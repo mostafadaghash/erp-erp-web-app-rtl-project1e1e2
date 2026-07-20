@@ -117,7 +117,7 @@ export function NewInvoicePage({ onNavigate }: NewInvoicePageProps) {
       toast.success("تم إنشاء الفاتورة بنجاح");
       onNavigate("invoices");
     } catch (err) {
-      toast.error("حدث خطأ أثناء إنشاء الفاتورة");
+      toast.error(err instanceof Error ? err.message : "حدث خطأ أثناء إنشاء الفاتورة");
     }
   };
 
