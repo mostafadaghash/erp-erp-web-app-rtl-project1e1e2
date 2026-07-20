@@ -4,14 +4,19 @@ import { api } from "../../convex/_generated/api";
 import { usePermission } from "../lib/access";
 import { toast } from "sonner";
 import { Truck, Plus, Search, Phone, Mail } from "lucide-react";
+import { getErrorMessage } from "../lib/errors";
+import type { Id } from "../../convex/_generated/dataModel";
 
 export function SuppliersPage() {
   const canCreate = usePermission("create_suppliers");
+  const canEdit = usePermission("edit_suppliers");
   const suppliers = useQuery(api.suppliers.list) ?? [];
   const createSupplier = useMutation(api.suppliers.create);
+  const setSupplierActive = useMutation(api.suppliers.setActive);
 
   const [search, setSearch] = useState("");
   const [showForm, setShowForm] = useState(false);
+  const [updatingId, setUpdatingId] = useState<Id<"suppliers"> | null>(null);
   const [form, setForm] = useState({ name: "", phone: "", email: "", address: "", notes: "" });
 
   const filtered = suppliers.filter(s =>
@@ -32,8 +37,24 @@ export function SuppliersPage() {
       toast.success("تم إضافة المورد بنجاح");
       setShowForm(false);
       setForm({ name: "", phone: "", email: "", address: "", notes: "" });
-    } catch (err) {
-      toast.error("حدث خطأ");
+    } catch (error) {
+      toast.error(getErrorMessage(error, "تعذر إضافة المورد"));
+    }
+  };
+
+  const handleSetActive = async (id: Id<"suppliers">, name: string, isActive: boolean) => {
+    const message = isActive
+      ? `هل تريد إعادة تفعيل المورد ${name}؟`
+      : `هل تريد تعطيل المورد ${name}؟ لن يظهر المورد المعطل في المنتجات أو الشحنات الجديدة.`;
+    if (updatingId || !window.confirm(message)) return;
+    setUpdatingId(id);
+    try {
+      await setSupplierActive({ id, isActive });
+      toast.success(isActive ? "تمت إعادة تفعيل المورد" : "تم تعطيل المورد");
+    } catch (error) {
+      toast.error(getErrorMessage(error, "تعذر تحديث حالة المورد"));
+    } finally {
+      setUpdatingId(null);
     }
   };
 
@@ -60,19 +81,21 @@ export function SuppliersPage() {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {filtered.map(s => (
-          <div key={s._id} className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 hover:shadow-md transition-all">
+          <div key={s._id} className={`rounded-2xl border border-slate-100 bg-white p-5 shadow-sm transition-all hover:shadow-md ${s.isActive === false ? "opacity-70 grayscale-[25%]" : ""}`}>
             <div className="flex items-center gap-3 mb-3">
               <div className="w-10 h-10 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-full flex items-center justify-center flex-shrink-0">
                 <Truck className="w-5 h-5 text-white" />
               </div>
               <div>
                 <p className="font-bold text-slate-800">{s.name}</p>
+                <span className={`badge ${s.isActive === false ? "badge-danger" : "badge-success"}`}>{s.isActive === false ? "معطل" : "نشط"}</span>
                 <p className="text-xs text-slate-500 flex items-center gap-1">
                   <Phone className="w-3 h-3" />
                   {s.phone}
                 </p>
               </div>
             </div>
+            {canEdit && <button disabled={updatingId !== null} onClick={() => void handleSetActive(s._id, s.name, s.isActive === false)} className={`mt-3 w-full rounded-lg px-3 py-2 text-xs font-bold ${s.isActive === false ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-800"}`}>{updatingId === s._id ? "جارٍ التحديث..." : s.isActive === false ? "إعادة تفعيل المورد" : "تعطيل المورد"}</button>}
             {s.email && (
               <p className="text-xs text-slate-500 flex items-center gap-1 mb-1">
                 <Mail className="w-3 h-3" />

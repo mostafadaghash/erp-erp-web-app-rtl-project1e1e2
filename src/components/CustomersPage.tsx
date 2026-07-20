@@ -4,14 +4,19 @@ import { api } from "../../convex/_generated/api";
 import { usePermission } from "../lib/access";
 import { toast } from "sonner";
 import { Users, Plus, Search, Phone, Mail, MapPin } from "lucide-react";
+import { getErrorMessage } from "../lib/errors";
+import type { Id } from "../../convex/_generated/dataModel";
 
 export function CustomersPage() {
   const canCreate = usePermission("create_customers");
+  const canEdit = usePermission("edit_customers");
   const customers = useQuery(api.customers.list) ?? [];
   const createCustomer = useMutation(api.customers.create);
+  const setCustomerActive = useMutation(api.customers.setActive);
 
   const [search, setSearch] = useState("");
   const [showForm, setShowForm] = useState(false);
+  const [updatingId, setUpdatingId] = useState<Id<"customers"> | null>(null);
   const [form, setForm] = useState({ name: "", phone: "", email: "", address: "", notes: "" });
 
   const filtered = customers.filter(c =>
@@ -32,8 +37,24 @@ export function CustomersPage() {
       toast.success("تم إضافة العميل بنجاح");
       setShowForm(false);
       setForm({ name: "", phone: "", email: "", address: "", notes: "" });
-    } catch (err) {
-      toast.error("حدث خطأ أثناء إضافة العميل");
+    } catch (error) {
+      toast.error(getErrorMessage(error, "تعذر إضافة العميل"));
+    }
+  };
+
+  const handleSetActive = async (id: Id<"customers">, name: string, isActive: boolean) => {
+    const message = isActive
+      ? `هل تريد إعادة تفعيل العميل ${name}؟ سيظهر مجددًا في المعاملات الجديدة.`
+      : `هل تريد تعطيل العميل ${name}؟ ستظل المستندات القديمة محفوظة، ولن يظهر العميل في المعاملات الجديدة.`;
+    if (updatingId || !window.confirm(message)) return;
+    setUpdatingId(id);
+    try {
+      await setCustomerActive({ id, isActive });
+      toast.success(isActive ? "تمت إعادة تفعيل العميل" : "تم تعطيل العميل");
+    } catch (error) {
+      toast.error(getErrorMessage(error, "تعذر تحديث حالة العميل"));
+    } finally {
+      setUpdatingId(null);
     }
   };
 
@@ -87,7 +108,7 @@ export function CustomersPage() {
       {/* Cards Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {filtered.map((c) => (
-          <div key={c._id} className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 hover:shadow-md transition-all">
+          <div key={c._id} className={`rounded-2xl border border-slate-100 bg-white p-5 shadow-sm transition-all hover:shadow-md ${c.isActive === false ? "opacity-70 grayscale-[25%]" : ""}`}>
             <div className="flex items-start justify-between mb-3">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full flex items-center justify-center flex-shrink-0">
@@ -95,6 +116,7 @@ export function CustomersPage() {
                 </div>
                 <div>
                   <p className="font-bold text-slate-800">{c.name}</p>
+                  <span className={`badge ${c.isActive === false ? "badge-danger" : "badge-success"}`}>{c.isActive === false ? "معطل" : "نشط"}</span>
                   <p className="text-xs text-slate-500 flex items-center gap-1">
                     <Phone className="w-3 h-3" />
                     {c.phone}
@@ -129,6 +151,7 @@ export function CustomersPage() {
                 </div>
               )}
             </div>
+            {canEdit && <button disabled={updatingId !== null} onClick={() => void handleSetActive(c._id, c.name, c.isActive === false)} className={`mt-3 w-full rounded-lg px-3 py-2 text-xs font-bold ${c.isActive === false ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-800"}`}>{updatingId === c._id ? "جارٍ التحديث..." : c.isActive === false ? "إعادة تفعيل العميل" : "تعطيل العميل"}</button>}
           </div>
         ))}
         {filtered.length === 0 && (

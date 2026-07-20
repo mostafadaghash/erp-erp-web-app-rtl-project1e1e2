@@ -10,6 +10,7 @@ import {
   DELIVERY_TRANSITIONS,
   calculateDeliveryAmounts,
   isValidIsoDate,
+  isRepairStatus,
 } from "../shared/businessRules.ts";
 import { formatDocumentNumber, nextValueAfterLegacy } from "../convex/lib/documentNumbers.ts";
 import { normalizeEgyptPhoneForWhatsApp } from "../src/lib/utils.ts";
@@ -35,6 +36,16 @@ test("repair and delivery state machines enforce terminal states", () => {
   assert.equal(canTransition(REPAIR_TRANSITIONS, "delivered", "ready"), false);
   assert.equal(canTransition(DELIVERY_TRANSITIONS, "shipped", "returned"), true);
   assert.equal(canTransition(DELIVERY_TRANSITIONS, "cancelled", "pending"), false);
+});
+
+test("repair transitions expose only approved next states", () => {
+  assert.deepEqual(REPAIR_TRANSITIONS.received, ["in_progress", "cancelled"]);
+  assert.deepEqual(REPAIR_TRANSITIONS.in_progress, ["ready", "cancelled"]);
+  assert.deepEqual(REPAIR_TRANSITIONS.ready, ["delivered", "cancelled"]);
+  assert.deepEqual(REPAIR_TRANSITIONS.delivered, []);
+  assert.deepEqual(REPAIR_TRANSITIONS.cancelled, []);
+  assert.equal(isRepairStatus("ready"), true);
+  assert.equal(isRepairStatus("unknown"), false);
 });
 
 test("delivery totals are calculated and rounded on the server", () => {

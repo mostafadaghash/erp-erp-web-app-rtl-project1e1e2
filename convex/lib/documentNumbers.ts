@@ -22,13 +22,25 @@ export function nextValueAfterLegacy(type: DocumentType, year: number, numbers: 
   }, 0) + 1;
 }
 
-async function existingNumbers(ctx: MutationCtx, type: DocumentType): Promise<string[]> {
+async function legacyNumbersForYear(ctx: MutationCtx, type: DocumentType, year: number): Promise<string[]> {
+  const lower = `${config[type].prefix}-${year}-`;
+  const upper = `${config[type].prefix}-${year}.`;
   switch (type) {
-    case "invoice": return (await ctx.db.query("invoices").collect()).map(x => x.invoiceNumber);
-    case "order": return (await ctx.db.query("orders").collect()).map(x => x.orderNumber);
-    case "shipment": return (await ctx.db.query("shipments").collect()).map(x => x.shipmentNumber);
-    case "repair": return (await ctx.db.query("repairs").collect()).map(x => x.repairNumber);
-    case "delivery": return (await ctx.db.query("deliveries").collect()).map(x => x.deliveryNumber);
+    case "invoice": return (await ctx.db.query("invoices").withIndex("by_invoice_number", q => q.gte("invoiceNumber", lower).lt("invoiceNumber", upper)).collect()).map(x => x.invoiceNumber);
+    case "order": return (await ctx.db.query("orders").withIndex("by_order_number", q => q.gte("orderNumber", lower).lt("orderNumber", upper)).collect()).map(x => x.orderNumber);
+    case "shipment": return (await ctx.db.query("shipments").withIndex("by_shipment_number", q => q.gte("shipmentNumber", lower).lt("shipmentNumber", upper)).collect()).map(x => x.shipmentNumber);
+    case "repair": return (await ctx.db.query("repairs").withIndex("by_repair_number", q => q.gte("repairNumber", lower).lt("repairNumber", upper)).collect()).map(x => x.repairNumber);
+    case "delivery": return (await ctx.db.query("deliveries").withIndex("by_delivery_number", q => q.gte("deliveryNumber", lower).lt("deliveryNumber", upper)).collect()).map(x => x.deliveryNumber);
+  }
+}
+
+export async function documentNumberExists(ctx: MutationCtx, type: DocumentType, number: string): Promise<boolean> {
+  switch (type) {
+    case "invoice": return (await ctx.db.query("invoices").withIndex("by_invoice_number", q => q.eq("invoiceNumber", number)).first()) !== null;
+    case "order": return (await ctx.db.query("orders").withIndex("by_order_number", q => q.eq("orderNumber", number)).first()) !== null;
+    case "shipment": return (await ctx.db.query("shipments").withIndex("by_shipment_number", q => q.eq("shipmentNumber", number)).first()) !== null;
+    case "repair": return (await ctx.db.query("repairs").withIndex("by_repair_number", q => q.eq("repairNumber", number)).first()) !== null;
+    case "delivery": return (await ctx.db.query("deliveries").withIndex("by_delivery_number", q => q.eq("deliveryNumber", number)).first()) !== null;
   }
 }
 
@@ -38,16 +50,15 @@ export async function nextDocumentNumber(ctx: MutationCtx, type: DocumentType, n
   const { prefix } = config[type];
   const key = `${type}:${year}`;
   const counter = await ctx.db.query("documentCounters").withIndex("by_key", q => q.eq("key", key)).unique();
-  const numbers = await existingNumbers(ctx, type);
-  let value = Math.max(counter?.nextValue ?? 1, nextValueAfterLegacy(type, year, numbers));
+  const numbers = counter ? [] : await legacyNumbersForYear(ctx, type, year);
+  let value = counter?.nextValue ?? nextValueAfterLegacy(type, year, numbers);
   let documentNumber = formatDocumentNumber(type, year, value);
-  const occupied = new Set(numbers);
-  while (occupied.has(documentNumber)) {
+  while (await documentNumberExists(ctx, type, documentNumber)) {
     value += 1;
     documentNumber = formatDocumentNumber(type, year, value);
   }
   if (counter) await ctx.db.patch(counter._id, { nextValue: value + 1, updatedAt: Date.now() });
   else await ctx.db.insert("documentCounters", { key, documentType: type, year, nextValue: value + 1, updatedAt: Date.now() });
-  if (occupied.has(documentNumber)) throw new ConvexError("تعذر إنشاء رقم مستند فريد");
+  if (await documentNumberExists(ctx, type, documentNumber)) throw new ConvexError("تعذر إنشاء رقم مستند فريد");
   return documentNumber;
 }
