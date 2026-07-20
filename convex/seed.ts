@@ -15,11 +15,11 @@ export const seedDemo = mutation({
       storeType: "electronics",
       primaryColor: "#6366f1",
       secondaryColor: "#8b5cf6",
-      currency: "ريال",
-      taxRate: 15,
-      phone: "0501234567",
-      address: "الرياض، حي العليا",
-      whatsappNumber: "966501234567",
+      currency: "EGP",
+      taxRate: 14,
+      phone: "01012345678",
+      address: "القاهرة، مدينة نصر",
+      whatsappNumber: "201012345678",
     });
 
     // Categories
@@ -31,14 +31,14 @@ export const seedDemo = mutation({
     // Suppliers
     const sup1 = await ctx.db.insert("suppliers", {
       name: "شركة التقنية المتقدمة",
-      phone: "0112345678",
-      email: "info@techco.sa",
-      address: "الرياض",
+      phone: "01112345678",
+      email: "info@techco.eg",
+      address: "القاهرة",
       balance: 5000,
     });
     const sup2 = await ctx.db.insert("suppliers", {
       name: "مستودع الإلكترونيات",
-      phone: "0123456789",
+      phone: "01212345678",
       balance: 0,
     });
 
@@ -111,22 +111,22 @@ export const seedDemo = mutation({
 
     // Customers
     const cust1 = await ctx.db.insert("customers", {
-      name: "أحمد محمد العمري",
-      phone: "0501234567",
+      name: "أحمد محمد السيد",
+      phone: "01012345678",
       email: "ahmed@email.com",
-      address: "الرياض",
+      address: "القاهرة",
       balance: 500,
       totalPurchases: 8500,
     });
     const cust2 = await ctx.db.insert("customers", {
-      name: "سارة عبدالله الزهراني",
-      phone: "0559876543",
+      name: "سارة عبدالله حسن",
+      phone: "01123456789",
       balance: 0,
       totalPurchases: 5200,
     });
     const cust3 = await ctx.db.insert("customers", {
-      name: "محمد خالد الشمري",
-      phone: "0531122334",
+      name: "محمد خالد إبراهيم",
+      phone: "01234567890",
       balance: 1200,
       totalPurchases: 12000,
     });
@@ -136,7 +136,7 @@ export const seedDemo = mutation({
       invoiceNumber: "INV-00001",
       customerId: cust1,
       customerName: "أحمد محمد العمري",
-      customerPhone: "0501234567",
+      customerPhone: "01012345678",
       items: [{
         productId: prod1,
         productName: "لابتوب Dell XPS 15",
@@ -159,7 +159,7 @@ export const seedDemo = mutation({
       invoiceNumber: "INV-00002",
       customerId: cust2,
       customerName: "سارة عبدالله الزهراني",
-      customerPhone: "0559876543",
+      customerPhone: "01123456789",
       items: [{
         productId: prod2,
         productName: "iPhone 15 Pro Max",
@@ -184,7 +184,7 @@ export const seedDemo = mutation({
       repairNumber: "REP-00001",
       customerId: cust1,
       customerName: "أحمد محمد العمري",
-      customerPhone: "0501234567",
+      customerPhone: "01012345678",
       deviceType: "لابتوب",
       deviceBrand: "Dell",
       deviceModel: "XPS 13",
@@ -203,7 +203,7 @@ export const seedDemo = mutation({
     await ctx.db.insert("repairs", {
       repairNumber: "REP-00002",
       customerName: "خالد السعيد",
-      customerPhone: "0567891234",
+      customerPhone: "01512345678",
       deviceType: "موبايل",
       deviceBrand: "Samsung",
       deviceModel: "Galaxy S23",
