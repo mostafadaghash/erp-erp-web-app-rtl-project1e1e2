@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useQuery } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { Sidebar } from "./Sidebar";
 import { Dashboard } from "./Dashboard";
@@ -23,6 +23,8 @@ import { Menu } from "lucide-react";
 import { ShieldX } from "lucide-react";
 import type { Permission } from "../../convex/lib/permissions";
 import { PermissionProvider } from "../lib/access";
+import type { Id } from "../../convex/_generated/dataModel";
+import { toast } from "sonner";
 
 export type Page =
   | "dashboard"
@@ -62,6 +64,21 @@ const PAGE_PERMISSIONS: Partial<Record<Page, Permission>> = {
   "audit-logs": "view_audit_logs",
 };
 
+const PAGE_MODULES: Partial<Record<Page, string>> = {
+  invoices: "invoices",
+  "new-invoice": "invoices",
+  orders: "orders",
+  deliveries: "deliveries",
+  repairs: "repairs",
+  expenses: "expenses",
+  suppliers: "suppliers",
+  shipments: "shipments",
+  branches: "branches",
+  employees: "employees",
+  crm: "crm",
+  reports: "reports",
+};
+
 export function ERPApp() {
   const [currentPage, setCurrentPage] = useState<Page>("dashboard");
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -71,9 +88,31 @@ export function ERPApp() {
   const storeName = settings?.storeName ?? "تك ستور ERP";
   const permissions = me?.permissions ?? [];
   const can = (permission: Permission) => permissions.includes(permission);
+  const modules = (settings?.modules ?? {}) as Record<string, boolean | undefined>;
+  const isModuleEnabled = (page: Page) => {
+    const moduleName = PAGE_MODULES[page];
+    return !moduleName || modules[moduleName] !== false;
+  };
   const canAccessPage = (page: Page) => {
     const required = PAGE_PERMISSIONS[page];
-    return !required || can(required);
+    return isModuleEnabled(page) && (!required || can(required));
+  };
+  const canSelectWorkingBranch =
+    settings !== undefined &&
+    me?.role === "admin" &&
+    can("manage_branches") &&
+    modules.branches !== false;
+  const branches = useQuery(api.branches.list, canSelectWorkingBranch ? {} : "skip");
+  const setWorkingBranch = useMutation(api.employees.setWorkingBranch);
+
+  const handleWorkingBranchChange = async (branchId: string) => {
+    if (!branchId) return;
+    try {
+      await setWorkingBranch({ branchId: branchId as Id<"branches"> });
+      toast.success("تم تغيير فرع العمل");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "تعذر تغيير فرع العمل");
+    }
   };
 
   const navigate = (page: Page) => {
@@ -136,7 +175,20 @@ export function ERPApp() {
             </div>
           </div>
           <div className="flex items-center gap-3">
-            {can("create_invoices") && <button
+            {canSelectWorkingBranch && (
+              <select
+                className={`hidden md:block text-xs rounded-lg border px-2.5 py-2 bg-white ${me.branchId ? "border-slate-200 text-slate-600" : "border-amber-300 text-amber-700"}`}
+                value={me.branchId ?? ""}
+                onChange={(event) => void handleWorkingBranchChange(event.target.value)}
+                aria-label="فرع العمل الحالي"
+              >
+                <option value="" disabled>اختر فرع العمل</option>
+                {(branches ?? []).filter((branch) => branch.isActive).map((branch) => (
+                  <option key={branch._id} value={branch._id}>{branch.name}</option>
+                ))}
+              </select>
+            )}
+            {can("create_invoices") && isModuleEnabled("invoices") && <button
               onClick={() => navigate("new-invoice")}
               className="btn-primary hidden sm:flex items-center gap-2"
             >
@@ -166,7 +218,7 @@ export function ERPApp() {
                 </div>
               </div>
             )}
-            {authorized && currentPage === "dashboard"   && <Dashboard onNavigate={navigate} permissions={permissions} />}
+            {authorized && currentPage === "dashboard"   && <Dashboard onNavigate={navigate} permissions={permissions} modules={modules} />}
             {authorized && currentPage === "products"    && <ProductsPage />}
             {authorized && currentPage === "customers"   && <CustomersPage />}
             {authorized && currentPage === "invoices"    && <InvoicesPage onNavigate={navigate} />}
