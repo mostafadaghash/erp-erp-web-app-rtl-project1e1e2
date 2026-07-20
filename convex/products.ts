@@ -11,7 +11,7 @@ export const list = query({
     lowStock: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
-    const user = await requireAuth(ctx);
+    const user = await requirePermission(ctx, "view_products");
     let products = await ctx.db.query("products").collect();
     // Branch isolation
     if (user.role !== "admin" && user.branchId) {
@@ -41,7 +41,7 @@ export const list = query({
 export const get = query({
   args: { id: v.id("products") },
   handler: async (ctx, args) => {
-    await requireAuth(ctx);
+    await requirePermission(ctx, "view_products");
     return await ctx.db.get(args.id);
   },
 });
@@ -49,7 +49,7 @@ export const get = query({
 export const categories = query({
   args: {},
   handler: async (ctx) => {
-    await requireAuth(ctx);
+    await requirePermission(ctx, "view_products");
     const all = await ctx.db.query("products").collect();
     const cats = new Set<string>();
     for (const p of all) {
@@ -175,7 +175,7 @@ export const adjustStock = mutation({
 export const stats = query({
   args: {},
   handler: async (ctx) => {
-    const user = await requireAuth(ctx);
+    const user = await requirePermission(ctx, "view_products");
     let products = await ctx.db.query("products").collect();
     if (user.role !== "admin" && user.branchId) {
       products = products.filter(p => !p.branchId || p.branchId === user.branchId);
