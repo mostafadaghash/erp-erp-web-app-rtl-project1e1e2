@@ -1,7 +1,7 @@
 import { query, mutation } from "./_generated/server";
 import { v, ConvexError } from "convex/values";
 import { requireAuth, requirePermission, logAction, hasAdmin, getAuthProfile } from "./lib/auth";
-import { ROLES, ROLE_PERMISSIONS } from "./lib/permissions";
+import { ROLES, ROLE_PERMISSIONS, isPermission } from "./lib/permissions";
 import { INVITE_TTL_MS, isValidEmail, normalizeEmail } from "./lib/identity";
 
 // Re-export for frontend convenience
@@ -128,7 +128,7 @@ export const accessState = query({
 export const list = query({
   args: { branchId: v.optional(v.id("branches")) },
   handler: async (ctx, args) => {
-    const user = await requireAuth(ctx);
+    const user = await requirePermission(ctx, "view_employees");
     const employees = await ctx.db.query("userProfiles").collect();
     // Non-admins can only see employees in their branch
     let filtered = employees;
@@ -145,7 +145,7 @@ export const list = query({
 export const get = query({
   args: { id: v.id("userProfiles") },
   handler: async (ctx, args) => {
-    await requireAuth(ctx);
+    await requirePermission(ctx, "view_employees");
     return await ctx.db.get(args.id);
   },
 });
@@ -153,7 +153,7 @@ export const get = query({
 export const getByUserId = query({
   args: { userId: v.string() },
   handler: async (ctx, args) => {
-    await requireAuth(ctx);
+    await requirePermission(ctx, "view_employees");
     return await ctx.db.query("userProfiles")
       .withIndex("by_user", q => q.eq("userId", args.userId))
       .first();
@@ -163,7 +163,7 @@ export const getByUserId = query({
 export const stats = query({
   args: {},
   handler: async (ctx) => {
-    await requireAuth(ctx);
+    await requirePermission(ctx, "view_employees");
     const all = await ctx.db.query("userProfiles").collect();
     const byRole: Record<string, number> = {};
     for (const e of all) {
@@ -174,6 +174,20 @@ export const stats = query({
       active: all.filter(e => e.isActive).length,
       inactive: all.filter(e => !e.isActive).length,
       byRole,
+    };
+  },
+});
+
+export const me = query({
+  args: {},
+  handler: async (ctx) => {
+    const user = await requireAuth(ctx);
+    return {
+      id: user.employeeId,
+      name: user.name,
+      role: user.role,
+      branchId: user.branchId,
+      permissions: user.permissions,
     };
   },
 });
@@ -190,6 +204,7 @@ export const create = mutation({
   },
   handler: async (ctx, args) => {
     const user = await requirePermission(ctx, "manage_users");
+    if (!(args.role in ROLES)) throw new ConvexError("الدور الوظيفي غير صالح");
     const email = normalizeEmail(args.email);
     if (!isValidEmail(email)) {
       throw new ConvexError("البريد الإلكتروني غير صالح");
@@ -201,7 +216,11 @@ export const create = mutation({
     if (duplicate) {
       throw new ConvexError("يوجد موظف مسجل بهذا البريد الإلكتروني");
     }
-    const permissions = args.permissions ?? ROLE_PERMISSIONS[args.role] ?? [];
+    const requestedPermissions = args.permissions ?? ROLE_PERMISSIONS[args.role] ?? [];
+    if (requestedPermissions.some((permission) => !isPermission(permission))) {
+      throw new ConvexError("توجد صلاحية غير معروفة");
+    }
+    const permissions = requestedPermissions.filter(isPermission);
     const id = await ctx.db.insert("userProfiles", {
       userId: `pending:${email}`,
       name: args.name,
@@ -237,6 +256,10 @@ export const update = mutation({
   },
   handler: async (ctx, args) => {
     const user = await requirePermission(ctx, "manage_users");
+    if (!(args.role in ROLES)) throw new ConvexError("الدور الوظيفي غير صالح");
+    if (args.permissions.some((permission) => !isPermission(permission))) {
+      throw new ConvexError("توجد صلاحية غير معروفة");
+    }
     const { id } = args;
     const emp = await ctx.db.get(id);
     if (!emp) throw new ConvexError("الموظف غير موجود");
@@ -275,7 +298,7 @@ export const update = mutation({
       phone: args.phone,
       role: args.role,
       branchId: args.branchId,
-      permissions: args.permissions,
+      permissions: args.permissions.filter(isPermission),
       isActive: args.isActive,
     });
     await logAction(ctx, user, {
@@ -385,9 +408,12 @@ export const updatePermissions = mutation({
   },
   handler: async (ctx, args) => {
     const user = await requirePermission(ctx, "manage_users");
+    if (args.permissions.some((permission) => !isPermission(permission))) {
+      throw new ConvexError("توجد صلاحية غير معروفة");
+    }
     const emp = await ctx.db.get(args.id);
     if (!emp) throw new ConvexError("الموظف غير موجود");
-    await ctx.db.patch(args.id, { permissions: args.permissions });
+    await ctx.db.patch(args.id, { permissions: args.permissions.filter(isPermission) });
     await logAction(ctx, user, {
       action: "update",
       module: "employees",
