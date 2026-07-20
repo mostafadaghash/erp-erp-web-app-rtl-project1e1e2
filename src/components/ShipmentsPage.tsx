@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
+import { usePermission } from "../lib/access";
 import { toast } from "sonner";
 import { Id } from "../../convex/_generated/dataModel";
 import {
@@ -31,6 +32,9 @@ interface ShipItem {
 const emptyItem = (): ShipItem => ({ productName: "", quantity: 1, unitCost: 0, total: 0 });
 
 export function ShipmentsPage() {
+  const canCreate = usePermission("create_shipments");
+  const canEdit = usePermission("edit_shipments");
+  const canDelete = usePermission("delete_shipments");
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [search, setSearch] = useState("");
   const [showForm, setShowForm] = useState(false);
@@ -80,10 +84,10 @@ export function ShipmentsPage() {
           </h1>
           <p className="text-slate-500 text-sm mt-0.5">تتبع طلبات الشراء من الموردين</p>
         </div>
-        <button onClick={() => setShowForm(true)} className="btn-primary flex items-center gap-2">
+        {canCreate && <button onClick={() => setShowForm(true)} className="btn-primary flex items-center gap-2">
           <Plus className="w-4 h-4" />
           شحنة جديدة
-        </button>
+        </button>}
       </div>
 
       {/* Stats */}
@@ -216,7 +220,7 @@ export function ShipmentsPage() {
                       </td>
                       <td>
                         <div className="flex items-center gap-1.5">
-                          {nextStatus && shipment.status !== "cancelled" && (
+                          {canEdit && nextStatus && shipment.status !== "cancelled" && (
                             <button
                               onClick={() => handleStatusChange(shipment._id, nextStatus)}
                               className={`px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors whitespace-nowrap ${
@@ -228,7 +232,7 @@ export function ShipmentsPage() {
                               {nextStatus === "arrived" ? "استلام الشحنة" : statusConfig[nextStatus].label}
                             </button>
                           )}
-                          {shipment.status !== "arrived" && shipment.status !== "cancelled" && (
+                          {canEdit && shipment.status !== "arrived" && shipment.status !== "cancelled" && (
                             <button
                               onClick={() => handleStatusChange(shipment._id, "cancelled")}
                               className="p-1.5 bg-slate-50 text-slate-400 rounded-lg hover:bg-red-50 hover:text-red-500 transition-colors"
@@ -237,13 +241,13 @@ export function ShipmentsPage() {
                               <XCircle className="w-3.5 h-3.5" />
                             </button>
                           )}
-                          <button
+                          {canDelete && <button
                             onClick={() => handleDelete(shipment._id)}
                             className="p-1.5 bg-slate-50 text-slate-400 rounded-lg hover:bg-red-50 hover:text-red-500 transition-colors"
                             title="حذف"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
-                          </button>
+                          </button>}
                         </div>
                       </td>
                     </tr>

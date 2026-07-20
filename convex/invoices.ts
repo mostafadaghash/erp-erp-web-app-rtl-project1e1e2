@@ -10,7 +10,7 @@ export const list = query({
     branchId: v.optional(v.id("branches")),
   },
   handler: async (ctx, args) => {
-    const user = await requireAuth(ctx);
+    const user = await requirePermission(ctx, "view_invoices");
     let invoices = await ctx.db.query("invoices").collect();
     // Branch isolation
     if (user.role !== "admin" && user.branchId) {
@@ -32,7 +32,7 @@ export const list = query({
 export const get = query({
   args: { id: v.id("invoices") },
   handler: async (ctx, args) => {
-    await requireAuth(ctx);
+    await requirePermission(ctx, "view_invoices");
     return await ctx.db.get(args.id);
   },
 });
@@ -217,7 +217,7 @@ export const remove = mutation({
 export const stats = query({
   args: {},
   handler: async (ctx) => {
-    const user = await requireAuth(ctx);
+    const user = await requirePermission(ctx, "view_invoices");
     let invoices = await ctx.db.query("invoices").collect();
     if (user.role !== "admin" && user.branchId) {
       invoices = invoices.filter(i => !i.branchId || i.branchId === user.branchId);

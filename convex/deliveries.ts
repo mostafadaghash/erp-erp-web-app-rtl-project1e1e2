@@ -9,7 +9,7 @@ export const list = query({
     city: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const user = await requireAuth(ctx);
+    const user = await requirePermission(ctx, "view_deliveries");
     let deliveries;
     if (args.status) {
       deliveries = await ctx.db
@@ -31,7 +31,7 @@ export const list = query({
 export const get = query({
   args: { id: v.id("deliveries") },
   handler: async (ctx, args) => {
-    await requireAuth(ctx);
+    await requirePermission(ctx, "view_deliveries");
     return await ctx.db.get(args.id);
   },
 });
@@ -157,7 +157,7 @@ export const remove = mutation({
 export const getStats = query({
   args: {},
   handler: async (ctx) => {
-    const user = await requireAuth(ctx);
+    const user = await requirePermission(ctx, "view_deliveries");
     const all = await ctx.db.query("deliveries").collect();
     const d = filterByBranch(all, user);
     const pending   = d.filter(x => x.status === "pending").length;

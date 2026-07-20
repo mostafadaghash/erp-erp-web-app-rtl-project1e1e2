@@ -6,7 +6,7 @@ import { QueryCtx, MutationCtx } from "../_generated/server";
 import { Id } from "../_generated/dataModel";
 import { ConvexError } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
-import { ROLE_PERMISSIONS, Permission } from "./permissions";
+import { PERMISSIONS, ROLE_PERMISSIONS, Permission } from "./permissions";
 
 // ──────────────────────────────────────────────
 // Types
@@ -18,6 +18,7 @@ export interface AuthUser {
   role: string;
   branchId?: Id<"branches">;
   isActive: boolean;
+  permissions: Permission[];
 }
 
 // ──────────────────────────────────────────────
@@ -56,6 +57,18 @@ export async function getAuthUser(
   const resolved = await getAuthProfile(ctx);
   if (!resolved?.profile) return null;
   const employee = resolved.profile;
+  const storedPermissions = employee.permissions ?? [];
+  const hasLegacyPermission = storedPermissions.some(
+    (permission) => !PERMISSIONS.includes(permission as Permission),
+  );
+  const effectivePermissions =
+    employee.role === "admin" || hasLegacyPermission || storedPermissions.length === 0
+      ? (ROLE_PERMISSIONS[employee.role] ?? []).filter((permission) =>
+          PERMISSIONS.includes(permission as Permission),
+        ) as Permission[]
+      : storedPermissions.filter((permission) =>
+          PERMISSIONS.includes(permission as Permission),
+        ) as Permission[];
 
   return {
     userId: resolved.authUserId,
@@ -64,6 +77,7 @@ export async function getAuthUser(
     role: employee.role,
     branchId: employee.branchId ?? undefined,
     isActive: employee.isActive,
+    permissions: effectivePermissions,
   };
 }
 
@@ -92,11 +106,14 @@ export async function requirePermission(
 ): Promise<AuthUser> {
   const user = await requireAuth(ctx);
 
-  const allowed = ROLE_PERMISSIONS[user.role] ?? [];
-  if (!allowed.includes(permission)) {
+  if (!user.permissions.includes(permission)) {
     throw new Error(`ليس لديك صلاحية: ${permission}`);
   }
   return user;
+}
+
+export function hasPermission(user: AuthUser, permission: Permission): boolean {
+  return user.permissions.includes(permission);
 }
 
 // ──────────────────────────────────────────────

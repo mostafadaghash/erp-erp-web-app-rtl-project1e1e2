@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
+import { usePermission } from "../lib/access";
 import { toast } from "sonner";
 import { Id } from "../../convex/_generated/dataModel";
 import {
@@ -64,6 +65,9 @@ interface OrderItem {
 const emptyItem = (): OrderItem => ({ productName: "", quantity: 1, unitPrice: 0 });
 
 export function OrdersPage() {
+  const canCreate = usePermission("create_orders");
+  const canEdit = usePermission("edit_orders");
+  const canDelete = usePermission("delete_orders");
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [search, setSearch] = useState("");
   const [showForm, setShowForm] = useState(false);
@@ -131,10 +135,10 @@ export function OrdersPage() {
           </h1>
           <p className="text-slate-500 text-sm mt-0.5">إدارة طلبات العملاء المسبقة</p>
         </div>
-        <button onClick={() => setShowForm(true)} className="btn-primary flex items-center gap-2">
+        {canCreate && <button onClick={() => setShowForm(true)} className="btn-primary flex items-center gap-2">
           <Plus className="w-4 h-4" />
           أوردر جديد
-        </button>
+        </button>}
       </div>
 
       {/* Stats */}
@@ -274,7 +278,7 @@ export function OrdersPage() {
                       <td className="text-slate-500 text-xs">{order.expectedDate ?? "—"}</td>
                       <td>
                         <div className="flex items-center gap-1.5">
-                          {nextStatus && order.status !== "cancelled" && (
+                          {canEdit && nextStatus && order.status !== "cancelled" && (
                             <button
                               onClick={() => handleStatusChange(order._id, nextStatus)}
                               className="px-2.5 py-1.5 bg-indigo-50 text-indigo-600 rounded-lg text-xs font-medium hover:bg-indigo-100 transition-colors whitespace-nowrap"
@@ -282,7 +286,7 @@ export function OrdersPage() {
                               {statusConfig[nextStatus].label}
                             </button>
                           )}
-                          {order.remaining > 0 && order.status !== "cancelled" && (
+                          {canEdit && order.remaining > 0 && order.status !== "cancelled" && (
                             <button
                               onClick={() => { setShowPayment(order._id); setPaymentAmount(""); }}
                               className="p-1.5 bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-100 transition-colors"
@@ -311,7 +315,7 @@ export function OrdersPage() {
                               <MessageCircle className="w-3.5 h-3.5" />
                             </span>
                           )}
-                          {order.status !== "delivered" && (
+                          {canEdit && order.status !== "delivered" && (
                             <button
                               onClick={() => handleStatusChange(order._id, "cancelled")}
                               className="p-1.5 bg-slate-50 text-slate-400 rounded-lg hover:bg-red-50 hover:text-red-500 transition-colors"
@@ -327,13 +331,13 @@ export function OrdersPage() {
                           >
                             <Printer className="w-3.5 h-3.5" />
                           </button>
-                          <button
+                          {canDelete && <button
                             onClick={() => handleDelete(order._id)}
                             className="p-1.5 bg-slate-50 text-slate-400 rounded-lg hover:bg-red-50 hover:text-red-500 transition-colors"
                             title="حذف"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
-                          </button>
+                          </button>}
                         </div>
                       </td>
                     </tr>

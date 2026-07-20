@@ -1,10 +1,12 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
+import { usePermission } from "../lib/access";
 import { toast } from "sonner";
 import { Package, Plus, Search, AlertTriangle, Edit2, ToggleLeft } from "lucide-react";
 
 export function ProductsPage() {
+  const canCreate = usePermission("create_products");
   const products = useQuery(api.products.list, {}) ?? [];
   const categories = useQuery(api.categories.list) ?? [];
   const suppliers = useQuery(api.suppliers.list) ?? [];
@@ -68,10 +70,10 @@ export function ProductsPage() {
           </h1>
           <p className="text-slate-500 text-sm mt-0.5">{products.length} منتج</p>
         </div>
-        <button onClick={() => setShowForm(true)} className="btn-primary flex items-center gap-2">
+        {canCreate && <button onClick={() => setShowForm(true)} className="btn-primary flex items-center gap-2">
           <Plus className="w-4 h-4" />
           منتج جديد
-        </button>
+        </button>}
       </div>
 
       {/* Filters */}

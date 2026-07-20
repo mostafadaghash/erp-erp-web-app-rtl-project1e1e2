@@ -191,32 +191,6 @@ export function SignInForm() {
             </div>
           </form>
 
-          <div className="flex items-center justify-center my-6">
-            <hr className="grow" style={{ borderTop: '1px solid rgba(229, 231, 235, 0.7)' }} />
-            <span className="mx-4 text-sm" style={{ color: '#9CA3AF' }}>or</span>
-            <hr className="grow" style={{ borderTop: '1px solid rgba(229, 231, 235, 0.7)' }} />
-          </div>
-
-          <button
-            className="w-full px-4 py-3 rounded-lg font-medium transition-all duration-200"
-            style={{
-              background: '#FFFFFF',
-              color: '#374151',
-              border: '1px solid rgba(229, 231, 235, 0.7)',
-              boxShadow: '0 2px 4px rgba(0, 0, 0, 0.04)'
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = '#FAFAFA';
-              e.currentTarget.style.boxShadow = '0 4px 8px rgba(0, 0, 0, 0.08)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = '#FFFFFF';
-              e.currentTarget.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.04)';
-            }}
-            onClick={() => void signIn("anonymous")}
-          >
-            Continue as Guest
-          </button>
         </div>
       </div>
     </div>

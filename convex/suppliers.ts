@@ -5,7 +5,7 @@ import { requireAuth, requirePermission, logAction } from "./lib/auth";
 export const list = query({
   args: {},
   handler: async (ctx) => {
-    await requireAuth(ctx);
+    await requirePermission(ctx, "view_suppliers");
     return await ctx.db.query("suppliers").collect();
   },
 });
@@ -13,7 +13,7 @@ export const list = query({
 export const get = query({
   args: { id: v.id("suppliers") },
   handler: async (ctx, args) => {
-    await requireAuth(ctx);
+    await requirePermission(ctx, "view_suppliers");
     return await ctx.db.get(args.id);
   },
 });

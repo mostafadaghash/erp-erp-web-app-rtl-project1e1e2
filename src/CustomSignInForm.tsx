@@ -7,8 +7,7 @@ import { toast } from "sonner";
  * CustomSignInForm — Arabic RTL sign-in / sign-up form.
  *
  * - Uses Password provider ONLY.
- * - NO "Continue as Guest" button.
- * - NO signIn("anonymous") call.
+ * - Password authentication only; no guest flow.
  * - Sign Up is kept temporarily (will be disabled after first admin is created).
  * - Styled to blend inside the glassmorphism login card in App.tsx.
  */

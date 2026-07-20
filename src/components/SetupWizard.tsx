@@ -8,7 +8,7 @@ import { Shield, User, Phone, LogOut, Check } from "lucide-react";
 /**
  * Setup Wizard — shown when no admin exists in the system.
  * Guides the first user through:
- * 1. Sign in (via the locked SignInForm, shown first)
+ * 1. Sign in (via CustomSignInForm, shown first)
  * 2. Create admin profile (this form, shown after sign-in)
  */
 export function SetupWizard() {

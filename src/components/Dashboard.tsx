@@ -7,24 +7,33 @@ import {
   Clock, CheckCircle, UserPlus, Target, PhoneCall, Star
 } from "lucide-react";
 import { useCurrency } from "../lib/utils";
+import type { Permission } from "../../convex/lib/permissions";
 
 interface DashboardProps {
   onNavigate: (page: Page) => void;
+  permissions: Permission[];
 }
 
-export function Dashboard({ onNavigate }: DashboardProps) {
-  const invoiceStats = useQuery(api.invoices.stats);
-  const repairStats = useQuery(api.repairs.getStats);
-  const expenseStats = useQuery(api.expenses.getStats);
-  const lowStockProducts = useQuery(api.products.list, { lowStock: true });
-  const recentInvoices = useQuery(api.invoices.list, {});
-  const recentRepairs = useQuery(api.repairs.list, {});
-  const crmStats = useQuery(api.leads.stats);
+export function Dashboard({ onNavigate, permissions }: DashboardProps) {
+  const can = (permission: Permission) => permissions.includes(permission);
+  const canViewInvoices = can("view_invoices");
+  const canViewRepairs = can("view_repairs");
+  const canViewExpenses = can("view_expenses");
+  const canViewProducts = can("view_products");
+  const canViewLeads = can("view_leads");
+
+  const invoiceStats = useQuery(api.invoices.stats, canViewInvoices ? {} : "skip");
+  const repairStats = useQuery(api.repairs.getStats, canViewRepairs ? {} : "skip");
+  const expenseStats = useQuery(api.expenses.getStats, canViewExpenses ? {} : "skip");
+  const lowStockProducts = useQuery(api.products.list, canViewProducts ? { lowStock: true } : "skip");
+  const recentInvoices = useQuery(api.invoices.list, canViewInvoices ? {} : "skip");
+  const recentRepairs = useQuery(api.repairs.list, canViewRepairs ? {} : "skip");
+  const crmStats = useQuery(api.leads.stats, canViewLeads ? {} : "skip");
 
   const { formatCurrency, currency } = useCurrency();
 
   const statCards = [
-    {
+    ...(canViewInvoices ? [{
       title: "إجمالي المبيعات المدفوعة",
       value: formatCurrency(invoiceStats?.totalRevenue ?? 0),
       sub: `${invoiceStats?.paid ?? 0} فاتورة مدفوعة`,
@@ -50,8 +59,8 @@ export function Dashboard({ onNavigate }: DashboardProps) {
       color: "from-amber-500 to-amber-600",
       bg: "bg-amber-50",
       text: "text-amber-600",
-    },
-    {
+    }] : []),
+    ...(canViewExpenses ? [{
       title: "مصروفات الشهر",
       value: formatCurrency(expenseStats?.total ?? 0),
       sub: `${expenseStats?.count ?? 0} عملية`,
@@ -59,7 +68,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
       color: "from-red-500 to-red-600",
       bg: "bg-red-50",
       text: "text-red-600",
-    },
+    }] : []),
   ];
 
   const repairStatusCards = [
@@ -79,7 +88,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
             {new Date().toLocaleDateString("ar-SA", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
           </p>
         </div>
-        <button
+        {can("create_invoices") && <button
           onClick={() => onNavigate("new-invoice")}
           className="btn-primary flex items-center gap-2"
         >
@@ -87,11 +96,11 @@ export function Dashboard({ onNavigate }: DashboardProps) {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
           </svg>
           <span className="hidden sm:inline">فاتورة جديدة</span>
-        </button>
+        </button>}
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      {statCards.length > 0 && <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {statCards.map((card, i) => {
           const Icon = card.icon;
           return (
@@ -114,10 +123,10 @@ export function Dashboard({ onNavigate }: DashboardProps) {
             </div>
           );
         })}
-      </div>
+      </div>}
 
       {/* CRM Quick Stats */}
-      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
+      {canViewLeads && <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
         <div className="flex items-center justify-between mb-4">
           <h2 className="font-bold text-slate-800 flex items-center gap-2">
             <Target className="w-4 h-4 text-purple-500" />
@@ -164,11 +173,11 @@ export function Dashboard({ onNavigate }: DashboardProps) {
             </div>
           </div>
         )}
-      </div>
+      </div>}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      {(canViewInvoices || canViewRepairs || canViewProducts) && <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Recent Invoices */}
-        <div className="lg:col-span-2 bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+        {canViewInvoices && <div className="lg:col-span-2 bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
           <div className="flex items-center justify-between p-5 border-b border-slate-100">
             <h2 className="font-bold text-slate-800 flex items-center gap-2">
               <FileTextIcon />
@@ -212,12 +221,12 @@ export function Dashboard({ onNavigate }: DashboardProps) {
               </tbody>
             </table>
           </div>
-        </div>
+        </div>}
 
         {/* Right column */}
-        <div className="space-y-4">
+        {(canViewRepairs || canViewProducts) && <div className="space-y-4">
           {/* Repair Status */}
-          <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
+          {canViewRepairs && <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
             <div className="flex items-center justify-between mb-4">
               <h2 className="font-bold text-slate-800 flex items-center gap-2">
                 <Wrench className="w-4 h-4 text-slate-500" />
@@ -241,10 +250,10 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                 );
               })}
             </div>
-          </div>
+          </div>}
 
           {/* Low Stock Alert */}
-          {(lowStockProducts ?? []).length > 0 && (
+          {canViewProducts && (lowStockProducts ?? []).length > 0 && (
             <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5">
               <div className="flex items-center gap-2 mb-3">
                 <AlertTriangle className="w-4 h-4 text-amber-600" />
@@ -268,7 +277,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
           )}
 
           {/* Recent Repairs */}
-          <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
+          {canViewRepairs && <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
             <h2 className="font-bold text-slate-800 mb-3 flex items-center gap-2">
               <Wrench className="w-4 h-4 text-slate-500" />
               آخر طلبات الصيانة
@@ -292,9 +301,9 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                 </div>
               ))}
             </div>
-          </div>
-        </div>
-      </div>
+          </div>}
+        </div>}
+      </div>}
     </div>
   );
 }

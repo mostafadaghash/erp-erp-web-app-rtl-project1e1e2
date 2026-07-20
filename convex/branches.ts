@@ -1,11 +1,11 @@
 import { query, mutation } from "./_generated/server";
 import { v, ConvexError } from "convex/values";
-import { requireAuth, requireAdmin, logAction } from "./lib/auth";
+import { requireAuth, requireAdmin, requirePermission, logAction } from "./lib/auth";
 
 export const list = query({
   args: {},
   handler: async (ctx) => {
-    await requireAuth(ctx);
+    await requirePermission(ctx, "view_branches");
     return await ctx.db.query("branches").collect();
   },
 });
@@ -13,7 +13,7 @@ export const list = query({
 export const get = query({
   args: { id: v.id("branches") },
   handler: async (ctx, args) => {
-    await requireAuth(ctx);
+    await requirePermission(ctx, "view_branches");
     return await ctx.db.get(args.id);
   },
 });
@@ -94,7 +94,7 @@ export const remove = mutation({
 export const stats = query({
   args: {},
   handler: async (ctx) => {
-    await requireAuth(ctx);
+    await requirePermission(ctx, "view_branches");
     const branches = await ctx.db.query("branches").collect();
     const employees = await ctx.db.query("userProfiles").collect();
     return {

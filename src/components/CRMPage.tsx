@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
+import { usePermission } from "../lib/access";
 import { Id } from "../../convex/_generated/dataModel";
 import { toast } from "sonner";
 import {
@@ -60,6 +61,9 @@ const emptyLeadForm = (): LeadForm => ({
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export function CRMPage() {
+  const canCreate = usePermission("create_leads");
+  const canEdit = usePermission("edit_leads");
+  const canDelete = usePermission("delete_leads");
   const [view, setView] = useState<"kanban" | "list">("kanban");
   const [search, setSearch] = useState("");
   const [filterSource, setFilterSource] = useState("all");
@@ -198,9 +202,9 @@ export function CRMPage() {
             <button onClick={() => setView("kanban")} className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${view === "kanban" ? "bg-white shadow-sm text-slate-800" : "text-slate-500"}`}>كانبان</button>
             <button onClick={() => setView("list")} className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${view === "list" ? "bg-white shadow-sm text-slate-800" : "text-slate-500"}`}>قائمة</button>
           </div>
-          <button onClick={openCreate} className="btn-primary flex items-center gap-2">
+          {canCreate && <button onClick={openCreate} className="btn-primary flex items-center gap-2">
             <Plus className="w-4 h-4" /> عميل جديد
-          </button>
+          </button>}
         </div>
       </div>
 
@@ -269,8 +273,8 @@ export function CRMPage() {
                               <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${src.color}`}>{src.emoji} {src.label}</span>
                             </div>
                             <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                              <button onClick={e => { e.stopPropagation(); openEdit(lead); }} className="p-1 hover:bg-slate-100 rounded-lg"><Pencil className="w-3 h-3 text-slate-400" /></button>
-                              <button onClick={e => { e.stopPropagation(); handleDelete(lead._id); }} className="p-1 hover:bg-red-50 rounded-lg"><Trash2 className="w-3 h-3 text-red-400" /></button>
+                              {canEdit && <button onClick={e => { e.stopPropagation(); openEdit(lead); }} className="p-1 hover:bg-slate-100 rounded-lg"><Pencil className="w-3 h-3 text-slate-400" /></button>}
+                              {canDelete && <button onClick={e => { e.stopPropagation(); handleDelete(lead._id); }} className="p-1 hover:bg-red-50 rounded-lg"><Trash2 className="w-3 h-3 text-red-400" /></button>}
                             </div>
                           </div>
                           <div className="flex items-center gap-1.5 text-xs text-slate-500 mb-2">
@@ -291,14 +295,14 @@ export function CRMPage() {
                               <Phone className="w-3 h-3" /> اتصال
                             </a>
                           </div>
-                          <select
+                          {canEdit && <select
                             value={lead.status}
                             onChange={e => { e.stopPropagation(); handleStatusChange(lead._id, e.target.value); }}
                             onClick={e => e.stopPropagation()}
                             className="w-full mt-2 text-xs border border-slate-200 rounded-lg px-2 py-1.5 bg-white text-slate-600 focus:outline-none focus:border-indigo-400"
                           >
                             {STATUSES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
-                          </select>
+                          </select>}
                         </div>
                       );
                     })}
@@ -319,7 +323,7 @@ export function CRMPage() {
                 <Target className="w-7 h-7 text-slate-400" />
               </div>
               <p className="text-slate-500 font-medium">لا يوجد عملاء محتملون</p>
-              <button onClick={openCreate} className="btn-primary mt-4 inline-flex items-center gap-2"><Plus className="w-4 h-4" /> إضافة عميل</button>
+              {canCreate && <button onClick={openCreate} className="btn-primary mt-4 inline-flex items-center gap-2"><Plus className="w-4 h-4" /> إضافة عميل</button>}
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -354,9 +358,9 @@ export function CRMPage() {
                         <td>
                           <div className="flex items-center gap-1.5" onClick={e => e.stopPropagation()}>
                             <button onClick={() => setSelectedLead(lead._id)} className="p-1.5 bg-slate-50 text-slate-500 rounded-lg hover:bg-indigo-50 hover:text-indigo-600 transition-colors"><Eye className="w-3.5 h-3.5" /></button>
-                            <button onClick={() => openEdit(lead)} className="p-1.5 bg-slate-50 text-slate-500 rounded-lg hover:bg-indigo-50 hover:text-indigo-600 transition-colors"><Pencil className="w-3.5 h-3.5" /></button>
+                            {canEdit && <button onClick={() => openEdit(lead)} className="p-1.5 bg-slate-50 text-slate-500 rounded-lg hover:bg-indigo-50 hover:text-indigo-600 transition-colors"><Pencil className="w-3.5 h-3.5" /></button>}
                             <a href={buildWhatsApp(lead.phone, lead.name)} target="_blank" rel="noopener noreferrer" className="p-1.5 bg-green-50 text-green-600 rounded-lg hover:bg-green-100 transition-colors"><MessageCircle className="w-3.5 h-3.5" /></a>
-                            <button onClick={() => handleDelete(lead._id)} className="p-1.5 bg-slate-50 text-slate-400 rounded-lg hover:bg-red-50 hover:text-red-500 transition-colors"><Trash2 className="w-3.5 h-3.5" /></button>
+                            {canDelete && <button onClick={() => handleDelete(lead._id)} className="p-1.5 bg-slate-50 text-slate-400 rounded-lg hover:bg-red-50 hover:text-red-500 transition-colors"><Trash2 className="w-3.5 h-3.5" /></button>}
                           </div>
                         </td>
                       </tr>
@@ -408,7 +412,7 @@ export function CRMPage() {
               </div>
 
               {/* Status Change */}
-              <div>
+              {canEdit && <div>
                 <p className="text-xs font-bold text-slate-500 uppercase mb-2">تغيير الحالة</p>
                 <div className="grid grid-cols-3 gap-2">
                   {STATUSES.map(s => {
@@ -421,7 +425,7 @@ export function CRMPage() {
                     );
                   })}
                 </div>
-              </div>
+              </div>}
 
               {/* Quick Actions */}
               <div className="grid grid-cols-2 gap-3">
@@ -429,7 +433,7 @@ export function CRMPage() {
                   className="flex items-center justify-center gap-2 py-3 bg-green-500 text-white rounded-xl font-medium text-sm hover:bg-green-600 transition-colors">
                   <MessageCircle className="w-4 h-4" /> واتساب
                 </a>
-                {!leadDetail.convertedToCustomerId && leadDetail.status !== "lost" ? (
+                {canEdit && !leadDetail.convertedToCustomerId && leadDetail.status !== "lost" ? (
                   <button onClick={() => handleConvert(leadDetail._id)}
                     className="flex items-center justify-center gap-2 py-3 bg-emerald-500 text-white rounded-xl font-medium text-sm hover:bg-emerald-600 transition-colors">
                     <CheckCircle className="w-4 h-4" /> تحويل لعميل
@@ -439,23 +443,23 @@ export function CRMPage() {
                     <CheckCircle className="w-4 h-4" /> تم التحويل ✓
                   </div>
                 ) : null}
-                <button onClick={() => { openEdit(leadDetail as any); setSelectedLead(null); }}
+                {canEdit && <button onClick={() => { openEdit(leadDetail as any); setSelectedLead(null); }}
                   className="flex items-center justify-center gap-2 py-3 bg-indigo-50 text-indigo-600 rounded-xl font-medium text-sm hover:bg-indigo-100 transition-colors col-span-1">
                   <Pencil className="w-4 h-4" /> تعديل
-                </button>
-                <button onClick={() => handleDelete(leadDetail._id)}
+                </button>}
+                {canDelete && <button onClick={() => handleDelete(leadDetail._id)}
                   className="flex items-center justify-center gap-2 py-3 bg-red-50 text-red-500 rounded-xl font-medium text-sm hover:bg-red-100 transition-colors col-span-1">
                   <Trash2 className="w-4 h-4" /> حذف
-                </button>
+                </button>}
               </div>
 
               {/* Activity Log */}
               <div>
                 <div className="flex items-center justify-between mb-3">
                   <p className="text-xs font-bold text-slate-500 uppercase">سجل التواصل</p>
-                  <button onClick={() => setShowActivity(!showActivity)} className="flex items-center gap-1 text-xs text-indigo-600 font-medium hover:text-indigo-700">
+                  {canEdit && <button onClick={() => setShowActivity(!showActivity)} className="flex items-center gap-1 text-xs text-indigo-600 font-medium hover:text-indigo-700">
                     <Plus className="w-3.5 h-3.5" /> تسجيل تواصل
-                  </button>
+                  </button>}
                 </div>
 
                 {showActivity && (
@@ -498,9 +502,9 @@ export function CRMPage() {
                             <span className="text-xs font-semibold text-slate-700">{aType.label}</span>
                             <div className="flex items-center gap-2">
                               <span className="text-xs text-slate-400">{new Date(act._creationTime).toLocaleDateString("ar-SA")}</span>
-                              <button onClick={() => deleteActivity({ id: act._id })} className="opacity-0 group-hover:opacity-100 p-0.5 hover:text-red-500 text-slate-400 transition-all">
+                              {canEdit && <button onClick={() => deleteActivity({ id: act._id })} className="opacity-0 group-hover:opacity-100 p-0.5 hover:text-red-500 text-slate-400 transition-all">
                                 <X className="w-3 h-3" />
-                              </button>
+                              </button>}
                             </div>
                           </div>
                           <p className="text-xs text-slate-600">{act.notes}</p>

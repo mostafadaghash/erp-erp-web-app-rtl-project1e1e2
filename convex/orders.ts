@@ -6,7 +6,7 @@ import { requireAuth, requirePermission, filterByBranch, logAction } from "./lib
 export const list = query({
   args: { status: v.optional(v.string()) },
   handler: async (ctx, args) => {
-    const user = await requireAuth(ctx);
+    const user = await requirePermission(ctx, "view_orders");
     let orders;
     if (args.status) {
       orders = await ctx.db
@@ -24,7 +24,7 @@ export const list = query({
 export const get = query({
   args: { id: v.id("orders") },
   handler: async (ctx, args) => {
-    await requireAuth(ctx);
+    await requirePermission(ctx, "view_orders");
     return await ctx.db.get(args.id);
   },
 });
@@ -32,7 +32,7 @@ export const get = query({
 export const stats = query({
   args: {},
   handler: async (ctx) => {
-    const user = await requireAuth(ctx);
+    const user = await requirePermission(ctx, "view_orders");
     const all = await ctx.db.query("orders").collect();
     const orders = filterByBranch(all, user);
     const pending = orders.filter((o) => o.status === "pending").length;

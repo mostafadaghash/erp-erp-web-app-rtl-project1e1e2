@@ -8,7 +8,7 @@ export const list = query({
     source: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const user = await requireAuth(ctx);
+    const user = await requirePermission(ctx, "view_leads");
     let leads;
     if (args.status) {
       leads = await ctx.db
@@ -29,7 +29,7 @@ export const list = query({
 export const get = query({
   args: { id: v.id("leads") },
   handler: async (ctx, args) => {
-    await requireAuth(ctx);
+    await requirePermission(ctx, "view_leads");
     return await ctx.db.get(args.id);
   },
 });
@@ -37,7 +37,7 @@ export const get = query({
 export const getWithActivities = query({
   args: { id: v.id("leads") },
   handler: async (ctx, args) => {
-    await requireAuth(ctx);
+    await requirePermission(ctx, "view_leads");
     const lead = await ctx.db.get(args.id);
     if (!lead) return null;
     const activities = await ctx.db
@@ -52,7 +52,7 @@ export const getWithActivities = query({
 export const stats = query({
   args: {},
   handler: async (ctx) => {
-    const user = await requireAuth(ctx);
+    const user = await requirePermission(ctx, "view_leads");
     const all = await ctx.db.query("leads").collect();
     const filtered = filterByBranch(all, user);
     const byStatus: Record<string, number> = {};
@@ -230,7 +230,7 @@ export const remove = mutation({
 export const listActivities = query({
   args: { leadId: v.id("leads") },
   handler: async (ctx, args) => {
-    await requireAuth(ctx);
+    await requirePermission(ctx, "view_leads");
     return await ctx.db
       .query("leadActivities")
       .withIndex("by_lead", (q) => q.eq("leadId", args.leadId))

@@ -3,6 +3,7 @@ import { useQuery, useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { toast } from "sonner";
 import { Id } from "../../convex/_generated/dataModel";
+import { PERMISSIONS, ROLE_PERMISSIONS } from "../../convex/lib/permissions";
 import {
   Users, Plus, X, Search, Phone, Building2, Mail, Link, Copy,
   Shield, Pencil, Trash2, CheckCircle, XCircle,
@@ -20,8 +21,7 @@ const ROLES = [
   { value: "viewer",           label: "مشاهد فقط",      color: "bg-slate-100 text-slate-600" },
 ];
 
-const ALL_PERMISSIONS = [
-  { key: "view_all",        label: "عرض كل البيانات",       group: "عرض" },
+const PERMISSION_LABELS_SOURCE = [
   { key: "view_products",   label: "عرض المنتجات",           group: "عرض" },
   { key: "view_customers",  label: "عرض العملاء",            group: "عرض" },
   { key: "view_orders",     label: "عرض الأوردرات",          group: "عرض" },
@@ -31,22 +31,18 @@ const ALL_PERMISSIONS = [
   { key: "view_reports",    label: "عرض التقارير",           group: "عرض" },
   { key: "view_prices",     label: "عرض الأسعار",            group: "عرض" },
   { key: "view_profits",    label: "عرض الأرباح",            group: "عرض" },
-  { key: "create_all",      label: "إضافة كل البيانات",      group: "إضافة" },
   { key: "create_orders",   label: "إنشاء أوردرات",          group: "إضافة" },
   { key: "create_invoices", label: "إنشاء فواتير",           group: "إضافة" },
   { key: "create_repairs",  label: "إنشاء أوامر صيانة",      group: "إضافة" },
   { key: "create_customers",label: "إضافة عملاء",            group: "إضافة" },
   { key: "create_expenses", label: "إضافة مصروفات",          group: "إضافة" },
   { key: "create_shipments",label: "إنشاء شحنات",            group: "إضافة" },
-  { key: "edit_all",        label: "تعديل كل البيانات",      group: "تعديل" },
   { key: "edit_orders",     label: "تعديل الأوردرات",        group: "تعديل" },
   { key: "edit_repairs",    label: "تعديل الصيانة",          group: "تعديل" },
   { key: "edit_customers",  label: "تعديل العملاء",          group: "تعديل" },
   { key: "edit_expenses",   label: "تعديل المصروفات",        group: "تعديل" },
   { key: "edit_shipments",  label: "تعديل الشحنات",          group: "تعديل" },
-  { key: "delete_all",      label: "حذف البيانات",           group: "حذف" },
   { key: "export_data",     label: "تصدير البيانات",         group: "أخرى" },
-  { key: "print_all",       label: "طباعة كل شيء",           group: "أخرى" },
   { key: "print_invoices",  label: "طباعة الفواتير",         group: "أخرى" },
   { key: "print_repairs",   label: "طباعة الصيانة",          group: "أخرى" },
   { key: "print_shipping",  label: "طباعة الشحن",            group: "أخرى" },
@@ -55,15 +51,26 @@ const ALL_PERMISSIONS = [
   { key: "manage_branches", label: "إدارة الفروع",           group: "أخرى" },
 ];
 
+const permissionGroup = (permission: string) => {
+  if (permission.startsWith("view_")) return "عرض";
+  if (permission.startsWith("create_")) return "إضافة";
+  if (permission.startsWith("edit_")) return "تعديل";
+  if (permission.startsWith("delete_")) return "حذف";
+  if (permission.startsWith("manage_")) return "إدارة";
+  return "أخرى";
+};
+
+const ALL_PERMISSIONS = PERMISSIONS.map((key) => {
+  const existing = PERMISSION_LABELS_SOURCE.find((permission) => permission.key === key);
+  return {
+    key,
+    label: existing?.label ?? key,
+    group: permissionGroup(key),
+  };
+});
+
 const ROLE_DEFAULT_PERMISSIONS: Record<string, string[]> = {
-  admin: ALL_PERMISSIONS.map(p => p.key),
-  manager: ["view_all","create_all","edit_all","view_prices","view_profits","export_data","print_all","view_reports"],
-  sales: ["view_products","view_customers","view_orders","view_invoices","create_orders","create_invoices","edit_orders","view_prices","print_invoices"],
-  customer_service: ["view_customers","view_orders","view_repairs","create_customers","edit_customers","create_orders","edit_orders","view_prices"],
-  technician: ["view_repairs","edit_repairs","create_repairs","view_products","view_prices","print_repairs"],
-  accountant: ["view_all","view_prices","view_profits","view_reports","export_data","create_expenses","edit_expenses"],
-  shipping: ["view_orders","view_shipments","edit_shipments","create_shipments","print_shipping"],
-  viewer: ["view_products","view_customers","view_orders","view_repairs","view_invoices"],
+  ...ROLE_PERMISSIONS,
 };
 
 interface EmpForm {

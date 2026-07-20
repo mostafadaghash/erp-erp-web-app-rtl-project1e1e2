@@ -20,6 +20,9 @@ import { CRMPage } from "./CRMPage";
 import { DeliveriesPage } from "./DeliveriesPage";
 import { AuditLogsPage } from "./AuditLogsPage";
 import { Menu } from "lucide-react";
+import { ShieldX } from "lucide-react";
+import type { Permission } from "../../convex/lib/permissions";
+import { PermissionProvider } from "../lib/access";
 
 export type Page =
   | "dashboard"
@@ -40,19 +43,57 @@ export type Page =
   | "settings"
   | "audit-logs";
 
+const PAGE_PERMISSIONS: Partial<Record<Page, Permission>> = {
+  products: "view_products",
+  customers: "view_customers",
+  invoices: "view_invoices",
+  "new-invoice": "create_invoices",
+  repairs: "view_repairs",
+  expenses: "view_expenses",
+  suppliers: "view_suppliers",
+  orders: "view_orders",
+  deliveries: "view_deliveries",
+  shipments: "view_shipments",
+  branches: "view_branches",
+  employees: "view_employees",
+  crm: "view_leads",
+  reports: "view_reports",
+  settings: "manage_settings",
+  "audit-logs": "view_audit_logs",
+};
+
 export function ERPApp() {
   const [currentPage, setCurrentPage] = useState<Page>("dashboard");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const settings = useQuery(api.settings.getPublic);
+  const me = useQuery(api.employees.me);
 
   const storeName = settings?.storeName ?? "تك ستور ERP";
+  const permissions = me?.permissions ?? [];
+  const can = (permission: Permission) => permissions.includes(permission);
+  const canAccessPage = (page: Page) => {
+    const required = PAGE_PERMISSIONS[page];
+    return !required || can(required);
+  };
 
   const navigate = (page: Page) => {
+    if (!canAccessPage(page)) return;
     setCurrentPage(page);
     setSidebarOpen(false);
   };
 
+  if (me === undefined) {
+    return (
+      <div className="h-screen flex items-center justify-center bg-slate-50" dir="rtl">
+        <p className="text-slate-500">جاري تحميل صلاحيات الحساب...</p>
+      </div>
+    );
+  }
+
+  const authorized = canAccessPage(currentPage);
+
   return (
+    <PermissionProvider permissions={permissions}>
     <div className="flex h-screen bg-slate-50 overflow-hidden" dir="rtl">
       {/* Mobile overlay */}
       {sidebarOpen && (
@@ -71,6 +112,9 @@ export function ERPApp() {
           currentPage={currentPage}
           onNavigate={navigate}
           storeName={storeName}
+          permissions={permissions}
+          userName={me.name}
+          role={me.role}
           onClose={() => setSidebarOpen(false)}
         />
       </div>
@@ -92,7 +136,7 @@ export function ERPApp() {
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <button
+            {can("create_invoices") && <button
               onClick={() => navigate("new-invoice")}
               className="btn-primary hidden sm:flex items-center gap-2"
             >
@@ -100,7 +144,7 @@ export function ERPApp() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
               </svg>
               فاتورة جديدة
-            </button>
+            </button>}
             <div className="w-px h-6 bg-slate-200" />
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full flex items-center justify-center">
@@ -113,26 +157,36 @@ export function ERPApp() {
         {/* Page content */}
         <main className="flex-1 overflow-y-auto">
           <div className="animate-fade-in-up">
-            {currentPage === "dashboard"   && <Dashboard onNavigate={navigate} />}
-            {currentPage === "products"    && <ProductsPage />}
-            {currentPage === "customers"   && <CustomersPage />}
-            {currentPage === "invoices"    && <InvoicesPage onNavigate={navigate} />}
-            {currentPage === "new-invoice" && <NewInvoicePage onNavigate={navigate} />}
-            {currentPage === "repairs"     && <RepairsPage />}
-            {currentPage === "expenses"    && <ExpensesPage />}
-            {currentPage === "suppliers"   && <SuppliersPage />}
-            {currentPage === "orders"      && <OrdersPage />}
-            {currentPage === "deliveries"  && <DeliveriesPage />}
-            {currentPage === "shipments"   && <ShipmentsPage />}
-            {currentPage === "branches"    && <BranchesPage />}
-            {currentPage === "employees"   && <EmployeesPage />}
-            {currentPage === "crm"         && <CRMPage />}
-            {currentPage === "reports"     && <ReportsPage />}
-            {currentPage === "settings"    && <SettingsPage />}
-            {currentPage === "audit-logs"  && <AuditLogsPage />}
+            {!authorized && (
+              <div className="min-h-[70vh] flex items-center justify-center p-6">
+                <div className="text-center">
+                  <ShieldX className="w-14 h-14 text-red-400 mx-auto mb-4" />
+                  <h2 className="text-xl font-bold text-slate-800">غير مصرح بالوصول</h2>
+                  <p className="text-sm text-slate-500 mt-2">لا يملك حسابك الصلاحية المطلوبة لفتح هذه الصفحة.</p>
+                </div>
+              </div>
+            )}
+            {authorized && currentPage === "dashboard"   && <Dashboard onNavigate={navigate} permissions={permissions} />}
+            {authorized && currentPage === "products"    && <ProductsPage />}
+            {authorized && currentPage === "customers"   && <CustomersPage />}
+            {authorized && currentPage === "invoices"    && <InvoicesPage onNavigate={navigate} />}
+            {authorized && currentPage === "new-invoice" && <NewInvoicePage onNavigate={navigate} />}
+            {authorized && currentPage === "repairs"     && <RepairsPage />}
+            {authorized && currentPage === "expenses"    && <ExpensesPage />}
+            {authorized && currentPage === "suppliers"   && <SuppliersPage />}
+            {authorized && currentPage === "orders"      && <OrdersPage />}
+            {authorized && currentPage === "deliveries"  && <DeliveriesPage />}
+            {authorized && currentPage === "shipments"   && <ShipmentsPage />}
+            {authorized && currentPage === "branches"    && <BranchesPage />}
+            {authorized && currentPage === "employees"   && <EmployeesPage />}
+            {authorized && currentPage === "crm"         && <CRMPage />}
+            {authorized && currentPage === "reports"     && <ReportsPage />}
+            {authorized && currentPage === "settings"    && <SettingsPage />}
+            {authorized && currentPage === "audit-logs"  && <AuditLogsPage />}
           </div>
         </main>
       </div>
     </div>
+    </PermissionProvider>
   );
 }
