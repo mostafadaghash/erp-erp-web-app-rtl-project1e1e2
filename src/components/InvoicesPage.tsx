@@ -48,16 +48,16 @@ export function InvoicesPage({ onNavigate }: InvoicesPageProps) {
       {/* Stats */}
       <div className="grid grid-cols-3 gap-3">
         <div className="bg-indigo-50 rounded-xl p-4 text-center">
-          <p className="text-xl font-black text-indigo-600">{totalRevenue.toLocaleString("ar-SA")}</p>
-          <p className="text-xs text-slate-600 mt-0.5">إجمالي المبيعات (ريال)</p>
+          <p className="text-xl font-black text-indigo-600">{totalRevenue.toLocaleString("ar-EG")}</p>
+          <p className="text-xs text-slate-600 mt-0.5">إجمالي المبيعات (ج.م)</p>
         </div>
         <div className="bg-emerald-50 rounded-xl p-4 text-center">
-          <p className="text-xl font-black text-emerald-600">{totalPaid.toLocaleString("ar-SA")}</p>
-          <p className="text-xs text-slate-600 mt-0.5">المحصل (ريال)</p>
+          <p className="text-xl font-black text-emerald-600">{totalPaid.toLocaleString("ar-EG")}</p>
+          <p className="text-xs text-slate-600 mt-0.5">المحصل (ج.م)</p>
         </div>
         <div className="bg-amber-50 rounded-xl p-4 text-center">
-          <p className="text-xl font-black text-amber-600">{totalPending.toLocaleString("ar-SA")}</p>
-          <p className="text-xs text-slate-600 mt-0.5">المتبقي (ريال)</p>
+          <p className="text-xl font-black text-amber-600">{totalPending.toLocaleString("ar-EG")}</p>
+          <p className="text-xs text-slate-600 mt-0.5">المتبقي (ج.م)</p>
         </div>
       </div>
 
@@ -106,12 +106,12 @@ export function InvoicesPage({ onNavigate }: InvoicesPageProps) {
                     {inv.customerPhone && <p className="text-xs text-slate-400">{inv.customerPhone}</p>}
                   </td>
                   <td className="text-slate-500 text-xs">
-                    {new Date(inv._creationTime).toLocaleDateString("ar-SA")}
+                    {new Date(inv._creationTime).toLocaleDateString("ar-EG")}
                   </td>
-                  <td className="font-bold">{inv.total.toLocaleString("ar-SA")} ريال</td>
-                  <td className="text-emerald-600 font-medium">{inv.paid.toLocaleString("ar-SA")} ريال</td>
+                  <td className="font-bold">{inv.total.toLocaleString("ar-EG")} ج.م</td>
+                  <td className="text-emerald-600 font-medium">{inv.paid.toLocaleString("ar-EG")} ج.م</td>
                   <td className={`font-medium ${inv.remaining > 0 ? "text-amber-600" : "text-slate-400"}`}>
-                    {inv.remaining.toLocaleString("ar-SA")} ريال
+                    {inv.remaining.toLocaleString("ar-EG")} ج.م
                   </td>
                   <td>
                     <span className="text-xs text-slate-600">
