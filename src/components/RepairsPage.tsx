@@ -5,6 +5,7 @@ import { usePermission } from "../lib/access";
 import { toast } from "sonner";
 import { Wrench, Plus, Search, Clock, CheckCircle, AlertCircle, Copy, MessageCircle, Printer } from "lucide-react";
 import { PrintModal } from "./PrintTemplate";
+import { buildEgyptWhatsAppUrl } from "../lib/utils";
 
 const statusConfig: Record<string, { label: string; badge: string; icon: any }> = {
   received: { label: "مستلم", badge: "badge-info", icon: Clock },
@@ -158,12 +159,12 @@ export function RepairsPage() {
               <div className="flex items-center justify-between mb-3 text-sm">
                 <div>
                   <p className="text-xs text-slate-500">التكلفة</p>
-                  <p className="font-bold text-slate-800">{r.totalCost.toLocaleString("ar-SA")} ريال</p>
+                  <p className="font-bold text-slate-800">{r.totalCost.toLocaleString("ar-EG")} ج.م</p>
                 </div>
                 <div className="text-left">
                   <p className="text-xs text-slate-500">المتبقي</p>
                   <p className={`font-bold ${r.remaining > 0 ? "text-amber-600" : "text-emerald-600"}`}>
-                    {r.remaining.toLocaleString("ar-SA")} ريال
+                    {r.remaining.toLocaleString("ar-EG")} ج.م
                   </p>
                 </div>
                 {r.technicianName && (
@@ -194,7 +195,7 @@ export function RepairsPage() {
                         <Copy className="w-3.5 h-3.5" />
                       </button>
                       <a
-                        href={`https://wa.me/${r.customerPhone.replace(/\D/g, "")}?text=${encodeURIComponent(`مرحباً ${r.customerName}،\nرابط متابعة طلب الصيانة الخاص بك:\n${window.location.origin}${window.location.pathname}#track=${r.trackingToken}\n\nرقم الطلب: ${r.repairNumber}`)}`}
+                        href={buildEgyptWhatsAppUrl(r.customerPhone, `مرحباً ${r.customerName}،\nرابط متابعة طلب الصيانة الخاص بك:\n${window.location.origin}${window.location.pathname}#track=${r.trackingToken}\n\nرقم الطلب: ${r.repairNumber}`)}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="p-1.5 bg-emerald-100 hover:bg-emerald-200 rounded-lg transition-colors text-emerald-600"
@@ -301,11 +302,11 @@ export function RepairsPage() {
                   <textarea className="form-input" required rows={2} value={form.problem} onChange={e => setForm({...form, problem: e.target.value})} placeholder="اشرح المشكلة بالتفصيل..." />
                 </div>
                 <div>
-                  <label className="form-label">تكلفة العمالة (ريال)</label>
+                  <label className="form-label">تكلفة العمالة (ج.م)</label>
                   <input className="form-input" type="number" value={form.laborCost} onChange={e => setForm({...form, laborCost: e.target.value})} placeholder="0" />
                 </div>
                 <div>
-                  <label className="form-label">العربون (ريال)</label>
+                  <label className="form-label">العربون (ج.م)</label>
                   <input className="form-input" type="number" value={form.deposit} onChange={e => setForm({...form, deposit: e.target.value})} placeholder="0" />
                 </div>
                 <div>
