@@ -4,18 +4,25 @@ import { api } from "../../convex/_generated/api";
 import { usePermission } from "../lib/access";
 import { toast } from "sonner";
 import { DollarSign, Plus, Search } from "lucide-react";
+import type { Doc } from "../../convex/_generated/dataModel";
+import { getErrorMessage } from "../lib/errors";
 
 const expenseCategories = ["إيجار", "رواتب", "مرافق", "تسويق", "صيانة", "مشتريات", "نقل", "أخرى"];
 
 export function ExpensesPage() {
   const canCreate = usePermission("create_expenses");
+  const canVoid = usePermission("delete_expenses");
   const expenses = useQuery(api.expenses.list) ?? [];
   const expenseStats = useQuery(api.expenses.getStats);
   const createExpense = useMutation(api.expenses.create);
+  const voidExpense = useMutation(api.expenses.void);
 
   const [search, setSearch] = useState("");
   const [filterCategory, setFilterCategory] = useState("");
   const [showForm, setShowForm] = useState(false);
+  const [voidTarget, setVoidTarget] = useState<Doc<"expenses"> | null>(null);
+  const [voidReason, setVoidReason] = useState("");
+  const [isVoiding, setIsVoiding] = useState(false);
   const [form, setForm] = useState({
     title: "", category: "إيجار", amount: "",
     date: new Date().toISOString().split("T")[0],
@@ -40,16 +47,32 @@ export function ExpensesPage() {
       toast.success("تم إضافة المصروف بنجاح");
       setShowForm(false);
       setForm({ title: "", category: "إيجار", amount: "", date: new Date().toISOString().split("T")[0], paymentMethod: "cash", notes: "" });
-    } catch (err) {
-      toast.error("حدث خطأ");
+    } catch (error) {
+      toast.error(getErrorMessage(error, "تعذر إضافة المصروف"));
+    }
+  };
+
+  const handleVoid = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!voidTarget || isVoiding || !voidReason.trim()) return;
+    setIsVoiding(true);
+    try {
+      await voidExpense({ id: voidTarget._id, reason: voidReason.trim() });
+      toast.success("تم إبطال المصروف بنجاح");
+      setVoidTarget(null);
+      setVoidReason("");
+    } catch (error) {
+      toast.error(getErrorMessage(error, "تعذر إبطال المصروف"));
+    } finally {
+      setIsVoiding(false);
     }
   };
 
   // Group by category
   const byCategory = expenseCategories.map(cat => ({
     name: cat,
-    total: expenses.filter(e => e.category === cat).reduce((s, e) => s + e.amount, 0),
-    count: expenses.filter(e => e.category === cat).length,
+    total: expenses.filter(e => e.category === cat && e.status !== "voided").reduce((s, e) => s + e.amount, 0),
+    count: expenses.filter(e => e.category === cat && e.status !== "voided").length,
   })).filter(c => c.count > 0);
 
   return (
@@ -124,11 +147,12 @@ export function ExpensesPage() {
                 <th>التاريخ</th>
                 <th>طريقة الدفع</th>
                 <th>ملاحظات</th>
+                <th>الحالة والإجراء</th>
               </tr>
             </thead>
             <tbody>
               {filtered.map(e => (
-                <tr key={e._id}>
+                <tr key={e._id} className={e.status === "voided" ? "bg-slate-50 opacity-70" : ""}>
                   <td className="font-medium text-slate-800">{e.title}</td>
                   <td><span className="badge badge-info">{e.category}</span></td>
                   <td className="font-bold text-red-600">{e.amount.toLocaleString("ar-EG")} ج.م</td>
@@ -138,11 +162,16 @@ export function ExpensesPage() {
                      e.paymentMethod === "card" ? "بطاقة" : "تحويل"}
                   </td>
                   <td className="text-slate-500 text-xs">{e.notes ?? "-"}</td>
+                  <td>
+                    {e.status === "voided" ? <span className="badge badge-danger">مبطل</span> : (
+                      <div className="flex items-center gap-2"><span className="badge badge-success">نشط</span>{canVoid && <button className="rounded-lg bg-red-50 px-2 py-1 text-xs font-bold text-red-700" onClick={() => { setVoidTarget(e); setVoidReason(""); }}>إبطال المصروف</button>}</div>
+                    )}
+                  </td>
                 </tr>
               ))}
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="text-center py-12 text-slate-400">
+                  <td colSpan={7} className="text-center py-12 text-slate-400">
                     <DollarSign className="w-10 h-10 mx-auto mb-2 opacity-30" />
                     لا توجد مصروفات
                   </td>
@@ -152,6 +181,10 @@ export function ExpensesPage() {
           </table>
         </div>
       </div>
+
+      {voidTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" dir="rtl"><div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl"><h2 className="text-lg font-black">إبطال المصروف</h2><p className="my-3 rounded-lg bg-amber-50 p-3 text-sm text-amber-800">سيظل السجل محفوظًا تاريخيًا، لكنه لن يدخل ضمن إجماليات المصروفات.</p><form onSubmit={handleVoid} className="space-y-4"><div><label className="form-label">سبب الإبطال *</label><textarea className="form-input" required rows={3} value={voidReason} onChange={e => setVoidReason(e.target.value)} /></div><div className="flex gap-3"><button className="btn-primary flex-1" disabled={isVoiding || !voidReason.trim()}>{isVoiding ? "جارٍ الإبطال..." : "تأكيد الإبطال"}</button><button type="button" className="btn-secondary" disabled={isVoiding} onClick={() => setVoidTarget(null)}>تراجع</button></div></form></div></div>
+      )}
 
       {/* Add Expense Modal */}
       {showForm && (

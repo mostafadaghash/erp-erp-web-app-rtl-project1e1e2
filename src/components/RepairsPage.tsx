@@ -4,11 +4,14 @@ import { api } from "../../convex/_generated/api";
 import { usePermission } from "../lib/access";
 import { toast } from "sonner";
 import { Wrench, Plus, Search, Clock, CheckCircle, AlertCircle, Copy, MessageCircle, Printer, RefreshCw } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { PrintModal } from "./PrintTemplate";
 import { buildEgyptWhatsAppUrl } from "../lib/utils";
 import type { Doc, Id } from "../../convex/_generated/dataModel";
+import { isRepairStatus, REPAIR_TRANSITIONS, type RepairStatus } from "../../shared/businessRules";
+import { getErrorMessage } from "../lib/errors";
 
-const statusConfig: Record<string, { label: string; badge: string; icon: any }> = {
+const statusConfig: Record<RepairStatus, { label: string; badge: string; icon: LucideIcon }> = {
   received: { label: "مستلم", badge: "badge-info", icon: Clock },
   in_progress: { label: "قيد الإصلاح", badge: "badge-warning", icon: Wrench },
   ready: { label: "جاهز للاستلام", badge: "badge-success", icon: CheckCircle },
@@ -30,6 +33,9 @@ export function RepairsPage() {
   const [filterStatus, setFilterStatus] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [printRepair, setPrintRepair] = useState<Doc<"repairs"> | null>(null);
+  const [cancelTarget, setCancelTarget] = useState<Doc<"repairs"> | null>(null);
+  const [cancelReason, setCancelReason] = useState("");
+  const [updatingId, setUpdatingId] = useState<Id<"repairs"> | null>(null);
   const [form, setForm] = useState({
     customerName: "", customerPhone: "", customerId: "",
     deviceType: "موبايل", deviceBrand: "", deviceModel: "",
@@ -63,22 +69,36 @@ export function RepairsPage() {
       toast.success("تم إضافة طلب الصيانة بنجاح");
       setShowForm(false);
       setForm({ customerName: "", customerPhone: "", customerId: "", deviceType: "موبايل", deviceBrand: "", deviceModel: "", problem: "", laborCost: "", deposit: "", expectedDate: "", notes: "", technicianName: "" });
-    } catch (err) {
-      toast.error("حدث خطأ أثناء إضافة طلب الصيانة");
+    } catch (error) {
+      toast.error(getErrorMessage(error, "تعذر إضافة طلب الصيانة"));
     }
   };
 
-  const handleStatusChange = async (id: string, status: string) => {
+  const applyStatus = async (id: Id<"repairs">, status: RepairStatus, reason?: string) => {
+    if (updatingId) return;
+    setUpdatingId(id);
     try {
-      await updateStatus({
-        id: id as Id<"repairs">,
-        status,
-        deliveredDate: status === "delivered" ? new Date().toISOString().split("T")[0] : undefined,
-      });
+      await updateStatus({ id, status, reason });
       toast.success("تم تحديث الحالة");
-    } catch (err) {
-      toast.error("حدث خطأ");
+      if (status === "cancelled") { setCancelTarget(null); setCancelReason(""); }
+    } catch (error) {
+      toast.error(getErrorMessage(error, "تعذر تحديث حالة الصيانة"));
+    } finally {
+      setUpdatingId(null);
     }
+  };
+
+  const handleStatusSelection = (repair: Doc<"repairs">, value: string) => {
+    if (!isRepairStatus(value) || !isRepairStatus(repair.status)) return;
+    if (!REPAIR_TRANSITIONS[repair.status].includes(value)) return;
+    if (value === "cancelled") { setCancelTarget(repair); setCancelReason(""); return; }
+    void applyStatus(repair._id, value);
+  };
+
+  const handleCancellation = (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!cancelTarget || !cancelReason.trim()) return;
+    void applyStatus(cancelTarget._id, "cancelled", cancelReason.trim());
   };
 
   const handleSelectCustomer = (id: string) => {
@@ -150,7 +170,8 @@ export function RepairsPage() {
       {/* Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {filtered.map((r) => {
-          const status = statusConfig[r.status] ?? statusConfig.received;
+          const currentStatus: RepairStatus = isRepairStatus(r.status) ? r.status : "received";
+          const status = statusConfig[currentStatus];
           const StatusIcon = status.icon;
           return (
             <div key={r._id} className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 hover:shadow-md transition-all">
@@ -236,14 +257,12 @@ export function RepairsPage() {
                 {canEdit && r.status !== "delivered" && r.status !== "cancelled" && (
                   <select
                     className="flex-1 text-xs border border-slate-200 rounded-lg px-2 py-1.5 bg-white text-slate-700"
-                    value={r.status}
-                    onChange={e => handleStatusChange(r._id, e.target.value)}
+                    value=""
+                    disabled={updatingId !== null}
+                    onChange={e => handleStatusSelection(r, e.target.value)}
                   >
-                    <option value="received">مستلم</option>
-                    <option value="in_progress">قيد الإصلاح</option>
-                    <option value="ready">جاهز</option>
-                    <option value="delivered">تم التسليم</option>
-                    <option value="cancelled">ملغي</option>
+                    <option value="" disabled>{updatingId === r._id ? "جارٍ التحديث..." : "تغيير الحالة"}</option>
+                    {REPAIR_TRANSITIONS[currentStatus].map(next => <option key={next} value={next}>{statusConfig[next].label}</option>)}
                   </select>
                 )}
                 {canPrint && <button
@@ -272,6 +291,10 @@ export function RepairsPage() {
           data={printRepair}
           onClose={() => setPrintRepair(null)}
         />
+      )}
+
+      {cancelTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" dir="rtl"><div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl"><h2 className="text-lg font-black">إلغاء أمر الصيانة {cancelTarget.repairNumber}</h2><p className="my-3 text-sm text-slate-600">لن تتغير الحالة قبل نجاح العملية. اكتب سبب الإلغاء للمتابعة.</p><form className="space-y-4" onSubmit={handleCancellation}><div><label className="form-label">سبب الإلغاء *</label><textarea required className="form-input" rows={3} value={cancelReason} onChange={e => setCancelReason(e.target.value)} /></div><div className="flex gap-3"><button className="btn-primary flex-1" disabled={updatingId !== null || !cancelReason.trim()}>{updatingId ? "جارٍ الإلغاء..." : "تأكيد الإلغاء"}</button><button type="button" className="btn-secondary" disabled={updatingId !== null} onClick={() => setCancelTarget(null)}>تراجع</button></div></form></div></div>
       )}
 
       {/* Add Repair Modal */}

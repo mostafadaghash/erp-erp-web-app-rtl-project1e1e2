@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useQuery } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { usePermission } from "../lib/access";
 import type { Page } from "./ERPApp";
@@ -7,6 +7,8 @@ import { FileText, Plus, Search, Printer } from "lucide-react";
 import { PrintModal } from "./PrintTemplate";
 import { useCurrency } from "../lib/utils";
 import type { Doc } from "../../convex/_generated/dataModel";
+import { toast } from "sonner";
+import { getErrorMessage } from "../lib/errors";
 
 interface InvoicesPageProps {
   onNavigate: (page: Page) => void;
@@ -15,21 +17,43 @@ interface InvoicesPageProps {
 export function InvoicesPage({ onNavigate }: InvoicesPageProps) {
   const canCreate = usePermission("create_invoices");
   const canPrint = usePermission("print_invoices");
+  const canCancel = usePermission("delete_invoices");
   const invoices = useQuery(api.invoices.list, {}) ?? [];
+  const cancelInvoice = useMutation(api.invoices.cancel);
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState("");
   const [printInvoice, setPrintInvoice] = useState<Doc<"invoices"> | null>(null);
+  const [cancelTarget, setCancelTarget] = useState<Doc<"invoices"> | null>(null);
+  const [cancelReason, setCancelReason] = useState("");
+  const [isCancelling, setIsCancelling] = useState(false);
+
+  const handleCancel = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!cancelTarget || isCancelling || !cancelReason.trim()) return;
+    setIsCancelling(true);
+    try {
+      await cancelInvoice({ id: cancelTarget._id, reason: cancelReason.trim() });
+      toast.success("تم إلغاء الفاتورة وعكس آثارها بنجاح");
+      setCancelTarget(null);
+      setCancelReason("");
+    } catch (error) {
+      toast.error(getErrorMessage(error, "تعذر إلغاء الفاتورة"));
+    } finally {
+      setIsCancelling(false);
+    }
+  };
 
   const filtered = invoices.filter(inv =>
     inv.invoiceNumber.includes(search) ||
     inv.customerName.toLowerCase().includes(search.toLowerCase())
   ).filter(inv => !filterStatus || inv.status === filterStatus);
 
-  const totalRevenue = filtered.reduce((s, i) => s + i.total, 0);
-  const totalPaid = filtered.reduce((s, i) => s + i.paid, 0);
-  const totalPending = filtered.reduce((s, i) => s + i.remaining, 0);
+  const activeFiltered = filtered.filter(invoice => invoice.status !== "cancelled");
+  const totalRevenue = activeFiltered.reduce((s, i) => s + i.total, 0);
+  const totalPaid = activeFiltered.reduce((s, i) => s + i.paid, 0);
+  const totalPending = activeFiltered.reduce((s, i) => s + i.remaining, 0);
 
-  const { currency, formatCurrency, formatAmount } = useCurrency();
+  const { formatCurrency } = useCurrency();
 
   return (
     <div className="p-4 lg:p-6 space-y-5">
@@ -79,6 +103,7 @@ export function InvoicesPage({ onNavigate }: InvoicesPageProps) {
           <option value="paid">مدفوعة</option>
           <option value="partial">جزئي</option>
           <option value="unpaid">معلقة</option>
+          <option value="cancelled">ملغاة</option>
         </select>
       </div>
 
@@ -124,21 +149,33 @@ export function InvoicesPage({ onNavigate }: InvoicesPageProps) {
                   </td>
                   <td>
                     <span className={`badge ${
+                      inv.status === "cancelled" ? "badge-danger" :
                       inv.status === "paid" ? "badge-success" :
                       inv.status === "partial" ? "badge-warning" : "badge-danger"
                     }`}>
-                      {inv.status === "paid" ? "مدفوعة" :
+                      {inv.status === "cancelled" ? "ملغاة" : inv.status === "paid" ? "مدفوعة" :
                        inv.status === "partial" ? "جزئي" : "معلقة"}
                     </span>
                   </td>
                   <td>
-                    {canPrint && <button
+                    {canPrint && inv.status !== "cancelled" && <button
                       onClick={() => { if (canPrint) setPrintInvoice(inv); }}
                       className="p-1.5 hover:bg-indigo-50 rounded-lg transition-colors text-slate-500 hover:text-indigo-600"
                       title="طباعة الفاتورة"
                     >
                       <Printer className="w-4 h-4" />
                     </button>}
+                    {canCancel && inv.status !== "cancelled" && inv.paid === 0 && (
+                      <button
+                        onClick={() => { setCancelTarget(inv); setCancelReason(""); }}
+                        className="mr-1 rounded-lg bg-red-50 px-2 py-1.5 text-xs font-bold text-red-700 hover:bg-red-100"
+                      >
+                        إلغاء الفاتورة
+                      </button>
+                    )}
+                    {canCancel && inv.status !== "cancelled" && inv.paid > 0 && (
+                      <p className="mt-1 text-xs text-amber-700">تحتاج معالجة استرداد مالي قبل الإلغاء</p>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -162,6 +199,23 @@ export function InvoicesPage({ onNavigate }: InvoicesPageProps) {
           data={printInvoice}
           onClose={() => setPrintInvoice(null)}
         />
+      )}
+      {cancelTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" dir="rtl">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+            <h2 className="text-lg font-black text-slate-800">إلغاء الفاتورة</h2>
+            <div className="my-4 rounded-xl bg-slate-50 p-4 text-sm">
+              <p><strong>رقم الفاتورة:</strong> {cancelTarget.invoiceNumber}</p>
+              <p><strong>العميل:</strong> {cancelTarget.customerName}</p>
+              <p><strong>الإجمالي:</strong> {formatCurrency(cancelTarget.total)}</p>
+            </div>
+            <p className="mb-3 rounded-lg bg-red-50 p-3 text-sm font-bold text-red-700">سيتم عكس المخزون ورصيد العميل. أكد الإلغاء بكتابة السبب.</p>
+            <form onSubmit={handleCancel} className="space-y-4">
+              <div><label className="form-label">سبب الإلغاء *</label><textarea className="form-input" required value={cancelReason} onChange={e => setCancelReason(e.target.value)} rows={3} /></div>
+              <div className="flex gap-3"><button className="btn-primary flex-1" disabled={isCancelling || !cancelReason.trim()}>{isCancelling ? "جارٍ الإلغاء..." : "تأكيد إلغاء الفاتورة"}</button><button type="button" className="btn-secondary" disabled={isCancelling} onClick={() => setCancelTarget(null)}>تراجع</button></div>
+            </form>
+          </div>
+        </div>
       )}
     </div>
   );
