@@ -49,6 +49,20 @@ export const stats = query({
   },
 });
 
+/** Least-privilege selector data needed by the shipment creation form. */
+export const creationOptions = query({
+  args: {},
+  handler: async (ctx) => {
+    const user = await requireModulePermission(ctx, "create_shipments", "shipments");
+    const products = filterByBranch(await ctx.db.query("products").collect(), user);
+    const suppliers = await ctx.db.query("suppliers").collect();
+    return {
+      products: products.map(({ _id, name }) => ({ _id, name })),
+      suppliers: suppliers.map(({ _id, name }) => ({ _id, name })),
+    };
+  },
+});
+
 export const create = mutation({
   args: {
     supplierName: v.string(),

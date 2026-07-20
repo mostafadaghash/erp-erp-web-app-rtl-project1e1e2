@@ -1,5 +1,6 @@
 import { useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
+import { usePermission } from "../lib/access";
 
 // ─── أنواع البيانات ────────────────────────────────────────────────────────────
 interface InvoiceData {
@@ -549,9 +550,13 @@ function RepairTemplate({ data, settings }: { data: RepairData; settings: any })
 
 // ─── المكوّن الرئيسي: نافذة الطباعة ──────────────────────────────────────────
 export function PrintModal({ type, data, onClose }: PrintTemplateProps) {
+  const canPrintInvoice = usePermission("print_invoices");
+  const canPrintRepair = usePermission("print_repairs");
+  const allowed = type === "invoice" || type === "order" ? canPrintInvoice : canPrintRepair;
   const settings = useQuery(api.settings.getPublic);
 
   const handlePrint = () => {
+    if (!allowed) return;
     window.print();
   };
 

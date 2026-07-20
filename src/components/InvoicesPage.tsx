@@ -6,6 +6,7 @@ import type { Page } from "./ERPApp";
 import { FileText, Plus, Search, Printer } from "lucide-react";
 import { PrintModal } from "./PrintTemplate";
 import { useCurrency } from "../lib/utils";
+import type { Doc } from "../../convex/_generated/dataModel";
 
 interface InvoicesPageProps {
   onNavigate: (page: Page) => void;
@@ -13,10 +14,11 @@ interface InvoicesPageProps {
 
 export function InvoicesPage({ onNavigate }: InvoicesPageProps) {
   const canCreate = usePermission("create_invoices");
+  const canPrint = usePermission("print_invoices");
   const invoices = useQuery(api.invoices.list, {}) ?? [];
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState("");
-  const [printInvoice, setPrintInvoice] = useState<any>(null);
+  const [printInvoice, setPrintInvoice] = useState<Doc<"invoices"> | null>(null);
 
   const filtered = invoices.filter(inv =>
     inv.invoiceNumber.includes(search) ||
@@ -130,13 +132,13 @@ export function InvoicesPage({ onNavigate }: InvoicesPageProps) {
                     </span>
                   </td>
                   <td>
-                    <button
-                      onClick={() => setPrintInvoice(inv)}
+                    {canPrint && <button
+                      onClick={() => { if (canPrint) setPrintInvoice(inv); }}
                       className="p-1.5 hover:bg-indigo-50 rounded-lg transition-colors text-slate-500 hover:text-indigo-600"
                       title="طباعة الفاتورة"
                     >
                       <Printer className="w-4 h-4" />
-                    </button>
+                    </button>}
                   </td>
                 </tr>
               ))}
@@ -154,7 +156,7 @@ export function InvoicesPage({ onNavigate }: InvoicesPageProps) {
       </div>
 
       {/* Print Modal */}
-      {printInvoice && (
+      {canPrint && printInvoice && (
         <PrintModal
           type="invoice"
           data={printInvoice}

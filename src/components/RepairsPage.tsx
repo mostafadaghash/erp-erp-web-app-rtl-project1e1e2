@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { Wrench, Plus, Search, Clock, CheckCircle, AlertCircle, Copy, MessageCircle, Printer, RefreshCw } from "lucide-react";
 import { PrintModal } from "./PrintTemplate";
 import { buildEgyptWhatsAppUrl } from "../lib/utils";
+import type { Doc, Id } from "../../convex/_generated/dataModel";
 
 const statusConfig: Record<string, { label: string; badge: string; icon: any }> = {
   received: { label: "مستلم", badge: "badge-info", icon: Clock },
@@ -18,8 +19,9 @@ const statusConfig: Record<string, { label: string; badge: string; icon: any }> 
 export function RepairsPage() {
   const canCreate = usePermission("create_repairs");
   const canEdit = usePermission("edit_repairs");
+  const canPrint = usePermission("print_repairs");
   const repairs = useQuery(api.repairs.list) ?? [];
-  const customers = useQuery(api.customers.list) ?? [];
+  const customers = useQuery(api.customers.repairPicker, canCreate ? {} : "skip") ?? [];
   const createRepair = useMutation(api.repairs.create);
   const updateStatus = useMutation(api.repairs.updateStatus);
   const rotateTrackingToken = useMutation(api.repairs.rotateTrackingToken);
@@ -27,7 +29,7 @@ export function RepairsPage() {
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState("");
   const [showForm, setShowForm] = useState(false);
-  const [printRepair, setPrintRepair] = useState<any>(null);
+  const [printRepair, setPrintRepair] = useState<Doc<"repairs"> | null>(null);
   const [form, setForm] = useState({
     customerName: "", customerPhone: "", customerId: "",
     deviceType: "موبايل", deviceBrand: "", deviceModel: "",
@@ -47,7 +49,7 @@ export function RepairsPage() {
       await createRepair({
         customerName: form.customerName,
         customerPhone: form.customerPhone,
-        customerId: form.customerId ? form.customerId as any : undefined,
+        customerId: form.customerId ? form.customerId as Id<"customers"> : undefined,
         deviceType: form.deviceType,
         deviceBrand: form.deviceBrand,
         deviceModel: form.deviceModel,
@@ -69,7 +71,7 @@ export function RepairsPage() {
   const handleStatusChange = async (id: string, status: string) => {
     try {
       await updateStatus({
-        id: id as any,
+        id: id as Id<"repairs">,
         status,
         deliveredDate: status === "delivered" ? new Date().toISOString().split("T")[0] : undefined,
       });
@@ -89,7 +91,7 @@ export function RepairsPage() {
   const handleRotateTrackingToken = async (id: string, repairNumber: string) => {
     if (!confirm("سيتم إلغاء رابط التتبع القديم وإنشاء رابط جديد. هل تريد المتابعة؟")) return;
     try {
-      const trackingToken = await rotateTrackingToken({ id: id as any });
+      const trackingToken = await rotateTrackingToken({ id: id as Id<"repairs"> });
       const url = `${window.location.origin}${window.location.pathname}#track=${trackingToken}`;
       await navigator.clipboard.writeText(url);
       toast.success(`تم تجديد رابط ${repairNumber} ونسخه`);
@@ -244,13 +246,13 @@ export function RepairsPage() {
                     <option value="cancelled">ملغي</option>
                   </select>
                 )}
-                <button
-                  onClick={() => setPrintRepair(r)}
+                {canPrint && <button
+                  onClick={() => { if (canPrint) setPrintRepair(r); }}
                   className="p-1.5 bg-slate-100 hover:bg-indigo-100 text-slate-500 hover:text-indigo-600 rounded-lg transition-colors"
                   title="طباعة"
                 >
                   <Printer className="w-4 h-4" />
-                </button>
+                </button>}
               </div>
             </div>
           );
@@ -264,7 +266,7 @@ export function RepairsPage() {
       </div>
 
       {/* Print Modal */}
-      {printRepair && (
+      {canPrint && printRepair && (
         <PrintModal
           type="repair"
           data={printRepair}

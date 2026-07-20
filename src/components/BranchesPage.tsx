@@ -21,13 +21,14 @@ const emptyForm = (): BranchForm => ({ name: "", address: "", phone: "", isActiv
 
 export function BranchesPage() {
   const canManage = usePermission("manage_branches");
+  const canViewEmployees = usePermission("view_employees");
   const [search, setSearch] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState<Id<"branches"> | null>(null);
   const [form, setForm] = useState<BranchForm>(emptyForm());
 
   const branches = useQuery(api.branches.list);
-  const employees = useQuery(api.employees.list, {});
+  const employees = useQuery(api.employees.list, canViewEmployees ? {} : "skip");
   const stats = useQuery(api.branches.stats);
   const legacyData = useQuery(api.branches.legacyDataStats, canManage ? {} : "skip");
   const createBranch = useMutation(api.branches.create);
@@ -121,7 +122,7 @@ export function BranchesPage() {
           { label: "إجمالي الفروع",   value: stats?.total ?? 0,         color: "text-indigo-600",  bg: "bg-indigo-50",  icon: Building2 },
           { label: "فروع نشطة",       value: stats?.active ?? 0,        color: "text-emerald-600", bg: "bg-emerald-50", icon: CheckCircle },
           { label: "فروع متوقفة",     value: stats?.inactive ?? 0,      color: "text-red-600",     bg: "bg-red-50",     icon: XCircle },
-          { label: "إجمالي الموظفين", value: stats?.totalEmployees ?? 0, color: "text-blue-600",    bg: "bg-blue-50",    icon: Users },
+          ...(canViewEmployees ? [{ label: "إجمالي الموظفين", value: stats?.totalEmployees ?? 0, color: "text-blue-600", bg: "bg-blue-50", icon: Users }] : []),
         ].map(s => {
           const Icon = s.icon;
           return (
@@ -164,7 +165,7 @@ export function BranchesPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
           {filtered.map(branch => {
-            const empCount = getBranchEmployeeCount(branch._id);
+            const empCount = canViewEmployees ? getBranchEmployeeCount(branch._id) : undefined;
             return (
               <div key={branch._id} className={`bg-white rounded-2xl border shadow-sm hover:shadow-md transition-all p-5 ${!branch.isActive ? "opacity-60 border-slate-200" : "border-slate-100"}`}>
                 {/* Card Header */}
@@ -210,10 +211,10 @@ export function BranchesPage() {
                       <span>{branch.phone}</span>
                     </div>
                   )}
-                  <div className="flex items-center gap-2 text-sm text-slate-600">
+                  {canViewEmployees && <div className="flex items-center gap-2 text-sm text-slate-600">
                     <Users className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
                     <span>{empCount} موظف</span>
-                  </div>
+                  </div>}
                 </div>
                 {canManage && (legacyData?.total ?? 0) > 0 && branch.isActive && (
                   <button

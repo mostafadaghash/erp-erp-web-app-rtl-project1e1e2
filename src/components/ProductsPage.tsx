@@ -7,9 +7,12 @@ import { Package, Plus, Search, AlertTriangle, Edit2, ToggleLeft } from "lucide-
 
 export function ProductsPage() {
   const canCreate = usePermission("create_products");
+  const canViewSuppliers = usePermission("view_suppliers");
+  const canViewPrices = usePermission("view_prices");
+  const canViewProfits = usePermission("view_profits");
   const products = useQuery(api.products.list, {}) ?? [];
   const categories = useQuery(api.categories.list) ?? [];
-  const suppliers = useQuery(api.suppliers.list) ?? [];
+  const suppliers = useQuery(api.suppliers.list, canViewSuppliers ? {} : "skip") ?? [];
   const createProduct = useMutation(api.products.create);
   const updateProduct = useMutation(api.products.update);
   const createCategory = useMutation(api.categories.create);
@@ -56,8 +59,8 @@ export function ProductsPage() {
     return categories.find(c => c._id === id)?.name ?? "-";
   };
 
-  const profit = (p: { sellPrice: number; costPrice: number }) => p.sellPrice - p.costPrice;
-  const profitPct = (p: { sellPrice: number; costPrice: number }) => p.costPrice > 0 ? ((profit(p) / p.costPrice) * 100).toFixed(1) : "0";
+  const profit = (p: { sellPrice?: number; costPrice?: number }) => (p.sellPrice ?? 0) - (p.costPrice ?? 0);
+  const profitPct = (p: { sellPrice?: number; costPrice?: number }) => (p.costPrice ?? 0) > 0 ? ((profit(p) / (p.costPrice ?? 1)) * 100).toFixed(1) : "0";
 
   return (
     <div className="p-4 lg:p-6 space-y-5">
@@ -122,9 +125,9 @@ export function ProductsPage() {
               <tr>
                 <th>المنتج</th>
                 <th>الفئة</th>
-                <th>سعر التكلفة</th>
-                <th>سعر البيع</th>
-                <th>الربح</th>
+                {canViewProfits && <th>سعر التكلفة</th>}
+                {canViewPrices && <th>سعر البيع</th>}
+                {canViewProfits && canViewPrices && <th>الربح</th>}
                 <th>المخزون</th>
                 <th>الحالة</th>
               </tr>
@@ -139,14 +142,14 @@ export function ProductsPage() {
                     </div>
                   </td>
                   <td className="text-slate-600">{getCategoryName(p.categoryId)}</td>
-                  <td className="font-medium">{p.costPrice.toLocaleString("ar-EG")} ج.م</td>
-                  <td className="font-bold text-indigo-600">{p.sellPrice.toLocaleString("ar-EG")} ج.م</td>
-                  <td>
+                  {canViewProfits && <td className="font-medium">{p.costPrice?.toLocaleString("ar-EG")} ج.م</td>}
+                  {canViewPrices && <td className="font-bold text-indigo-600">{p.sellPrice?.toLocaleString("ar-EG")} ج.م</td>}
+                  {canViewProfits && canViewPrices && <td>
                     <span className="text-emerald-600 font-medium">
                       {profit(p).toLocaleString("ar-EG")} ج.م
                     </span>
                     <span className="text-xs text-slate-400 mr-1">({profitPct(p)}%)</span>
-                  </td>
+                  </td>}
                   <td>
                     <div className="flex items-center gap-1.5">
                       {p.stock <= p.minStock && p.stock > 0 && (
@@ -167,7 +170,7 @@ export function ProductsPage() {
               ))}
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="text-center py-12 text-slate-400">
+                  <td colSpan={4 + Number(canViewProfits) + Number(canViewPrices) + Number(canViewProfits && canViewPrices)} className="text-center py-12 text-slate-400">
                     <Package className="w-10 h-10 mx-auto mb-2 opacity-30" />
                     لا توجد منتجات
                   </td>
@@ -223,13 +226,13 @@ export function ProductsPage() {
                     {categories.map(c => <option key={c._id} value={c._id}>{c.name}</option>)}
                   </select>
                 </div>
-                <div>
+                {canViewSuppliers && <div>
                   <label className="form-label">المورد</label>
                   <select className="form-input" value={form.supplierId} onChange={e => setForm({...form, supplierId: e.target.value})}>
                     <option value="">اختر المورد</option>
                     {suppliers.map(s => <option key={s._id} value={s._id}>{s.name}</option>)}
                   </select>
-                </div>
+                </div>}
                 <div>
                   <label className="form-label">الوحدة</label>
                   <select className="form-input" value={form.unit} onChange={e => setForm({...form, unit: e.target.value})}>
