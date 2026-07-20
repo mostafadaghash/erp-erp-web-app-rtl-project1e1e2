@@ -71,12 +71,12 @@ export function ExpensesPage() {
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
         <div className="bg-red-50 rounded-xl p-4 text-center">
-          <p className="text-xl font-black text-red-600">{(expenseStats?.total ?? 0).toLocaleString("ar-SA")}</p>
-          <p className="text-xs text-slate-600 mt-0.5">إجمالي المصروفات (ريال)</p>
+          <p className="text-xl font-black text-red-600">{(expenseStats?.total ?? 0).toLocaleString("ar-EG")}</p>
+          <p className="text-xs text-slate-600 mt-0.5">إجمالي المصروفات (ج.م)</p>
         </div>
         <div className="bg-amber-50 rounded-xl p-4 text-center">
-          <p className="text-xl font-black text-amber-600">{(expenseStats?.today ?? 0).toLocaleString("ar-SA")}</p>
-          <p className="text-xs text-slate-600 mt-0.5">مصروفات اليوم (ريال)</p>
+          <p className="text-xl font-black text-amber-600">{(expenseStats?.today ?? 0).toLocaleString("ar-EG")}</p>
+          <p className="text-xs text-slate-600 mt-0.5">مصروفات اليوم (ج.م)</p>
         </div>
         <div className="bg-slate-50 rounded-xl p-4 text-center">
           <p className="text-xl font-black text-slate-600">{expenseStats?.count ?? 0}</p>
@@ -91,7 +91,7 @@ export function ExpensesPage() {
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             {byCategory.map(cat => (
               <div key={cat.name} className="bg-slate-50 rounded-xl p-3 text-center">
-                <p className="font-bold text-slate-800">{cat.total.toLocaleString("ar-SA")}</p>
+                <p className="font-bold text-slate-800">{cat.total.toLocaleString("ar-EG")}</p>
                 <p className="text-xs text-slate-500 mt-0.5">{cat.name}</p>
                 <p className="text-xs text-slate-400">{cat.count} عملية</p>
               </div>
@@ -131,7 +131,7 @@ export function ExpensesPage() {
                 <tr key={e._id}>
                   <td className="font-medium text-slate-800">{e.title}</td>
                   <td><span className="badge badge-info">{e.category}</span></td>
-                  <td className="font-bold text-red-600">{e.amount.toLocaleString("ar-SA")} ريال</td>
+                  <td className="font-bold text-red-600">{e.amount.toLocaleString("ar-EG")} ج.م</td>
                   <td className="text-slate-500 text-xs">{e.date}</td>
                   <td className="text-slate-600 text-xs">
                     {e.paymentMethod === "cash" ? "نقدي" :
@@ -178,7 +178,7 @@ export function ExpensesPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="form-label">المبلغ (ريال) *</label>
+                  <label className="form-label">المبلغ (ج.م) *</label>
                   <input className="form-input" type="number" required value={form.amount} onChange={e => setForm({...form, amount: e.target.value})} placeholder="0" />
                 </div>
                 <div>
