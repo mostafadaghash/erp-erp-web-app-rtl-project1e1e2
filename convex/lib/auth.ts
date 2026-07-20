@@ -137,10 +137,37 @@ export function filterByBranch<T extends { branchId?: Id<"branches"> }>(
   user: AuthUser
 ): T[] {
   if (user.role === "admin") return items;
-  if (!user.branchId) return items;
-  return items.filter(
-    (item) => !item.branchId || item.branchId === user.branchId
-  );
+  if (!user.branchId) return [];
+  return items.filter((item) => item.branchId === user.branchId);
+}
+
+/** Reject direct-ID access to records outside the employee's branch. */
+export function assertBranchAccess(
+  user: AuthUser,
+  record: { branchId?: Id<"branches"> },
+): void {
+  if (user.role === "admin") return;
+  if (!user.branchId || record.branchId !== user.branchId) {
+    throw new ConvexError("ليس لديك صلاحية للوصول إلى بيانات هذا الفرع");
+  }
+}
+
+/** Ignore a non-admin caller's requested branch and always use their branch. */
+export function resolveWriteBranch(
+  user: AuthUser,
+  requestedBranchId?: Id<"branches">,
+): Id<"branches"> | undefined {
+  if (user.role === "admin") {
+    const branchId = requestedBranchId ?? user.branchId;
+    if (!branchId) {
+      throw new ConvexError("اختر فرع العمل من الشريط العلوي قبل إضافة البيانات");
+    }
+    return branchId;
+  }
+  if (!user.branchId) {
+    throw new ConvexError("يجب ربط حسابك بفرع قبل إضافة البيانات");
+  }
+  return user.branchId;
 }
 
 // ──────────────────────────────────────────────
@@ -185,6 +212,16 @@ export async function requireModuleEnabled(
       throw new Error(`وحدة "${moduleName}" معطلة في النظام`);
     }
   }
+}
+
+export async function requireModulePermission(
+  ctx: QueryCtx | MutationCtx,
+  permission: Permission,
+  moduleName: string,
+): Promise<AuthUser> {
+  const user = await requirePermission(ctx, permission);
+  await requireModuleEnabled(ctx, moduleName);
+  return user;
 }
 
 // ──────────────────────────────────────────────

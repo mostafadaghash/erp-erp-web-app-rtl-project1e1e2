@@ -1,6 +1,6 @@
 import { query, mutation } from "./_generated/server";
 import { v, ConvexError } from "convex/values";
-import { requireAuth, requirePermission, logAction, hasAdmin, getAuthProfile } from "./lib/auth";
+import { assertBranchAccess, filterByBranch, requireAuth, requireModulePermission, resolveWriteBranch, logAction, hasAdmin, getAuthProfile } from "./lib/auth";
 import { ROLES, ROLE_PERMISSIONS, isPermission } from "./lib/permissions";
 import { INVITE_TTL_MS, isValidEmail, normalizeEmail } from "./lib/identity";
 
@@ -128,14 +128,10 @@ export const accessState = query({
 export const list = query({
   args: { branchId: v.optional(v.id("branches")) },
   handler: async (ctx, args) => {
-    const user = await requirePermission(ctx, "view_employees");
+    const user = await requireModulePermission(ctx, "view_employees", "employees");
     const employees = await ctx.db.query("userProfiles").collect();
-    // Non-admins can only see employees in their branch
-    let filtered = employees;
-    if (user.role !== "admin" && user.branchId) {
-      filtered = filtered.filter(e => !e.branchId || e.branchId === user.branchId);
-    }
-    if (args.branchId) {
+    const filtered = filterByBranch(employees, user);
+    if (args.branchId && user.role === "admin") {
       return filtered.filter(e => e.branchId === args.branchId);
     }
     return filtered;
@@ -145,26 +141,30 @@ export const list = query({
 export const get = query({
   args: { id: v.id("userProfiles") },
   handler: async (ctx, args) => {
-    await requirePermission(ctx, "view_employees");
-    return await ctx.db.get(args.id);
+    const user = await requireModulePermission(ctx, "view_employees", "employees");
+    const employee = await ctx.db.get(args.id);
+    if (employee) assertBranchAccess(user, employee);
+    return employee;
   },
 });
 
 export const getByUserId = query({
   args: { userId: v.string() },
   handler: async (ctx, args) => {
-    await requirePermission(ctx, "view_employees");
-    return await ctx.db.query("userProfiles")
+    const user = await requireModulePermission(ctx, "view_employees", "employees");
+    const employee = await ctx.db.query("userProfiles")
       .withIndex("by_user", q => q.eq("userId", args.userId))
       .first();
+    if (employee) assertBranchAccess(user, employee);
+    return employee;
   },
 });
 
 export const stats = query({
   args: {},
   handler: async (ctx) => {
-    await requirePermission(ctx, "view_employees");
-    const all = await ctx.db.query("userProfiles").collect();
+    const user = await requireModulePermission(ctx, "view_employees", "employees");
+    const all = filterByBranch(await ctx.db.query("userProfiles").collect(), user);
     const byRole: Record<string, number> = {};
     for (const e of all) {
       byRole[e.role] = (byRole[e.role] ?? 0) + 1;
@@ -192,6 +192,28 @@ export const me = query({
   },
 });
 
+export const setWorkingBranch = mutation({
+  args: { branchId: v.id("branches") },
+  handler: async (ctx, args) => {
+    const user = await requireModulePermission(ctx, "manage_branches", "branches");
+    if (user.role !== "admin") {
+      throw new ConvexError("مدير النظام فقط يمكنه تغيير فرع العمل");
+    }
+    const branch = await ctx.db.get(args.branchId);
+    if (!branch || !branch.isActive) {
+      throw new ConvexError("الفرع غير موجود أو غير نشط");
+    }
+    await ctx.db.patch(user.employeeId, { branchId: args.branchId });
+    await logAction(ctx, { ...user, branchId: args.branchId }, {
+      action: "select_branch",
+      module: "branches",
+      recordId: args.branchId,
+      recordLabel: branch.name,
+      details: `اختيار فرع العمل: ${branch.name}`,
+    });
+  },
+});
+
 export const create = mutation({
   args: {
     name: v.string(),
@@ -203,7 +225,7 @@ export const create = mutation({
     isActive: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
-    const user = await requirePermission(ctx, "manage_users");
+    const user = await requireModulePermission(ctx, "manage_users", "employees");
     if (!(args.role in ROLES)) throw new ConvexError("الدور الوظيفي غير صالح");
     const email = normalizeEmail(args.email);
     if (!isValidEmail(email)) {
@@ -221,13 +243,19 @@ export const create = mutation({
       throw new ConvexError("توجد صلاحية غير معروفة");
     }
     const permissions = requestedPermissions.filter(isPermission);
+    if (user.role !== "admin") {
+      if (args.role === "admin" || permissions.some((permission) => !user.permissions.includes(permission))) {
+        throw new ConvexError("لا يمكنك منح دور أو صلاحيات أعلى من صلاحياتك");
+      }
+    }
+    const branchId = resolveWriteBranch(user, args.branchId);
     const id = await ctx.db.insert("userProfiles", {
       userId: `pending:${email}`,
       name: args.name,
       email,
       phone: args.phone,
       role: args.role,
-      branchId: args.branchId,
+      branchId,
       permissions,
       isActive: args.isActive ?? true,
       inviteExpiresAt: Date.now() + INVITE_TTL_MS,
@@ -255,7 +283,7 @@ export const update = mutation({
     isActive: v.boolean(),
   },
   handler: async (ctx, args) => {
-    const user = await requirePermission(ctx, "manage_users");
+    const user = await requireModulePermission(ctx, "manage_users", "employees");
     if (!(args.role in ROLES)) throw new ConvexError("الدور الوظيفي غير صالح");
     if (args.permissions.some((permission) => !isPermission(permission))) {
       throw new ConvexError("توجد صلاحية غير معروفة");
@@ -263,6 +291,14 @@ export const update = mutation({
     const { id } = args;
     const emp = await ctx.db.get(id);
     if (!emp) throw new ConvexError("الموظف غير موجود");
+    assertBranchAccess(user, emp);
+    if (user.role !== "admin" && (emp.role === "admin" || args.role === "admin")) {
+      throw new ConvexError("لا يمكنك إدارة حسابات مديري النظام");
+    }
+    const permissions = args.permissions.filter(isPermission);
+    if (user.role !== "admin" && permissions.some((permission) => !user.permissions.includes(permission))) {
+      throw new ConvexError("لا يمكنك منح صلاحيات أعلى من صلاحياتك");
+    }
     const email = args.email ? normalizeEmail(args.email) : emp.email;
     if (email && !isValidEmail(email)) {
       throw new ConvexError("البريد الإلكتروني غير صالح");
@@ -292,13 +328,14 @@ export const update = mutation({
       }
     }
 
+    const branchId = resolveWriteBranch(user, args.branchId ?? emp.branchId);
     await ctx.db.patch(id, {
       name: args.name,
       email,
       phone: args.phone,
       role: args.role,
-      branchId: args.branchId,
-      permissions: args.permissions.filter(isPermission),
+      branchId,
+      permissions,
       isActive: args.isActive,
     });
     await logAction(ctx, user, {
@@ -314,9 +351,13 @@ export const update = mutation({
 export const toggleActive = mutation({
   args: { id: v.id("userProfiles") },
   handler: async (ctx, args) => {
-    const user = await requirePermission(ctx, "manage_users");
+    const user = await requireModulePermission(ctx, "manage_users", "employees");
     const emp = await ctx.db.get(args.id);
     if (!emp) throw new ConvexError("الموظف غير موجود");
+    assertBranchAccess(user, emp);
+    if (user.role !== "admin" && emp.role === "admin") {
+      throw new ConvexError("لا يمكنك إدارة حسابات مديري النظام");
+    }
 
     // Last admin protection
     if (emp.role === "admin" && emp.isActive) {
@@ -344,9 +385,13 @@ export const toggleActive = mutation({
 export const remove = mutation({
   args: { id: v.id("userProfiles") },
   handler: async (ctx, args) => {
-    const user = await requirePermission(ctx, "manage_users");
+    const user = await requireModulePermission(ctx, "manage_users", "employees");
     const emp = await ctx.db.get(args.id);
     if (!emp) throw new ConvexError("الموظف غير موجود");
+    assertBranchAccess(user, emp);
+    if (user.role !== "admin" && emp.role === "admin") {
+      throw new ConvexError("لا يمكنك إدارة حسابات مديري النظام");
+    }
 
     // Last admin protection
     if (emp.role === "admin" && emp.isActive) {
@@ -377,9 +422,10 @@ export const remove = mutation({
 export const renewInvitation = mutation({
   args: { id: v.id("userProfiles") },
   handler: async (ctx, args) => {
-    const user = await requirePermission(ctx, "manage_users");
+    const user = await requireModulePermission(ctx, "manage_users", "employees");
     const employee = await ctx.db.get(args.id);
     if (!employee) throw new ConvexError("الموظف غير موجود");
+    assertBranchAccess(user, employee);
     if (employee.tokenIdentifier) {
       throw new ConvexError("تم تفعيل حساب هذا الموظف بالفعل");
     }
@@ -407,13 +453,21 @@ export const updatePermissions = mutation({
     permissions: v.array(v.string()),
   },
   handler: async (ctx, args) => {
-    const user = await requirePermission(ctx, "manage_users");
+    const user = await requireModulePermission(ctx, "manage_users", "employees");
     if (args.permissions.some((permission) => !isPermission(permission))) {
       throw new ConvexError("توجد صلاحية غير معروفة");
     }
     const emp = await ctx.db.get(args.id);
     if (!emp) throw new ConvexError("الموظف غير موجود");
-    await ctx.db.patch(args.id, { permissions: args.permissions.filter(isPermission) });
+    assertBranchAccess(user, emp);
+    if (user.role !== "admin" && emp.role === "admin") {
+      throw new ConvexError("لا يمكنك إدارة حسابات مديري النظام");
+    }
+    const permissions = args.permissions.filter(isPermission);
+    if (user.role !== "admin" && permissions.some((permission) => !user.permissions.includes(permission))) {
+      throw new ConvexError("لا يمكنك منح صلاحيات أعلى من صلاحياتك");
+    }
+    await ctx.db.patch(args.id, { permissions });
     await logAction(ctx, user, {
       action: "update",
       module: "employees",

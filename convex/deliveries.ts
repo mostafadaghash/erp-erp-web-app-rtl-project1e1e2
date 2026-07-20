@@ -1,7 +1,7 @@
 import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
 import { ConvexError } from "convex/values";
-import { requireAuth, requirePermission, filterByBranch, logAction } from "./lib/auth";
+import { assertBranchAccess, requireModulePermission, filterByBranch, resolveWriteBranch, logAction } from "./lib/auth";
 
 export const list = query({
   args: {
@@ -9,7 +9,7 @@ export const list = query({
     city: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const user = await requirePermission(ctx, "view_deliveries");
+    const user = await requireModulePermission(ctx, "view_deliveries", "deliveries");
     let deliveries;
     if (args.status) {
       deliveries = await ctx.db
@@ -31,8 +31,10 @@ export const list = query({
 export const get = query({
   args: { id: v.id("deliveries") },
   handler: async (ctx, args) => {
-    await requirePermission(ctx, "view_deliveries");
-    return await ctx.db.get(args.id);
+    const user = await requireModulePermission(ctx, "view_deliveries", "deliveries");
+    const delivery = await ctx.db.get(args.id);
+    if (delivery) assertBranchAccess(user, delivery);
+    return delivery;
   },
 });
 
@@ -62,9 +64,19 @@ export const create = mutation({
     branchId: v.optional(v.id("branches")),
   },
   handler: async (ctx, args) => {
-    const user = await requirePermission(ctx, "create_deliveries");
+    const user = await requireModulePermission(ctx, "create_deliveries", "deliveries");
+    if (args.orderId) {
+      const order = await ctx.db.get(args.orderId);
+      if (!order) throw new ConvexError("الطلب غير موجود");
+      assertBranchAccess(user, order);
+    }
+    if (args.customerId) {
+      const customer = await ctx.db.get(args.customerId);
+      if (!customer) throw new ConvexError("العميل غير موجود");
+      assertBranchAccess(user, customer);
+    }
     const deliveryNumber = `DEL-${Date.now().toString().slice(-6)}`;
-    const branchId = args.branchId ?? (user.branchId as any);
+    const branchId = resolveWriteBranch(user, args.branchId);
     const id = await ctx.db.insert("deliveries", {
       ...args,
       branchId,
@@ -89,9 +101,10 @@ export const updateStatus = mutation({
     notes: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const user = await requirePermission(ctx, "edit_deliveries");
+    const user = await requireModulePermission(ctx, "edit_deliveries", "deliveries");
     const delivery = await ctx.db.get(args.id);
     if (!delivery) throw new ConvexError("الشحنة غير موجودة");
+    assertBranchAccess(user, delivery);
     const patch: Record<string, unknown> = { status: args.status };
     if (args.status === "delivered") patch.deliveredDate = new Date().toISOString().split("T")[0];
     if (args.notes) patch.notes = args.notes;
@@ -122,9 +135,10 @@ export const update = mutation({
     notes: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const user = await requirePermission(ctx, "edit_deliveries");
+    const user = await requireModulePermission(ctx, "edit_deliveries", "deliveries");
     const delivery = await ctx.db.get(args.id);
     if (!delivery) throw new ConvexError("الشحنة غير موجودة");
+    assertBranchAccess(user, delivery);
     const { id, ...rest } = args;
     await ctx.db.patch(id, rest);
     await logAction(ctx, user, {
@@ -140,9 +154,10 @@ export const update = mutation({
 export const remove = mutation({
   args: { id: v.id("deliveries") },
   handler: async (ctx, args) => {
-    const user = await requirePermission(ctx, "delete_deliveries");
+    const user = await requireModulePermission(ctx, "delete_deliveries", "deliveries");
     const delivery = await ctx.db.get(args.id);
     if (!delivery) throw new ConvexError("الشحنة غير موجودة");
+    assertBranchAccess(user, delivery);
     await ctx.db.delete(args.id);
     await logAction(ctx, user, {
       action: "delete",
@@ -157,7 +172,7 @@ export const remove = mutation({
 export const getStats = query({
   args: {},
   handler: async (ctx) => {
-    const user = await requirePermission(ctx, "view_deliveries");
+    const user = await requireModulePermission(ctx, "view_deliveries", "deliveries");
     const all = await ctx.db.query("deliveries").collect();
     const d = filterByBranch(all, user);
     const pending   = d.filter(x => x.status === "pending").length;

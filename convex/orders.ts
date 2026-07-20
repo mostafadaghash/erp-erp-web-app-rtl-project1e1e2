@@ -1,12 +1,12 @@
 import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
 import { ConvexError } from "convex/values";
-import { requireAuth, requirePermission, filterByBranch, logAction } from "./lib/auth";
+import { assertBranchAccess, requireModulePermission, filterByBranch, resolveWriteBranch, logAction } from "./lib/auth";
 
 export const list = query({
   args: { status: v.optional(v.string()) },
   handler: async (ctx, args) => {
-    const user = await requirePermission(ctx, "view_orders");
+    const user = await requireModulePermission(ctx, "view_orders", "orders");
     let orders;
     if (args.status) {
       orders = await ctx.db
@@ -24,15 +24,17 @@ export const list = query({
 export const get = query({
   args: { id: v.id("orders") },
   handler: async (ctx, args) => {
-    await requirePermission(ctx, "view_orders");
-    return await ctx.db.get(args.id);
+    const user = await requireModulePermission(ctx, "view_orders", "orders");
+    const order = await ctx.db.get(args.id);
+    if (order) assertBranchAccess(user, order);
+    return order;
   },
 });
 
 export const stats = query({
   args: {},
   handler: async (ctx) => {
-    const user = await requirePermission(ctx, "view_orders");
+    const user = await requireModulePermission(ctx, "view_orders", "orders");
     const all = await ctx.db.query("orders").collect();
     const orders = filterByBranch(all, user);
     const pending = orders.filter((o) => o.status === "pending").length;
@@ -65,11 +67,16 @@ export const create = mutation({
     branchId: v.optional(v.id("branches")),
   },
   handler: async (ctx, args) => {
-    const user = await requirePermission(ctx, "create_orders");
+    const user = await requireModulePermission(ctx, "create_orders", "orders");
+    if (args.customerId) {
+      const customer = await ctx.db.get(args.customerId);
+      if (!customer) throw new ConvexError("العميل غير موجود");
+      assertBranchAccess(user, customer);
+    }
     const count = (await ctx.db.query("orders").collect()).length + 1;
     const orderNumber = "ORD-" + String(count).padStart(4, "0");
     const remaining = args.total - args.deposit;
-    const branchId = args.branchId ?? (user.branchId as any);
+    const branchId = resolveWriteBranch(user, args.branchId);
     const id = await ctx.db.insert("orders", {
       ...args,
       branchId,
@@ -91,9 +98,10 @@ export const create = mutation({
 export const updateStatus = mutation({
   args: { id: v.id("orders"), status: v.string() },
   handler: async (ctx, args) => {
-    const user = await requirePermission(ctx, "edit_orders");
+    const user = await requireModulePermission(ctx, "edit_orders", "orders");
     const order = await ctx.db.get(args.id);
     if (!order) throw new ConvexError("الطلب غير موجود");
+    assertBranchAccess(user, order);
     await ctx.db.patch(args.id, { status: args.status });
     await logAction(ctx, user, {
       action: "update",
@@ -108,9 +116,10 @@ export const updateStatus = mutation({
 export const addPayment = mutation({
   args: { id: v.id("orders"), amount: v.number() },
   handler: async (ctx, args) => {
-    const user = await requirePermission(ctx, "edit_orders");
+    const user = await requireModulePermission(ctx, "edit_orders", "orders");
     const order = await ctx.db.get(args.id);
     if (!order) throw new ConvexError("الطلب غير موجود");
+    assertBranchAccess(user, order);
     const newDeposit = order.deposit + args.amount;
     const newRemaining = order.total - newDeposit;
     if (newRemaining < 0) throw new ConvexError("المبلغ المدفوع أكبر من إجمالي الطلب");
@@ -132,9 +141,10 @@ export const addPayment = mutation({
 export const remove = mutation({
   args: { id: v.id("orders") },
   handler: async (ctx, args) => {
-    const user = await requirePermission(ctx, "delete_orders");
+    const user = await requireModulePermission(ctx, "delete_orders", "orders");
     const order = await ctx.db.get(args.id);
     if (!order) throw new ConvexError("الطلب غير موجود");
+    assertBranchAccess(user, order);
     if (order.status === "delivered") throw new ConvexError("لا يمكن حذف طلب تم تسليمه");
     await ctx.db.delete(args.id);
     await logAction(ctx, user, {

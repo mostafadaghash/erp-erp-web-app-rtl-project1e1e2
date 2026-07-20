@@ -12,15 +12,17 @@ import type { Permission } from "../../convex/lib/permissions";
 interface DashboardProps {
   onNavigate: (page: Page) => void;
   permissions: Permission[];
+  modules: Record<string, boolean | undefined>;
 }
 
-export function Dashboard({ onNavigate, permissions }: DashboardProps) {
+export function Dashboard({ onNavigate, permissions, modules }: DashboardProps) {
   const can = (permission: Permission) => permissions.includes(permission);
-  const canViewInvoices = can("view_invoices");
-  const canViewRepairs = can("view_repairs");
-  const canViewExpenses = can("view_expenses");
+  const enabled = (moduleName: string) => modules[moduleName] !== false;
+  const canViewInvoices = can("view_invoices") && enabled("invoices");
+  const canViewRepairs = can("view_repairs") && enabled("repairs");
+  const canViewExpenses = can("view_expenses") && enabled("expenses");
   const canViewProducts = can("view_products");
-  const canViewLeads = can("view_leads");
+  const canViewLeads = can("view_leads") && enabled("crm");
 
   const invoiceStats = useQuery(api.invoices.stats, canViewInvoices ? {} : "skip");
   const repairStats = useQuery(api.repairs.getStats, canViewRepairs ? {} : "skip");
@@ -88,7 +90,7 @@ export function Dashboard({ onNavigate, permissions }: DashboardProps) {
             {new Date().toLocaleDateString("ar-SA", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
           </p>
         </div>
-        {can("create_invoices") && <button
+        {can("create_invoices") && enabled("invoices") && <button
           onClick={() => onNavigate("new-invoice")}
           className="btn-primary flex items-center gap-2"
         >

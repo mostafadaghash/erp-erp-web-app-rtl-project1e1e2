@@ -1,6 +1,6 @@
 import { query, mutation } from "./_generated/server";
 import { v, ConvexError } from "convex/values";
-import { requireAuth, requirePermission, filterByBranch, logAction } from "./lib/auth";
+import { assertBranchAccess, requireModulePermission, filterByBranch, resolveWriteBranch, logAction } from "./lib/auth";
 
 export const list = query({
   args: {
@@ -8,7 +8,7 @@ export const list = query({
     source: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const user = await requirePermission(ctx, "view_leads");
+    const user = await requireModulePermission(ctx, "view_leads", "crm");
     let leads;
     if (args.status) {
       leads = await ctx.db
@@ -29,17 +29,20 @@ export const list = query({
 export const get = query({
   args: { id: v.id("leads") },
   handler: async (ctx, args) => {
-    await requirePermission(ctx, "view_leads");
-    return await ctx.db.get(args.id);
+    const user = await requireModulePermission(ctx, "view_leads", "crm");
+    const lead = await ctx.db.get(args.id);
+    if (lead) assertBranchAccess(user, lead);
+    return lead;
   },
 });
 
 export const getWithActivities = query({
   args: { id: v.id("leads") },
   handler: async (ctx, args) => {
-    await requirePermission(ctx, "view_leads");
+    const user = await requireModulePermission(ctx, "view_leads", "crm");
     const lead = await ctx.db.get(args.id);
     if (!lead) return null;
+    assertBranchAccess(user, lead);
     const activities = await ctx.db
       .query("leadActivities")
       .withIndex("by_lead", (q) => q.eq("leadId", args.id))
@@ -52,7 +55,7 @@ export const getWithActivities = query({
 export const stats = query({
   args: {},
   handler: async (ctx) => {
-    const user = await requirePermission(ctx, "view_leads");
+    const user = await requireModulePermission(ctx, "view_leads", "crm");
     const all = await ctx.db.query("leads").collect();
     const filtered = filterByBranch(all, user);
     const byStatus: Record<string, number> = {};
@@ -92,8 +95,8 @@ export const create = mutation({
     nextFollowUpDate: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const user = await requirePermission(ctx, "create_leads");
-    const branchId = args.branchId ?? (user.branchId as any);
+    const user = await requireModulePermission(ctx, "create_leads", "crm");
+    const branchId = resolveWriteBranch(user, args.branchId);
     const id = await ctx.db.insert("leads", {
       ...args,
       branchId,
@@ -128,11 +131,13 @@ export const update = mutation({
     nextFollowUpDate: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const user = await requirePermission(ctx, "edit_leads");
+    const user = await requireModulePermission(ctx, "edit_leads", "crm");
     const { id, ...data } = args;
     const lead = await ctx.db.get(id);
     if (!lead) throw new ConvexError("العميل المحتمل غير موجود");
-    await ctx.db.patch(id, data);
+    assertBranchAccess(user, lead);
+    const branchId = resolveWriteBranch(user, data.branchId ?? lead.branchId);
+    await ctx.db.patch(id, { ...data, branchId });
     await logAction(ctx, user, {
       action: "update",
       module: "leads",
@@ -150,9 +155,10 @@ export const updateStatus = mutation({
     lostReason: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const user = await requirePermission(ctx, "edit_leads");
+    const user = await requireModulePermission(ctx, "edit_leads", "crm");
     const lead = await ctx.db.get(args.id);
     if (!lead) throw new ConvexError("العميل المحتمل غير موجود");
+    assertBranchAccess(user, lead);
     await ctx.db.patch(args.id, {
       status: args.status,
       lostReason: args.lostReason,
@@ -174,9 +180,10 @@ export const convertToCustomer = mutation({
     address: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const user = await requirePermission(ctx, "edit_leads");
+    const user = await requireModulePermission(ctx, "edit_leads", "crm");
     const lead = await ctx.db.get(args.id);
     if (!lead) throw new ConvexError("العميل المحتمل غير موجود");
+    assertBranchAccess(user, lead);
     if (lead.convertedToCustomerId)
       throw new ConvexError("تم تحويل هذا العميل مسبقاً");
     const customerId = await ctx.db.insert("customers", {
@@ -208,9 +215,10 @@ export const convertToCustomer = mutation({
 export const remove = mutation({
   args: { id: v.id("leads") },
   handler: async (ctx, args) => {
-    const user = await requirePermission(ctx, "delete_leads");
+    const user = await requireModulePermission(ctx, "delete_leads", "crm");
     const lead = await ctx.db.get(args.id);
     if (!lead) throw new ConvexError("العميل المحتمل غير موجود");
+    assertBranchAccess(user, lead);
     const activities = await ctx.db
       .query("leadActivities")
       .withIndex("by_lead", (q) => q.eq("leadId", args.id))
@@ -230,7 +238,10 @@ export const remove = mutation({
 export const listActivities = query({
   args: { leadId: v.id("leads") },
   handler: async (ctx, args) => {
-    await requirePermission(ctx, "view_leads");
+    const user = await requireModulePermission(ctx, "view_leads", "crm");
+    const lead = await ctx.db.get(args.leadId);
+    if (!lead) throw new ConvexError("العميل المحتمل غير موجود");
+    assertBranchAccess(user, lead);
     return await ctx.db
       .query("leadActivities")
       .withIndex("by_lead", (q) => q.eq("leadId", args.leadId))
@@ -249,9 +260,10 @@ export const addActivity = mutation({
     createdBy: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const user = await requirePermission(ctx, "edit_leads");
+    const user = await requireModulePermission(ctx, "edit_leads", "crm");
     const lead = await ctx.db.get(args.leadId);
     if (!lead) throw new ConvexError("العميل المحتمل غير موجود");
+    assertBranchAccess(user, lead);
     await ctx.db.patch(args.leadId, {
       lastContactDate: new Date().toISOString().split("T")[0],
     });
@@ -273,7 +285,12 @@ export const addActivity = mutation({
 export const deleteActivity = mutation({
   args: { id: v.id("leadActivities") },
   handler: async (ctx, args) => {
-    const user = await requirePermission(ctx, "edit_leads");
+    const user = await requireModulePermission(ctx, "edit_leads", "crm");
+    const activity = await ctx.db.get(args.id);
+    if (!activity) throw new ConvexError("النشاط غير موجود");
+    const lead = await ctx.db.get(activity.leadId);
+    if (!lead) throw new ConvexError("العميل المحتمل غير موجود");
+    assertBranchAccess(user, lead);
     await ctx.db.delete(args.id);
     await logAction(ctx, user, {
       action: "delete",

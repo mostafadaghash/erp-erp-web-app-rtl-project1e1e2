@@ -1,11 +1,11 @@
 import { query, mutation } from "./_generated/server";
-import { v } from "convex/values";
-import { requireAuth, requirePermission, filterByBranch, logAction } from "./lib/auth";
+import { v, ConvexError } from "convex/values";
+import { assertBranchAccess, requireModuleEnabled, requireModulePermission, filterByBranch, resolveWriteBranch, logAction } from "./lib/auth";
 
 export const list = query({
   args: {},
   handler: async (ctx) => {
-    const user = await requirePermission(ctx, "view_repairs");
+    const user = await requireModulePermission(ctx, "view_repairs", "repairs");
     const repairs = await ctx.db.query("repairs").order("desc").collect();
     return filterByBranch(repairs, user);
   },
@@ -14,14 +14,17 @@ export const list = query({
 export const get = query({
   args: { id: v.id("repairs") },
   handler: async (ctx, args) => {
-    await requirePermission(ctx, "view_repairs");
-    return await ctx.db.get(args.id);
+    const user = await requireModulePermission(ctx, "view_repairs", "repairs");
+    const repair = await ctx.db.get(args.id);
+    if (repair) assertBranchAccess(user, repair);
+    return repair;
   },
 });
 
 export const getByTracking = query({
   args: { token: v.string() },
   handler: async (ctx, args) => {
+    await requireModuleEnabled(ctx, "repairs");
     return await ctx.db.query("repairs")
       .withIndex("by_tracking", q => q.eq("trackingToken", args.token))
       .first();
@@ -45,12 +48,17 @@ export const create = mutation({
     technicianName: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const user = await requirePermission(ctx, "create_repairs");
+    const user = await requireModulePermission(ctx, "create_repairs", "repairs");
+    if (args.customerId) {
+      const customer = await ctx.db.get(args.customerId);
+      if (!customer) throw new ConvexError("العميل غير موجود");
+      assertBranchAccess(user, customer);
+    }
     const count = await ctx.db.query("repairs").collect();
     const repairNumber = `REP-${String(count.length + 1).padStart(5, "0")}`;
     const trackingToken = Math.random().toString(36).substring(2, 10).toUpperCase();
     const totalCost = args.laborCost;
-    const branchId = args.branchId ?? (user.branchId as any);
+    const branchId = resolveWriteBranch(user, args.branchId);
     const id = await ctx.db.insert("repairs", {
       ...args,
       branchId,
@@ -81,9 +89,10 @@ export const updateStatus = mutation({
     deliveredDate: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const user = await requirePermission(ctx, "edit_repairs");
+    const user = await requireModulePermission(ctx, "edit_repairs", "repairs");
     const repair = await ctx.db.get(args.id);
     if (!repair) throw new Error("أمر الصيانة غير موجود");
+    assertBranchAccess(user, repair);
     const { id, ...rest } = args;
     await ctx.db.patch(id, rest);
     await logAction(ctx, user, {
@@ -99,7 +108,7 @@ export const updateStatus = mutation({
 export const getStats = query({
   args: {},
   handler: async (ctx) => {
-    const user = await requirePermission(ctx, "view_repairs");
+    const user = await requireModulePermission(ctx, "view_repairs", "repairs");
     const all = await ctx.db.query("repairs").collect();
     const repairs = filterByBranch(all, user);
     return {

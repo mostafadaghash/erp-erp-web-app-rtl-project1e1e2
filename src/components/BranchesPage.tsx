@@ -7,7 +7,7 @@ import { Id } from "../../convex/_generated/dataModel";
 import {
   Building2, Plus, X, Search, MapPin, Phone,
   CheckCircle, XCircle, Pencil, Trash2, Users,
-  ToggleLeft, ToggleRight
+  ToggleLeft, ToggleRight, DatabaseZap
 } from "lucide-react";
 
 interface BranchForm {
@@ -29,9 +29,11 @@ export function BranchesPage() {
   const branches = useQuery(api.branches.list);
   const employees = useQuery(api.employees.list, {});
   const stats = useQuery(api.branches.stats);
+  const legacyData = useQuery(api.branches.legacyDataStats, canManage ? {} : "skip");
   const createBranch = useMutation(api.branches.create);
   const updateBranch = useMutation(api.branches.update);
   const removeBranch = useMutation(api.branches.remove);
+  const assignLegacyData = useMutation(api.branches.assignLegacyData);
 
   const filtered = (branches ?? []).filter(b =>
     b.name.includes(search) || b.address.includes(search)
@@ -73,6 +75,16 @@ export function BranchesPage() {
     }
   };
 
+  const handleAssignLegacyData = async (id: Id<"branches">, name: string) => {
+    if (!confirm(`سيتم إسناد كل البيانات القديمة غير المرتبطة بفرع إلى «${name}». هل تريد المتابعة؟`)) return;
+    try {
+      const assigned = await assignLegacyData({ branchId: id });
+      toast.success(`تم إسناد ${assigned} سجل إلى ${name}`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "تعذر إسناد البيانات القديمة");
+    }
+  };
+
   const getBranchEmployeeCount = (branchId: Id<"branches">) =>
     (employees ?? []).filter(e => e.branchId === branchId).length;
 
@@ -92,6 +104,16 @@ export function BranchesPage() {
           فرع جديد
         </button>}
       </div>
+
+      {canManage && (legacyData?.total ?? 0) > 0 && (
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-start gap-3">
+          <DatabaseZap className="w-5 h-5 text-amber-600 mt-0.5 flex-shrink-0" />
+          <div>
+            <p className="font-bold text-amber-800">يوجد {legacyData?.total} سجل قديم بدون فرع</p>
+            <p className="text-xs text-amber-700 mt-1">اختر الفرع المناسب ثم استخدم زر «إسناد البيانات القديمة» داخل بطاقة الفرع.</p>
+          </div>
+        </div>
+      )}
 
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -193,6 +215,16 @@ export function BranchesPage() {
                     <span>{empCount} موظف</span>
                   </div>
                 </div>
+                {canManage && (legacyData?.total ?? 0) > 0 && branch.isActive && (
+                  <button
+                    type="button"
+                    onClick={() => void handleAssignLegacyData(branch._id, branch.name)}
+                    className="mt-4 w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-amber-50 text-amber-700 text-xs font-bold hover:bg-amber-100 transition-colors"
+                  >
+                    <DatabaseZap className="w-4 h-4" />
+                    إسناد البيانات القديمة لهذا الفرع
+                  </button>
+                )}
               </div>
             );
           })}
