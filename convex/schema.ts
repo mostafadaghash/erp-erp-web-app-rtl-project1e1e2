@@ -294,6 +294,7 @@ const applicationTables = {
     recordId: v.optional(v.string()),
     recordLabel: v.optional(v.string()),
     details: v.optional(v.string()),
+    branchId: v.optional(v.id("branches")),
   })
     .index("by_user", ["userId"])
     .index("by_module", ["module"])

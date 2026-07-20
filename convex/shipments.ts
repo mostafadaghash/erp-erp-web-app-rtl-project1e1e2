@@ -1,24 +1,30 @@
 import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
 import { ConvexError } from "convex/values";
+import { requireAuth, requirePermission, filterByBranch, logAction } from "./lib/auth";
 
 export const list = query({
   args: { status: v.optional(v.string()) },
   handler: async (ctx, args) => {
+    const user = await requireAuth(ctx);
+    let shipments;
     if (args.status) {
-      return await ctx.db
+      shipments = await ctx.db
         .query("shipments")
         .withIndex("by_status", (q) => q.eq("status", args.status!))
         .order("desc")
         .collect();
+    } else {
+      shipments = await ctx.db.query("shipments").order("desc").collect();
     }
-    return await ctx.db.query("shipments").order("desc").collect();
+    return filterByBranch(shipments, user);
   },
 });
 
 export const get = query({
   args: { id: v.id("shipments") },
   handler: async (ctx, args) => {
+    await requireAuth(ctx);
     return await ctx.db.get(args.id);
   },
 });
@@ -26,15 +32,17 @@ export const get = query({
 export const stats = query({
   args: {},
   handler: async (ctx) => {
+    const user = await requireAuth(ctx);
     const all = await ctx.db.query("shipments").collect();
-    const ordered = all.filter((s) => s.status === "ordered").length;
-    const inTransit = all.filter((s) => s.status === "in_transit").length;
-    const arrived = all.filter((s) => s.status === "arrived").length;
-    const totalCost = all.reduce((s, sh) => s + sh.grandTotal, 0);
-    const pendingCost = all
-      .filter((s) => s.status !== "arrived" && s.status !== "cancelled")
-      .reduce((s, sh) => s + sh.grandTotal, 0);
-    return { ordered, inTransit, arrived, totalCost, pendingCost, total: all.length };
+    const s = filterByBranch(all, user);
+    const ordered = s.filter((x) => x.status === "ordered").length;
+    const inTransit = s.filter((x) => x.status === "in_transit").length;
+    const arrived = s.filter((x) => x.status === "arrived").length;
+    const totalCost = s.reduce((sum, sh) => sum + sh.grandTotal, 0);
+    const pendingCost = s
+      .filter((x) => x.status !== "arrived" && x.status !== "cancelled")
+      .reduce((sum, sh) => sum + sh.grandTotal, 0);
+    return { ordered, inTransit, arrived, totalCost, pendingCost, total: s.length };
   },
 });
 
@@ -54,15 +62,27 @@ export const create = mutation({
     grandTotal: v.number(),
     expectedDate: v.optional(v.string()),
     notes: v.optional(v.string()),
+    branchId: v.optional(v.id("branches")),
   },
   handler: async (ctx, args) => {
+    const user = await requirePermission(ctx, "create_shipments");
     const count = (await ctx.db.query("shipments").collect()).length + 1;
     const shipmentNumber = "SHP-" + String(count).padStart(4, "0");
-    return await ctx.db.insert("shipments", {
+    const branchId = args.branchId ?? (user.branchId as any);
+    const id = await ctx.db.insert("shipments", {
       ...args,
+      branchId,
       shipmentNumber,
       status: "ordered",
     });
+    await logAction(ctx, user, {
+      action: "create",
+      module: "shipments",
+      recordId: id,
+      recordLabel: shipmentNumber,
+      details: `إنشاء شحنة واردة: ${shipmentNumber} من ${args.supplierName} بقيمة ${args.grandTotal}`,
+    });
+    return id;
   },
 });
 
@@ -73,11 +93,11 @@ export const updateStatus = mutation({
     arrivedDate: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    const user = await requirePermission(ctx, "edit_shipments");
     const shipment = await ctx.db.get(args.id);
     if (!shipment) throw new ConvexError("الشحنة غير موجودة");
     const patch: Record<string, string> = { status: args.status };
     if (args.arrivedDate) patch.arrivedDate = args.arrivedDate;
-
     await ctx.db.patch(args.id, patch);
 
     // When arrived, update product stock
@@ -93,15 +113,30 @@ export const updateStatus = mutation({
         }
       }
     }
+    await logAction(ctx, user, {
+      action: "update",
+      module: "shipments",
+      recordId: args.id,
+      recordLabel: shipment.shipmentNumber,
+      details: `تحديث حالة الشحنة ${shipment.shipmentNumber} إلى: ${args.status}`,
+    });
   },
 });
 
 export const remove = mutation({
   args: { id: v.id("shipments") },
   handler: async (ctx, args) => {
+    const user = await requirePermission(ctx, "delete_all");
     const shipment = await ctx.db.get(args.id);
     if (!shipment) throw new ConvexError("الشحنة غير موجودة");
     if (shipment.status === "arrived") throw new ConvexError("لا يمكن حذف شحنة تم استلامها");
     await ctx.db.delete(args.id);
+    await logAction(ctx, user, {
+      action: "delete",
+      module: "shipments",
+      recordId: args.id,
+      recordLabel: shipment.shipmentNumber,
+      details: `حذف الشحنة ${shipment.shipmentNumber}`,
+    });
   },
 });

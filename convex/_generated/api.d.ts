@@ -19,6 +19,7 @@ import type * as expenses from "../expenses.js";
 import type * as http from "../http.js";
 import type * as invoices from "../invoices.js";
 import type * as leads from "../leads.js";
+import type * as lib_auth from "../lib/auth.js";
 import type * as orders from "../orders.js";
 import type * as products from "../products.js";
 import type * as repairs from "../repairs.js";
@@ -54,6 +55,7 @@ declare const fullApi: ApiFromModules<{
   http: typeof http;
   invoices: typeof invoices;
   leads: typeof leads;
+  "lib/auth": typeof lib_auth;
   orders: typeof orders;
   products: typeof products;
   repairs: typeof repairs;

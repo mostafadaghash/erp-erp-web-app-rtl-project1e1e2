@@ -94,10 +94,10 @@ export function AuditLogsPage() {
       {stats && (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {[
-            { label: "إجمالي العمليات", value: stats.total,   color: "bg-slate-100 text-slate-700" },
-            { label: "إنشاء",           value: stats.creates, color: "bg-emerald-100 text-emerald-700" },
-            { label: "تعديل",           value: stats.updates, color: "bg-blue-100 text-blue-700" },
-            { label: "حذف",             value: stats.deletes, color: "bg-red-100 text-red-700" },
+            { label: "إجمالي العمليات", value: stats.total,                    color: "bg-slate-100 text-slate-700" },
+            { label: "إنشاء",           value: stats.byAction["create"] ?? 0,  color: "bg-emerald-100 text-emerald-700" },
+            { label: "تعديل",           value: stats.byAction["update"] ?? 0,  color: "bg-blue-100 text-blue-700" },
+            { label: "حذف",             value: stats.byAction["delete"] ?? 0,  color: "bg-red-100 text-red-700" },
           ].map(s => (
             <div key={s.label} className={`rounded-xl p-4 text-center ${s.color}`}>
               <p className="text-2xl font-black">{s.value}</p>

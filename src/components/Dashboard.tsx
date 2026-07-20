@@ -13,30 +13,30 @@ interface DashboardProps {
 }
 
 export function Dashboard({ onNavigate }: DashboardProps) {
-  const invoiceStats = useQuery(api.invoices.getStats);
+  const invoiceStats = useQuery(api.invoices.stats);
   const repairStats = useQuery(api.repairs.getStats);
   const expenseStats = useQuery(api.expenses.getStats);
-  const lowStockProducts = useQuery(api.products.getLowStock);
-  const recentInvoices = useQuery(api.invoices.list);
-  const recentRepairs = useQuery(api.repairs.list);
+  const lowStockProducts = useQuery(api.products.list, { lowStock: true });
+  const recentInvoices = useQuery(api.invoices.list, {});
+  const recentRepairs = useQuery(api.repairs.list, {});
   const crmStats = useQuery(api.leads.stats);
 
   const { formatCurrency, currency } = useCurrency();
 
   const statCards = [
     {
-      title: "مبيعات اليوم",
-      value: formatCurrency(invoiceStats?.todaySales ?? 0),
-      sub: `${invoiceStats?.todayInvoices ?? 0} فاتورة`,
+      title: "إجمالي المبيعات المدفوعة",
+      value: formatCurrency(invoiceStats?.totalRevenue ?? 0),
+      sub: `${invoiceStats?.paid ?? 0} فاتورة مدفوعة`,
       icon: TrendingUp,
       color: "from-indigo-500 to-indigo-600",
       bg: "bg-indigo-50",
       text: "text-indigo-600",
     },
     {
-      title: "إجمالي المبيعات",
-      value: formatCurrency(invoiceStats?.totalSales ?? 0),
-      sub: `${invoiceStats?.totalInvoices ?? 0} فاتورة`,
+      title: "إجمالي الفواتير",
+      value: formatCurrency(invoiceStats?.totalOutstanding ?? 0),
+      sub: `${invoiceStats?.total ?? 0} فاتورة`,
       icon: ShoppingCart,
       color: "from-emerald-500 to-emerald-600",
       bg: "bg-emerald-50",
@@ -44,7 +44,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
     },
     {
       title: "مستحقات العملاء",
-      value: formatCurrency(invoiceStats?.pendingPayments ?? 0),
+      value: formatCurrency(invoiceStats?.totalOutstanding ?? 0),
       sub: "مبالغ معلقة",
       icon: DollarSign,
       color: "from-amber-500 to-amber-600",

@@ -1,5 +1,6 @@
 import { query, mutation } from "./_generated/server";
 import { v, ConvexError } from "convex/values";
+import { requireAuth, requirePermission, filterByBranch, logAction } from "./lib/auth";
 
 export const list = query({
   args: {
@@ -7,6 +8,7 @@ export const list = query({
     source: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    const user = await requireAuth(ctx);
     let leads;
     if (args.status) {
       leads = await ctx.db
@@ -20,13 +22,14 @@ export const list = query({
     if (args.source) {
       leads = leads.filter((l) => l.source === args.source);
     }
-    return leads;
+    return filterByBranch(leads, user);
   },
 });
 
 export const get = query({
   args: { id: v.id("leads") },
   handler: async (ctx, args) => {
+    await requireAuth(ctx);
     return await ctx.db.get(args.id);
   },
 });
@@ -34,6 +37,7 @@ export const get = query({
 export const getWithActivities = query({
   args: { id: v.id("leads") },
   handler: async (ctx, args) => {
+    await requireAuth(ctx);
     const lead = await ctx.db.get(args.id);
     if (!lead) return null;
     const activities = await ctx.db
@@ -48,17 +52,19 @@ export const getWithActivities = query({
 export const stats = query({
   args: {},
   handler: async (ctx) => {
+    const user = await requireAuth(ctx);
     const all = await ctx.db.query("leads").collect();
+    const filtered = filterByBranch(all, user);
     const byStatus: Record<string, number> = {};
     const bySource: Record<string, number> = {};
-    for (const l of all) {
+    for (const l of filtered) {
       byStatus[l.status] = (byStatus[l.status] ?? 0) + 1;
       bySource[l.source] = (bySource[l.source] ?? 0) + 1;
     }
-    const won = all.filter((l) => l.status === "won").length;
-    const total = all.filter((l) => l.status !== "new").length;
+    const won = filtered.filter((l) => l.status === "won").length;
+    const total = filtered.filter((l) => l.status !== "new").length;
     return {
-      total: all.length,
+      total: filtered.length,
       new: byStatus["new"] ?? 0,
       contacted: byStatus["contacted"] ?? 0,
       interested: byStatus["interested"] ?? 0,
@@ -86,11 +92,22 @@ export const create = mutation({
     nextFollowUpDate: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    return await ctx.db.insert("leads", {
+    const user = await requirePermission(ctx, "create_leads");
+    const branchId = args.branchId ?? (user.branchId as any);
+    const id = await ctx.db.insert("leads", {
       ...args,
+      branchId,
       status: args.status ?? "new",
       lastContactDate: new Date().toISOString().split("T")[0],
     });
+    await logAction(ctx, user, {
+      action: "create",
+      module: "leads",
+      recordId: id,
+      recordLabel: args.name,
+      details: `إضافة عميل محتمل: ${args.name} - ${args.phone}`,
+    });
+    return id;
   },
 });
 
@@ -111,10 +128,18 @@ export const update = mutation({
     nextFollowUpDate: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    const user = await requirePermission(ctx, "edit_leads");
     const { id, ...data } = args;
     const lead = await ctx.db.get(id);
     if (!lead) throw new ConvexError("العميل المحتمل غير موجود");
     await ctx.db.patch(id, data);
+    await logAction(ctx, user, {
+      action: "update",
+      module: "leads",
+      recordId: id,
+      recordLabel: args.name,
+      details: `تحديث بيانات العميل المحتمل: ${args.name}`,
+    });
   },
 });
 
@@ -125,12 +150,20 @@ export const updateStatus = mutation({
     lostReason: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    const user = await requirePermission(ctx, "edit_leads");
     const lead = await ctx.db.get(args.id);
     if (!lead) throw new ConvexError("العميل المحتمل غير موجود");
     await ctx.db.patch(args.id, {
       status: args.status,
       lostReason: args.lostReason,
       lastContactDate: new Date().toISOString().split("T")[0],
+    });
+    await logAction(ctx, user, {
+      action: "update",
+      module: "leads",
+      recordId: args.id,
+      recordLabel: lead.name,
+      details: `تحديث حالة العميل ${lead.name} إلى: ${args.status}`,
     });
   },
 });
@@ -141,6 +174,7 @@ export const convertToCustomer = mutation({
     address: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    const user = await requirePermission(ctx, "edit_leads");
     const lead = await ctx.db.get(args.id);
     if (!lead) throw new ConvexError("العميل المحتمل غير موجود");
     if (lead.convertedToCustomerId)
@@ -160,6 +194,13 @@ export const convertToCustomer = mutation({
       convertedToCustomerId: customerId,
       lastContactDate: new Date().toISOString().split("T")[0],
     });
+    await logAction(ctx, user, {
+      action: "convert",
+      module: "leads",
+      recordId: args.id,
+      recordLabel: lead.name,
+      details: `تحويل العميل المحتمل ${lead.name} إلى عميل فعلي`,
+    });
     return customerId;
   },
 });
@@ -167,6 +208,7 @@ export const convertToCustomer = mutation({
 export const remove = mutation({
   args: { id: v.id("leads") },
   handler: async (ctx, args) => {
+    const user = await requirePermission(ctx, "delete_all");
     const lead = await ctx.db.get(args.id);
     if (!lead) throw new ConvexError("العميل المحتمل غير موجود");
     const activities = await ctx.db
@@ -175,12 +217,20 @@ export const remove = mutation({
       .collect();
     for (const a of activities) await ctx.db.delete(a._id);
     await ctx.db.delete(args.id);
+    await logAction(ctx, user, {
+      action: "delete",
+      module: "leads",
+      recordId: args.id,
+      recordLabel: lead.name,
+      details: `حذف العميل المحتمل: ${lead.name}`,
+    });
   },
 });
 
 export const listActivities = query({
   args: { leadId: v.id("leads") },
   handler: async (ctx, args) => {
+    await requireAuth(ctx);
     return await ctx.db
       .query("leadActivities")
       .withIndex("by_lead", (q) => q.eq("leadId", args.leadId))
@@ -199,18 +249,38 @@ export const addActivity = mutation({
     createdBy: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    const user = await requirePermission(ctx, "edit_leads");
     const lead = await ctx.db.get(args.leadId);
     if (!lead) throw new ConvexError("العميل المحتمل غير موجود");
     await ctx.db.patch(args.leadId, {
       lastContactDate: new Date().toISOString().split("T")[0],
     });
-    return await ctx.db.insert("leadActivities", args);
+    const id = await ctx.db.insert("leadActivities", {
+      ...args,
+      createdBy: user.name,
+    });
+    await logAction(ctx, user, {
+      action: "create",
+      module: "leads",
+      recordId: id,
+      recordLabel: lead.name,
+      details: `إضافة نشاط للعميل ${lead.name}: ${args.type}`,
+    });
+    return id;
   },
 });
 
 export const deleteActivity = mutation({
   args: { id: v.id("leadActivities") },
   handler: async (ctx, args) => {
+    const user = await requirePermission(ctx, "edit_leads");
     await ctx.db.delete(args.id);
+    await logAction(ctx, user, {
+      action: "delete",
+      module: "leads",
+      recordId: args.id,
+      recordLabel: undefined,
+      details: `حذف نشاط`,
+    });
   },
 });

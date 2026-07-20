@@ -1,16 +1,20 @@
 import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
+import { requireAuth, requirePermission, filterByBranch, logAction } from "./lib/auth";
 
 export const list = query({
   args: {},
   handler: async (ctx) => {
-    return await ctx.db.query("repairs").order("desc").collect();
+    const user = await requireAuth(ctx);
+    const repairs = await ctx.db.query("repairs").order("desc").collect();
+    return filterByBranch(repairs, user);
   },
 });
 
 export const get = query({
   args: { id: v.id("repairs") },
   handler: async (ctx, args) => {
+    await requireAuth(ctx);
     return await ctx.db.get(args.id);
   },
 });
@@ -41,12 +45,15 @@ export const create = mutation({
     technicianName: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    const user = await requirePermission(ctx, "create_repairs");
     const count = await ctx.db.query("repairs").collect();
     const repairNumber = `REP-${String(count.length + 1).padStart(5, "0")}`;
     const trackingToken = Math.random().toString(36).substring(2, 10).toUpperCase();
     const totalCost = args.laborCost;
-    return await ctx.db.insert("repairs", {
+    const branchId = args.branchId ?? (user.branchId as any);
+    const id = await ctx.db.insert("repairs", {
       ...args,
+      branchId,
       repairNumber,
       trackingToken,
       parts: [],
@@ -55,6 +62,14 @@ export const create = mutation({
       status: "received",
       receivedDate: new Date().toISOString().split("T")[0],
     });
+    await logAction(ctx, user, {
+      action: "create",
+      module: "repairs",
+      recordId: id,
+      recordLabel: repairNumber,
+      details: `استلام جهاز للصيانة: ${repairNumber} - ${args.deviceBrand} ${args.deviceModel} للعميل ${args.customerName}`,
+    });
+    return id;
   },
 });
 
@@ -66,15 +81,27 @@ export const updateStatus = mutation({
     deliveredDate: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    const user = await requirePermission(ctx, "edit_repairs");
+    const repair = await ctx.db.get(args.id);
+    if (!repair) throw new Error("أمر الصيانة غير موجود");
     const { id, ...rest } = args;
     await ctx.db.patch(id, rest);
+    await logAction(ctx, user, {
+      action: "update",
+      module: "repairs",
+      recordId: args.id,
+      recordLabel: repair.repairNumber,
+      details: `تحديث حالة الصيانة ${repair.repairNumber} إلى: ${args.status}`,
+    });
   },
 });
 
 export const getStats = query({
   args: {},
   handler: async (ctx) => {
-    const repairs = await ctx.db.query("repairs").collect();
+    const user = await requireAuth(ctx);
+    const all = await ctx.db.query("repairs").collect();
+    const repairs = filterByBranch(all, user);
     return {
       total: repairs.length,
       received: repairs.filter(r => r.status === "received").length,

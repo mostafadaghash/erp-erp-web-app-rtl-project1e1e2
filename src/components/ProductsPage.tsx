@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { Package, Plus, Search, AlertTriangle, Edit2, ToggleLeft } from "lucide-react";
 
 export function ProductsPage() {
-  const products = useQuery(api.products.listAll) ?? [];
+  const products = useQuery(api.products.list, {}) ?? [];
   const categories = useQuery(api.categories.list) ?? [];
   const suppliers = useQuery(api.suppliers.list) ?? [];
   const createProduct = useMutation(api.products.create);
@@ -33,14 +33,12 @@ export function ProductsPage() {
       await createProduct({
         name: form.name,
         sku: form.sku,
-        costPrice: Number(form.costPrice),
-        sellPrice: Number(form.sellPrice),
+        cost: Number(form.costPrice),
+        price: Number(form.sellPrice),
         stock: Number(form.stock),
         minStock: Number(form.minStock),
         unit: form.unit,
-        categoryId: form.categoryId ? form.categoryId as any : undefined,
-        supplierId: form.supplierId ? form.supplierId as any : undefined,
-        warrantyMonths: form.warrantyMonths ? Number(form.warrantyMonths) : undefined,
+        category: form.categoryId || undefined,
         description: form.description || undefined,
       });
       toast.success("تم إضافة المنتج بنجاح");
@@ -56,8 +54,8 @@ export function ProductsPage() {
     return categories.find(c => c._id === id)?.name ?? "-";
   };
 
-  const profit = (p: any) => p.sellPrice - p.costPrice;
-  const profitPct = (p: any) => p.costPrice > 0 ? ((profit(p) / p.costPrice) * 100).toFixed(1) : "0";
+  const profit = (p: { sellPrice: number; costPrice: number }) => p.sellPrice - p.costPrice;
+  const profitPct = (p: { sellPrice: number; costPrice: number }) => p.costPrice > 0 ? ((profit(p) / p.costPrice) * 100).toFixed(1) : "0";
 
   return (
     <div className="p-4 lg:p-6 space-y-5">

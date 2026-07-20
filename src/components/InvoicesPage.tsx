@@ -74,7 +74,7 @@ export function InvoicesPage({ onNavigate }: InvoicesPageProps) {
           <option value="">كل الحالات</option>
           <option value="paid">مدفوعة</option>
           <option value="partial">جزئي</option>
-          <option value="pending">معلقة</option>
+          <option value="unpaid">معلقة</option>
         </select>
       </div>
 

@@ -1,6 +1,7 @@
 import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
 import { ConvexError } from "convex/values";
+import { requireAuth, requirePermission, logAction } from "./lib/auth";
 
 // Role definitions with Arabic labels and permissions
 export const ROLES = {
@@ -61,17 +62,24 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
 export const list = query({
   args: { branchId: v.optional(v.id("branches")) },
   handler: async (ctx, args) => {
+    const user = await requireAuth(ctx);
     const employees = await ctx.db.query("userProfiles").collect();
-    if (args.branchId) {
-      return employees.filter(e => e.branchId === args.branchId);
+    // Non-admins can only see employees in their branch
+    let filtered = employees;
+    if (user.role !== "admin" && user.branchId) {
+      filtered = filtered.filter(e => !e.branchId || e.branchId === user.branchId);
     }
-    return employees;
+    if (args.branchId) {
+      return filtered.filter(e => e.branchId === args.branchId);
+    }
+    return filtered;
   },
 });
 
 export const get = query({
   args: { id: v.id("userProfiles") },
   handler: async (ctx, args) => {
+    await requireAuth(ctx);
     return await ctx.db.get(args.id);
   },
 });
@@ -88,6 +96,7 @@ export const getByUserId = query({
 export const stats = query({
   args: {},
   handler: async (ctx) => {
+    await requireAuth(ctx);
     const all = await ctx.db.query("userProfiles").collect();
     const byRole: Record<string, number> = {};
     for (const e of all) {
@@ -112,11 +121,10 @@ export const create = mutation({
     isActive: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
-    // Auto-assign permissions based on role if not provided
+    const user = await requirePermission(ctx, "manage_users");
     const permissions = args.permissions ?? ROLE_PERMISSIONS[args.role] ?? [];
-    // Generate a placeholder userId (in real app, linked to auth user)
     const userId = "emp_" + Date.now().toString();
-    return await ctx.db.insert("userProfiles", {
+    const id = await ctx.db.insert("userProfiles", {
       userId,
       name: args.name,
       phone: args.phone,
@@ -125,6 +133,14 @@ export const create = mutation({
       permissions,
       isActive: args.isActive ?? true,
     });
+    await logAction(ctx, user, {
+      action: "create",
+      module: "employees",
+      recordId: id,
+      recordLabel: args.name,
+      details: `إضافة موظف جديد: ${args.name} (${args.role})`,
+    });
+    return id;
   },
 });
 
@@ -139,28 +155,52 @@ export const update = mutation({
     isActive: v.boolean(),
   },
   handler: async (ctx, args) => {
+    const user = await requirePermission(ctx, "manage_users");
     const { id, ...data } = args;
     const emp = await ctx.db.get(id);
     if (!emp) throw new ConvexError("الموظف غير موجود");
     await ctx.db.patch(id, data);
+    await logAction(ctx, user, {
+      action: "update",
+      module: "employees",
+      recordId: id,
+      recordLabel: args.name,
+      details: `تعديل بيانات الموظف: ${args.name}`,
+    });
   },
 });
 
 export const toggleActive = mutation({
   args: { id: v.id("userProfiles") },
   handler: async (ctx, args) => {
+    const user = await requirePermission(ctx, "manage_users");
     const emp = await ctx.db.get(args.id);
     if (!emp) throw new ConvexError("الموظف غير موجود");
     await ctx.db.patch(args.id, { isActive: !emp.isActive });
+    await logAction(ctx, user, {
+      action: "update",
+      module: "employees",
+      recordId: args.id,
+      recordLabel: emp.name,
+      details: `${emp.isActive ? "إيقاف" : "تفعيل"} الموظف: ${emp.name}`,
+    });
   },
 });
 
 export const remove = mutation({
   args: { id: v.id("userProfiles") },
   handler: async (ctx, args) => {
+    const user = await requirePermission(ctx, "manage_users");
     const emp = await ctx.db.get(args.id);
     if (!emp) throw new ConvexError("الموظف غير موجود");
     await ctx.db.delete(args.id);
+    await logAction(ctx, user, {
+      action: "delete",
+      module: "employees",
+      recordId: args.id,
+      recordLabel: emp.name,
+      details: `حذف الموظف: ${emp.name}`,
+    });
   },
 });
 
@@ -170,8 +210,16 @@ export const updatePermissions = mutation({
     permissions: v.array(v.string()),
   },
   handler: async (ctx, args) => {
+    const user = await requirePermission(ctx, "manage_users");
     const emp = await ctx.db.get(args.id);
     if (!emp) throw new ConvexError("الموظف غير موجود");
     await ctx.db.patch(args.id, { permissions: args.permissions });
+    await logAction(ctx, user, {
+      action: "update",
+      module: "employees",
+      recordId: args.id,
+      recordLabel: emp.name,
+      details: `تحديث صلاحيات الموظف: ${emp.name}`,
+    });
   },
 });

@@ -110,10 +110,8 @@ export function NewInvoicePage({ onNavigate }: NewInvoicePageProps) {
         tax: taxAmount,
         total,
         paid,
-        remaining,
         paymentMethod,
         notes: notes || undefined,
-        type: "sale",
       });
       toast.success("تم إنشاء الفاتورة بنجاح");
       onNavigate("invoices");

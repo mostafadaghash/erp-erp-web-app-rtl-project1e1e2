@@ -21,7 +21,7 @@ export function ReportsPage() {
 
   const allInvoices = useQuery(api.invoices.list) ?? [];
   const allExpenses = useQuery(api.expenses.list) ?? [];
-  const products = useQuery(api.products.listAll) ?? [];
+  const products = useQuery(api.products.list, {}) ?? [];
   const customers = useQuery(api.customers.list) ?? [];
   const allRepairs = useQuery(api.repairs.list) ?? [];
   const crmStats = useQuery(api.leads.stats);
