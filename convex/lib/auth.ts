@@ -5,6 +5,7 @@
 import { QueryCtx, MutationCtx } from "../_generated/server";
 import { Id } from "../_generated/dataModel";
 import { ConvexError } from "convex/values";
+import { getAuthUserId } from "@convex-dev/auth/server";
 import { ROLE_PERMISSIONS, Permission } from "./permissions";
 
 // ──────────────────────────────────────────────
@@ -22,22 +23,42 @@ export interface AuthUser {
 // ──────────────────────────────────────────────
 // Core: resolve the authenticated employee from userProfiles
 // ──────────────────────────────────────────────
+export async function getAuthProfile(ctx: QueryCtx | MutationCtx) {
+  const authUserId = await getAuthUserId(ctx);
+  if (!authUserId) return null;
+  const stableUserId = String(authUserId);
+
+  let profile = await ctx.db
+    .query("userProfiles")
+    .withIndex("by_token", (q) => q.eq("tokenIdentifier", stableUserId))
+    .unique();
+
+  if (!profile) {
+    // Backward compatibility for profiles created with the old
+    // session-scoped identity.subject value.
+    const legacyPrefix = `${stableUserId}|`;
+    const allProfiles = await ctx.db.query("userProfiles").collect();
+    profile =
+      allProfiles.find(
+        (candidate) =>
+          candidate.userId === stableUserId ||
+          candidate.userId.startsWith(legacyPrefix) ||
+          candidate.tokenIdentifier?.startsWith(legacyPrefix),
+      ) ?? null;
+  }
+
+  return { authUserId: stableUserId, profile };
+}
+
 export async function getAuthUser(
   ctx: QueryCtx | MutationCtx
 ): Promise<AuthUser | null> {
-  const identity = await ctx.auth.getUserIdentity();
-  if (!identity) return null;
-
-  // Look up employee profile by tokenIdentifier (subject)
-  const employee = await ctx.db
-    .query("userProfiles")
-    .withIndex("by_token", (q) => q.eq("tokenIdentifier", identity.subject))
-    .unique();
-
-  if (!employee) return null;
+  const resolved = await getAuthProfile(ctx);
+  if (!resolved?.profile) return null;
+  const employee = resolved.profile;
 
   return {
-    userId: identity.subject,
+    userId: resolved.authUserId,
     employeeId: employee._id,
     name: employee.name,
     role: employee.role,
