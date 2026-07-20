@@ -1,7 +1,8 @@
 import { query, mutation } from "./_generated/server";
 import { v, ConvexError } from "convex/values";
-import { requireAuth, requirePermission, logAction, hasAdmin } from "./lib/auth";
+import { requireAuth, requirePermission, logAction, hasAdmin, getAuthProfile } from "./lib/auth";
 import { ROLES, ROLE_PERMISSIONS } from "./lib/permissions";
+import { INVITE_TTL_MS, isValidEmail, normalizeEmail } from "./lib/identity";
 
 // Re-export for frontend convenience
 export { ROLES, ROLE_PERMISSIONS };
@@ -34,17 +35,15 @@ export const createFirstAdmin = mutation({
       throw new ConvexError("النظام تم إعداده بالفعل. يرجى تسجيل الدخول.");
     }
 
-    // Get the current identity (user must be signed in via Convex Auth)
+    // Resolve the stable Convex Auth user ID.
     const identity = await ctx.auth.getUserIdentity();
-    if (!identity) {
+    const resolved = await getAuthProfile(ctx);
+    if (!identity || !resolved) {
       throw new ConvexError("يجب تسجيل الدخول أولاً قبل إعداد النظام");
     }
+    const stableUserId = resolved.authUserId;
 
-    // Check if a profile already exists for this token
-    const existing = await ctx.db
-      .query("userProfiles")
-      .withIndex("by_token", (q) => q.eq("tokenIdentifier", identity.subject))
-      .unique();
+    const existing = resolved.profile;
 
     if (existing) {
       // Upgrade existing profile to admin
@@ -54,14 +53,16 @@ export const createFirstAdmin = mutation({
         phone: args.phone,
         permissions: [...ROLE_PERMISSIONS.admin],
         isActive: true,
+        userId: stableUserId,
+        tokenIdentifier: stableUserId,
       });
       return existing._id;
     }
 
     // Create new admin profile
     const id = await ctx.db.insert("userProfiles", {
-      userId: identity.subject,
-      tokenIdentifier: identity.subject,
+      userId: stableUserId,
+      tokenIdentifier: stableUserId,
       name: args.name,
       phone: args.phone,
       role: "admin",
@@ -71,7 +72,7 @@ export const createFirstAdmin = mutation({
 
     // Log the setup action (manual log since no user profile existed before)
     await ctx.db.insert("auditLogs", {
-      userId: identity.subject,
+      userId: stableUserId,
       userName: args.name,
       action: "setup",
       module: "system",
@@ -92,15 +93,13 @@ export const accessState = query({
   args: {},
   handler: async (ctx) => {
     const identity = await ctx.auth.getUserIdentity();
-    if (!identity) {
+    const resolved = await getAuthProfile(ctx);
+    if (!identity || !resolved) {
       throw new ConvexError("يجب تسجيل الدخول");
     }
 
     const adminExists = await hasAdmin(ctx);
-    const existing = await ctx.db
-      .query("userProfiles")
-      .withIndex("by_token", (q) => q.eq("tokenIdentifier", identity.subject))
-      .unique();
+    const existing = resolved.profile;
 
     if (!existing) {
       return {
@@ -182,6 +181,7 @@ export const stats = query({
 export const create = mutation({
   args: {
     name: v.string(),
+    email: v.string(),
     phone: v.optional(v.string()),
     role: v.string(),
     branchId: v.optional(v.id("branches")),
@@ -190,16 +190,28 @@ export const create = mutation({
   },
   handler: async (ctx, args) => {
     const user = await requirePermission(ctx, "manage_users");
+    const email = normalizeEmail(args.email);
+    if (!isValidEmail(email)) {
+      throw new ConvexError("البريد الإلكتروني غير صالح");
+    }
+    const duplicate = await ctx.db
+      .query("userProfiles")
+      .withIndex("by_email", (q) => q.eq("email", email))
+      .unique();
+    if (duplicate) {
+      throw new ConvexError("يوجد موظف مسجل بهذا البريد الإلكتروني");
+    }
     const permissions = args.permissions ?? ROLE_PERMISSIONS[args.role] ?? [];
-    const userId = "emp_" + Date.now().toString();
     const id = await ctx.db.insert("userProfiles", {
-      userId,
+      userId: `pending:${email}`,
       name: args.name,
+      email,
       phone: args.phone,
       role: args.role,
       branchId: args.branchId,
       permissions,
       isActive: args.isActive ?? true,
+      inviteExpiresAt: Date.now() + INVITE_TTL_MS,
     });
     await logAction(ctx, user, {
       action: "create",
@@ -208,7 +220,7 @@ export const create = mutation({
       recordLabel: args.name,
       details: `إضافة موظف جديد: ${args.name} (${args.role})`,
     });
-    return id;
+    return { id, inviteCode: String(id), email };
   },
 });
 
@@ -216,6 +228,7 @@ export const update = mutation({
   args: {
     id: v.id("userProfiles"),
     name: v.string(),
+    email: v.optional(v.string()),
     phone: v.optional(v.string()),
     role: v.string(),
     branchId: v.optional(v.id("branches")),
@@ -224,9 +237,25 @@ export const update = mutation({
   },
   handler: async (ctx, args) => {
     const user = await requirePermission(ctx, "manage_users");
-    const { id, ...data } = args;
+    const { id } = args;
     const emp = await ctx.db.get(id);
     if (!emp) throw new ConvexError("الموظف غير موجود");
+    const email = args.email ? normalizeEmail(args.email) : emp.email;
+    if (email && !isValidEmail(email)) {
+      throw new ConvexError("البريد الإلكتروني غير صالح");
+    }
+    if (email && email !== emp.email) {
+      if (emp.tokenIdentifier) {
+        throw new ConvexError("لا يمكن تغيير بريد موظف فعّل حسابه");
+      }
+      const duplicate = await ctx.db
+        .query("userProfiles")
+        .withIndex("by_email", (q) => q.eq("email", email))
+        .unique();
+      if (duplicate && duplicate._id !== id) {
+        throw new ConvexError("يوجد موظف مسجل بهذا البريد الإلكتروني");
+      }
+    }
 
     // Last admin protection: prevent deactivating or demoting the last active admin
     if (emp.role === "admin" && emp.isActive && (args.role !== "admin" || !args.isActive)) {
@@ -240,7 +269,15 @@ export const update = mutation({
       }
     }
 
-    await ctx.db.patch(id, data);
+    await ctx.db.patch(id, {
+      name: args.name,
+      email,
+      phone: args.phone,
+      role: args.role,
+      branchId: args.branchId,
+      permissions: args.permissions,
+      isActive: args.isActive,
+    });
     await logAction(ctx, user, {
       action: "update",
       module: "employees",
@@ -300,14 +337,44 @@ export const remove = mutation({
       }
     }
 
-    await ctx.db.delete(args.id);
+    await ctx.db.patch(args.id, {
+      isActive: false,
+      inviteExpiresAt: undefined,
+    });
     await logAction(ctx, user, {
-      action: "delete",
+      action: "deactivate",
       module: "employees",
       recordId: args.id,
       recordLabel: emp.name,
-      details: `حذف الموظف: ${emp.name}`,
+      details: `إلغاء تنشيط الموظف مع الاحتفاظ بسجل الحساب: ${emp.name}`,
     });
+  },
+});
+
+export const renewInvitation = mutation({
+  args: { id: v.id("userProfiles") },
+  handler: async (ctx, args) => {
+    const user = await requirePermission(ctx, "manage_users");
+    const employee = await ctx.db.get(args.id);
+    if (!employee) throw new ConvexError("الموظف غير موجود");
+    if (employee.tokenIdentifier) {
+      throw new ConvexError("تم تفعيل حساب هذا الموظف بالفعل");
+    }
+    if (!employee.email) {
+      throw new ConvexError("أضف بريد الموظف أولاً");
+    }
+    await ctx.db.patch(args.id, {
+      isActive: true,
+      inviteExpiresAt: Date.now() + INVITE_TTL_MS,
+    });
+    await logAction(ctx, user, {
+      action: "renew_invitation",
+      module: "employees",
+      recordId: args.id,
+      recordLabel: employee.name,
+      details: `تجديد دعوة الموظف: ${employee.name}`,
+    });
+    return { inviteCode: String(args.id), email: employee.email };
   },
 });
 
