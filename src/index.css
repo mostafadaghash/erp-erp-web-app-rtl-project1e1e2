@@ -1,0 +1,404 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --color-light: #ffffff;
+  --color-dark: #171717;
+  --primary: #6366f1;
+  --primary-hover: #4f46e5;
+}
+
+* {
+  font-family: 'Tajawal', sans-serif;
+}
+
+.accent-text {
+  @apply text-slate-600;
+}
+
+body {
+  font-family: 'Tajawal', sans-serif;
+  color: var(--color-dark);
+  background: var(--color-light);
+  direction: rtl;
+}
+
+/* only use this to update the style of the auth input fields. use a different class for all other input fields */
+.auth-input-field {
+  @apply w-full px-4 py-3 rounded-lg bg-white/10 border border-white/20 text-white placeholder-white/50 focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400 outline-none transition-all;
+}
+
+/* only use this to update the style of the auth buttons. use the button class for all other buttons */
+.auth-button {
+  @apply w-full px-4 py-3 rounded-lg bg-gradient-to-r from-indigo-500 to-purple-600 text-white font-bold hover:from-indigo-600 hover:to-purple-700 transition-all shadow-lg hover:shadow-indigo-500/25 disabled:opacity-50 disabled:cursor-not-allowed;
+}
+
+/* Sidebar */
+.sidebar-item {
+  @apply flex items-center gap-3 px-4 py-3 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-all cursor-pointer text-sm font-medium;
+}
+
+.sidebar-item.active {
+  @apply text-white bg-indigo-600/30 border border-indigo-500/30;
+}
+
+/* Cards */
+.stat-card {
+  @apply bg-white rounded-2xl p-6 shadow-sm border border-slate-100 hover:shadow-md transition-all;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Animations */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideInRight {
+  from { opacity: 0; transform: translateX(-20px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.4); }
+  50% { box-shadow: 0 0 0 8px rgba(99, 102, 241, 0); }
+}
+
+.animate-fade-in-up {
+  animation: fadeInUp 0.5s ease forwards;
+}
+
+.animate-slide-in {
+  animation: slideInRight 0.4s ease forwards;
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 2s infinite;
+}
+
+/* Status badges */
+.badge {
+  @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+}
+
+.badge-success { @apply bg-emerald-100 text-emerald-700; }
+.badge-warning { @apply bg-amber-100 text-amber-700; }
+.badge-danger { @apply bg-red-100 text-red-700; }
+.badge-info { @apply bg-blue-100 text-blue-700; }
+.badge-purple { @apply bg-purple-100 text-purple-700; }
+
+/* Print styles */
+@media print {
+  .no-print { display: none !important; }
+  .print-only { display: block !important; }
+  body { background: white; margin: 0; padding: 0; }
+  * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+}
+
+/* ─── Print Template Styles ─────────────────────────────────────────── */
+.print-page {
+  font-family: 'Tajawal', sans-serif;
+  direction: rtl;
+  padding: 24px 28px;
+  max-width: 210mm;
+  margin: 0 auto;
+  color: #1e293b;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.print-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 2px solid #e2e8f0;
+  gap: 16px;
+}
+
+.print-logo {
+  width: 64px;
+  height: 64px;
+  object-fit: contain;
+  border-radius: 8px;
+}
+
+.print-store-info {
+  flex: 1;
+}
+
+.print-store-name {
+  font-size: 22px;
+  font-weight: 900;
+  color: #1e293b;
+  margin: 0 0 4px 0;
+}
+
+.print-store-detail {
+  font-size: 12px;
+  color: #64748b;
+  margin: 2px 0;
+}
+
+.print-doc-info {
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+.print-doc-badge {
+  display: inline-block;
+  background: #4f46e5;
+  color: white;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 20px;
+  letter-spacing: 0.5px;
+}
+
+.print-doc-number {
+  font-size: 16px;
+  font-weight: 900;
+  color: #4f46e5;
+  margin: 0;
+  font-family: monospace;
+}
+
+.print-doc-date {
+  font-size: 11px;
+  color: #64748b;
+  margin: 0;
+}
+
+.print-status-badge {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 10px;
+  border-radius: 20px;
+}
+
+.status-paid   { background: #d1fae5; color: #065f46; }
+.status-partial { background: #fef3c7; color: #92400e; }
+.status-pending { background: #fee2e2; color: #991b1b; }
+
+.print-customer-box {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 12px 16px;
+  margin-bottom: 16px;
+}
+
+.print-customer-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.print-customer-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 6px;
+}
+
+.print-field-label {
+  font-weight: 700;
+  color: #475569;
+}
+
+.print-field-value {
+  color: #1e293b;
+}
+
+.print-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 16px;
+  font-size: 12.5px;
+}
+
+.print-th {
+  padding: 8px 10px;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  text-align: right;
+  font-weight: 700;
+  font-size: 11px;
+  color: #475569;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.print-td {
+  padding: 8px 10px;
+  border: 1px solid #e2e8f0;
+  color: #334155;
+  vertical-align: middle;
+}
+
+.print-tr-even {
+  background: #f8fafc;
+}
+
+.print-totals {
+  display: flex;
+  justify-content: flex-start;
+  margin-bottom: 16px;
+}
+
+.print-totals-box {
+  min-width: 260px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.print-total-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 7px 14px;
+  font-size: 13px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.print-total-final {
+  display: flex;
+  justify-content: space-between;
+  padding: 10px 14px;
+  font-size: 15px;
+  font-weight: 900;
+  background: #1e293b;
+  color: white;
+  border-bottom: 1px solid #334155;
+}
+
+.print-notes {
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 12px;
+  color: #78350f;
+  margin-bottom: 16px;
+}
+
+.print-problem-box {
+  background: #f0f9ff;
+  border: 1px solid #bae6fd;
+  border-radius: 10px;
+  padding: 12px 16px;
+  margin-bottom: 16px;
+  font-size: 13px;
+}
+
+.print-section-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: #475569;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.print-signature-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 40px;
+  margin: 24px 0 16px;
+}
+
+.print-signature-box {
+  flex: 1;
+  text-align: center;
+  font-size: 12px;
+  color: #64748b;
+}
+
+.print-signature-line {
+  height: 1px;
+  background: #94a3b8;
+  margin-bottom: 6px;
+}
+
+.print-footer {
+  text-align: center;
+  padding-top: 14px;
+  border-top: 1px solid #e2e8f0;
+  font-size: 11px;
+  color: #94a3b8;
+  line-height: 1.8;
+}
+
+@media print {
+  .print-page { padding: 15mm 18mm; }
+  .print-store-name { font-size: 20px; }
+  .print-doc-number { font-size: 15px; }
+}
+
+/* Table */
+.data-table {
+  @apply w-full text-sm;
+}
+.data-table th {
+  @apply px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200;
+}
+.data-table td {
+  @apply px-4 py-3 text-slate-700 border-b border-slate-100;
+}
+.data-table tr:hover td {
+  @apply bg-slate-50;
+}
+
+/* Form inputs */
+.form-input {
+  @apply w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-800 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none transition-all text-sm;
+}
+
+.form-label {
+  @apply block text-sm font-medium text-slate-700 mb-1.5;
+}
+
+/* Buttons */
+.btn-primary {
+  @apply px-5 py-2.5 bg-indigo-600 text-white rounded-xl font-medium hover:bg-indigo-700 transition-all shadow-sm hover:shadow-indigo-200 active:scale-95 text-sm;
+}
+
+.btn-secondary {
+  @apply px-5 py-2.5 bg-slate-100 text-slate-700 rounded-xl font-medium hover:bg-slate-200 transition-all active:scale-95 text-sm;
+}
+
+.btn-danger {
+  @apply px-5 py-2.5 bg-red-500 text-white rounded-xl font-medium hover:bg-red-600 transition-all active:scale-95 text-sm;
+}
+
+.btn-success {
+  @apply px-5 py-2.5 bg-emerald-500 text-white rounded-xl font-medium hover:bg-emerald-600 transition-all active:scale-95 text-sm;
+}

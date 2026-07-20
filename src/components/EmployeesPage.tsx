@@ -1,0 +1,519 @@
+import { useState } from "react";
+import { useQuery, useMutation } from "convex/react";
+import { api } from "../../convex/_generated/api";
+import { toast } from "sonner";
+import { Id } from "../../convex/_generated/dataModel";
+import {
+  Users, Plus, X, Search, Phone, Building2,
+  Shield, Pencil, Trash2, CheckCircle, XCircle,
+  ChevronDown, ChevronUp, Lock, Unlock
+} from "lucide-react";
+
+const ROLES = [
+  { value: "admin",            label: "مدير النظام",    color: "bg-purple-100 text-purple-700" },
+  { value: "manager",          label: "مدير فرع",       color: "bg-indigo-100 text-indigo-700" },
+  { value: "sales",            label: "موظف مبيعات",    color: "bg-blue-100 text-blue-700" },
+  { value: "customer_service", label: "خدمة العملاء",   color: "bg-cyan-100 text-cyan-700" },
+  { value: "technician",       label: "فني صيانة",      color: "bg-amber-100 text-amber-700" },
+  { value: "accountant",       label: "محاسب",          color: "bg-emerald-100 text-emerald-700" },
+  { value: "shipping",         label: "موظف شحن",       color: "bg-orange-100 text-orange-700" },
+  { value: "viewer",           label: "مشاهد فقط",      color: "bg-slate-100 text-slate-600" },
+];
+
+const ALL_PERMISSIONS = [
+  { key: "view_all",        label: "عرض كل البيانات",       group: "عرض" },
+  { key: "view_products",   label: "عرض المنتجات",           group: "عرض" },
+  { key: "view_customers",  label: "عرض العملاء",            group: "عرض" },
+  { key: "view_orders",     label: "عرض الأوردرات",          group: "عرض" },
+  { key: "view_invoices",   label: "عرض الفواتير",           group: "عرض" },
+  { key: "view_repairs",    label: "عرض الصيانة",            group: "عرض" },
+  { key: "view_shipments",  label: "عرض الشحنات",            group: "عرض" },
+  { key: "view_reports",    label: "عرض التقارير",           group: "عرض" },
+  { key: "view_prices",     label: "عرض الأسعار",            group: "عرض" },
+  { key: "view_profits",    label: "عرض الأرباح",            group: "عرض" },
+  { key: "create_all",      label: "إضافة كل البيانات",      group: "إضافة" },
+  { key: "create_orders",   label: "إنشاء أوردرات",          group: "إضافة" },
+  { key: "create_invoices", label: "إنشاء فواتير",           group: "إضافة" },
+  { key: "create_repairs",  label: "إنشاء أوامر صيانة",      group: "إضافة" },
+  { key: "create_customers",label: "إضافة عملاء",            group: "إضافة" },
+  { key: "create_expenses", label: "إضافة مصروفات",          group: "إضافة" },
+  { key: "create_shipments",label: "إنشاء شحنات",            group: "إضافة" },
+  { key: "edit_all",        label: "تعديل كل البيانات",      group: "تعديل" },
+  { key: "edit_orders",     label: "تعديل الأوردرات",        group: "تعديل" },
+  { key: "edit_repairs",    label: "تعديل الصيانة",          group: "تعديل" },
+  { key: "edit_customers",  label: "تعديل العملاء",          group: "تعديل" },
+  { key: "edit_expenses",   label: "تعديل المصروفات",        group: "تعديل" },
+  { key: "edit_shipments",  label: "تعديل الشحنات",          group: "تعديل" },
+  { key: "delete_all",      label: "حذف البيانات",           group: "حذف" },
+  { key: "export_data",     label: "تصدير البيانات",         group: "أخرى" },
+  { key: "print_all",       label: "طباعة كل شيء",           group: "أخرى" },
+  { key: "print_invoices",  label: "طباعة الفواتير",         group: "أخرى" },
+  { key: "print_repairs",   label: "طباعة الصيانة",          group: "أخرى" },
+  { key: "print_shipping",  label: "طباعة الشحن",            group: "أخرى" },
+  { key: "manage_users",    label: "إدارة المستخدمين",       group: "أخرى" },
+  { key: "manage_settings", label: "إدارة الإعدادات",        group: "أخرى" },
+  { key: "manage_branches", label: "إدارة الفروع",           group: "أخرى" },
+];
+
+const ROLE_DEFAULT_PERMISSIONS: Record<string, string[]> = {
+  admin: ALL_PERMISSIONS.map(p => p.key),
+  manager: ["view_all","create_all","edit_all","view_prices","view_profits","export_data","print_all","view_reports"],
+  sales: ["view_products","view_customers","view_orders","view_invoices","create_orders","create_invoices","edit_orders","view_prices","print_invoices"],
+  customer_service: ["view_customers","view_orders","view_repairs","create_customers","edit_customers","create_orders","edit_orders","view_prices"],
+  technician: ["view_repairs","edit_repairs","create_repairs","view_products","view_prices","print_repairs"],
+  accountant: ["view_all","view_prices","view_profits","view_reports","export_data","create_expenses","edit_expenses"],
+  shipping: ["view_orders","view_shipments","edit_shipments","create_shipments","print_shipping"],
+  viewer: ["view_products","view_customers","view_orders","view_repairs","view_invoices"],
+};
+
+interface EmpForm {
+  name: string;
+  phone: string;
+  role: string;
+  branchId: string;
+  isActive: boolean;
+  permissions: string[];
+}
+
+const emptyForm = (): EmpForm => ({
+  name: "", phone: "", role: "sales", branchId: "", isActive: true,
+  permissions: ROLE_DEFAULT_PERMISSIONS["sales"],
+});
+
+export function EmployeesPage() {
+  const [search, setSearch] = useState("");
+  const [filterRole, setFilterRole] = useState("all");
+  const [showForm, setShowForm] = useState(false);
+  const [editId, setEditId] = useState<Id<"userProfiles"> | null>(null);
+  const [form, setForm] = useState<EmpForm>(emptyForm());
+  const [showPermissions, setShowPermissions] = useState(false);
+
+  const employees = useQuery(api.employees.list, {});
+  const branches = useQuery(api.branches.list);
+  const stats = useQuery(api.employees.stats);
+  const createEmployee = useMutation(api.employees.create);
+  const updateEmployee = useMutation(api.employees.update);
+  const removeEmployee = useMutation(api.employees.remove);
+  const toggleActive = useMutation(api.employees.toggleActive);
+
+  const filtered = (employees ?? []).filter(e => {
+    const matchSearch = e.name.includes(search) || (e.phone ?? "").includes(search);
+    const matchRole = filterRole === "all" || e.role === filterRole;
+    return matchSearch && matchRole;
+  });
+
+  const getRoleInfo = (role: string) => ROLES.find(r => r.value === role) ?? ROLES[0];
+  const getBranchName = (branchId?: Id<"branches">) =>
+    (branches ?? []).find(b => b._id === branchId)?.name ?? "—";
+
+  const openCreate = () => {
+    setForm(emptyForm());
+    setEditId(null);
+    setShowPermissions(false);
+    setShowForm(true);
+  };
+
+  const openEdit = (emp: NonNullable<typeof employees>[number]) => {
+    setForm({
+      name: emp.name,
+      phone: emp.phone ?? "",
+      role: emp.role,
+      branchId: emp.branchId ?? "",
+      isActive: emp.isActive,
+      permissions: emp.permissions,
+    });
+    setEditId(emp._id);
+    setShowPermissions(false);
+    setShowForm(true);
+  };
+
+  const handleRoleChange = (role: string) => {
+    setForm({ ...form, role, permissions: ROLE_DEFAULT_PERMISSIONS[role] ?? [] });
+  };
+
+  const togglePermission = (key: string) => {
+    const perms = form.permissions.includes(key)
+      ? form.permissions.filter(p => p !== key)
+      : [...form.permissions, key];
+    setForm({ ...form, permissions: perms });
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!form.name.trim()) { toast.error("أدخل اسم الموظف"); return; }
+    try {
+      if (editId) {
+        await updateEmployee({
+          id: editId,
+          name: form.name,
+          phone: form.phone || undefined,
+          role: form.role,
+          branchId: form.branchId ? form.branchId as Id<"branches"> : undefined,
+          permissions: form.permissions,
+          isActive: form.isActive,
+        });
+        toast.success("تم تحديث بيانات الموظف");
+      } else {
+        await createEmployee({
+          name: form.name,
+          phone: form.phone || undefined,
+          role: form.role,
+          branchId: form.branchId ? form.branchId as Id<"branches"> : undefined,
+          permissions: form.permissions,
+          isActive: form.isActive,
+        });
+        toast.success("تم إضافة الموظف بنجاح");
+      }
+      setShowForm(false);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "حدث خطأ");
+    }
+  };
+
+  const handleDelete = async (id: Id<"userProfiles">) => {
+    if (!confirm("هل أنت متأكد من حذف هذا الموظف؟")) return;
+    try {
+      await removeEmployee({ id });
+      toast.success("تم حذف الموظف");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "حدث خطأ");
+    }
+  };
+
+  const handleToggle = async (id: Id<"userProfiles">) => {
+    try {
+      await toggleActive({ id });
+      toast.success("تم تغيير حالة الموظف");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "حدث خطأ");
+    }
+  };
+
+  // Group permissions by group
+  const permGroups = ALL_PERMISSIONS.reduce((acc, p) => {
+    if (!acc[p.group]) acc[p.group] = [];
+    acc[p.group].push(p);
+    return acc;
+  }, {} as Record<string, typeof ALL_PERMISSIONS>);
+
+  return (
+    <div className="p-4 lg:p-6 space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between gap-4 flex-wrap">
+        <div>
+          <h1 className="text-2xl font-black text-slate-800 flex items-center gap-2">
+            <Users className="w-6 h-6 text-indigo-600" />
+            الموظفون والصلاحيات
+          </h1>
+          <p className="text-slate-500 text-sm mt-0.5">إدارة فريق العمل وتحديد الصلاحيات</p>
+        </div>
+        <button onClick={openCreate} className="btn-primary flex items-center gap-2">
+          <Plus className="w-4 h-4" />
+          موظف جديد
+        </button>
+      </div>
+
+      {/* Stats */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {[
+          { label: "إجمالي الموظفين", value: stats?.total ?? 0,    color: "text-indigo-600",  bg: "bg-indigo-50",  icon: Users },
+          { label: "نشطون",           value: stats?.active ?? 0,   color: "text-emerald-600", bg: "bg-emerald-50", icon: CheckCircle },
+          { label: "موقوفون",         value: stats?.inactive ?? 0, color: "text-red-600",     bg: "bg-red-50",     icon: XCircle },
+          { label: "الأدوار",         value: Object.keys(stats?.byRole ?? {}).length, color: "text-purple-600", bg: "bg-purple-50", icon: Shield },
+        ].map(s => {
+          const Icon = s.icon;
+          return (
+            <div key={s.label} className="stat-card flex items-center gap-4">
+              <div className={`w-12 h-12 ${s.bg} rounded-xl flex items-center justify-center flex-shrink-0`}>
+                <Icon className={`w-5 h-5 ${s.color}`} />
+              </div>
+              <div>
+                <p className="text-2xl font-black text-slate-800">{s.value}</p>
+                <p className="text-xs text-slate-500">{s.label}</p>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Roles Summary */}
+      {stats?.byRole && Object.keys(stats.byRole).length > 0 && (
+        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
+          <h3 className="font-bold text-slate-700 text-sm mb-3 flex items-center gap-2">
+            <Shield className="w-4 h-4 text-indigo-500" />
+            توزيع الأدوار
+          </h3>
+          <div className="flex flex-wrap gap-2">
+            {Object.entries(stats.byRole).map(([role, count]) => {
+              const info = getRoleInfo(role);
+              return (
+                <span key={role} className={`px-3 py-1.5 rounded-xl text-xs font-semibold ${info.color}`}>
+                  {info.label}: {count}
+                </span>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Filters */}
+      <div className="flex gap-3 flex-wrap">
+        <div className="relative flex-1 min-w-48">
+          <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+          <input
+            className="form-input pr-9"
+            placeholder="بحث بالاسم أو الهاتف..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+          />
+        </div>
+        <div className="flex gap-2 flex-wrap">
+          <button
+            onClick={() => setFilterRole("all")}
+            className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${filterRole === "all" ? "bg-indigo-600 text-white" : "bg-white text-slate-600 border border-slate-200 hover:border-indigo-300"}`}
+          >
+            الكل
+          </button>
+          {ROLES.map(r => (
+            <button
+              key={r.value}
+              onClick={() => setFilterRole(r.value)}
+              className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${filterRole === r.value ? "bg-indigo-600 text-white" : "bg-white text-slate-600 border border-slate-200 hover:border-indigo-300"}`}
+            >
+              {r.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Table */}
+      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+        {filtered.length === 0 ? (
+          <div className="text-center py-16">
+            <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+              <Users className="w-7 h-7 text-slate-400" />
+            </div>
+            <p className="text-slate-500 font-medium">لا يوجد موظفون</p>
+            <p className="text-slate-400 text-sm mt-1">أضف موظفاً جديداً للبدء</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>الموظف</th>
+                  <th>الدور</th>
+                  <th>الفرع</th>
+                  <th>الصلاحيات</th>
+                  <th>الحالة</th>
+                  <th>إجراءات</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map(emp => {
+                  const roleInfo = getRoleInfo(emp.role);
+                  return (
+                    <tr key={emp._id}>
+                      <td>
+                        <div className="flex items-center gap-3">
+                          <div className="w-9 h-9 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full flex items-center justify-center flex-shrink-0">
+                            <span className="text-white text-sm font-bold">{emp.name.charAt(0)}</span>
+                          </div>
+                          <div>
+                            <p className="font-semibold text-slate-800">{emp.name}</p>
+                            {emp.phone && <p className="text-xs text-slate-400">{emp.phone}</p>}
+                          </div>
+                        </div>
+                      </td>
+                      <td>
+                        <span className={`px-2.5 py-1 rounded-lg text-xs font-semibold ${roleInfo.color}`}>
+                          {roleInfo.label}
+                        </span>
+                      </td>
+                      <td>
+                        <div className="flex items-center gap-1.5 text-slate-600 text-sm">
+                          <Building2 className="w-3.5 h-3.5 text-slate-400" />
+                          {getBranchName(emp.branchId)}
+                        </div>
+                      </td>
+                      <td>
+                        <div className="flex items-center gap-1.5">
+                          <Lock className="w-3.5 h-3.5 text-slate-400" />
+                          <span className="text-sm text-slate-600">{emp.permissions.length} صلاحية</span>
+                        </div>
+                      </td>
+                      <td>
+                        <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${emp.isActive ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-600"}`}>
+                          {emp.isActive ? "نشط" : "موقوف"}
+                        </span>
+                      </td>
+                      <td>
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            onClick={() => openEdit(emp)}
+                            className="p-1.5 bg-slate-50 text-slate-500 rounded-lg hover:bg-indigo-50 hover:text-indigo-600 transition-colors"
+                            title="تعديل"
+                          >
+                            <Pencil className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => handleToggle(emp._id)}
+                            className={`p-1.5 rounded-lg transition-colors ${emp.isActive ? "bg-amber-50 text-amber-600 hover:bg-amber-100" : "bg-emerald-50 text-emerald-600 hover:bg-emerald-100"}`}
+                            title={emp.isActive ? "إيقاف" : "تفعيل"}
+                          >
+                            {emp.isActive ? <Lock className="w-3.5 h-3.5" /> : <Unlock className="w-3.5 h-3.5" />}
+                          </button>
+                          <button
+                            onClick={() => handleDelete(emp._id)}
+                            className="p-1.5 bg-slate-50 text-slate-400 rounded-lg hover:bg-red-50 hover:text-red-500 transition-colors"
+                            title="حذف"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* Form Modal */}
+      {showForm && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+          <div className="bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-white border-b border-slate-100 px-6 py-4 flex items-center justify-between z-10 rounded-t-3xl sm:rounded-t-2xl">
+              <h2 className="font-bold text-slate-800 flex items-center gap-2">
+                <Users className="w-5 h-5 text-indigo-600" />
+                {editId ? "تعديل الموظف" : "موظف جديد"}
+              </h2>
+              <button onClick={() => setShowForm(false)} className="p-1.5 hover:bg-slate-100 rounded-lg">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmit} className="p-6 space-y-5">
+              {/* Basic Info */}
+              <div className="bg-slate-50 rounded-xl p-4 space-y-3">
+                <p className="text-sm font-semibold text-slate-700">البيانات الأساسية</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="form-label">الاسم *</label>
+                    <input className="form-input" placeholder="اسم الموظف" value={form.name}
+                      onChange={e => setForm({ ...form, name: e.target.value })} />
+                  </div>
+                  <div>
+                    <label className="form-label">رقم الهاتف</label>
+                    <input className="form-input" placeholder="05xxxxxxxx" value={form.phone}
+                      onChange={e => setForm({ ...form, phone: e.target.value })} />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="form-label">الدور الوظيفي *</label>
+                    <select className="form-input" value={form.role} onChange={e => handleRoleChange(e.target.value)}>
+                      {ROLES.map(r => (
+                        <option key={r.value} value={r.value}>{r.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="form-label">الفرع</label>
+                    <select className="form-input" value={form.branchId} onChange={e => setForm({ ...form, branchId: e.target.value })}>
+                      <option value="">— بدون فرع —</option>
+                      {(branches ?? []).map(b => (
+                        <option key={b._id} value={b._id}>{b.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                <div className="flex items-center justify-between bg-white rounded-lg p-3 border border-slate-200">
+                  <span className="text-sm font-medium text-slate-700">حالة الموظف</span>
+                  <button
+                    type="button"
+                    onClick={() => setForm({ ...form, isActive: !form.isActive })}
+                    className={`text-sm font-semibold px-3 py-1 rounded-lg transition-colors ${form.isActive ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-600"}`}
+                  >
+                    {form.isActive ? "✓ نشط" : "✗ موقوف"}
+                  </button>
+                </div>
+              </div>
+
+              {/* Permissions */}
+              <div className="border border-slate-200 rounded-xl overflow-hidden">
+                <button
+                  type="button"
+                  onClick={() => setShowPermissions(!showPermissions)}
+                  className="w-full flex items-center justify-between p-4 bg-slate-50 hover:bg-slate-100 transition-colors"
+                >
+                  <div className="flex items-center gap-2">
+                    <Shield className="w-4 h-4 text-indigo-600" />
+                    <span className="font-semibold text-slate-700 text-sm">الصلاحيات</span>
+                    <span className="bg-indigo-100 text-indigo-700 text-xs font-bold px-2 py-0.5 rounded-full">
+                      {form.permissions.length} مفعّلة
+                    </span>
+                  </div>
+                  {showPermissions ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
+                </button>
+
+                {showPermissions && (
+                  <div className="p-4 space-y-4">
+                    <div className="flex gap-2 mb-3">
+                      <button
+                        type="button"
+                        onClick={() => setForm({ ...form, permissions: ALL_PERMISSIONS.map(p => p.key) })}
+                        className="text-xs px-3 py-1.5 bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-100 font-medium"
+                      >
+                        تحديد الكل
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setForm({ ...form, permissions: [] })}
+                        className="text-xs px-3 py-1.5 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 font-medium"
+                      >
+                        إلغاء الكل
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setForm({ ...form, permissions: ROLE_DEFAULT_PERMISSIONS[form.role] ?? [] })}
+                        className="text-xs px-3 py-1.5 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200 font-medium"
+                      >
+                        إعادة للافتراضي
+                      </button>
+                    </div>
+                    {Object.entries(permGroups).map(([group, perms]) => (
+                      <div key={group}>
+                        <p className="text-xs font-bold text-slate-500 uppercase mb-2">{group}</p>
+                        <div className="grid grid-cols-2 gap-2">
+                          {perms.map(p => (
+                            <label key={p.key} className="flex items-center gap-2 cursor-pointer group">
+                              <input
+                                type="checkbox"
+                                checked={form.permissions.includes(p.key)}
+                                onChange={() => togglePermission(p.key)}
+                                className="w-4 h-4 rounded text-indigo-600 border-slate-300 focus:ring-indigo-500"
+                              />
+                              <span className="text-xs text-slate-600 group-hover:text-slate-800">{p.label}</span>
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button type="button" onClick={() => setShowForm(false)} className="btn-secondary flex-1">إلغاء</button>
+                <button type="submit" className="btn-primary flex-1">{editId ? "حفظ التعديلات" : "إضافة الموظف"}</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

@@ -1,0 +1,216 @@
+import { query, mutation } from "./_generated/server";
+import { v, ConvexError } from "convex/values";
+
+export const list = query({
+  args: {
+    status: v.optional(v.string()),
+    source: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    let leads;
+    if (args.status) {
+      leads = await ctx.db
+        .query("leads")
+        .withIndex("by_status", (q) => q.eq("status", args.status!))
+        .order("desc")
+        .collect();
+    } else {
+      leads = await ctx.db.query("leads").order("desc").collect();
+    }
+    if (args.source) {
+      leads = leads.filter((l) => l.source === args.source);
+    }
+    return leads;
+  },
+});
+
+export const get = query({
+  args: { id: v.id("leads") },
+  handler: async (ctx, args) => {
+    return await ctx.db.get(args.id);
+  },
+});
+
+export const getWithActivities = query({
+  args: { id: v.id("leads") },
+  handler: async (ctx, args) => {
+    const lead = await ctx.db.get(args.id);
+    if (!lead) return null;
+    const activities = await ctx.db
+      .query("leadActivities")
+      .withIndex("by_lead", (q) => q.eq("leadId", args.id))
+      .order("desc")
+      .collect();
+    return { ...lead, activities };
+  },
+});
+
+export const stats = query({
+  args: {},
+  handler: async (ctx) => {
+    const all = await ctx.db.query("leads").collect();
+    const byStatus: Record<string, number> = {};
+    const bySource: Record<string, number> = {};
+    for (const l of all) {
+      byStatus[l.status] = (byStatus[l.status] ?? 0) + 1;
+      bySource[l.source] = (bySource[l.source] ?? 0) + 1;
+    }
+    const won = all.filter((l) => l.status === "won").length;
+    const total = all.filter((l) => l.status !== "new").length;
+    return {
+      total: all.length,
+      new: byStatus["new"] ?? 0,
+      contacted: byStatus["contacted"] ?? 0,
+      interested: byStatus["interested"] ?? 0,
+      negotiating: byStatus["negotiating"] ?? 0,
+      won: byStatus["won"] ?? 0,
+      lost: byStatus["lost"] ?? 0,
+      conversionRate: total > 0 ? Math.round((won / total) * 100) : 0,
+      bySource,
+    };
+  },
+});
+
+export const create = mutation({
+  args: {
+    name: v.string(),
+    phone: v.string(),
+    email: v.optional(v.string()),
+    source: v.string(),
+    status: v.optional(v.string()),
+    interest: v.optional(v.string()),
+    budget: v.optional(v.number()),
+    assignedTo: v.optional(v.string()),
+    branchId: v.optional(v.id("branches")),
+    notes: v.optional(v.string()),
+    nextFollowUpDate: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    return await ctx.db.insert("leads", {
+      ...args,
+      status: args.status ?? "new",
+      lastContactDate: new Date().toISOString().split("T")[0],
+    });
+  },
+});
+
+export const update = mutation({
+  args: {
+    id: v.id("leads"),
+    name: v.string(),
+    phone: v.string(),
+    email: v.optional(v.string()),
+    source: v.string(),
+    status: v.string(),
+    interest: v.optional(v.string()),
+    budget: v.optional(v.number()),
+    assignedTo: v.optional(v.string()),
+    branchId: v.optional(v.id("branches")),
+    notes: v.optional(v.string()),
+    lostReason: v.optional(v.string()),
+    nextFollowUpDate: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const { id, ...data } = args;
+    const lead = await ctx.db.get(id);
+    if (!lead) throw new ConvexError("العميل المحتمل غير موجود");
+    await ctx.db.patch(id, data);
+  },
+});
+
+export const updateStatus = mutation({
+  args: {
+    id: v.id("leads"),
+    status: v.string(),
+    lostReason: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const lead = await ctx.db.get(args.id);
+    if (!lead) throw new ConvexError("العميل المحتمل غير موجود");
+    await ctx.db.patch(args.id, {
+      status: args.status,
+      lostReason: args.lostReason,
+      lastContactDate: new Date().toISOString().split("T")[0],
+    });
+  },
+});
+
+export const convertToCustomer = mutation({
+  args: {
+    id: v.id("leads"),
+    address: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const lead = await ctx.db.get(args.id);
+    if (!lead) throw new ConvexError("العميل المحتمل غير موجود");
+    if (lead.convertedToCustomerId)
+      throw new ConvexError("تم تحويل هذا العميل مسبقاً");
+    const customerId = await ctx.db.insert("customers", {
+      name: lead.name,
+      phone: lead.phone,
+      email: lead.email,
+      address: args.address,
+      balance: 0,
+      totalPurchases: 0,
+      notes: lead.notes,
+      branchId: lead.branchId,
+    });
+    await ctx.db.patch(args.id, {
+      status: "won",
+      convertedToCustomerId: customerId,
+      lastContactDate: new Date().toISOString().split("T")[0],
+    });
+    return customerId;
+  },
+});
+
+export const remove = mutation({
+  args: { id: v.id("leads") },
+  handler: async (ctx, args) => {
+    const lead = await ctx.db.get(args.id);
+    if (!lead) throw new ConvexError("العميل المحتمل غير موجود");
+    const activities = await ctx.db
+      .query("leadActivities")
+      .withIndex("by_lead", (q) => q.eq("leadId", args.id))
+      .collect();
+    for (const a of activities) await ctx.db.delete(a._id);
+    await ctx.db.delete(args.id);
+  },
+});
+
+export const listActivities = query({
+  args: { leadId: v.id("leads") },
+  handler: async (ctx, args) => {
+    return await ctx.db
+      .query("leadActivities")
+      .withIndex("by_lead", (q) => q.eq("leadId", args.leadId))
+      .order("desc")
+      .collect();
+  },
+});
+
+export const addActivity = mutation({
+  args: {
+    leadId: v.id("leads"),
+    type: v.string(),
+    notes: v.string(),
+    outcome: v.optional(v.string()),
+    nextAction: v.optional(v.string()),
+    createdBy: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const lead = await ctx.db.get(args.leadId);
+    if (!lead) throw new ConvexError("العميل المحتمل غير موجود");
+    await ctx.db.patch(args.leadId, {
+      lastContactDate: new Date().toISOString().split("T")[0],
+    });
+    return await ctx.db.insert("leadActivities", args);
+  },
+});
+
+export const deleteActivity = mutation({
+  args: { id: v.id("leadActivities") },
+  handler: async (ctx, args) => {
+    await ctx.db.delete(args.id);
+  },
+});
