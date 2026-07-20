@@ -10,12 +10,11 @@ import {
   CreditCard, Trash2, MessageCircle, Printer
 } from "lucide-react";
 import { PrintModal } from "./PrintTemplate";
+import { buildEgyptWhatsAppUrl } from "../lib/utils";
 
 // ─── WhatsApp helper ───────────────────────────────────────────────────────────
 function buildWhatsAppLink(phone: string, message: string) {
-  const clean = phone.replace(/\D/g, "");
-  const intl = clean.startsWith("0") ? "966" + clean.slice(1) : clean;
-  return `https://wa.me/${intl}?text=${encodeURIComponent(message)}`;
+  return buildEgyptWhatsAppUrl(phone, message);
 }
 
 function getWhatsAppMessage(
@@ -33,7 +32,7 @@ function getWhatsAppMessage(
     case "confirmed":
       return `${greeting}\n\nنود إعلامكم بأن طلبكم لدى ${store} قد تم تأكيده ✅\n${ordNum}\n\nسنقوم بإشعاركم فور جاهزية الطلب. شكراً لثقتكم 🙏`;
     case "ready":
-      return `${greeting}\n\nيسعدنا إعلامكم بأن طلبكم لدى ${store} أصبح جاهزاً للاستلام 🎉\n${ordNum}\n${remaining > 0 ? `\nالمبلغ المتبقي: *${remaining.toLocaleString("ar-SA")} ريال*\n` : ""}\nيمكنكم التفضل باستلامه في أي وقت خلال أوقات الدوام. شكراً لكم 😊`;
+      return `${greeting}\n\nيسعدنا إعلامكم بأن طلبكم لدى ${store} أصبح جاهزاً للاستلام 🎉\n${ordNum}\n${remaining > 0 ? `\nالمبلغ المتبقي: *${remaining.toLocaleString("ar-EG")} ج.م*\n` : ""}\nيمكنكم التفضل باستلامه في أي وقت خلال أوقات الدوام. شكراً لكم 😊`;
     case "delivered":
       return `${greeting}\n\nشكراً لزيارتكم ${store} 🌟\n${ordNum}\n\nنتمنى أن تكونوا راضين عن خدمتنا. يسعدنا دائماً خدمتكم 💙`;
     case "cancelled":
@@ -78,7 +77,7 @@ export function OrdersPage() {
 
   const orders = useQuery(api.orders.list, filterStatus !== "all" ? { status: filterStatus } : {});
   const stats = useQuery(api.orders.stats);
-  const settings = useQuery(api.settings.get);
+  const settings = useQuery(api.settings.getPublic);
   const updateStatus = useMutation(api.orders.updateStatus);
   const addPayment = useMutation(api.orders.addPayment);
   const removeOrder = useMutation(api.orders.remove);
@@ -262,11 +261,11 @@ export function OrdersPage() {
                           {order.items.map(i => i.productName).join("، ")}
                         </p>
                       </td>
-                      <td className="font-bold text-slate-800">{order.total.toLocaleString("ar-SA")} ر</td>
-                      <td className="text-emerald-600 font-medium">{order.deposit.toLocaleString("ar-SA")} ر</td>
+                      <td className="font-bold text-slate-800">{order.total.toLocaleString("ar-EG")} ج.م</td>
+                      <td className="text-emerald-600 font-medium">{order.deposit.toLocaleString("ar-EG")} ج.م</td>
                       <td>
                         <span className={`font-bold ${order.remaining > 0 ? "text-amber-600" : "text-emerald-600"}`}>
-                          {order.remaining.toLocaleString("ar-SA")} ر
+                          {order.remaining.toLocaleString("ar-EG")} ج.م
                         </span>
                       </td>
                       <td>
@@ -364,7 +363,7 @@ export function OrdersPage() {
             </div>
             <div className="space-y-4">
               <div>
-                <label className="form-label">المبلغ المدفوع (ريال)</label>
+                <label className="form-label">المبلغ المدفوع (ج.م)</label>
                 <input
                   className="form-input text-center text-xl font-bold"
                   type="number"
@@ -492,7 +491,7 @@ function NewOrderForm({ onClose }: { onClose: () => void }) {
               <div>
                 <label className="form-label">رقم الهاتف</label>
                 <input className="form-input" value={form.customerPhone}
-                  onChange={e => setForm({ ...form, customerPhone: e.target.value })} placeholder="05xxxxxxxx" />
+                  onChange={e => setForm({ ...form, customerPhone: e.target.value })} placeholder="01xxxxxxxxx" />
               </div>
             </div>
           </div>
@@ -535,7 +534,7 @@ function NewOrderForm({ onClose }: { onClose: () => void }) {
                 <input className="form-input text-sm" placeholder="ملاحظات (اختياري)" value={item.notes ?? ""}
                   onChange={e => updateItem(idx, "notes", e.target.value)} />
                 <div className="text-left text-sm font-bold text-indigo-600">
-                  {(item.quantity * item.unitPrice).toLocaleString("ar-SA")} ريال
+                  {(item.quantity * item.unitPrice).toLocaleString("ar-EG")} ج.م
                 </div>
               </div>
             ))}
@@ -545,10 +544,10 @@ function NewOrderForm({ onClose }: { onClose: () => void }) {
           <div className="bg-indigo-50 rounded-xl p-4 space-y-3">
             <div className="flex items-center justify-between">
               <span className="font-semibold text-slate-700">الإجمالي</span>
-              <span className="font-black text-xl text-indigo-700">{total.toLocaleString("ar-SA")} ريال</span>
+              <span className="font-black text-xl text-indigo-700">{total.toLocaleString("ar-EG")} ج.م</span>
             </div>
             <div>
-              <label className="form-label">العربون / الدفعة الأولى (ريال)</label>
+              <label className="form-label">العربون / الدفعة الأولى (ج.م)</label>
               <input className="form-input" type="number" placeholder="0" min="0"
                 value={form.deposit} onChange={e => setForm({ ...form, deposit: e.target.value })} />
             </div>
@@ -556,7 +555,7 @@ function NewOrderForm({ onClose }: { onClose: () => void }) {
               <div className="flex items-center justify-between text-sm">
                 <span className="text-slate-600">المتبقي</span>
                 <span className="font-bold text-amber-600">
-                  {Math.max(0, total - parseFloat(form.deposit || "0")).toLocaleString("ar-SA")} ريال
+                  {Math.max(0, total - parseFloat(form.deposit || "0")).toLocaleString("ar-EG")} ج.م
                 </span>
               </div>
             )}

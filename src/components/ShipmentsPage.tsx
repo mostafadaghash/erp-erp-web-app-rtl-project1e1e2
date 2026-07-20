@@ -96,7 +96,7 @@ export function ShipmentsPage() {
           { label: "تم الطلب",    value: stats?.ordered ?? 0,    color: "text-blue-600",   bg: "bg-blue-50",   icon: Clock },
           { label: "في الطريق",   value: stats?.inTransit ?? 0,  color: "text-amber-600",  bg: "bg-amber-50",  icon: Plane },
           { label: "وصلت",        value: stats?.arrived ?? 0,    color: "text-emerald-600",bg: "bg-emerald-50",icon: CheckCircle },
-          { label: "إجمالي التكلفة", value: (stats?.totalCost ?? 0).toLocaleString("ar-SA") + " ر",
+          { label: "إجمالي التكلفة", value: (stats?.totalCost ?? 0).toLocaleString("ar-EG") + " ج.م",
             color: "text-indigo-600", bg: "bg-indigo-50", icon: TrendingDown },
         ].map((s) => {
           const Icon = s.icon;
@@ -204,9 +204,9 @@ export function ShipmentsPage() {
                           {shipment.items.map(i => i.productName).join("، ")}
                         </p>
                       </td>
-                      <td className="text-slate-700 font-medium">{shipment.totalCost.toLocaleString("ar-SA")} ر</td>
-                      <td className="text-slate-500">{shipment.shippingCost.toLocaleString("ar-SA")} ر</td>
-                      <td className="font-bold text-slate-800">{shipment.grandTotal.toLocaleString("ar-SA")} ر</td>
+                      <td className="text-slate-700 font-medium">{shipment.totalCost.toLocaleString("ar-EG")} ج.م</td>
+                      <td className="text-slate-500">{shipment.shippingCost.toLocaleString("ar-EG")} ج.م</td>
+                      <td className="font-bold text-slate-800">{shipment.grandTotal.toLocaleString("ar-EG")} ج.م</td>
                       <td>
                         <span className={cfg.badge}>
                           <Icon className="w-3 h-3 ml-1" />
@@ -422,7 +422,7 @@ function NewShipmentForm({ onClose }: { onClose: () => void }) {
                   </div>
                 </div>
                 <div className="text-left text-sm font-bold text-indigo-600">
-                  {(item.quantity * item.unitCost).toLocaleString("ar-SA")} ريال
+                  {(item.quantity * item.unitCost).toLocaleString("ar-EG")} ج.م
                 </div>
               </div>
             ))}
@@ -432,16 +432,16 @@ function NewShipmentForm({ onClose }: { onClose: () => void }) {
           <div className="bg-indigo-50 rounded-xl p-4 space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-slate-600 text-sm">تكلفة البضاعة</span>
-              <span className="font-bold text-slate-800">{totalCost.toLocaleString("ar-SA")} ريال</span>
+              <span className="font-bold text-slate-800">{totalCost.toLocaleString("ar-EG")} ج.م</span>
             </div>
             <div>
-              <label className="form-label">تكلفة الشحن (ريال)</label>
+              <label className="form-label">تكلفة الشحن (ج.م)</label>
               <input className="form-input" type="number" placeholder="0" min="0"
                 value={form.shippingCost} onChange={e => setForm({ ...form, shippingCost: e.target.value })} />
             </div>
             <div className="flex items-center justify-between border-t border-indigo-200 pt-3">
               <span className="font-semibold text-slate-700">الإجمالي الكلي</span>
-              <span className="font-black text-xl text-indigo-700">{grandTotal.toLocaleString("ar-SA")} ريال</span>
+              <span className="font-black text-xl text-indigo-700">{grandTotal.toLocaleString("ar-EG")} ج.م</span>
             </div>
           </div>
 
