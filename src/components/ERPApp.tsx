@@ -43,7 +43,7 @@ export type Page =
 export function ERPApp() {
   const [currentPage, setCurrentPage] = useState<Page>("dashboard");
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const settings = useQuery(api.settings.get);
+  const settings = useQuery(api.settings.getPublic);
 
   const storeName = settings?.storeName ?? "تك ستور ERP";
 

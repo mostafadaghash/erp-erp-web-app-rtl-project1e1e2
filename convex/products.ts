@@ -75,7 +75,7 @@ export const create = mutation({
     description: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const user = await requirePermission(ctx, "create_all");
+    const user = await requirePermission(ctx, "create_products");
     const id = await ctx.db.insert("products", {
       name: args.name,
       sku: args.sku ?? "",
@@ -118,7 +118,7 @@ export const update = mutation({
     description: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const user = await requirePermission(ctx, "edit_all");
+    const user = await requirePermission(ctx, "edit_products");
     const { id, ...data } = args;
     const prod = await ctx.db.get(id);
     if (!prod) throw new ConvexError("المنتج غير موجود");
@@ -136,7 +136,7 @@ export const update = mutation({
 export const remove = mutation({
   args: { id: v.id("products") },
   handler: async (ctx, args) => {
-    const user = await requirePermission(ctx, "delete_all");
+    const user = await requirePermission(ctx, "delete_products");
     const prod = await ctx.db.get(args.id);
     if (!prod) throw new ConvexError("المنتج غير موجود");
     await ctx.db.delete(args.id);
@@ -157,7 +157,7 @@ export const adjustStock = mutation({
     reason: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const user = await requirePermission(ctx, "edit_all");
+    const user = await requirePermission(ctx, "edit_products");
     const prod = await ctx.db.get(args.id);
     if (!prod) throw new ConvexError("المنتج غير موجود");
     const newStock = prod.stock + args.adjustment;

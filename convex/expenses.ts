@@ -22,7 +22,7 @@ export const create = mutation({
     branchId: v.optional(v.id("branches")),
   },
   handler: async (ctx, args) => {
-    const user = await requirePermission(ctx, "manage_expenses");
+    const user = await requirePermission(ctx, "create_expenses");
     const branchId = args.branchId ?? (user.branchId as any);
     const id = await ctx.db.insert("expenses", {
       ...args,
@@ -43,7 +43,7 @@ export const create = mutation({
 export const remove = mutation({
   args: { id: v.id("expenses") },
   handler: async (ctx, args) => {
-    const user = await requirePermission(ctx, "manage_expenses");
+    const user = await requirePermission(ctx, "delete_expenses");
     const expense = await ctx.db.get(args.id);
     if (!expense) throw new ConvexError("المصروف غير موجود");
     await ctx.db.delete(args.id);

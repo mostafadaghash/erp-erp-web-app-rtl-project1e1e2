@@ -16,7 +16,7 @@ export const create = mutation({
     icon: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const user = await requirePermission(ctx, "manage_products");
+    const user = await requirePermission(ctx, "create_products");
     const id = await ctx.db.insert("categories", args);
     await logAction(ctx, user, {
       action: "create",
@@ -32,7 +32,7 @@ export const create = mutation({
 export const remove = mutation({
   args: { id: v.id("categories") },
   handler: async (ctx, args) => {
-    const user = await requirePermission(ctx, "manage_products");
+    const user = await requirePermission(ctx, "delete_products");
     const category = await ctx.db.get(args.id);
     if (!category) throw new Error("الفئة غير موجودة");
     await ctx.db.delete(args.id);

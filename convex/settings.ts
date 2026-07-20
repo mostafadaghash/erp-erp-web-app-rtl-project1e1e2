@@ -2,6 +2,29 @@ import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
 import { requireAuth, requireAdmin, logAction } from "./lib/auth";
 
+// Public query — no auth required, used by login page and tracking page
+export const getPublic = query({
+  args: {},
+  handler: async (ctx) => {
+    const settings = await ctx.db.query("settings").first();
+    if (!settings) return null;
+    // Only expose safe public fields
+    return {
+      storeName: settings.storeName,
+      storeType: settings.storeType,
+      primaryColor: settings.primaryColor,
+      secondaryColor: settings.secondaryColor,
+      logoUrl: settings.logoUrl,
+      phone: settings.phone,
+      address: settings.address,
+      currency: settings.currency,
+      whatsappNumber: settings.whatsappNumber,
+      modules: settings.modules,
+    };
+  },
+});
+
+// Authenticated query — full settings including tax rate
 export const get = query({
   args: {},
   handler: async (ctx) => {

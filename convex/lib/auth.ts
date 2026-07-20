@@ -1,132 +1,119 @@
+/**
+ * Centralized auth & authorization helpers.
+ * ALL backend modules MUST use these decorators — never call ctx.auth.getUserIdentity directly.
+ */
 import { QueryCtx, MutationCtx } from "../_generated/server";
-import { ConvexError } from "convex/values";
-import { Doc } from "../_generated/dataModel";
-import { ROLE_PERMISSIONS } from "../employees";
+import { Id } from "../_generated/dataModel";
+import { ROLE_PERMISSIONS, Permission } from "./permissions";
 
-export type Role = keyof typeof ROLE_PERMISSIONS;
-
+// ──────────────────────────────────────────────
+// Types
+// ──────────────────────────────────────────────
 export interface AuthUser {
   userId: string;
-  profile: Doc<"userProfiles"> | null;
-  role: string;
-  branchId?: string;
+  employeeId: Id<"userProfiles">;
   name: string;
-  permissions: string[];
+  role: string;
+  branchId?: Id<"branches">;
+  isActive: boolean;
 }
 
-/**
- * Get the authenticated user's profile from the database.
- * Returns null if not authenticated or no profile exists.
- */
-export async function getAuthUser(ctx: QueryCtx | MutationCtx): Promise<AuthUser | null> {
+// ──────────────────────────────────────────────
+// Core: resolve the authenticated employee from userProfiles
+// ──────────────────────────────────────────────
+export async function getAuthUser(
+  ctx: QueryCtx | MutationCtx
+): Promise<AuthUser | null> {
   const identity = await ctx.auth.getUserIdentity();
   if (!identity) return null;
 
-  const profile = await ctx.db
+  // Look up employee profile by tokenIdentifier (subject)
+  const employee = await ctx.db
     .query("userProfiles")
-    .withIndex("by_user", (q) => q.eq("userId", identity.subject))
-    .first();
+    .withIndex("by_token", (q) => q.eq("tokenIdentifier", identity.subject))
+    .unique();
 
-  // If no profile yet, user might be a new sign-up
-  if (!profile) {
-    return {
-      userId: identity.subject,
-      profile: null,
-      role: "viewer",
-      name: identity.name ?? identity.email ?? "مستخدم",
-      permissions: [],
-    };
-  }
-
-  // Disabled employees get viewer-level access
-  if (!profile.isActive) {
-    return {
-      userId: identity.subject,
-      profile,
-      role: "viewer",
-      branchId: profile.branchId,
-      name: profile.name,
-      permissions: [],
-    };
-  }
+  if (!employee) return null;
 
   return {
     userId: identity.subject,
-    profile,
-    role: profile.role,
-    branchId: profile.branchId,
-    name: profile.name,
-    permissions: profile.permissions,
+    employeeId: employee._id,
+    name: employee.name,
+    role: employee.role,
+    branchId: employee.branchId ?? undefined,
+    isActive: employee.isActive,
   };
 }
 
-/**
- * Require authentication. Throws if not signed in.
- */
-export async function requireAuth(ctx: QueryCtx | MutationCtx): Promise<AuthUser> {
+// ──────────────────────────────────────────────
+// requireAuth — throws if not signed in
+// ──────────────────────────────────────────────
+export async function requireAuth(
+  ctx: QueryCtx | MutationCtx
+): Promise<AuthUser> {
   const user = await getAuthUser(ctx);
-  if (!user) throw new ConvexError("يجب تسجيل الدخول أولاً");
+  if (!user) throw new Error("يجب تسجيل الدخول للوصول إلى هذا المورد");
   return user;
 }
 
-/**
- * Require a specific permission. Throws if user lacks it.
- */
+// ──────────────────────────────────────────────
+// requirePermission — throws if user lacks permission
+// Disabled employees are automatically downgraded to "viewer"
+// ──────────────────────────────────────────────
 export async function requirePermission(
   ctx: QueryCtx | MutationCtx,
-  permission: string
+  permission: Permission
 ): Promise<AuthUser> {
   const user = await requireAuth(ctx);
-  if (user.role === "admin") return user; // admin bypasses all checks
-  if (!user.permissions.includes(permission)) {
-    throw new ConvexError("ليس لديك صلاحية للقيام بهذا الإجراء");
+
+  // Disabled employees get viewer-level access only
+  const effectiveRole = user.isActive ? user.role : "viewer";
+  const allowed = ROLE_PERMISSIONS[effectiveRole] ?? [];
+  if (!allowed.includes(permission)) {
+    throw new Error(`ليس لديك صلاحية: ${permission}`);
   }
   return user;
 }
 
-/**
- * Require admin role specifically.
- */
-export async function requireAdmin(ctx: QueryCtx | MutationCtx): Promise<AuthUser> {
+// ──────────────────────────────────────────────
+// requireAdmin — throws if user is not an active admin
+// ──────────────────────────────────────────────
+export async function requireAdmin(
+  ctx: QueryCtx | MutationCtx
+): Promise<AuthUser> {
   const user = await requireAuth(ctx);
-  if (user.role !== "admin") {
-    throw new ConvexError("هذا الإجراء يتطلب صلاحيات مدير النظام");
+  if (user.role !== "admin" || !user.isActive) {
+    throw new Error("هذه العملية تتطلب صلاحيات مدير النظام");
   }
   return user;
 }
 
-/**
- * Filter records by branch for non-admin users.
- * Admins see all; managers/employees see only their branch.
- */
-export function filterByBranch<T extends { branchId?: string }>(
-  records: T[],
+// ──────────────────────────────────────────────
+// filterByBranch — filter array results by user's branch (non-admins only)
+// ──────────────────────────────────────────────
+export function filterByBranch<T extends { branchId?: Id<"branches"> }>(
+  items: T[],
   user: AuthUser
 ): T[] {
-  if (user.role === "admin") return records;
-  if (!user.branchId) return records; // no branch restriction if not assigned
-  return records.filter(r => !r.branchId || r.branchId === user.branchId);
+  if (user.role === "admin") return items;
+  if (!user.branchId) return items;
+  return items.filter(
+    (item) => !item.branchId || item.branchId === user.branchId
+  );
 }
 
-/**
- * Check if user can access a specific branch's data.
- */
-export function canAccessBranch(user: AuthUser, branchId?: string): boolean {
-  if (user.role === "admin") return true;
-  if (!branchId) return true;
-  return user.branchId === branchId;
-}
-
-/**
- * Log an action to the audit log with real user info.
- */
+// ──────────────────────────────────────────────
+// logAction — centralized audit logging
+// Matches the call signature used by all modules:
+//   logAction(ctx, user, { action, module, recordId, recordLabel, details })
+// ──────────────────────────────────────────────
 export async function logAction(
   ctx: MutationCtx,
   user: AuthUser,
   params: {
     action: string;
     module: string;
-    recordId?: string;
+    recordId?: Id<any>;
     recordLabel?: string;
     details?: string;
   }
@@ -134,11 +121,35 @@ export async function logAction(
   await ctx.db.insert("auditLogs", {
     userId: user.userId,
     userName: user.name,
+    branchId: user.branchId,
     action: params.action,
     module: params.module,
-    recordId: params.recordId,
+    recordId: params.recordId ? (params.recordId as any) : undefined,
     recordLabel: params.recordLabel,
-    details: params.details,
-    branchId: user.branchId as any,
+    details: params.details ?? "",
   });
+}
+
+// ──────────────────────────────────────────────
+// requireModuleEnabled — checks if a module is enabled in settings
+// ──────────────────────────────────────────────
+export async function requireModuleEnabled(
+  ctx: QueryCtx | MutationCtx,
+  moduleName: string
+): Promise<void> {
+  const settings = await ctx.db.query("settings").first();
+  if (settings?.modules) {
+    const enabled = (settings.modules as Record<string, boolean>)[moduleName];
+    if (enabled === false) {
+      throw new Error(`وحدة "${moduleName}" معطلة في النظام`);
+    }
+  }
+}
+
+// ──────────────────────────────────────────────
+// System setup check — is there at least one active admin?
+// ──────────────────────────────────────────────
+export async function hasAdmin(ctx: QueryCtx): Promise<boolean> {
+  const all = await ctx.db.query("userProfiles").collect();
+  return all.some((e) => e.role === "admin" && e.isActive);
 }

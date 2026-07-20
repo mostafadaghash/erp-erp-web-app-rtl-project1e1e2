@@ -76,7 +76,7 @@ export const update = mutation({
 export const remove = mutation({
   args: { id: v.id("customers") },
   handler: async (ctx, args) => {
-    const user = await requirePermission(ctx, "delete_all");
+    const user = await requirePermission(ctx, "delete_customers");
     const customer = await ctx.db.get(args.id);
     if (!customer) throw new ConvexError("العميل غير موجود");
     await ctx.db.delete(args.id);

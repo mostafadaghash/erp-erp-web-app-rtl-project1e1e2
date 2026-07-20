@@ -1,0 +1,134 @@
+/**
+ * Single Source of Truth for all permissions and role-permission mappings.
+ * Backend modules MUST use the exact permission strings defined here.
+ * Frontend components import the same list for UI gating.
+ */
+
+export const PERMISSIONS = [
+  // ── View ──
+  "view_products",
+  "view_customers",
+  "view_orders",
+  "view_invoices",
+  "view_repairs",
+  "view_shipments",
+  "view_deliveries",
+  "view_suppliers",
+  "view_expenses",
+  "view_leads",
+  "view_branches",
+  "view_employees",
+  "view_reports",
+  "view_audit_logs",
+  "view_prices",
+  "view_profits",
+  // ── Create ──
+  "create_products",
+  "create_customers",
+  "create_orders",
+  "create_invoices",
+  "create_repairs",
+  "create_shipments",
+  "create_deliveries",
+  "create_suppliers",
+  "create_expenses",
+  "create_leads",
+  // ── Edit ──
+  "edit_products",
+  "edit_customers",
+  "edit_orders",
+  "edit_invoices",
+  "edit_repairs",
+  "edit_shipments",
+  "edit_deliveries",
+  "edit_suppliers",
+  "edit_expenses",
+  "edit_leads",
+  // ── Delete ──
+  "delete_products",
+  "delete_customers",
+  "delete_orders",
+  "delete_invoices",
+  "delete_repairs",
+  "delete_shipments",
+  "delete_deliveries",
+  "delete_suppliers",
+  "delete_expenses",
+  "delete_leads",
+  // ── Admin-only ──
+  "manage_users",
+  "manage_settings",
+  "manage_branches",
+  // ── Other ──
+  "export_data",
+  "print_invoices",
+  "print_repairs",
+  "print_shipping",
+] as const;
+
+export type Permission = (typeof PERMISSIONS)[number];
+
+export const ROLE_PERMISSIONS: Record<string, string[]> = {
+  admin: [...PERMISSIONS],
+  manager: [
+    "view_products", "view_customers", "view_orders", "view_invoices",
+    "view_repairs", "view_shipments", "view_deliveries", "view_suppliers",
+    "view_expenses", "view_leads", "view_branches", "view_reports",
+    "view_prices", "view_profits",
+    "create_products", "create_customers", "create_orders", "create_invoices",
+    "create_repairs", "create_shipments", "create_deliveries", "create_suppliers",
+    "create_expenses", "create_leads",
+    "edit_products", "edit_customers", "edit_orders", "edit_invoices",
+    "edit_repairs", "edit_shipments", "edit_deliveries", "edit_suppliers",
+    "edit_expenses", "edit_leads",
+    "export_data", "print_invoices", "print_repairs", "print_shipping",
+  ],
+  sales: [
+    "view_products", "view_customers", "view_orders", "view_invoices",
+    "view_prices",
+    "create_orders", "create_invoices", "create_customers",
+    "edit_orders",
+    "print_invoices",
+  ],
+  customer_service: [
+    "view_customers", "view_orders", "view_repairs",
+    "create_customers", "edit_customers",
+    "create_orders", "edit_orders",
+    "create_repairs",
+    "view_prices",
+  ],
+  technician: [
+    "view_repairs", "view_products", "view_prices",
+    "create_repairs", "edit_repairs",
+    "print_repairs",
+  ],
+  accountant: [
+    "view_products", "view_customers", "view_invoices", "view_expenses",
+    "view_reports", "view_prices", "view_profits",
+    "create_expenses", "edit_expenses",
+    "export_data",
+  ],
+  shipping: [
+    "view_orders", "view_shipments", "view_deliveries",
+    "create_shipments", "edit_shipments",
+    "create_deliveries", "edit_deliveries",
+    "print_shipping",
+  ],
+  viewer: [
+    "view_products", "view_customers", "view_orders",
+    "view_repairs", "view_invoices",
+  ],
+};
+
+export const ROLES = {
+  admin:            { label: "مدير النظام",      color: "purple" },
+  manager:          { label: "مدير فرع",          color: "indigo" },
+  sales:            { label: "موظف مبيعات",       color: "blue" },
+  customer_service: { label: "خدمة العملاء",      color: "cyan" },
+  technician:       { label: "فني صيانة",         color: "amber" },
+  accountant:       { label: "محاسب",             color: "emerald" },
+  shipping:         { label: "موظف شحن",          color: "orange" },
+  viewer:           { label: "مشاهد فقط",         color: "slate" },
+} as const;
+
+export type Role = keyof typeof ROLES;

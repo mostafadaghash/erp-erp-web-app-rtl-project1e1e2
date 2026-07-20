@@ -220,13 +220,14 @@ const applicationTables = {
   // المستخدمين والصلاحيات
   userProfiles: defineTable({
     userId: v.string(),
+    tokenIdentifier: v.optional(v.string()),
     name: v.string(),
     role: v.string(),
     branchId: v.optional(v.id("branches")),
     permissions: v.array(v.string()),
     isActive: v.boolean(),
     phone: v.optional(v.string()),
-  }).index("by_user", ["userId"]),
+  }).index("by_user", ["userId"]).index("by_token", ["tokenIdentifier"]).index("by_role", ["role"]).index("by_branch", ["branchId"]),
 
   // CRM - العملاء المحتملون
   leads: defineTable({
@@ -295,6 +296,7 @@ const applicationTables = {
     recordLabel: v.optional(v.string()),
     details: v.optional(v.string()),
     branchId: v.optional(v.id("branches")),
+    timestamp: v.optional(v.number()),
   })
     .index("by_user", ["userId"])
     .index("by_module", ["module"])

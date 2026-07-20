@@ -147,7 +147,7 @@ export const update = mutation({
     branchId: v.optional(v.id("branches")),
   },
   handler: async (ctx, args) => {
-    const user = await requirePermission(ctx, "edit_all");
+    const user = await requirePermission(ctx, "edit_invoices");
     const { id, ...data } = args;
     const inv = await ctx.db.get(id);
     if (!inv) throw new ConvexError("الفاتورة غير موجودة");
@@ -183,7 +183,7 @@ export const updateStatus = mutation({
     status: v.string(),
   },
   handler: async (ctx, args) => {
-    const user = await requirePermission(ctx, "edit_all");
+    const user = await requirePermission(ctx, "edit_invoices");
     const inv = await ctx.db.get(args.id);
     if (!inv) throw new ConvexError("الفاتورة غير موجودة");
     await ctx.db.patch(args.id, { status: args.status });
@@ -200,7 +200,7 @@ export const updateStatus = mutation({
 export const remove = mutation({
   args: { id: v.id("invoices") },
   handler: async (ctx, args) => {
-    const user = await requirePermission(ctx, "delete_all");
+    const user = await requirePermission(ctx, "delete_invoices");
     const inv = await ctx.db.get(args.id);
     if (!inv) throw new ConvexError("الفاتورة غير موجودة");
     await ctx.db.delete(args.id);

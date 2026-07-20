@@ -126,7 +126,7 @@ export const updateStatus = mutation({
 export const remove = mutation({
   args: { id: v.id("shipments") },
   handler: async (ctx, args) => {
-    const user = await requirePermission(ctx, "delete_all");
+    const user = await requirePermission(ctx, "delete_shipments");
     const shipment = await ctx.db.get(args.id);
     if (!shipment) throw new ConvexError("الشحنة غير موجودة");
     if (shipment.status === "arrived") throw new ConvexError("لا يمكن حذف شحنة تم استلامها");

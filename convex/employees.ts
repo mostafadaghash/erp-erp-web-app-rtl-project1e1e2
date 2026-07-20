@@ -1,63 +1,155 @@
 import { query, mutation } from "./_generated/server";
-import { v } from "convex/values";
-import { ConvexError } from "convex/values";
-import { requireAuth, requirePermission, logAction } from "./lib/auth";
+import { v, ConvexError } from "convex/values";
+import { requireAuth, requirePermission, logAction, hasAdmin } from "./lib/auth";
+import { ROLES, ROLE_PERMISSIONS } from "./lib/permissions";
 
-// Role definitions with Arabic labels and permissions
-export const ROLES = {
-  admin:            { label: "مدير النظام",      color: "purple" },
-  manager:          { label: "مدير فرع",          color: "indigo" },
-  sales:            { label: "موظف مبيعات",       color: "blue" },
-  customer_service: { label: "خدمة العملاء",      color: "cyan" },
-  technician:       { label: "فني صيانة",         color: "amber" },
-  accountant:       { label: "محاسب",             color: "emerald" },
-  shipping:         { label: "موظف شحن",          color: "orange" },
-  viewer:           { label: "مشاهد فقط",         color: "slate" },
-} as const;
+// Re-export for frontend convenience
+export { ROLES, ROLE_PERMISSIONS };
 
-export const ROLE_PERMISSIONS: Record<string, string[]> = {
-  admin: [
-    "view_all", "create_all", "edit_all", "delete_all",
-    "view_prices", "view_profits", "manage_users",
-    "export_data", "print_all", "manage_settings",
-    "view_reports", "manage_branches",
-  ],
-  manager: [
-    "view_all", "create_all", "edit_all",
-    "view_prices", "view_profits",
-    "export_data", "print_all", "view_reports",
-  ],
-  sales: [
-    "view_products", "view_customers", "view_orders", "view_invoices",
-    "create_orders", "create_invoices", "edit_orders",
-    "view_prices", "print_invoices",
-  ],
-  customer_service: [
-    "view_customers", "view_orders", "view_repairs",
-    "create_customers", "edit_customers",
-    "create_orders", "edit_orders",
-    "view_prices",
-  ],
-  technician: [
-    "view_repairs", "edit_repairs", "create_repairs",
-    "view_products", "view_prices",
-    "print_repairs",
-  ],
-  accountant: [
-    "view_all", "view_prices", "view_profits",
-    "view_reports", "export_data",
-    "create_expenses", "edit_expenses",
-  ],
-  shipping: [
-    "view_orders", "view_shipments",
-    "edit_shipments", "create_shipments",
-    "print_shipping",
-  ],
-  viewer: [
-    "view_products", "view_customers", "view_orders",
-    "view_repairs", "view_invoices",
-  ],
-};
+// ──────────────────────────────────────────────
+// PUBLIC: System setup status — no auth required
+// Frontend uses this to decide: show setup wizard or login form
+// ──────────────────────────────────────────────
+export const setupStatus = query({
+  args: {},
+  handler: async (ctx) => {
+    const adminExists = await hasAdmin(ctx);
+    return { needsSetup: !adminExists };
+  },
+});
+
+// ──────────────────────────────────────────────
+// PUBLIC: Create first admin — only works when no admin exists
+// Called from the setup wizard before any auth
+// ──────────────────────────────────────────────
+export const createFirstAdmin = mutation({
+  args: {
+    name: v.string(),
+    phone: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    // Block if an admin already exists — prevents hijacking
+    const adminExists = await hasAdmin(ctx);
+    if (adminExists) {
+      throw new ConvexError("النظام تم إعداده بالفعل. يرجى تسجيل الدخول.");
+    }
+
+    // Get the current identity (user must be signed in via Convex Auth)
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new ConvexError("يجب تسجيل الدخول أولاً قبل إعداد النظام");
+    }
+
+    // Check if a profile already exists for this token
+    const existing = await ctx.db
+      .query("userProfiles")
+      .withIndex("by_token", (q) => q.eq("tokenIdentifier", identity.subject))
+      .unique();
+
+    if (existing) {
+      // Upgrade existing profile to admin
+      await ctx.db.patch(existing._id, {
+        role: "admin",
+        name: args.name,
+        phone: args.phone,
+        permissions: [...ROLE_PERMISSIONS.admin],
+        isActive: true,
+      });
+      return existing._id;
+    }
+
+    // Create new admin profile
+    const id = await ctx.db.insert("userProfiles", {
+      userId: identity.subject,
+      tokenIdentifier: identity.subject,
+      name: args.name,
+      phone: args.phone,
+      role: "admin",
+      permissions: [...ROLE_PERMISSIONS.admin],
+      isActive: true,
+    });
+
+    // Log the setup action (manual log since no user profile existed before)
+    await ctx.db.insert("auditLogs", {
+      userId: identity.subject,
+      userName: args.name,
+      action: "setup",
+      module: "system",
+      recordId: id as any,
+      recordLabel: args.name,
+      details: `إعداد النظام وإنشاء أول مدير: ${args.name}`,
+    });
+
+    return id;
+  },
+});
+
+// ──────────────────────────────────────────────
+// AUTH: Ensure profile exists for signed-in user
+// Called by frontend after authentication.
+// - If no admin exists yet → returns { needsSetup: true }
+// - If admin exists but user has no profile → creates viewer profile, returns { needsSetup: false, profile: "viewer" }
+// - If user has profile → returns { needsSetup: false, profile: existing role }
+// ──────────────────────────────────────────────
+export const ensureProfile = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new ConvexError("يجب تسجيل الدخول");
+    }
+
+    // Check if any admin exists
+    const adminExists = await hasAdmin(ctx);
+
+    // Check if user already has a profile
+    const existing = await ctx.db
+      .query("userProfiles")
+      .withIndex("by_token", (q) => q.eq("tokenIdentifier", identity.subject))
+      .unique();
+
+    if (existing) {
+      return {
+        needsSetup: !adminExists,
+        role: existing.role,
+        isActive: existing.isActive,
+      };
+    }
+
+    // No profile yet
+    if (!adminExists) {
+      // No admin yet — user should go through setup wizard
+      return { needsSetup: true, role: null, isActive: false };
+    }
+
+    // Admin exists but this user has no profile → create viewer (pending approval)
+    const name = identity.name ?? identity.email ?? "مستخدم جديد";
+    const id = await ctx.db.insert("userProfiles", {
+      userId: identity.subject,
+      tokenIdentifier: identity.subject,
+      name,
+      role: "viewer",
+      permissions: [...ROLE_PERMISSIONS.viewer],
+      isActive: true,
+    });
+
+    await ctx.db.insert("auditLogs", {
+      userId: identity.subject,
+      userName: name,
+      action: "login",
+      module: "auth",
+      recordId: id as any,
+      recordLabel: name,
+      details: `تسجيل مستخدم جديد بدور مشاهد (بانتظار الموافقة): ${name}`,
+    });
+
+    return { needsSetup: false, role: "viewer", isActive: true };
+  },
+});
+
+// ──────────────────────────────────────────────
+// Standard employee CRUD (protected)
+// ──────────────────────────────────────────────
 
 export const list = query({
   args: { branchId: v.optional(v.id("branches")) },
@@ -159,6 +251,19 @@ export const update = mutation({
     const { id, ...data } = args;
     const emp = await ctx.db.get(id);
     if (!emp) throw new ConvexError("الموظف غير موجود");
+
+    // Last admin protection: prevent deactivating or demoting the last active admin
+    if (emp.role === "admin" && emp.isActive && (args.role !== "admin" || !args.isActive)) {
+      const admins = await ctx.db
+        .query("userProfiles")
+        .withIndex("by_role", q => q.eq("role", "admin"))
+        .filter(q => q.eq(q.field("isActive"), true))
+        .collect();
+      if (admins.length <= 1) {
+        throw new ConvexError("لا يمكن تعطيل أو تغيير دور آخر مدير نظام نشط");
+      }
+    }
+
     await ctx.db.patch(id, data);
     await logAction(ctx, user, {
       action: "update",
@@ -176,6 +281,19 @@ export const toggleActive = mutation({
     const user = await requirePermission(ctx, "manage_users");
     const emp = await ctx.db.get(args.id);
     if (!emp) throw new ConvexError("الموظف غير موجود");
+
+    // Last admin protection
+    if (emp.role === "admin" && emp.isActive) {
+      const admins = await ctx.db
+        .query("userProfiles")
+        .withIndex("by_role", q => q.eq("role", "admin"))
+        .filter(q => q.eq(q.field("isActive"), true))
+        .collect();
+      if (admins.length <= 1) {
+        throw new ConvexError("لا يمكن تعطيل آخر مدير نظام نشط");
+      }
+    }
+
     await ctx.db.patch(args.id, { isActive: !emp.isActive });
     await logAction(ctx, user, {
       action: "update",
@@ -193,6 +311,19 @@ export const remove = mutation({
     const user = await requirePermission(ctx, "manage_users");
     const emp = await ctx.db.get(args.id);
     if (!emp) throw new ConvexError("الموظف غير موجود");
+
+    // Last admin protection
+    if (emp.role === "admin" && emp.isActive) {
+      const admins = await ctx.db
+        .query("userProfiles")
+        .withIndex("by_role", q => q.eq("role", "admin"))
+        .filter(q => q.eq(q.field("isActive"), true))
+        .collect();
+      if (admins.length <= 1) {
+        throw new ConvexError("لا يمكن حذف آخر مدير نظام نشط");
+      }
+    }
+
     await ctx.db.delete(args.id);
     await logAction(ctx, user, {
       action: "delete",

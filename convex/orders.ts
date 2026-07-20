@@ -132,7 +132,7 @@ export const addPayment = mutation({
 export const remove = mutation({
   args: { id: v.id("orders") },
   handler: async (ctx, args) => {
-    const user = await requirePermission(ctx, "delete_all");
+    const user = await requirePermission(ctx, "delete_orders");
     const order = await ctx.db.get(args.id);
     if (!order) throw new ConvexError("الطلب غير موجود");
     if (order.status === "delivered") throw new ConvexError("لا يمكن حذف طلب تم تسليمه");

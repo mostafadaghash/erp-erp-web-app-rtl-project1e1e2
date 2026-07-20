@@ -62,7 +62,7 @@ export const create = mutation({
     branchId: v.optional(v.id("branches")),
   },
   handler: async (ctx, args) => {
-    const user = await requirePermission(ctx, "create_orders");
+    const user = await requirePermission(ctx, "create_deliveries");
     const deliveryNumber = `DEL-${Date.now().toString().slice(-6)}`;
     const branchId = args.branchId ?? (user.branchId as any);
     const id = await ctx.db.insert("deliveries", {
@@ -89,7 +89,7 @@ export const updateStatus = mutation({
     notes: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const user = await requirePermission(ctx, "edit_shipments");
+    const user = await requirePermission(ctx, "edit_deliveries");
     const delivery = await ctx.db.get(args.id);
     if (!delivery) throw new ConvexError("الشحنة غير موجودة");
     const patch: Record<string, unknown> = { status: args.status };
@@ -122,7 +122,7 @@ export const update = mutation({
     notes: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const user = await requirePermission(ctx, "edit_shipments");
+    const user = await requirePermission(ctx, "edit_deliveries");
     const delivery = await ctx.db.get(args.id);
     if (!delivery) throw new ConvexError("الشحنة غير موجودة");
     const { id, ...rest } = args;
@@ -140,7 +140,7 @@ export const update = mutation({
 export const remove = mutation({
   args: { id: v.id("deliveries") },
   handler: async (ctx, args) => {
-    const user = await requirePermission(ctx, "delete_all");
+    const user = await requirePermission(ctx, "delete_deliveries");
     const delivery = await ctx.db.get(args.id);
     if (!delivery) throw new ConvexError("الشحنة غير موجودة");
     await ctx.db.delete(args.id);

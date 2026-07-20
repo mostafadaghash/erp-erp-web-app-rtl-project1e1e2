@@ -27,7 +27,7 @@ export const create = mutation({
     notes: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const user = await requirePermission(ctx, "manage_suppliers");
+    const user = await requirePermission(ctx, "create_suppliers");
     const id = await ctx.db.insert("suppliers", { ...args, balance: 0 });
     await logAction(ctx, user, {
       action: "create",
@@ -50,7 +50,7 @@ export const update = mutation({
     notes: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const user = await requirePermission(ctx, "manage_suppliers");
+    const user = await requirePermission(ctx, "edit_suppliers");
     const { id, ...rest } = args;
     const supplier = await ctx.db.get(id);
     if (!supplier) throw new ConvexError("المورد غير موجود");
@@ -68,7 +68,7 @@ export const update = mutation({
 export const remove = mutation({
   args: { id: v.id("suppliers") },
   handler: async (ctx, args) => {
-    const user = await requirePermission(ctx, "delete_all");
+    const user = await requirePermission(ctx, "delete_suppliers");
     const supplier = await ctx.db.get(args.id);
     if (!supplier) throw new ConvexError("المورد غير موجود");
     await ctx.db.delete(args.id);
