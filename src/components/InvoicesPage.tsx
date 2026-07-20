@@ -11,7 +11,7 @@ interface InvoicesPageProps {
 }
 
 export function InvoicesPage({ onNavigate }: InvoicesPageProps) {
-  const invoices = useQuery(api.invoices.list) ?? [];
+  const invoices = useQuery(api.invoices.list, {}) ?? [];
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState("");
   const [printInvoice, setPrintInvoice] = useState<any>(null);

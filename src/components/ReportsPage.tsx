@@ -19,12 +19,12 @@ function filterByPeriod<T extends { _creationTime: number }>(items: T[], period:
 export function ReportsPage() {
   const [period, setPeriod] = useState<Period>("month");
 
-  const allInvoices = useQuery(api.invoices.list) ?? [];
-  const allExpenses = useQuery(api.expenses.list) ?? [];
+  const allInvoices = useQuery(api.invoices.list, {}) ?? [];
+  const allExpenses = useQuery(api.expenses.list, {}) ?? [];
   const products = useQuery(api.products.list, {}) ?? [];
-  const customers = useQuery(api.customers.list) ?? [];
-  const allRepairs = useQuery(api.repairs.list) ?? [];
-  const crmStats = useQuery(api.leads.stats);
+  const customers = useQuery(api.customers.list, {}) ?? [];
+  const allRepairs = useQuery(api.repairs.list, {}) ?? [];
+  const crmStats = useQuery(api.leads.stats, {});
 
   const invoices = filterByPeriod(allInvoices, period);
   const expenses = filterByPeriod(allExpenses, period);

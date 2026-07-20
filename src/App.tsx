@@ -1,6 +1,6 @@
 import { Authenticated, Unauthenticated, useQuery, useMutation } from "convex/react";
 import { api } from "../convex/_generated/api";
-import { SignInForm } from "./SignInForm";
+import { CustomSignInForm } from "./CustomSignInForm";
 import { SignOutButton } from "./SignOutButton";
 import { Toaster } from "sonner";
 import { ERPApp } from "./components/ERPApp";
@@ -157,7 +157,7 @@ function LoginPage() {
           <h2 className="text-xl font-bold text-white mb-6 text-center">
             {needsSetup ? "إنشاء حساب" : "تسجيل الدخول"}
           </h2>
-          <SignInForm />
+          <CustomSignInForm />
         </div>
 
         <p className="text-center text-slate-500 text-xs mt-6">
