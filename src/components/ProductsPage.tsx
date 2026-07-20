@@ -139,11 +139,11 @@ export function ProductsPage() {
                     </div>
                   </td>
                   <td className="text-slate-600">{getCategoryName(p.categoryId)}</td>
-                  <td className="font-medium">{p.costPrice.toLocaleString("ar-SA")} ريال</td>
-                  <td className="font-bold text-indigo-600">{p.sellPrice.toLocaleString("ar-SA")} ريال</td>
+                  <td className="font-medium">{p.costPrice.toLocaleString("ar-EG")} ج.م</td>
+                  <td className="font-bold text-indigo-600">{p.sellPrice.toLocaleString("ar-EG")} ج.م</td>
                   <td>
                     <span className="text-emerald-600 font-medium">
-                      {profit(p).toLocaleString("ar-SA")} ريال
+                      {profit(p).toLocaleString("ar-EG")} ج.م
                     </span>
                     <span className="text-xs text-slate-400 mr-1">({profitPct(p)}%)</span>
                   </td>
