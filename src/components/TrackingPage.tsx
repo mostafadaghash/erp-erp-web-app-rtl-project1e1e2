@@ -5,6 +5,7 @@ import {
   Search, Wrench, CheckCircle, AlertCircle,
   Package, MessageCircle, ArrowRight
 } from "lucide-react";
+import { normalizeEgyptPhoneForWhatsApp } from "../lib/utils";
 
 const statusSteps = [
   { key: "received",    label: "تم الاستلام",     icon: Package,      desc: "تم استلام جهازك وتسجيله في النظام" },
@@ -24,7 +25,7 @@ const statusOrder: Record<string, number> = {
 export function TrackingPage() {
   const [token, setToken] = useState("");
   const [searchToken, setSearchToken] = useState("");
-  const settings = useQuery(api.settings.get);
+  const settings = useQuery(api.settings.getPublic);
 
   // Read token from URL hash
   useEffect(() => {
@@ -48,7 +49,9 @@ export function TrackingPage() {
   );
 
   const storeName = settings?.storeName ?? "تك ستور";
-  const whatsapp = settings?.whatsappNumber;
+  const whatsapp = settings?.whatsappNumber
+    ? normalizeEgyptPhoneForWhatsApp(settings.whatsappNumber)
+    : undefined;
   const primary = settings?.primaryColor ?? "#6366f1";
   const secondary = settings?.secondaryColor ?? "#8b5cf6";
   const gradBg = `linear-gradient(135deg, ${primary}, ${secondary})`;
@@ -242,20 +245,20 @@ export function TrackingPage() {
                 <div className="grid grid-cols-3 gap-4 text-center">
                   <div>
                     <p className="text-slate-500 text-xs mb-1">التكلفة الإجمالية</p>
-                    <p className="text-white font-black text-xl">{repair.totalCost.toLocaleString("ar-SA")}</p>
-                    <p className="text-slate-500 text-xs">ريال</p>
+                    <p className="text-white font-black text-xl">{repair.totalCost.toLocaleString("ar-EG")}</p>
+                    <p className="text-slate-500 text-xs">ج.م</p>
                   </div>
                   <div>
                     <p className="text-slate-500 text-xs mb-1">المدفوع</p>
-                    <p className="text-emerald-400 font-black text-xl">{repair.deposit.toLocaleString("ar-SA")}</p>
-                    <p className="text-slate-500 text-xs">ريال</p>
+                    <p className="text-emerald-400 font-black text-xl">{repair.deposit.toLocaleString("ar-EG")}</p>
+                    <p className="text-slate-500 text-xs">ج.م</p>
                   </div>
                   <div>
                     <p className="text-slate-500 text-xs mb-1">المتبقي</p>
                     <p className={`font-black text-xl ${repair.remaining > 0 ? "text-amber-400" : "text-emerald-400"}`}>
-                      {repair.remaining.toLocaleString("ar-SA")}
+                      {repair.remaining.toLocaleString("ar-EG")}
                     </p>
-                    <p className="text-slate-500 text-xs">ريال</p>
+                    <p className="text-slate-500 text-xs">ج.م</p>
                   </div>
                 </div>
               </div>
@@ -375,7 +378,7 @@ export function TrackingPage() {
                   يمكنك زيارة المحل لاستلام جهازك
                   {repair.remaining > 0 && (
                     <span className="text-amber-400 font-bold">
-                      {" "}والمبلغ المتبقي {repair.remaining.toLocaleString("ar-SA")} ريال
+                      {" "}والمبلغ المتبقي {repair.remaining.toLocaleString("ar-EG")} ج.م
                     </span>
                   )}
                 </p>
