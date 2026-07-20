@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
+import { usePermission } from "../lib/access";
 import { toast } from "sonner";
 import {
   Truck, Plus, Search, X, Package, MapPin, Phone,
@@ -76,6 +77,9 @@ const emptyForm = {
 };
 
 export function DeliveriesPage() {
+  const canCreate = usePermission("create_deliveries");
+  const canEdit = usePermission("edit_deliveries");
+  const canDelete = usePermission("delete_deliveries");
   const deliveries = useQuery(api.deliveries.list, {}) ?? [];
   const stats = useQuery(api.deliveries.getStats);
   const createDelivery = useMutation(api.deliveries.create);
@@ -175,10 +179,10 @@ export function DeliveriesPage() {
           </h1>
           <p className="text-slate-500 text-sm mt-0.5">تتبع شحنات العملاء وحالة التوصيل</p>
         </div>
-        <button onClick={() => setShowForm(true)} className="btn-primary flex items-center gap-2">
+        {canCreate && <button onClick={() => setShowForm(true)} className="btn-primary flex items-center gap-2">
           <Plus className="w-4 h-4" />
           شحنة جديدة
-        </button>
+        </button>}
       </div>
 
       {/* Stats */}
@@ -291,14 +295,14 @@ export function DeliveriesPage() {
                         )}
                       </td>
                       <td className="px-4 py-3">
-                        <div className="relative group">
-                          <button className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold ${cfg.color} cursor-pointer`}>
+                        <div className={`relative ${canEdit ? "group" : ""}`}>
+                          <button className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold ${cfg.color} ${canEdit ? "cursor-pointer" : "cursor-default"}`}>
                             <Icon className="w-3.5 h-3.5" />
                             {cfg.label}
-                            <ChevronDown className="w-3 h-3" />
+                            {canEdit && <ChevronDown className="w-3 h-3" />}
                           </button>
                           {/* Status dropdown */}
-                          <div className="absolute top-full mt-1 right-0 bg-white border border-slate-200 rounded-xl shadow-xl z-10 hidden group-hover:block min-w-36">
+                          {canEdit && <div className="absolute top-full mt-1 right-0 bg-white border border-slate-200 rounded-xl shadow-xl z-10 hidden group-hover:block min-w-36">
                             {Object.entries(STATUS_CONFIG).map(([key, val]) => {
                               const VIcon = val.icon;
                               return (
@@ -314,7 +318,7 @@ export function DeliveriesPage() {
                                 </button>
                               );
                             })}
-                          </div>
+                          </div>}
                         </div>
                       </td>
                       <td className="px-4 py-3">
@@ -326,13 +330,13 @@ export function DeliveriesPage() {
                           >
                             <Eye className="w-4 h-4" />
                           </button>
-                          <button
+                          {canDelete && <button
                             onClick={() => handleDelete(d._id)}
                             className="p-1.5 rounded-lg hover:bg-red-50 text-slate-400 hover:text-red-600 transition-colors"
                             title="حذف"
                           >
                             <Trash2 className="w-4 h-4" />
-                          </button>
+                          </button>}
                         </div>
                       </td>
                     </tr>
@@ -590,7 +594,7 @@ export function DeliveriesPage() {
               )}
 
               {/* Status Actions */}
-              <div className="flex gap-2 flex-wrap pt-1">
+              {canEdit && <div className="flex gap-2 flex-wrap pt-1">
                 {Object.entries(STATUS_CONFIG).map(([key, val]) => {
                   if (key === viewDelivery.status) return null;
                   const VIcon = val.icon;
@@ -605,7 +609,7 @@ export function DeliveriesPage() {
                     </button>
                   );
                 })}
-              </div>
+              </div>}
             </div>
           </div>
         </div>
