@@ -1,12 +1,14 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
+import { usePermission } from "../lib/access";
 import { toast } from "sonner";
 import { DollarSign, Plus, Search } from "lucide-react";
 
 const expenseCategories = ["إيجار", "رواتب", "مرافق", "تسويق", "صيانة", "مشتريات", "نقل", "أخرى"];
 
 export function ExpensesPage() {
+  const canCreate = usePermission("create_expenses");
   const expenses = useQuery(api.expenses.list) ?? [];
   const expenseStats = useQuery(api.expenses.getStats);
   const createExpense = useMutation(api.expenses.create);
@@ -60,10 +62,10 @@ export function ExpensesPage() {
           </h1>
           <p className="text-slate-500 text-sm mt-0.5">{expenses.length} مصروف</p>
         </div>
-        <button onClick={() => setShowForm(true)} className="btn-primary flex items-center gap-2">
+        {canCreate && <button onClick={() => setShowForm(true)} className="btn-primary flex items-center gap-2">
           <Plus className="w-4 h-4" />
           مصروف جديد
-        </button>
+        </button>}
       </div>
 
       {/* Stats */}
