@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { useMutation } from "convex/react";
+import { useAuthActions } from "@convex-dev/auth/react";
 import { api } from "../../convex/_generated/api";
 import { toast } from "sonner";
-import { Shield, User, Phone, ArrowLeft, Check } from "lucide-react";
+import { Shield, User, Phone, LogOut, Check } from "lucide-react";
 
 /**
  * Setup Wizard — shown when no admin exists in the system.
@@ -127,11 +128,18 @@ export function SetupWizard() {
 }
 
 /**
- * Pending Approval screen — shown when a user signs in but has no profile
- * (only happens after an admin exists; new users get auto-viewer role via ensureProfile,
- * but if they're deactivated they see this screen)
+ * Fail-closed access screen for unprovisioned or inactive accounts.
  */
-export function PendingApproval({ userName }: { userName?: string }) {
+export function PendingApproval({
+  status,
+  userName,
+}: {
+  status: "pending" | "inactive";
+  userName?: string;
+}) {
+  const { signOut } = useAuthActions();
+  const inactive = status === "inactive";
+
   return (
     <div className="min-h-screen relative flex items-center justify-center overflow-hidden bg-slate-900">
       <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-indigo-950/80 to-purple-950/60" />
@@ -146,23 +154,26 @@ export function PendingApproval({ userName }: { userName?: string }) {
           {userName ? `مرحباً ${userName}` : "مرحباً بك"}
         </h1>
         <p className="text-slate-400 text-sm leading-relaxed mb-8">
-          تم تسجيل دخولك بنجاح. حسابك حالياً بدور "مشاهد" فقط.
+          {inactive
+            ? "هذا الحساب معطّل ولا يمكنه الوصول إلى بيانات النظام."
+            : "هذا الحساب غير مربوط بموظف مصرح له داخل النظام."}
           <br />
-          يرجى التواصل مع مدير النظام لمنحك الصلاحيات المناسبة.
+          يرجى التواصل مع مدير النظام.
         </p>
 
         <div className="bg-white/5 backdrop-blur-xl rounded-2xl border border-white/10 p-6 mb-6">
           <div className="flex items-center justify-center gap-2 text-slate-300 text-sm">
-            <ArrowLeft className="w-4 h-4" />
-            <span>يمكنك تصفح النظام بصلاحيات محدودة</span>
+            <Shield className="w-4 h-4" />
+            <span>لم يتم تحميل أي بيانات أو وحدات من نظام ERP</span>
           </div>
         </div>
 
         <button
-          onClick={() => window.location.reload()}
-          className="px-6 py-2.5 rounded-lg font-semibold text-white bg-gradient-to-r from-indigo-600 to-purple-600 shadow-lg hover:scale-105 transition-all"
+          onClick={() => void signOut()}
+          className="inline-flex items-center gap-2 px-6 py-2.5 rounded-lg font-semibold text-white bg-gradient-to-r from-indigo-600 to-purple-600 shadow-lg hover:scale-105 transition-all"
         >
-          متابعة كمشاهد
+          <LogOut className="w-4 h-4" />
+          تسجيل الخروج
         </button>
       </div>
     </div>

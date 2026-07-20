@@ -4,6 +4,7 @@
  */
 import { QueryCtx, MutationCtx } from "../_generated/server";
 import { Id } from "../_generated/dataModel";
+import { ConvexError } from "convex/values";
 import { ROLE_PERMISSIONS, Permission } from "./permissions";
 
 // ──────────────────────────────────────────────
@@ -52,13 +53,17 @@ export async function requireAuth(
   ctx: QueryCtx | MutationCtx
 ): Promise<AuthUser> {
   const user = await getAuthUser(ctx);
-  if (!user) throw new Error("يجب تسجيل الدخول للوصول إلى هذا المورد");
+  if (!user) {
+    throw new ConvexError("الحساب غير مربوط بموظف مصرح له");
+  }
+  if (!user.isActive) {
+    throw new ConvexError("تم تعطيل هذا الحساب. تواصل مع مدير النظام");
+  }
   return user;
 }
 
 // ──────────────────────────────────────────────
-// requirePermission — throws if user lacks permission
-// Disabled employees are automatically downgraded to "viewer"
+// requirePermission — throws if an active user lacks permission
 // ──────────────────────────────────────────────
 export async function requirePermission(
   ctx: QueryCtx | MutationCtx,
@@ -66,9 +71,7 @@ export async function requirePermission(
 ): Promise<AuthUser> {
   const user = await requireAuth(ctx);
 
-  // Disabled employees get viewer-level access only
-  const effectiveRole = user.isActive ? user.role : "viewer";
-  const allowed = ROLE_PERMISSIONS[effectiveRole] ?? [];
+  const allowed = ROLE_PERMISSIONS[user.role] ?? [];
   if (!allowed.includes(permission)) {
     throw new Error(`ليس لديك صلاحية: ${permission}`);
   }
@@ -82,7 +85,7 @@ export async function requireAdmin(
   ctx: QueryCtx | MutationCtx
 ): Promise<AuthUser> {
   const user = await requireAuth(ctx);
-  if (user.role !== "admin" || !user.isActive) {
+  if (user.role !== "admin") {
     throw new Error("هذه العملية تتطلب صلاحيات مدير النظام");
   }
   return user;

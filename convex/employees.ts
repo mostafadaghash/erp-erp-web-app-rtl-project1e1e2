@@ -85,13 +85,10 @@ export const createFirstAdmin = mutation({
 });
 
 // ──────────────────────────────────────────────
-// AUTH: Ensure profile exists for signed-in user
-// Called by frontend after authentication.
-// - If no admin exists yet → returns { needsSetup: true }
-// - If admin exists but user has no profile → creates viewer profile, returns { needsSetup: false, profile: "viewer" }
-// - If user has profile → returns { needsSetup: false, profile: existing role }
+// AUTH: Resolve access state without creating or activating a profile.
+// A missing profile remains pending until an admin explicitly provisions it.
 // ──────────────────────────────────────────────
-export const ensureProfile = mutation({
+export const accessState = query({
   args: {},
   handler: async (ctx) => {
     const identity = await ctx.auth.getUserIdentity();
@@ -99,51 +96,29 @@ export const ensureProfile = mutation({
       throw new ConvexError("يجب تسجيل الدخول");
     }
 
-    // Check if any admin exists
     const adminExists = await hasAdmin(ctx);
-
-    // Check if user already has a profile
     const existing = await ctx.db
       .query("userProfiles")
       .withIndex("by_token", (q) => q.eq("tokenIdentifier", identity.subject))
       .unique();
 
-    if (existing) {
+    if (!existing) {
       return {
         needsSetup: !adminExists,
-        role: existing.role,
-        isActive: existing.isActive,
+        status: adminExists ? "pending" as const : "setup" as const,
+        role: null,
+        isActive: false,
+        name: identity.name ?? identity.email ?? null,
       };
     }
 
-    // No profile yet
-    if (!adminExists) {
-      // No admin yet — user should go through setup wizard
-      return { needsSetup: true, role: null, isActive: false };
-    }
-
-    // Admin exists but this user has no profile → create viewer (pending approval)
-    const name = identity.name ?? identity.email ?? "مستخدم جديد";
-    const id = await ctx.db.insert("userProfiles", {
-      userId: identity.subject,
-      tokenIdentifier: identity.subject,
-      name,
-      role: "viewer",
-      permissions: [...ROLE_PERMISSIONS.viewer],
-      isActive: true,
-    });
-
-    await ctx.db.insert("auditLogs", {
-      userId: identity.subject,
-      userName: name,
-      action: "login",
-      module: "auth",
-      recordId: id as any,
-      recordLabel: name,
-      details: `تسجيل مستخدم جديد بدور مشاهد (بانتظار الموافقة): ${name}`,
-    });
-
-    return { needsSetup: false, role: "viewer", isActive: true };
+    return {
+      needsSetup: false,
+      status: existing.isActive ? "active" as const : "inactive" as const,
+      role: existing.role,
+      isActive: existing.isActive,
+      name: existing.name,
+    };
   },
 });
 
@@ -179,6 +154,7 @@ export const get = query({
 export const getByUserId = query({
   args: { userId: v.string() },
   handler: async (ctx, args) => {
+    await requireAuth(ctx);
     return await ctx.db.query("userProfiles")
       .withIndex("by_user", q => q.eq("userId", args.userId))
       .first();
