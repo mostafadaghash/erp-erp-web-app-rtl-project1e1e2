@@ -28,7 +28,7 @@ export const getPublic = query({
 export const get = query({
   args: {},
   handler: async (ctx) => {
-    await requireAuth(ctx);
+    await requireAdmin(ctx);
     const settings = await ctx.db.query("settings").first();
     return settings;
   },
