@@ -1,12 +1,10 @@
-import { Authenticated, Unauthenticated, useQuery, useMutation } from "convex/react";
+import { Authenticated, Unauthenticated, useQuery } from "convex/react";
 import { api } from "../convex/_generated/api";
 import { CustomSignInForm } from "./CustomSignInForm";
-import { SignOutButton } from "./SignOutButton";
 import { Toaster } from "sonner";
 import { ERPApp } from "./components/ERPApp";
 import { TrackingPage } from "./components/TrackingPage";
 import { SetupWizard, PendingApproval } from "./components/SetupWizard";
-import { useEffect, useState } from "react";
 
 export default function App() {
   // Check if URL has #track= hash for public tracking page
@@ -37,49 +35,16 @@ export default function App() {
 
 /**
  * AuthedRouter — handles the post-authentication flow:
- * 1. Call ensureProfile to create/verify the user's profile
+ * 1. Resolve the authenticated user's access state without auto-provisioning
  * 2. If no admin exists → show SetupWizard
  * 3. If profile exists → show ERPApp
  * 4. If profile creation fails → show error
  */
 function AuthedRouter() {
-  const ensureProfile = useMutation(api.employees.ensureProfile);
-  const setupStatus = useQuery(api.employees.setupStatus);
-  const [profileState, setProfileState] = useState<{
-    loading: boolean;
-    needsSetup: boolean;
-    role: string | null;
-    isActive: boolean;
-  }>({ loading: true, needsSetup: false, role: null, isActive: false });
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const result = await ensureProfile({});
-        if (cancelled) return;
-        setProfileState({
-          loading: false,
-          needsSetup: result.needsSetup,
-          role: result.role,
-          isActive: result.isActive,
-        });
-      } catch {
-        if (cancelled) return;
-        // If ensureProfile fails, try to proceed anyway — maybe settings aren't set up
-        setProfileState({
-          loading: false,
-          needsSetup: false,
-          role: "viewer",
-          isActive: true,
-        });
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [ensureProfile]);
+  const accessState = useQuery(api.employees.accessState);
 
   // Loading state
-  if (profileState.loading) {
+  if (accessState === undefined) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-900">
         <div className="text-center">
@@ -91,13 +56,18 @@ function AuthedRouter() {
   }
 
   // No admin exists → show setup wizard
-  if (profileState.needsSetup) {
+  if (accessState.needsSetup) {
     return <SetupWizard />;
   }
 
-  // User is inactive → show pending approval
-  if (!profileState.isActive) {
-    return <PendingApproval />;
+  // Missing and inactive profiles are blocked from the application shell.
+  if (accessState.status !== "active") {
+    return (
+      <PendingApproval
+        status={accessState.status}
+        userName={accessState.name ?? undefined}
+      />
+    );
   }
 
   // All good → show the main app
