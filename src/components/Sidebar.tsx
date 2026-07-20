@@ -9,12 +9,16 @@ import {
 import { useState } from "react";
 import { useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
+import type { Permission } from "../../convex/lib/permissions";
 
 interface SidebarProps {
   currentPage: Page;
   onNavigate: (page: Page) => void;
   storeName: string;
   onClose: () => void;
+  permissions: Permission[];
+  userName: string;
+  role: string;
 }
 
 interface NavItem {
@@ -22,6 +26,7 @@ interface NavItem {
   label: string;
   icon: React.ElementType;
   moduleKey?: string; // if set, hidden when module is disabled
+  permission?: Permission;
 }
 
 interface NavGroup {
@@ -39,48 +44,48 @@ const ALL_NAV_GROUPS: NavGroup[] = [
   {
     label: "المبيعات",
     items: [
-      { id: "invoices",    label: "المبيعات والفواتير", icon: FileText,      moduleKey: "invoices" },
-      { id: "orders",      label: "الأوردرات",           icon: ShoppingCart,  moduleKey: "orders" },
-      { id: "deliveries",  label: "التوصيلات",           icon: Truck,         moduleKey: "deliveries" },
+      { id: "invoices",    label: "المبيعات والفواتير", icon: FileText,      moduleKey: "invoices", permission: "view_invoices" },
+      { id: "orders",      label: "الأوردرات",           icon: ShoppingCart,  moduleKey: "orders", permission: "view_orders" },
+      { id: "deliveries",  label: "التوصيلات",           icon: Truck,         moduleKey: "deliveries", permission: "view_deliveries" },
     ],
   },
   {
     label: "المخزون والموردين",
     items: [
-      { id: "products",  label: "المنتجات والمخزون",  icon: Package },
-      { id: "shipments", label: "الشحنات الواردة",    icon: Ship,   moduleKey: "shipments" },
-      { id: "suppliers", label: "الموردين",            icon: Truck,  moduleKey: "suppliers" },
+      { id: "products",  label: "المنتجات والمخزون",  icon: Package, permission: "view_products" },
+      { id: "shipments", label: "الشحنات الواردة",    icon: Ship,   moduleKey: "shipments", permission: "view_shipments" },
+      { id: "suppliers", label: "الموردين",            icon: Truck,  moduleKey: "suppliers", permission: "view_suppliers" },
     ],
   },
   {
     label: "العملاء والخدمات",
     items: [
-      { id: "customers", label: "العملاء",              icon: Users },
-      { id: "repairs",   label: "الصيانة",              icon: Wrench,  moduleKey: "repairs" },
-      { id: "crm",       label: "العملاء المحتملين",    icon: Target,  moduleKey: "crm" },
+      { id: "customers", label: "العملاء",              icon: Users, permission: "view_customers" },
+      { id: "repairs",   label: "الصيانة",              icon: Wrench,  moduleKey: "repairs", permission: "view_repairs" },
+      { id: "crm",       label: "العملاء المحتملين",    icon: Target,  moduleKey: "crm", permission: "view_leads" },
     ],
   },
   {
     label: "المالية",
     items: [
-      { id: "expenses", label: "المصروفات", icon: DollarSign, moduleKey: "expenses" },
-      { id: "reports",  label: "التقارير",  icon: BarChart3,  moduleKey: "reports" },
+      { id: "expenses", label: "المصروفات", icon: DollarSign, moduleKey: "expenses", permission: "view_expenses" },
+      { id: "reports",  label: "التقارير",  icon: BarChart3,  moduleKey: "reports", permission: "view_reports" },
     ],
   },
   {
     label: "الإدارة",
     items: [
-      { id: "branches",   label: "الفروع",              icon: Building2, moduleKey: "branches" },
-      { id: "employees",  label: "الموظفون والصلاحيات", icon: UserCog,   moduleKey: "employees" },
-      { id: "audit-logs", label: "سجل العمليات",        icon: Shield },
-      { id: "settings",   label: "الإعدادات",           icon: Settings },
+      { id: "branches",   label: "الفروع",              icon: Building2, moduleKey: "branches", permission: "view_branches" },
+      { id: "employees",  label: "الموظفون والصلاحيات", icon: UserCog,   moduleKey: "employees", permission: "view_employees" },
+      { id: "audit-logs", label: "سجل العمليات",        icon: Shield, permission: "view_audit_logs" },
+      { id: "settings",   label: "الإعدادات",           icon: Settings, permission: "manage_settings" },
     ],
   },
 ];
 
-export function Sidebar({ currentPage, onNavigate, storeName, onClose }: SidebarProps) {
+export function Sidebar({ currentPage, onNavigate, storeName, onClose, permissions, userName, role }: SidebarProps) {
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
-  const settings = useQuery(api.settings.get);
+  const settings = useQuery(api.settings.getPublic);
 
   const modules = settings?.modules ?? {};
 
@@ -100,7 +105,11 @@ export function Sidebar({ currentPage, onNavigate, storeName, onClose }: Sidebar
   // Filter groups to only show enabled modules
   const navGroups = ALL_NAV_GROUPS.map(group => ({
     ...group,
-    items: group.items.filter(item => isModuleEnabled(item.moduleKey)),
+    items: group.items.filter(
+      item =>
+        isModuleEnabled(item.moduleKey) &&
+        (!item.permission || permissions.includes(item.permission)),
+    ),
   })).filter(group => group.items.length > 0);
 
   return (
@@ -129,7 +138,7 @@ export function Sidebar({ currentPage, onNavigate, storeName, onClose }: Sidebar
       </div>
 
       {/* Quick action */}
-      <div className="p-4">
+      {permissions.includes("create_invoices") && <div className="p-4">
         <button
           onClick={() => onNavigate("new-invoice")}
           className="w-full flex items-center justify-center gap-2 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl font-medium text-sm hover:from-indigo-700 hover:to-purple-700 transition-all shadow-lg shadow-indigo-500/20 active:scale-95"
@@ -139,7 +148,7 @@ export function Sidebar({ currentPage, onNavigate, storeName, onClose }: Sidebar
           </svg>
           فاتورة جديدة
         </button>
-      </div>
+      </div>}
 
       {/* Navigation Groups */}
       <nav className="flex-1 px-3 pb-4 space-y-1 overflow-y-auto">
@@ -194,8 +203,8 @@ export function Sidebar({ currentPage, onNavigate, storeName, onClose }: Sidebar
             <span className="text-white text-xs font-bold">م</span>
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-white text-xs font-medium truncate">المدير العام</p>
-            <p className="text-slate-500 text-xs">مدير النظام</p>
+            <p className="text-white text-xs font-medium truncate">{userName}</p>
+            <p className="text-slate-500 text-xs">{role}</p>
           </div>
         </div>
         <SignOutButton />
