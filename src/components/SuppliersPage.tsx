@@ -84,7 +84,7 @@ export function SuppliersPage() {
               <div className="flex items-center justify-between">
                 <p className="text-xs text-slate-500">الرصيد المستحق</p>
                 <p className={`font-bold text-sm ${s.balance > 0 ? "text-amber-600" : "text-emerald-600"}`}>
-                  {s.balance.toLocaleString("ar-SA")} ريال
+                  {s.balance.toLocaleString("ar-EG")} ج.م
                 </p>
               </div>
             </div>
