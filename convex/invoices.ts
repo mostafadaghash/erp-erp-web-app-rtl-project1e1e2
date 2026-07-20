@@ -1,7 +1,7 @@
 import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
 import { ConvexError } from "convex/values";
-import { requireAuth, requirePermission, logAction } from "./lib/auth";
+import { assertBranchAccess, filterByBranch, requireModulePermission, resolveWriteBranch, logAction } from "./lib/auth";
 
 export const list = query({
   args: {
@@ -10,13 +10,10 @@ export const list = query({
     branchId: v.optional(v.id("branches")),
   },
   handler: async (ctx, args) => {
-    const user = await requirePermission(ctx, "view_invoices");
+    const user = await requireModulePermission(ctx, "view_invoices", "invoices");
     let invoices = await ctx.db.query("invoices").collect();
-    // Branch isolation
-    if (user.role !== "admin" && user.branchId) {
-      invoices = invoices.filter(i => !i.branchId || i.branchId === user.branchId);
-    }
-    if (args.branchId) {
+    invoices = filterByBranch(invoices, user);
+    if (args.branchId && user.role === "admin") {
       invoices = invoices.filter(i => i.branchId === args.branchId);
     }
     if (args.status) {
@@ -32,8 +29,10 @@ export const list = query({
 export const get = query({
   args: { id: v.id("invoices") },
   handler: async (ctx, args) => {
-    await requirePermission(ctx, "view_invoices");
-    return await ctx.db.get(args.id);
+    const user = await requireModulePermission(ctx, "view_invoices", "invoices");
+    const invoice = await ctx.db.get(args.id);
+    if (invoice) assertBranchAccess(user, invoice);
+    return invoice;
   },
 });
 
@@ -61,7 +60,19 @@ export const create = mutation({
     branchId: v.optional(v.id("branches")),
   },
   handler: async (ctx, args) => {
-    const user = await requirePermission(ctx, "create_invoices");
+    const user = await requireModulePermission(ctx, "create_invoices", "invoices");
+    const branchId = resolveWriteBranch(user, args.branchId);
+
+    if (args.customerId) {
+      const customer = await ctx.db.get(args.customerId);
+      if (!customer) throw new ConvexError("العميل غير موجود");
+      assertBranchAccess(user, customer);
+    }
+    for (const item of args.items) {
+      const product = await ctx.db.get(item.productId);
+      if (!product) throw new ConvexError(`المنتج غير موجود: ${item.productName}`);
+      assertBranchAccess(user, product);
+    }
 
     // Generate invoice number if not provided
     let invoiceNumber = args.invoiceNumber;
@@ -86,7 +97,7 @@ export const create = mutation({
       paymentMethod: args.paymentMethod ?? "cash",
       status: args.paid >= args.total ? "paid" : args.paid > 0 ? "partial" : "unpaid",
       notes: args.notes,
-      branchId: args.branchId,
+      branchId,
       userId: user.userId,
       type: "sale",
     });
@@ -147,10 +158,22 @@ export const update = mutation({
     branchId: v.optional(v.id("branches")),
   },
   handler: async (ctx, args) => {
-    const user = await requirePermission(ctx, "edit_invoices");
+    const user = await requireModulePermission(ctx, "edit_invoices", "invoices");
     const { id, ...data } = args;
     const inv = await ctx.db.get(id);
     if (!inv) throw new ConvexError("الفاتورة غير موجودة");
+    assertBranchAccess(user, inv);
+    if (data.customerId) {
+      const customer = await ctx.db.get(data.customerId);
+      if (!customer) throw new ConvexError("العميل غير موجود");
+      assertBranchAccess(user, customer);
+    }
+    for (const item of data.items) {
+      const product = await ctx.db.get(item.productId);
+      if (!product) throw new ConvexError(`المنتج غير موجود: ${item.productName}`);
+      assertBranchAccess(user, product);
+    }
+    const branchId = resolveWriteBranch(user, data.branchId ?? inv.branchId);
     await ctx.db.patch(id, {
       customerId: data.customerId,
       customerName: data.customerName,
@@ -165,7 +188,7 @@ export const update = mutation({
       paymentMethod: data.paymentMethod ?? "cash",
       status: data.paid >= data.total ? "paid" : data.paid > 0 ? "partial" : "unpaid",
       notes: data.notes,
-      branchId: data.branchId,
+      branchId,
     });
     await logAction(ctx, user, {
       action: "update",
@@ -183,9 +206,10 @@ export const updateStatus = mutation({
     status: v.string(),
   },
   handler: async (ctx, args) => {
-    const user = await requirePermission(ctx, "edit_invoices");
+    const user = await requireModulePermission(ctx, "edit_invoices", "invoices");
     const inv = await ctx.db.get(args.id);
     if (!inv) throw new ConvexError("الفاتورة غير موجودة");
+    assertBranchAccess(user, inv);
     await ctx.db.patch(args.id, { status: args.status });
     await logAction(ctx, user, {
       action: "update",
@@ -200,9 +224,10 @@ export const updateStatus = mutation({
 export const remove = mutation({
   args: { id: v.id("invoices") },
   handler: async (ctx, args) => {
-    const user = await requirePermission(ctx, "delete_invoices");
+    const user = await requireModulePermission(ctx, "delete_invoices", "invoices");
     const inv = await ctx.db.get(args.id);
     if (!inv) throw new ConvexError("الفاتورة غير موجودة");
+    assertBranchAccess(user, inv);
     await ctx.db.delete(args.id);
     await logAction(ctx, user, {
       action: "delete",
@@ -217,11 +242,9 @@ export const remove = mutation({
 export const stats = query({
   args: {},
   handler: async (ctx) => {
-    const user = await requirePermission(ctx, "view_invoices");
+    const user = await requireModulePermission(ctx, "view_invoices", "invoices");
     let invoices = await ctx.db.query("invoices").collect();
-    if (user.role !== "admin" && user.branchId) {
-      invoices = invoices.filter(i => !i.branchId || i.branchId === user.branchId);
-    }
+    invoices = filterByBranch(invoices, user);
     const totalRevenue = invoices.filter(i => i.status === "paid").reduce((s, i) => s + i.total, 0);
     const totalOutstanding = invoices.reduce((s, i) => s + (i.remaining ?? 0), 0);
     return {
