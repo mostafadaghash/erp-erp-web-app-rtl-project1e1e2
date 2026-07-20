@@ -1,7 +1,7 @@
 import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
 import { ConvexError } from "convex/values";
-import { requireAuth, requirePermission, logAction } from "./lib/auth";
+import { assertBranchAccess, filterByBranch, requirePermission, resolveWriteBranch, logAction } from "./lib/auth";
 
 export const list = query({
   args: {
@@ -13,11 +13,8 @@ export const list = query({
   handler: async (ctx, args) => {
     const user = await requirePermission(ctx, "view_products");
     let products = await ctx.db.query("products").collect();
-    // Branch isolation
-    if (user.role !== "admin" && user.branchId) {
-      products = products.filter(p => !p.branchId || p.branchId === user.branchId);
-    }
-    if (args.branchId) {
+    products = filterByBranch(products, user);
+    if (args.branchId && user.role === "admin") {
       products = products.filter(p => p.branchId === args.branchId);
     }
     if (args.category) {
@@ -41,8 +38,10 @@ export const list = query({
 export const get = query({
   args: { id: v.id("products") },
   handler: async (ctx, args) => {
-    await requirePermission(ctx, "view_products");
-    return await ctx.db.get(args.id);
+    const user = await requirePermission(ctx, "view_products");
+    const product = await ctx.db.get(args.id);
+    if (product) assertBranchAccess(user, product);
+    return product;
   },
 });
 
@@ -76,6 +75,7 @@ export const create = mutation({
   },
   handler: async (ctx, args) => {
     const user = await requirePermission(ctx, "create_products");
+    const branchId = resolveWriteBranch(user, args.branchId);
     const id = await ctx.db.insert("products", {
       name: args.name,
       sku: args.sku ?? "",
@@ -86,7 +86,7 @@ export const create = mutation({
       stock: args.stock,
       minStock: args.minStock ?? 0,
       unit: args.unit ?? "قطعة",
-      branchId: args.branchId,
+      branchId,
       description: args.description,
       isActive: true,
     });
@@ -122,7 +122,9 @@ export const update = mutation({
     const { id, ...data } = args;
     const prod = await ctx.db.get(id);
     if (!prod) throw new ConvexError("المنتج غير موجود");
-    await ctx.db.patch(id, data);
+    assertBranchAccess(user, prod);
+    const branchId = resolveWriteBranch(user, data.branchId);
+    await ctx.db.patch(id, { ...data, branchId });
     await logAction(ctx, user, {
       action: "update",
       module: "products",
@@ -139,6 +141,7 @@ export const remove = mutation({
     const user = await requirePermission(ctx, "delete_products");
     const prod = await ctx.db.get(args.id);
     if (!prod) throw new ConvexError("المنتج غير موجود");
+    assertBranchAccess(user, prod);
     await ctx.db.delete(args.id);
     await logAction(ctx, user, {
       action: "delete",
@@ -160,6 +163,7 @@ export const adjustStock = mutation({
     const user = await requirePermission(ctx, "edit_products");
     const prod = await ctx.db.get(args.id);
     if (!prod) throw new ConvexError("المنتج غير موجود");
+    assertBranchAccess(user, prod);
     const newStock = prod.stock + args.adjustment;
     await ctx.db.patch(args.id, { stock: newStock });
     await logAction(ctx, user, {
@@ -177,9 +181,7 @@ export const stats = query({
   handler: async (ctx) => {
     const user = await requirePermission(ctx, "view_products");
     let products = await ctx.db.query("products").collect();
-    if (user.role !== "admin" && user.branchId) {
-      products = products.filter(p => !p.branchId || p.branchId === user.branchId);
-    }
+    products = filterByBranch(products, user);
     const totalValue = products.reduce((sum, p) => sum + p.costPrice * p.stock, 0);
     const totalRetail = products.reduce((sum, p) => sum + p.sellPrice * p.stock, 0);
     const lowStock = products.filter(p => p.stock <= (p.minStock ?? 0)).length;
