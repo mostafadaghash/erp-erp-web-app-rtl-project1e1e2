@@ -50,19 +50,19 @@ export function ReportsPage() {
   const now = new Date();
   for (let i = 5; i >= 0; i--) {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    const key = d.toLocaleDateString("ar-SA", { month: "short", year: "2-digit" });
+    const key = d.toLocaleDateString("ar-EG", { month: "short", year: "2-digit" });
     months[key] = { revenue: 0, expenses: 0 };
   }
 
   invoices.forEach(inv => {
     const d = new Date(inv._creationTime);
-    const key = d.toLocaleDateString("ar-SA", { month: "short", year: "2-digit" });
+    const key = d.toLocaleDateString("ar-EG", { month: "short", year: "2-digit" });
     if (months[key]) months[key].revenue += inv.total;
   });
 
   expenses.forEach(exp => {
     const d = new Date(exp._creationTime);
-    const key = d.toLocaleDateString("ar-SA", { month: "short", year: "2-digit" });
+    const key = d.toLocaleDateString("ar-EG", { month: "short", year: "2-digit" });
     if (months[key]) months[key].expenses += exp.amount;
   });
 
@@ -131,10 +131,10 @@ export function ReportsPage() {
       {/* KPI Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-          { label: "إجمالي الإيرادات", value: totalRevenue, icon: TrendingUp, color: "text-emerald-600", bg: "bg-emerald-50", suffix: " ريال" },
-          { label: "إجمالي المصروفات", value: totalExpenses, icon: TrendingDown, color: "text-red-600", bg: "bg-red-50", suffix: " ريال" },
-          { label: "صافي الربح", value: netProfit, icon: DollarSign, color: netProfit >= 0 ? "text-indigo-600" : "text-red-600", bg: netProfit >= 0 ? "bg-indigo-50" : "bg-red-50", suffix: " ريال" },
-          { label: "مستحقات العملاء", value: totalPending, icon: Users, color: "text-amber-600", bg: "bg-amber-50", suffix: " ريال" },
+          { label: "إجمالي الإيرادات", value: totalRevenue, icon: TrendingUp, color: "text-emerald-600", bg: "bg-emerald-50", suffix: " ج.م" },
+          { label: "إجمالي المصروفات", value: totalExpenses, icon: TrendingDown, color: "text-red-600", bg: "bg-red-50", suffix: " ج.م" },
+          { label: "صافي الربح", value: netProfit, icon: DollarSign, color: netProfit >= 0 ? "text-indigo-600" : "text-red-600", bg: netProfit >= 0 ? "bg-indigo-50" : "bg-red-50", suffix: " ج.م" },
+          { label: "مستحقات العملاء", value: totalPending, icon: Users, color: "text-amber-600", bg: "bg-amber-50", suffix: " ج.م" },
         ].map((kpi, i) => {
           const Icon = kpi.icon;
           return (
@@ -143,7 +143,7 @@ export function ReportsPage() {
                 <Icon className={`w-5 h-5 ${kpi.color}`} />
               </div>
               <p className={`text-xl font-black ${kpi.color}`}>
-                {kpi.value.toLocaleString("ar-SA")}{kpi.suffix}
+                {kpi.value.toLocaleString("ar-EG")}{kpi.suffix}
               </p>
               <p className="text-xs text-slate-500 mt-1">{kpi.label}</p>
             </div>
@@ -177,12 +177,12 @@ export function ReportsPage() {
                   <div
                     className="flex-1 bg-indigo-500 rounded-t-sm transition-all"
                     style={{ height: `${(data.revenue / maxVal) * 100}%`, minHeight: data.revenue > 0 ? "4px" : "0" }}
-                    title={`إيرادات: ${data.revenue.toLocaleString("ar-SA")} ريال`}
+                    title={`إيرادات: ${data.revenue.toLocaleString("ar-EG")} ج.م`}
                   />
                   <div
                     className="flex-1 bg-red-400 rounded-t-sm transition-all"
                     style={{ height: `${(data.expenses / maxVal) * 100}%`, minHeight: data.expenses > 0 ? "4px" : "0" }}
-                    title={`مصروفات: ${data.expenses.toLocaleString("ar-SA")} ريال`}
+                    title={`مصروفات: ${data.expenses.toLocaleString("ar-EG")} ج.م`}
                   />
                 </div>
                 <p className="text-xs text-slate-500 text-center">{month}</p>
@@ -221,7 +221,7 @@ export function ReportsPage() {
                     </div>
                   </div>
                   <div className="text-left flex-shrink-0">
-                    <p className="text-sm font-bold text-slate-800">{p.revenue.toLocaleString("ar-SA")} ريال</p>
+                    <p className="text-sm font-bold text-slate-800">{p.revenue.toLocaleString("ar-EG")} ج.م</p>
                     <p className="text-xs text-slate-400">{p.qty} قطعة</p>
                   </div>
                 </div>
@@ -249,7 +249,7 @@ export function ReportsPage() {
                     </div>
                   </div>
                   <span className="text-sm font-bold text-slate-700 w-28 text-left flex-shrink-0">
-                    {amount.toLocaleString("ar-SA")} ريال
+                    {amount.toLocaleString("ar-EG")} ج.م
                   </span>
                 </div>
               ))}
@@ -279,7 +279,7 @@ export function ReportsPage() {
             <div className="flex justify-between text-sm">
               <span className="text-slate-500">إجمالي إيرادات الصيانة</span>
               <span className="font-bold text-slate-800">
-                {repairs.reduce((s, r) => s + r.totalCost, 0).toLocaleString("ar-SA")} ريال
+                {repairs.reduce((s, r) => s + r.totalCost, 0).toLocaleString("ar-EG")} ج.م
               </span>
             </div>
           </div>
