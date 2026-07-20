@@ -1,10 +1,12 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
+import { usePermission } from "../lib/access";
 import { toast } from "sonner";
 import { Truck, Plus, Search, Phone, Mail } from "lucide-react";
 
 export function SuppliersPage() {
+  const canCreate = usePermission("create_suppliers");
   const suppliers = useQuery(api.suppliers.list) ?? [];
   const createSupplier = useMutation(api.suppliers.create);
 
@@ -45,10 +47,10 @@ export function SuppliersPage() {
           </h1>
           <p className="text-slate-500 text-sm mt-0.5">{suppliers.length} مورد</p>
         </div>
-        <button onClick={() => setShowForm(true)} className="btn-primary flex items-center gap-2">
+        {canCreate && <button onClick={() => setShowForm(true)} className="btn-primary flex items-center gap-2">
           <Plus className="w-4 h-4" />
           مورد جديد
-        </button>
+        </button>}
       </div>
 
       <div className="relative">
