@@ -1,11 +1,11 @@
 import { query, mutation } from "./_generated/server";
 import { v, ConvexError } from "convex/values";
-import { requireAuth, requireAdmin, requirePermission, logAction } from "./lib/auth";
+import { requireModulePermission, logAction } from "./lib/auth";
 
 export const list = query({
   args: {},
   handler: async (ctx) => {
-    await requirePermission(ctx, "view_branches");
+    await requireModulePermission(ctx, "view_branches", "branches");
     return await ctx.db.query("branches").collect();
   },
 });
@@ -13,7 +13,7 @@ export const list = query({
 export const get = query({
   args: { id: v.id("branches") },
   handler: async (ctx, args) => {
-    await requirePermission(ctx, "view_branches");
+    await requireModulePermission(ctx, "view_branches", "branches");
     return await ctx.db.get(args.id);
   },
 });
@@ -26,7 +26,7 @@ export const create = mutation({
     isActive: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
-    const user = await requireAdmin(ctx);
+    const user = await requireModulePermission(ctx, "manage_branches", "branches");
     const existing = await ctx.db.query("branches")
       .filter(q => q.eq(q.field("name"), args.name)).first();
     if (existing) throw new ConvexError("يوجد فرع بهذا الاسم بالفعل");
@@ -56,7 +56,7 @@ export const update = mutation({
     isActive: v.boolean(),
   },
   handler: async (ctx, args) => {
-    const user = await requireAdmin(ctx);
+    const user = await requireModulePermission(ctx, "manage_branches", "branches");
     const { id, ...data } = args;
     const branch = await ctx.db.get(id);
     if (!branch) throw new ConvexError("الفرع غير موجود");
@@ -74,7 +74,7 @@ export const update = mutation({
 export const remove = mutation({
   args: { id: v.id("branches") },
   handler: async (ctx, args) => {
-    const user = await requireAdmin(ctx);
+    const user = await requireModulePermission(ctx, "manage_branches", "branches");
     const branch = await ctx.db.get(args.id);
     if (!branch) throw new ConvexError("الفرع غير موجود");
     const employees = await ctx.db.query("userProfiles")
@@ -94,7 +94,7 @@ export const remove = mutation({
 export const stats = query({
   args: {},
   handler: async (ctx) => {
-    await requirePermission(ctx, "view_branches");
+    await requireModulePermission(ctx, "view_branches", "branches");
     const branches = await ctx.db.query("branches").collect();
     const employees = await ctx.db.query("userProfiles").collect();
     return {
@@ -103,5 +103,67 @@ export const stats = query({
       inactive: branches.filter(b => !b.isActive).length,
       totalEmployees: employees.length,
     };
+  },
+});
+
+export const legacyDataStats = query({
+  args: {},
+  handler: async (ctx) => {
+    await requireModulePermission(ctx, "manage_branches", "branches");
+    const [products, customers, invoices, orders, repairs, shipments, expenses, payments, leads, deliveries] = await Promise.all([
+      ctx.db.query("products").collect(),
+      ctx.db.query("customers").collect(),
+      ctx.db.query("invoices").collect(),
+      ctx.db.query("orders").collect(),
+      ctx.db.query("repairs").collect(),
+      ctx.db.query("shipments").collect(),
+      ctx.db.query("expenses").collect(),
+      ctx.db.query("payments").collect(),
+      ctx.db.query("leads").collect(),
+      ctx.db.query("deliveries").collect(),
+    ]);
+    const counts = {
+      products: products.filter((item) => !item.branchId).length,
+      customers: customers.filter((item) => !item.branchId).length,
+      invoices: invoices.filter((item) => !item.branchId).length,
+      orders: orders.filter((item) => !item.branchId).length,
+      repairs: repairs.filter((item) => !item.branchId).length,
+      shipments: shipments.filter((item) => !item.branchId).length,
+      expenses: expenses.filter((item) => !item.branchId).length,
+      payments: payments.filter((item) => !item.branchId).length,
+      leads: leads.filter((item) => !item.branchId).length,
+      deliveries: deliveries.filter((item) => !item.branchId).length,
+    };
+    return { counts, total: Object.values(counts).reduce((sum, count) => sum + count, 0) };
+  },
+});
+
+export const assignLegacyData = mutation({
+  args: { branchId: v.id("branches") },
+  handler: async (ctx, args) => {
+    const user = await requireModulePermission(ctx, "manage_branches", "branches");
+    const branch = await ctx.db.get(args.branchId);
+    if (!branch) throw new ConvexError("الفرع غير موجود");
+    let assigned = 0;
+
+    for (const item of await ctx.db.query("products").collect()) if (!item.branchId) { await ctx.db.patch(item._id, { branchId: args.branchId }); assigned++; }
+    for (const item of await ctx.db.query("customers").collect()) if (!item.branchId) { await ctx.db.patch(item._id, { branchId: args.branchId }); assigned++; }
+    for (const item of await ctx.db.query("invoices").collect()) if (!item.branchId) { await ctx.db.patch(item._id, { branchId: args.branchId }); assigned++; }
+    for (const item of await ctx.db.query("orders").collect()) if (!item.branchId) { await ctx.db.patch(item._id, { branchId: args.branchId }); assigned++; }
+    for (const item of await ctx.db.query("repairs").collect()) if (!item.branchId) { await ctx.db.patch(item._id, { branchId: args.branchId }); assigned++; }
+    for (const item of await ctx.db.query("shipments").collect()) if (!item.branchId) { await ctx.db.patch(item._id, { branchId: args.branchId }); assigned++; }
+    for (const item of await ctx.db.query("expenses").collect()) if (!item.branchId) { await ctx.db.patch(item._id, { branchId: args.branchId }); assigned++; }
+    for (const item of await ctx.db.query("payments").collect()) if (!item.branchId) { await ctx.db.patch(item._id, { branchId: args.branchId }); assigned++; }
+    for (const item of await ctx.db.query("leads").collect()) if (!item.branchId) { await ctx.db.patch(item._id, { branchId: args.branchId }); assigned++; }
+    for (const item of await ctx.db.query("deliveries").collect()) if (!item.branchId) { await ctx.db.patch(item._id, { branchId: args.branchId }); assigned++; }
+
+    await logAction(ctx, user, {
+      action: "migrate",
+      module: "branches",
+      recordId: args.branchId,
+      recordLabel: branch.name,
+      details: `إسناد ${assigned} سجل قديم بدون فرع إلى ${branch.name}`,
+    });
+    return assigned;
   },
 });
