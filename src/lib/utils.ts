@@ -1,7 +1,5 @@
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
-import { useQuery } from "convex/react";
-import { api } from "../../convex/_generated/api";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -12,12 +10,15 @@ export function cn(...inputs: ClassValue[]) {
 // const { currency, formatCurrency } = useCurrency();
 
 export function useCurrency() {
-  const settings = useQuery(api.settings.get);
-  const currency = settings?.currency ?? "ريال";
+  const currency = "EGP";
 
   const formatCurrency = (amount: number): string => {
-    const formatted = new Intl.NumberFormat("ar-EG").format(amount);
-    return `${formatted} ${currency}`;
+    return new Intl.NumberFormat("ar-EG", {
+      style: "currency",
+      currency,
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 2,
+    }).format(amount);
   };
 
   const formatAmount = (amount: number): string => {
@@ -25,4 +26,17 @@ export function useCurrency() {
   };
 
   return { currency, formatCurrency, formatAmount };
+}
+
+export function normalizeEgyptPhoneForWhatsApp(phone: string): string {
+  let digits = phone.replace(/\D/g, "");
+  if (digits.startsWith("0020")) digits = digits.slice(2);
+  if (digits.startsWith("20")) return digits;
+  if (digits.startsWith("0")) return `20${digits.slice(1)}`;
+  if (digits.length === 10 && digits.startsWith("1")) return `20${digits}`;
+  return digits;
+}
+
+export function buildEgyptWhatsAppUrl(phone: string, message: string): string {
+  return `https://wa.me/${normalizeEgyptPhoneForWhatsApp(phone)}?text=${encodeURIComponent(message)}`;
 }
