@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
+import { usePermission } from "../lib/access";
 import { toast } from "sonner";
 import { Wrench, Plus, Search, Clock, CheckCircle, AlertCircle, Copy, MessageCircle, Printer } from "lucide-react";
 import { PrintModal } from "./PrintTemplate";
@@ -14,6 +15,8 @@ const statusConfig: Record<string, { label: string; badge: string; icon: any }> 
 };
 
 export function RepairsPage() {
+  const canCreate = usePermission("create_repairs");
+  const canEdit = usePermission("edit_repairs");
   const repairs = useQuery(api.repairs.list) ?? [];
   const customers = useQuery(api.customers.list) ?? [];
   const createRepair = useMutation(api.repairs.create);
@@ -91,10 +94,10 @@ export function RepairsPage() {
           </h1>
           <p className="text-slate-500 text-sm mt-0.5">{repairs.length} طلب صيانة</p>
         </div>
-        <button onClick={() => setShowForm(true)} className="btn-primary flex items-center gap-2">
+        {canCreate && <button onClick={() => setShowForm(true)} className="btn-primary flex items-center gap-2">
           <Plus className="w-4 h-4" />
           طلب صيانة جديد
-        </button>
+        </button>}
       </div>
 
       {/* Status filter tabs */}
@@ -205,7 +208,7 @@ export function RepairsPage() {
               )}
 
               <div className="flex gap-2">
-                {r.status !== "delivered" && r.status !== "cancelled" && (
+                {canEdit && r.status !== "delivered" && r.status !== "cancelled" && (
                   <select
                     className="flex-1 text-xs border border-slate-200 rounded-lg px-2 py-1.5 bg-white text-slate-700"
                     value={r.status}
