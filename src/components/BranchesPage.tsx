@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
+import { usePermission } from "../lib/access";
 import { toast } from "sonner";
 import { Id } from "../../convex/_generated/dataModel";
 import {
@@ -19,6 +20,7 @@ interface BranchForm {
 const emptyForm = (): BranchForm => ({ name: "", address: "", phone: "", isActive: true });
 
 export function BranchesPage() {
+  const canManage = usePermission("manage_branches");
   const [search, setSearch] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState<Id<"branches"> | null>(null);
@@ -85,10 +87,10 @@ export function BranchesPage() {
           </h1>
           <p className="text-slate-500 text-sm mt-0.5">إدارة فروع المتجر ومواقعه</p>
         </div>
-        <button onClick={openCreate} className="btn-primary flex items-center gap-2">
+        {canManage && <button onClick={openCreate} className="btn-primary flex items-center gap-2">
           <Plus className="w-4 h-4" />
           فرع جديد
-        </button>
+        </button>}
       </div>
 
       {/* Stats */}
@@ -133,9 +135,9 @@ export function BranchesPage() {
           </div>
           <p className="text-slate-500 font-semibold text-lg">لا توجد فروع</p>
           <p className="text-slate-400 text-sm mt-1">أضف فرعاً جديداً للبدء</p>
-          <button onClick={openCreate} className="btn-primary mt-4 inline-flex items-center gap-2">
+          {canManage && <button onClick={openCreate} className="btn-primary mt-4 inline-flex items-center gap-2">
             <Plus className="w-4 h-4" /> إضافة فرع
-          </button>
+          </button>}
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
@@ -156,7 +158,7 @@ export function BranchesPage() {
                       </span>
                     </div>
                   </div>
-                  <div className="flex gap-1">
+                  {canManage && <div className="flex gap-1">
                     <button
                       onClick={() => openEdit(branch)}
                       className="p-1.5 hover:bg-indigo-50 text-slate-400 hover:text-indigo-600 rounded-lg transition-colors"
@@ -171,7 +173,7 @@ export function BranchesPage() {
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
-                  </div>
+                  </div>}
                 </div>
 
                 {/* Details */}
