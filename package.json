@@ -8,7 +8,11 @@
     "dev:frontend": "vite --open",
     "dev:backend": "convex dev",
     "build": "vite build",
-    "lint": "tsc -p convex -noEmit --pretty false && tsc -p . -noEmit --pretty false && convex dev --once && vite build"
+    "typecheck": "tsc -p convex --noEmit --pretty false && tsc -p . --noEmit --pretty false",
+    "test": "node --test --experimental-strip-types tests/*.test.ts",
+    "security:check": "node scripts/security-check.mjs",
+    "verify": "npm run typecheck && npm test && npm run security:check && npm run build",
+    "lint": "npm run verify"
   },
   "dependencies": {
     "@convex-dev/auth": "^0.0.80",

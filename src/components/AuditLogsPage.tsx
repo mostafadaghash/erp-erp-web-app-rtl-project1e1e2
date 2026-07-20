@@ -1,7 +1,6 @@
 import { useState } from "react";
-import { useQuery, useMutation } from "convex/react";
+import { useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
-import { toast } from "sonner";
 import {
   Shield, Search, Filter, Trash2, Plus, Edit2,
   Eye, AlertTriangle, RefreshCw, BarChart3
@@ -33,7 +32,6 @@ const MODULE_LABELS: Record<string, string> = {
 export function AuditLogsPage() {
   const logs = useQuery(api.auditLogs.list, { limit: 200 }) ?? [];
   const stats = useQuery(api.auditLogs.getStats);
-  const clearLogs = useMutation(api.auditLogs.clear);
 
   const [search, setSearch] = useState("");
   const [filterAction, setFilterAction] = useState("all");
@@ -51,16 +49,6 @@ export function AuditLogsPage() {
   });
 
   const uniqueModules = [...new Set(logs.map(l => l.module))];
-
-  const handleClear = async () => {
-    if (!confirm("هل أنت متأكد من حذف جميع سجلات العمليات؟ لا يمكن التراجع عن هذا الإجراء.")) return;
-    try {
-      const count = await clearLogs({});
-      toast.success(`تم حذف ${count} سجل`);
-    } catch {
-      toast.error("حدث خطأ أثناء الحذف");
-    }
-  };
 
   const formatTime = (ts: number) => {
     const d = new Date(ts);
@@ -81,13 +69,9 @@ export function AuditLogsPage() {
           </h1>
           <p className="text-slate-500 text-sm mt-0.5">تتبع جميع الإجراءات التي تمت على النظام</p>
         </div>
-        <button
-          onClick={handleClear}
-          className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-red-200 text-red-600 hover:bg-red-50 font-medium text-sm transition-colors"
-        >
-          <Trash2 className="w-4 h-4" />
-          مسح السجلات
-        </button>
+        <span className="text-xs font-medium px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-100">
+          سجل محفوظ وغير قابل للمسح
+        </span>
       </div>
 
       {/* Stats */}

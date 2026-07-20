@@ -1,32 +1,61 @@
-# أريد إنشاء ERP
+# ERP عربي RTL لمحلات الإلكترونيات
 
-أريد إنشاء ERP Web App عربي RTL قابل للبيع لمحلات اللابتوب والموبايل والبلا
+تطبيق ERP كامل مبني بـ React وVite وConvex، ومهيأ للسوق المصري (`ar-EG` و`EGP` وأرقام واتساب `+20`).
 
-This is a project built with Stunning.
+## الوحدات
 
+- المنتجات والمخزون والعملاء والموردون
+- الفواتير والأوردرات والتوصيلات والشحنات الواردة
+- الصيانة مع صفحة تتبع عامة آمنة
+- المصروفات والتقارير وCRM
+- الفروع والموظفون والصلاحيات وسجل العمليات
+- White Label وتفعيل/تعطيل الوحدات
 
+## الأمان والصلاحيات
 
-## Project structure
+- تسجيل الدخول بكلمة المرور فقط؛ لا يوجد Guest أو Anonymous.
+- إنشاء أول مدير متاح أثناء الإعداد الأول فقط، وبعده تُنشأ الحسابات من دعوات موظفين منتهية الصلاحية.
+- كل مستخدم يجب أن يكون مربوطاً بملف موظف نشط.
+- الصلاحيات تُطبق في الواجهة وفي Convex queries/mutations.
+- بيانات الفروع معزولة؛ الموظف لا يقرأ أو يعدّل سجلات فرع آخر.
+- المدير يختار «فرع العمل» قبل إنشاء بيانات مرتبطة بفرع.
+- سجل العمليات append-only ولا يمكن للواجهة تزويره أو مسحه.
+- روابط تتبع الصيانة تستخدم رموزاً عشوائية 128-bit وتعرض أقل قدر لازم من البيانات.
 
-The frontend code is in the `app` directory and is built with [Vite](https://vitejs.dev/).
+## التشغيل محلياً
 
-The backend code is in the `convex` directory.
+المتطلبات: Node.js 22، npm، ومشروع Convex مضبوط في متغيرات البيئة.
 
-`npm run dev` will start the frontend and backend servers.
+```bash
+npm ci
+npm run dev
+```
 
-## App authentication
+الواجهة في `src/` والخادم وقاعدة البيانات في `convex/`.
 
-Stunning apps use built-in authentication with Anonymous auth for easy sign in. You may wish to change this before deploying your app.
+## التحقق قبل الرفع
 
-## Developing and deploying your app
+```bash
+npm run verify
+```
 
-Your full-stack application includes:
-* Built-in database for data storage
-* Authentication system with multiple providers
-* File upload and storage capabilities
-* Real-time UI updates
-* Background workflows and scheduled tasks
+الأمر يشغّل:
 
-## HTTP API
+- TypeScript للواجهة والخادم
+- اختبارات قواعد المال وانتقالات الحالات وأرقام واتساب والصلاحيات
+- فحصاً أمنياً يمنع رجوع Anonymous أو wildcard permissions أو إعدادات سعودية قديمة
+- production build عبر Vite
 
-User-defined http routes are defined in the `convex/router.ts` file. We split these routes into a separate file from `convex/http.ts` to allow us to prevent the LLM from modifying the authentication routes.
+GitHub Actions يشغّل نفس التحقق تلقائياً على كل Pull Request وكل push إلى `main`.
+
+## أول إعداد
+
+1. سجّل أول حساب من شاشة الإعداد وأنشئ مدير النظام.
+2. أنشئ فرعاً واحداً على الأقل من صفحة الفروع.
+3. اختر فرع العمل من الشريط العلوي.
+4. إذا ظهرت رسالة بوجود بيانات قديمة بدون فرع، استخدم «إسناد البيانات القديمة» في بطاقة الفرع الصحيح.
+5. أنشئ الموظفين وأرسل لكل موظف رابط الدعوة الخاص به.
+
+## متغيرات البيئة والنشر
+
+لا تضع أسرار Convex أو مفاتيح النشر داخل المستودع. استخدم إعدادات بيئة الاستضافة وConvex Dashboard. عملية CI لا تنشر التطبيق ولا تحتاج أسرار الإنتاج؛ النشر يتم من بيئة الاستضافة المتصلة بالمستودع بعد نجاح الفحوصات.

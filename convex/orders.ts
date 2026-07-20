@@ -2,16 +2,7 @@ import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
 import { ConvexError } from "convex/values";
 import { assertBranchAccess, requireModulePermission, filterByBranch, resolveWriteBranch, logAction } from "./lib/auth";
-
-const ORDER_TRANSITIONS: Record<string, string[]> = {
-  pending: ["confirmed", "cancelled"],
-  confirmed: ["ready", "cancelled"],
-  ready: ["delivered", "cancelled"],
-  delivered: [],
-  cancelled: [],
-};
-
-const roundMoney = (value: number) => Math.round((value + Number.EPSILON) * 100) / 100;
+import { canTransition, ORDER_TRANSITIONS, roundMoney } from "../shared/businessRules";
 
 export const list = query({
   args: { status: v.optional(v.string()) },
@@ -136,7 +127,7 @@ export const updateStatus = mutation({
     const order = await ctx.db.get(args.id);
     if (!order) throw new ConvexError("الطلب غير موجود");
     assertBranchAccess(user, order);
-    if (!(ORDER_TRANSITIONS[order.status] ?? []).includes(args.status)) {
+    if (!canTransition(ORDER_TRANSITIONS, order.status, args.status)) {
       throw new ConvexError(`لا يمكن تغيير حالة الطلب من ${order.status} إلى ${args.status}`);
     }
     await ctx.db.patch(args.id, { status: args.status });

@@ -1,6 +1,6 @@
-import { query, mutation } from "./_generated/server";
+import { query } from "./_generated/server";
 import { v } from "convex/values";
-import { requireAuth, requireAdmin, requirePermission } from "./lib/auth";
+import { requirePermission } from "./lib/auth";
 
 export const list = query({
   args: {
@@ -61,36 +61,5 @@ export const getStats = query({
       byModule,
       byAction,
     };
-  },
-});
-
-export const log = mutation({
-  args: {
-    action: v.string(),
-    module: v.string(),
-    recordId: v.optional(v.string()),
-    recordLabel: v.optional(v.string()),
-    details: v.optional(v.string()),
-  },
-  handler: async (ctx, args) => {
-    const user = await requireAuth(ctx);
-    return await ctx.db.insert("auditLogs", {
-      ...args,
-      userId: user.userId,
-      userName: user.name,
-      branchId: user.branchId as any,
-    });
-  },
-});
-
-export const clear = mutation({
-  args: {},
-  handler: async (ctx) => {
-    await requireAdmin(ctx);
-    const logs = await ctx.db.query("auditLogs").collect();
-    for (const l of logs) {
-      await ctx.db.delete(l._id);
-    }
-    return logs.length;
   },
 });
