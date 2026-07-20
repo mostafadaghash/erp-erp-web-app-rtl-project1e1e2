@@ -42,7 +42,6 @@ export function ShipmentsPage() {
   const shipments = useQuery(api.shipments.list, filterStatus !== "all" ? { status: filterStatus } : {});
   const stats = useQuery(api.shipments.stats);
   const updateStatus = useMutation(api.shipments.updateStatus);
-  const removeShipment = useMutation(api.shipments.remove);
 
   const filtered = (shipments ?? []).filter(s =>
     s.supplierName.includes(search) ||
@@ -51,8 +50,9 @@ export function ShipmentsPage() {
 
   const handleStatusChange = async (id: Id<"shipments">, status: string) => {
     try {
-      const arrivedDate = status === "arrived" ? new Date().toISOString().split("T")[0] : undefined;
-      await updateStatus({ id, status, arrivedDate });
+      const reason = status === "cancelled" ? prompt("أدخل سبب إلغاء الشحنة") : undefined;
+      if (status === "cancelled" && !reason?.trim()) return;
+      await updateStatus({ id, status, reason });
       toast.success(
         status === "arrived"
           ? "تم استلام الشحنة وتحديث المخزون تلقائياً"
@@ -64,10 +64,11 @@ export function ShipmentsPage() {
   };
 
   const handleDelete = async (id: Id<"shipments">) => {
-    if (!confirm("هل أنت متأكد من حذف هذه الشحنة؟")) return;
+    const reason = prompt("أدخل سبب إلغاء الشحنة");
+    if (!reason?.trim() || !confirm("هل أنت متأكد من إلغاء هذه الشحنة؟")) return;
     try {
-      await removeShipment({ id });
-      toast.success("تم حذف الشحنة");
+      await updateStatus({ id, status: "cancelled", reason });
+      toast.success("تم إلغاء الشحنة");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "حدث خطأ");
     }
@@ -244,7 +245,7 @@ export function ShipmentsPage() {
                           {canDelete && <button
                             onClick={() => handleDelete(shipment._id)}
                             className="p-1.5 bg-slate-50 text-slate-400 rounded-lg hover:bg-red-50 hover:text-red-500 transition-colors"
-                            title="حذف"
+                            title="إلغاء"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>}

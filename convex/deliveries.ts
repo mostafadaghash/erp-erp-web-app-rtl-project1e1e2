@@ -1,6 +1,9 @@
 import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
 import { ConvexError } from "convex/values";
+import { canTransition, DELIVERY_TRANSITIONS, calculateDeliveryAmounts, roundMoney } from "../shared/businessRules";
+import { nextDocumentNumber } from "./lib/documentNumbers";
+import { requireActiveBranch, requireActiveCustomer } from "./lib/references";
 import { assertBranchAccess, requireModulePermission, filterByBranch, resolveWriteBranch, logAction } from "./lib/auth";
 
 export const list = query({
@@ -50,7 +53,7 @@ export const create = mutation({
       unitPrice: v.number(),
     })),
     totalAmount: v.number(),
-    paymentMethod: v.string(),
+    paymentMethod: v.union(v.literal("cod"), v.literal("prepaid"), v.literal("partial")),
     codAmount: v.optional(v.number()),
     prepaidAmount: v.optional(v.number()),
     shippingCompany: v.string(),
@@ -65,23 +68,39 @@ export const create = mutation({
   },
   handler: async (ctx, args) => {
     const user = await requireModulePermission(ctx, "create_deliveries", "deliveries");
+    const branchId = resolveWriteBranch(user, args.branchId);
+    await requireActiveBranch(ctx, branchId);
+    let trustedOrderNumber = args.orderNumber;
     if (args.orderId) {
       const order = await ctx.db.get(args.orderId);
-      if (!order) throw new ConvexError("الطلب غير موجود");
+      if (!order || order.status === "cancelled") throw new ConvexError("الطلب غير موجود أو ملغي");
       assertBranchAccess(user, order);
+      if (branchId && order.branchId && order.branchId !== branchId) throw new ConvexError("الطلب لا ينتمي إلى فرع التوصيل");
+      const existing = (await ctx.db.query("deliveries").collect()).find(d => d.orderId === args.orderId && !["returned", "cancelled"].includes(d.status));
+      if (existing) throw new ConvexError("يوجد توصيل نشط لهذا الطلب بالفعل");
+      trustedOrderNumber = order.orderNumber;
     }
     if (args.customerId) {
-      const customer = await ctx.db.get(args.customerId);
-      if (!customer) throw new ConvexError("العميل غير موجود");
+      const customer = await requireActiveCustomer(ctx, args.customerId, branchId);
       assertBranchAccess(user, customer);
     }
-    const deliveryNumber = `DEL-${Date.now().toString().slice(-6)}`;
-    const branchId = resolveWriteBranch(user, args.branchId);
+    if (!Number.isFinite(args.shippingCost) || args.shippingCost < 0) throw new ConvexError("تكلفة الشحن غير صالحة");
+    const items = args.items.map(item => {
+      if (!item.productName.trim()) throw new ConvexError("اسم المنتج مطلوب");
+      if (!Number.isInteger(item.quantity) || item.quantity <= 0) throw new ConvexError("الكمية يجب أن تكون عدداً صحيحاً أكبر من صفر");
+      if (!Number.isFinite(item.unitPrice) || item.unitPrice < 0) throw new ConvexError("سعر الوحدة غير صالح");
+      return { ...item, productName: item.productName.trim(), unitPrice: roundMoney(item.unitPrice) };
+    });
+    const amounts = calculateDeliveryAmounts(items, args.shippingCost);
+    let prepaidAmount = roundMoney(args.prepaidAmount ?? 0), codAmount = roundMoney(args.codAmount ?? 0);
+    if (args.paymentMethod === "cod") { prepaidAmount = 0; codAmount = amounts.grandTotal; }
+    if (args.paymentMethod === "prepaid") { prepaidAmount = amounts.grandTotal; codAmount = 0; }
+    if (args.paymentMethod === "partial" && (prepaidAmount < 0 || codAmount < 0 || roundMoney(prepaidAmount + codAmount) !== amounts.grandTotal)) throw new ConvexError("مجموع المدفوع مقدماً وعند الاستلام يجب أن يساوي الإجمالي");
+    const deliveryNumber = await nextDocumentNumber(ctx, "delivery");
+    const { totalAmount: _ignoredTotal, orderNumber: _ignoredOrder, ...input } = args;
     const id = await ctx.db.insert("deliveries", {
-      ...args,
-      branchId,
-      deliveryNumber,
-      status: "pending",
+      ...input, items, ...amounts, prepaidAmount, codAmount, orderNumber: trustedOrderNumber,
+      branchId, deliveryNumber, status: "pending",
     });
     await logAction(ctx, user, {
       action: "create",
@@ -97,7 +116,8 @@ export const create = mutation({
 export const updateStatus = mutation({
   args: {
     id: v.id("deliveries"),
-    status: v.string(),
+    status: v.union(v.literal("pending"), v.literal("shipped"), v.literal("delivered"), v.literal("returned"), v.literal("cancelled")),
+    reason: v.optional(v.string()),
     notes: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
@@ -105,8 +125,12 @@ export const updateStatus = mutation({
     const delivery = await ctx.db.get(args.id);
     if (!delivery) throw new ConvexError("الشحنة غير موجودة");
     assertBranchAccess(user, delivery);
+    if (!canTransition(DELIVERY_TRANSITIONS, delivery.status, args.status)) throw new ConvexError(`لا يمكن تغيير حالة التوصيل من ${delivery.status} إلى ${args.status}`);
+    if ((args.status === "cancelled" || args.status === "returned") && !args.reason?.trim()) throw new ConvexError("سبب الإلغاء أو الإرجاع مطلوب");
     const patch: Record<string, unknown> = { status: args.status };
-    if (args.status === "delivered") patch.deliveredDate = new Date().toISOString().split("T")[0];
+    if (args.status === "delivered") patch.deliveredDate = new Date().toISOString().slice(0, 10);
+    if (args.status === "cancelled") { patch.cancelledAt = Date.now(); patch.cancelledBy = user.userId; patch.cancellationReason = args.reason?.trim(); }
+    if (args.status === "returned") patch.cancellationReason = args.reason?.trim();
     if (args.notes) patch.notes = args.notes;
     await ctx.db.patch(args.id, patch);
     await logAction(ctx, user, {
@@ -139,6 +163,7 @@ export const update = mutation({
     const delivery = await ctx.db.get(args.id);
     if (!delivery) throw new ConvexError("الشحنة غير موجودة");
     assertBranchAccess(user, delivery);
+    if (delivery.status === "cancelled" || delivery.status === "returned") throw new ConvexError("لا يمكن تعديل توصيل ملغي أو مرتجع");
     const { id, ...rest } = args;
     await ctx.db.patch(id, rest);
     await logAction(ctx, user, {
@@ -151,23 +176,7 @@ export const update = mutation({
   },
 });
 
-export const remove = mutation({
-  args: { id: v.id("deliveries") },
-  handler: async (ctx, args) => {
-    const user = await requireModulePermission(ctx, "delete_deliveries", "deliveries");
-    const delivery = await ctx.db.get(args.id);
-    if (!delivery) throw new ConvexError("الشحنة غير موجودة");
-    assertBranchAccess(user, delivery);
-    await ctx.db.delete(args.id);
-    await logAction(ctx, user, {
-      action: "delete",
-      module: "deliveries",
-      recordId: args.id,
-      recordLabel: delivery.deliveryNumber,
-      details: `حذف شحنة التوصيل ${delivery.deliveryNumber}`,
-    });
-  },
-});
+export const remove = mutation({ args: { id: v.id("deliveries") }, handler: async () => { throw new ConvexError("استخدم تحديث الحالة إلى ملغاة مع إدخال السبب"); } });
 
 export const getStats = query({
   args: {},

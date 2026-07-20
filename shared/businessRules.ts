@@ -26,7 +26,9 @@ export function calculateInvoiceTotals(
   return { subtotal, discount: normalizedDiscount, tax, total, paid: normalizedPaid, remaining, status };
 }
 
-export const ORDER_TRANSITIONS: Readonly<Record<string, readonly string[]>> = {
+export const ORDER_STATUSES = ["pending", "confirmed", "ready", "delivered", "cancelled"] as const;
+export type OrderStatus = (typeof ORDER_STATUSES)[number];
+export const ORDER_TRANSITIONS: Readonly<Record<OrderStatus, readonly OrderStatus[]>> = {
   pending: ["confirmed", "cancelled"],
   confirmed: ["ready", "cancelled"],
   ready: ["delivered", "cancelled"],
@@ -34,12 +36,41 @@ export const ORDER_TRANSITIONS: Readonly<Record<string, readonly string[]>> = {
   cancelled: [],
 };
 
-export const SHIPMENT_TRANSITIONS: Readonly<Record<string, readonly string[]>> = {
+export const SHIPMENT_STATUSES = ["ordered", "in_transit", "arrived", "cancelled"] as const;
+export type ShipmentStatus = (typeof SHIPMENT_STATUSES)[number];
+export const SHIPMENT_TRANSITIONS: Readonly<Record<ShipmentStatus, readonly ShipmentStatus[]>> = {
   ordered: ["in_transit", "cancelled"],
   in_transit: ["arrived", "cancelled"],
   arrived: [],
   cancelled: [],
 };
+
+export const REPAIR_STATUSES = ["received", "in_progress", "ready", "delivered", "cancelled"] as const;
+export type RepairStatus = (typeof REPAIR_STATUSES)[number];
+export const REPAIR_TRANSITIONS: Readonly<Record<RepairStatus, readonly RepairStatus[]>> = {
+  received: ["in_progress", "cancelled"], in_progress: ["ready", "cancelled"],
+  ready: ["delivered", "cancelled"], delivered: [], cancelled: [],
+};
+
+export const DELIVERY_STATUSES = ["pending", "shipped", "delivered", "returned", "cancelled"] as const;
+export type DeliveryStatus = (typeof DELIVERY_STATUSES)[number];
+export const DELIVERY_TRANSITIONS: Readonly<Record<DeliveryStatus, readonly DeliveryStatus[]>> = {
+  pending: ["shipped", "cancelled"], shipped: ["delivered", "returned"],
+  delivered: ["returned"], returned: [], cancelled: [],
+};
+
+export const PAYMENT_METHODS = ["cash", "card", "bank_transfer", "wallet"] as const;
+
+export function isValidIsoDate(value: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const date = new Date(`${value}T00:00:00.000Z`);
+  return !Number.isNaN(date.valueOf()) && date.toISOString().slice(0, 10) === value;
+}
+
+export function calculateDeliveryAmounts(items: readonly { quantity: number; unitPrice: number }[], shipping: number) {
+  const totalAmount = roundMoney(items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0));
+  return { totalAmount, shippingCost: roundMoney(shipping), grandTotal: roundMoney(totalAmount + shipping) };
+}
 
 export function canTransition(
   transitions: Readonly<Record<string, readonly string[]>>,

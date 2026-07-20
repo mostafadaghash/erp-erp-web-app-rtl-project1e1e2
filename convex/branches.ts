@@ -71,25 +71,11 @@ export const update = mutation({
   },
 });
 
-export const remove = mutation({
-  args: { id: v.id("branches") },
-  handler: async (ctx, args) => {
-    const user = await requireModulePermission(ctx, "manage_branches", "branches");
-    const branch = await ctx.db.get(args.id);
-    if (!branch) throw new ConvexError("الفرع غير موجود");
-    const employees = await ctx.db.query("userProfiles")
-      .filter(q => q.eq(q.field("branchId"), args.id)).first();
-    if (employees) throw new ConvexError("لا يمكن حذف فرع يحتوي على موظفين");
-    await ctx.db.delete(args.id);
-    await logAction(ctx, user, {
-      action: "delete",
-      module: "branches",
-      recordId: args.id,
-      recordLabel: branch.name,
-      details: `حذف الفرع: ${branch.name}`,
-    });
-  },
+export const setActive = mutation({
+  args: { id: v.id("branches"), isActive: v.boolean() },
+  handler: async (ctx, args) => { const user = await requireModulePermission(ctx, "manage_branches", "branches"); const branch = await ctx.db.get(args.id); if (!branch) throw new ConvexError("الفرع غير موجود"); if (!args.isActive) { const employees = (await ctx.db.query("userProfiles").collect()).filter(profile => profile.branchId === args.id && profile.isActive); if (employees.length) throw new ConvexError("لا يمكن تعطيل فرع يحتوي على موظفين نشطين"); } await ctx.db.patch(args.id, { isActive: args.isActive }); await logAction(ctx, user, { action: args.isActive ? "activate" : "deactivate", module: "branches", recordId: args.id, recordLabel: branch.name, details: `${args.isActive ? "تفعيل" : "تعطيل"} الفرع ${branch.name}` }); },
 });
+export const remove = mutation({ args: { id: v.id("branches") }, handler: async () => { throw new ConvexError("استخدم تعطيل الفرع بدلاً من الحذف"); } });
 
 export const stats = query({
   args: {},

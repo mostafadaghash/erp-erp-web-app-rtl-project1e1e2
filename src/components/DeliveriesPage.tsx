@@ -84,7 +84,6 @@ export function DeliveriesPage() {
   const stats = useQuery(api.deliveries.getStats);
   const createDelivery = useMutation(api.deliveries.create);
   const updateStatus   = useMutation(api.deliveries.updateStatus);
-  const removeDelivery = useMutation(api.deliveries.remove);
 
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
@@ -151,20 +150,23 @@ export function DeliveriesPage() {
 
   const handleStatusChange = async (id: Id<"deliveries">, status: string) => {
     try {
-      await updateStatus({ id, status });
+      const reason = status === "cancelled" || status === "returned" ? prompt("أدخل سبب الإلغاء أو الإرجاع") : undefined;
+      if ((status === "cancelled" || status === "returned") && !reason?.trim()) return;
+      await updateStatus({ id, status, reason });
       toast.success(`تم تحديث الحالة إلى: ${STATUS_CONFIG[status]?.label}`);
     } catch (err) {
-      toast.error("حدث خطأ أثناء التحديث");
+      toast.error(err instanceof Error ? err.message : "حدث خطأ أثناء التحديث");
     }
   };
 
   const handleDelete = async (id: Id<"deliveries">) => {
-    if (!confirm("هل أنت متأكد من حذف هذه الشحنة؟")) return;
+    const reason = prompt("أدخل سبب إلغاء التوصيل");
+    if (!reason?.trim() || !confirm("هل أنت متأكد من إلغاء التوصيل؟")) return;
     try {
-      await removeDelivery({ id });
-      toast.success("تم حذف الشحنة");
-    } catch {
-      toast.error("حدث خطأ أثناء الحذف");
+      await updateStatus({ id, status: "cancelled", reason });
+      toast.success("تم إلغاء التوصيل");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "حدث خطأ أثناء الإلغاء");
     }
   };
 
@@ -333,7 +335,7 @@ export function DeliveriesPage() {
                           {canDelete && <button
                             onClick={() => handleDelete(d._id)}
                             className="p-1.5 rounded-lg hover:bg-red-50 text-slate-400 hover:text-red-600 transition-colors"
-                            title="حذف"
+                            title="إلغاء"
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>}

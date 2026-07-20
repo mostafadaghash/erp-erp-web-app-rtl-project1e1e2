@@ -7,6 +7,8 @@ import { assertBranchAccess, filterByBranch, requireModulePermission, resolveWri
 import { calculateInvoiceTotals, roundMoney } from "../shared/businessRules";
 import { changeProductStock } from "./lib/inventory";
 import { INVENTORY_MOVEMENT_TYPES } from "../shared/inventoryRules";
+import { nextDocumentNumber } from "./lib/documentNumbers";
+import { requireActiveBranch, requireActiveCustomer } from "./lib/references";
 
 type InvoiceItemInput = {
   productId: Id<"products">;
@@ -95,9 +97,10 @@ async function adjustCustomer(
   const customer = await ctx.db.get(customerId);
   if (!customer) throw new ConvexError("العميل غير موجود");
   assertBranchAccess(user, customer);
+  if (customer.totalPurchases + purchasesDelta < 0 || customer.balance + balanceDelta < 0) throw new ConvexError("لا يمكن عكس رصيد العميل لأن البيانات الحالية غير متسقة");
   await ctx.db.patch(customerId, {
-    totalPurchases: Math.max(0, roundMoney(customer.totalPurchases + purchasesDelta)),
-    balance: Math.max(0, roundMoney(customer.balance + balanceDelta)),
+    totalPurchases: roundMoney(customer.totalPurchases + purchasesDelta),
+    balance: roundMoney(customer.balance + balanceDelta),
   });
 }
 
@@ -136,7 +139,6 @@ export const get = query({
 
 export const create = mutation({
   args: {
-    invoiceNumber: v.optional(v.string()),
     customerId: v.optional(v.id("customers")),
     customerName: v.string(),
     customerPhone: v.optional(v.string()),
@@ -160,25 +162,19 @@ export const create = mutation({
   handler: async (ctx, args) => {
     const user = await requireModulePermission(ctx, "create_invoices", "invoices");
     const branchId = resolveWriteBranch(user, args.branchId);
+    await requireActiveBranch(ctx, branchId);
     let customerName = args.customerName.trim();
     let customerPhone = args.customerPhone;
     if (!customerName) throw new ConvexError("اسم العميل مطلوب");
     if (args.customerId) {
-      const customer = await ctx.db.get(args.customerId);
-      if (!customer) throw new ConvexError("العميل غير موجود");
+      const customer = await requireActiveCustomer(ctx, args.customerId, branchId);
       assertBranchAccess(user, customer);
       customerName = customer.name;
       customerPhone = customer.phone;
     }
     const prepared = await prepareInvoice(ctx, user, args.items, args.discount, args.paid);
 
-    // Generate invoice number if not provided
-    let invoiceNumber = args.invoiceNumber;
-    if (!invoiceNumber) {
-      const count = await ctx.db.query("invoices").collect();
-      const year = new Date().getFullYear();
-      invoiceNumber = `INV-${year}-${String(count.length + 1).padStart(5, "0")}`;
-    }
+    const invoiceNumber = await nextDocumentNumber(ctx, "invoice");
 
     const id = await ctx.db.insert("invoices", {
       invoiceNumber,
@@ -257,6 +253,8 @@ export const update = mutation({
     const inv = await ctx.db.get(id);
     if (!inv) throw new ConvexError("الفاتورة غير موجودة");
     assertBranchAccess(user, inv);
+    if (inv.status === "cancelled") throw new ConvexError("لا يمكن تعديل فاتورة ملغاة");
+    if (inv.paid > 0) throw new ConvexError("لا يمكن تعديل فاتورة مدفوعة قبل تنفيذ التسوية المالية");
     let customerName = data.customerName.trim();
     let customerPhone = data.customerPhone;
     if (!customerName) throw new ConvexError("اسم العميل مطلوب");
@@ -339,13 +337,17 @@ export const updateStatus = mutation({
   },
 });
 
-export const remove = mutation({
-  args: { id: v.id("invoices") },
+export const cancel = mutation({
+  args: { id: v.id("invoices"), reason: v.string() },
   handler: async (ctx, args) => {
     const user = await requireModulePermission(ctx, "delete_invoices", "invoices");
     const inv = await ctx.db.get(args.id);
     if (!inv) throw new ConvexError("الفاتورة غير موجودة");
     assertBranchAccess(user, inv);
+    const reason = args.reason.trim();
+    if (!reason) throw new ConvexError("سبب الإلغاء مطلوب");
+    if (inv.status === "cancelled") throw new ConvexError("الفاتورة ملغاة بالفعل");
+    if (inv.paid > 0) throw new ConvexError("لا يمكن إلغاء فاتورة مدفوعة أو جزئية قبل تنفيذ الاسترداد المالي");
     const quantities = new Map<string, number>();
     for (const item of inv.items) {
       const key = String(item.productId);
@@ -355,21 +357,23 @@ export const remove = mutation({
       const product = await ctx.db.get(productId as Id<"products">);
       if (!product) throw new ConvexError("تعذر استعادة مخزون منتج محذوف من الفاتورة");
       assertBranchAccess(user, product);
-      await changeProductStock(ctx, user, { productId: product._id, quantityDelta: quantity, type: INVENTORY_MOVEMENT_TYPES.saleReversal, reason: `عكس مخزون حذف الفاتورة ${inv.invoiceNumber}`, referenceId: String(args.id), referenceType: "invoice" });
+      await changeProductStock(ctx, user, { productId: product._id, quantityDelta: quantity, type: INVENTORY_MOVEMENT_TYPES.saleReversal, reason: `عكس مخزون إلغاء الفاتورة ${inv.invoiceNumber}`, referenceId: String(args.id), referenceType: "invoice" });
     }
     if (inv.customerId) {
       await adjustCustomer(ctx, user, inv.customerId, -inv.total, -inv.remaining);
     }
-    await ctx.db.delete(args.id);
+    await ctx.db.patch(args.id, { status: "cancelled", cancelledAt: Date.now(), cancelledBy: user.userId, cancellationReason: reason });
     await logAction(ctx, user, {
-      action: "delete",
+      action: "cancel",
       module: "invoices",
       recordId: args.id,
       recordLabel: inv.invoiceNumber,
-      details: `حذف الفاتورة ${inv.invoiceNumber}`,
+      details: `إلغاء الفاتورة ${inv.invoiceNumber}: ${reason}`,
     });
   },
 });
+
+export const remove = mutation({ args: { id: v.id("invoices") }, handler: async () => { throw new ConvexError("استخدم مسار إلغاء الفاتورة مع إدخال السبب"); } });
 
 export const stats = query({
   args: {},
@@ -377,13 +381,15 @@ export const stats = query({
     const user = await requireModulePermission(ctx, "view_invoices", "invoices");
     let invoices = await ctx.db.query("invoices").collect();
     invoices = filterByBranch(invoices, user);
-    const totalRevenue = invoices.filter(i => i.status === "paid").reduce((s, i) => s + i.total, 0);
-    const totalOutstanding = invoices.reduce((s, i) => s + (i.remaining ?? 0), 0);
+    const active = invoices.filter(i => i.status !== "cancelled");
+    const totalRevenue = active.filter(i => i.status === "paid").reduce((s, i) => s + i.total, 0);
+    const totalOutstanding = active.reduce((s, i) => s + (i.remaining ?? 0), 0);
     return {
       total: invoices.length,
       paid: invoices.filter(i => i.status === "paid").length,
       partial: invoices.filter(i => i.status === "partial").length,
       unpaid: invoices.filter(i => i.status === "unpaid").length,
+      cancelled: invoices.filter(i => i.status === "cancelled").length,
       totalRevenue,
       totalOutstanding,
     };

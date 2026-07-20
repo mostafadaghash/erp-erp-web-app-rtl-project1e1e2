@@ -5,6 +5,8 @@ import { assertBranchAccess, requireModulePermission, filterByBranch, resolveWri
 import { canTransition, roundMoney, SHIPMENT_TRANSITIONS } from "../shared/businessRules";
 import { changeProductStock } from "./lib/inventory";
 import { INVENTORY_MOVEMENT_TYPES } from "../shared/inventoryRules";
+import { nextDocumentNumber } from "./lib/documentNumbers";
+import { requireActiveBranch, requireActiveSupplier } from "./lib/references";
 
 export const list = query({
   args: { status: v.optional(v.string()) },
@@ -57,7 +59,7 @@ export const creationOptions = query({
   handler: async (ctx) => {
     const user = await requireModulePermission(ctx, "create_shipments", "shipments");
     const products = filterByBranch(await ctx.db.query("products").collect(), user).filter((product) => product.isActive);
-    const suppliers = await ctx.db.query("suppliers").collect();
+    const suppliers = (await ctx.db.query("suppliers").collect()).filter(supplier => supplier.isActive !== false);
     return {
       products: products.map(({ _id, name }) => ({ _id, name })),
       suppliers: suppliers.map(({ _id, name }) => ({ _id, name })),
@@ -85,10 +87,11 @@ export const create = mutation({
   },
   handler: async (ctx, args) => {
     const user = await requireModulePermission(ctx, "create_shipments", "shipments");
+    const branchId = resolveWriteBranch(user, args.branchId);
+    await requireActiveBranch(ctx, branchId);
     let supplierName = args.supplierName.trim();
     if (args.supplierId) {
-      const supplier = await ctx.db.get(args.supplierId);
-      if (!supplier) throw new ConvexError("المورد غير موجود");
+      const supplier = await requireActiveSupplier(ctx, args.supplierId);
       supplierName = supplier.name;
     }
     if (!supplierName) throw new ConvexError("اسم المورد مطلوب");
@@ -102,6 +105,7 @@ export const create = mutation({
         const product = await ctx.db.get(item.productId);
         if (!product || !product.isActive) throw new ConvexError(`المنتج غير موجود أو غير نشط: ${item.productName}`);
         assertBranchAccess(user, product);
+        if (branchId && product.branchId && product.branchId !== branchId) throw new ConvexError("المنتج لا ينتمي إلى فرع الشحنة");
         productName = product.name;
       }
       if (!productName) throw new ConvexError("اسم المنتج مطلوب");
@@ -112,9 +116,7 @@ export const create = mutation({
     const totalCost = roundMoney(items.reduce((sum, item) => sum + item.total, 0));
     const shippingCost = roundMoney(args.shippingCost);
     const grandTotal = roundMoney(totalCost + shippingCost);
-    const count = (await ctx.db.query("shipments").collect()).length + 1;
-    const shipmentNumber = "SHP-" + String(count).padStart(4, "0");
-    const branchId = resolveWriteBranch(user, args.branchId);
+    const shipmentNumber = await nextDocumentNumber(ctx, "shipment");
     const id = await ctx.db.insert("shipments", {
       supplierName,
       supplierId: args.supplierId,
@@ -142,18 +144,20 @@ export const create = mutation({
 export const updateStatus = mutation({
   args: {
     id: v.id("shipments"),
-    status: v.string(),
-    arrivedDate: v.optional(v.string()),
+    status: v.union(v.literal("ordered"), v.literal("in_transit"), v.literal("arrived"), v.literal("cancelled")),
+    reason: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const user = await requireModulePermission(ctx, "edit_shipments", "shipments");
     const shipment = await ctx.db.get(args.id);
     if (!shipment) throw new ConvexError("الشحنة غير موجودة");
     assertBranchAccess(user, shipment);
+    if (args.status === "cancelled" && !args.reason?.trim()) throw new ConvexError("سبب الإلغاء مطلوب");
     if (!canTransition(SHIPMENT_TRANSITIONS, shipment.status, args.status)) {
       throw new ConvexError(`لا يمكن تغيير حالة الشحنة من ${shipment.status} إلى ${args.status}`);
     }
-    const patch: Record<string, string> = { status: args.status };
+    const patch: Record<string, string | number> = { status: args.status };
+    if (args.status === "cancelled") { patch.cancelledAt = Date.now(); patch.cancelledBy = user.userId; patch.cancellationReason = args.reason?.trim() ?? ""; }
     if (args.status === "arrived") patch.arrivedDate = new Date().toISOString().split("T")[0];
     await ctx.db.patch(args.id, patch);
 
@@ -186,21 +190,4 @@ export const updateStatus = mutation({
   },
 });
 
-export const remove = mutation({
-  args: { id: v.id("shipments") },
-  handler: async (ctx, args) => {
-    const user = await requireModulePermission(ctx, "delete_shipments", "shipments");
-    const shipment = await ctx.db.get(args.id);
-    if (!shipment) throw new ConvexError("الشحنة غير موجودة");
-    assertBranchAccess(user, shipment);
-    if (shipment.status === "arrived") throw new ConvexError("لا يمكن حذف شحنة تم استلامها");
-    await ctx.db.delete(args.id);
-    await logAction(ctx, user, {
-      action: "delete",
-      module: "shipments",
-      recordId: args.id,
-      recordLabel: shipment.shipmentNumber,
-      details: `حذف الشحنة ${shipment.shipmentNumber}`,
-    });
-  },
-});
+export const remove = mutation({ args: { id: v.id("shipments") }, handler: async () => { throw new ConvexError("استخدم انتقال حالة الشحنة إلى ملغاة مع إدخال السبب"); } });

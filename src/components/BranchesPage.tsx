@@ -33,7 +33,7 @@ export function BranchesPage() {
   const legacyData = useQuery(api.branches.legacyDataStats, canManage ? {} : "skip");
   const createBranch = useMutation(api.branches.create);
   const updateBranch = useMutation(api.branches.update);
-  const removeBranch = useMutation(api.branches.remove);
+  const removeBranch = useMutation(api.branches.setActive);
   const assignLegacyData = useMutation(api.branches.assignLegacyData);
 
   const filtered = (branches ?? []).filter(b =>
@@ -41,10 +41,9 @@ export function BranchesPage() {
   );
 
   const openCreate = () => { setForm(emptyForm()); setEditId(null); setShowForm(true); };
-  const openEdit = (b: typeof branches extends (infer T)[] | undefined ? T : never) => {
-    if (!b) return;
-    setForm({ name: (b as any).name, address: (b as any).address, phone: (b as any).phone ?? "", isActive: (b as any).isActive });
-    setEditId((b as any)._id);
+  const openEdit = (b: NonNullable<typeof branches>[number]) => {
+    setForm({ name: b.name, address: b.address, phone: b.phone ?? "", isActive: b.isActive });
+    setEditId(b._id);
     setShowForm(true);
   };
 
@@ -67,10 +66,10 @@ export function BranchesPage() {
   };
 
   const handleDelete = async (id: Id<"branches">) => {
-    if (!confirm("هل أنت متأكد من حذف هذا الفرع؟")) return;
+    if (!confirm("هل أنت متأكد من تعطيل هذا الفرع؟")) return;
     try {
-      await removeBranch({ id });
-      toast.success("تم حذف الفرع");
+      await removeBranch({ id, isActive: false });
+      toast.success("تم تعطيل الفرع");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "حدث خطأ");
     }
@@ -192,7 +191,7 @@ export function BranchesPage() {
                     <button
                       onClick={() => handleDelete(branch._id)}
                       className="p-1.5 hover:bg-red-50 text-slate-400 hover:text-red-500 rounded-lg transition-colors"
-                      title="حذف"
+                      title="تعطيل"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
