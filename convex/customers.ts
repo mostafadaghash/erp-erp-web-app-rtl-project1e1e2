@@ -1,6 +1,6 @@
 import { query, mutation } from "./_generated/server";
 import { v, ConvexError } from "convex/values";
-import { requireAuth, requirePermission, filterByBranch, logAction } from "./lib/auth";
+import { assertBranchAccess, requirePermission, filterByBranch, resolveWriteBranch, logAction } from "./lib/auth";
 
 export const list = query({
   args: {},
@@ -14,8 +14,10 @@ export const list = query({
 export const get = query({
   args: { id: v.id("customers") },
   handler: async (ctx, args) => {
-    await requirePermission(ctx, "view_customers");
-    return await ctx.db.get(args.id);
+    const user = await requirePermission(ctx, "view_customers");
+    const customer = await ctx.db.get(args.id);
+    if (customer) assertBranchAccess(user, customer);
+    return customer;
   },
 });
 
@@ -30,7 +32,7 @@ export const create = mutation({
   },
   handler: async (ctx, args) => {
     const user = await requirePermission(ctx, "create_customers");
-    const branchId = args.branchId ?? (user.branchId as any);
+    const branchId = resolveWriteBranch(user, args.branchId);
     const id = await ctx.db.insert("customers", {
       ...args,
       branchId,
@@ -62,6 +64,7 @@ export const update = mutation({
     const { id, ...rest } = args;
     const customer = await ctx.db.get(id);
     if (!customer) throw new ConvexError("العميل غير موجود");
+    assertBranchAccess(user, customer);
     await ctx.db.patch(id, rest);
     await logAction(ctx, user, {
       action: "update",
@@ -79,6 +82,7 @@ export const remove = mutation({
     const user = await requirePermission(ctx, "delete_customers");
     const customer = await ctx.db.get(args.id);
     if (!customer) throw new ConvexError("العميل غير موجود");
+    assertBranchAccess(user, customer);
     await ctx.db.delete(args.id);
     await logAction(ctx, user, {
       action: "delete",
