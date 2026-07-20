@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
+import { usePermission } from "../lib/access";
 import type { Page } from "./ERPApp";
 import { FileText, Plus, Search, Printer } from "lucide-react";
 import { PrintModal } from "./PrintTemplate";
@@ -11,6 +12,7 @@ interface InvoicesPageProps {
 }
 
 export function InvoicesPage({ onNavigate }: InvoicesPageProps) {
+  const canCreate = usePermission("create_invoices");
   const invoices = useQuery(api.invoices.list, {}) ?? [];
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState("");
@@ -37,10 +39,10 @@ export function InvoicesPage({ onNavigate }: InvoicesPageProps) {
           </h1>
           <p className="text-slate-500 text-sm mt-0.5">{invoices.length} فاتورة</p>
         </div>
-        <button onClick={() => onNavigate("new-invoice")} className="btn-primary flex items-center gap-2">
+        {canCreate && <button onClick={() => onNavigate("new-invoice")} className="btn-primary flex items-center gap-2">
           <Plus className="w-4 h-4" />
           فاتورة جديدة
-        </button>
+        </button>}
       </div>
 
       {/* Stats */}
