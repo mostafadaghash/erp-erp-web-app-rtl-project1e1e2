@@ -16,7 +16,7 @@ export const repairPicker = query({
   args: {},
   handler: async (ctx) => {
     const user = await requirePermission(ctx, "create_repairs");
-    const customers = filterByBranch(await ctx.db.query("customers").collect(), user);
+    const customers = filterByBranch(await ctx.db.query("customers").collect(), user).filter(customer => customer.isActive !== false);
     return customers.map(({ _id, name, phone }) => ({ _id, name, phone }));
   },
 });
@@ -48,6 +48,7 @@ export const create = mutation({
       branchId,
       balance: 0,
       totalPurchases: 0,
+      isActive: true,
     });
     await logAction(ctx, user, {
       action: "create",
@@ -86,20 +87,13 @@ export const update = mutation({
   },
 });
 
-export const remove = mutation({
-  args: { id: v.id("customers") },
+export const setActive = mutation({
+  args: { id: v.id("customers"), isActive: v.boolean() },
   handler: async (ctx, args) => {
     const user = await requirePermission(ctx, "delete_customers");
-    const customer = await ctx.db.get(args.id);
-    if (!customer) throw new ConvexError("العميل غير موجود");
-    assertBranchAccess(user, customer);
-    await ctx.db.delete(args.id);
-    await logAction(ctx, user, {
-      action: "delete",
-      module: "customers",
-      recordId: args.id,
-      recordLabel: customer.name,
-      details: `حذف العميل: ${customer.name}`,
-    });
+    const customer = await ctx.db.get(args.id); if (!customer) throw new ConvexError("العميل غير موجود");
+    assertBranchAccess(user, customer); await ctx.db.patch(args.id, { isActive: args.isActive });
+    await logAction(ctx, user, { action: args.isActive ? "activate" : "deactivate", module: "customers", recordId: args.id, recordLabel: customer.name, details: `${args.isActive ? "تفعيل" : "تعطيل"} العميل ${customer.name}` });
   },
 });
+export const remove = mutation({ args: { id: v.id("customers") }, handler: async () => { throw new ConvexError("استخدم تعطيل العميل بدلاً من الحذف"); } });

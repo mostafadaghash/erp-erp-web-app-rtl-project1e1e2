@@ -6,13 +6,47 @@ import {
   ORDER_TRANSITIONS,
   roundMoney,
   SHIPMENT_TRANSITIONS,
+  REPAIR_TRANSITIONS,
+  DELIVERY_TRANSITIONS,
+  calculateDeliveryAmounts,
+  isValidIsoDate,
 } from "../shared/businessRules.ts";
+import { formatDocumentNumber, nextValueAfterLegacy } from "../convex/lib/documentNumbers.ts";
 import { normalizeEgyptPhoneForWhatsApp } from "../src/lib/utils.ts";
 import { isPermission, ROLE_PERMISSIONS } from "../convex/lib/permissions.ts";
 
 test("money is rounded to two decimal places", () => {
   assert.equal(roundMoney(10.005), 10.01);
   assert.equal(roundMoney(4.444), 4.44);
+});
+
+test("document number formats are separated by type and year", () => {
+  assert.equal(formatDocumentNumber("invoice", 2026, 1), "INV-2026-00001");
+  assert.equal(formatDocumentNumber("order", 2026, 1), "ORD-2026-00001");
+  assert.equal(formatDocumentNumber("shipment", 2027, 2), "SHP-2027-00002");
+  assert.equal(formatDocumentNumber("repair", 2026, 10), "REP-2026-00010");
+  assert.equal(formatDocumentNumber("delivery", 2026, 11), "DEL-2026-00011");
+  assert.equal(nextValueAfterLegacy("invoice", 2026, ["INV-2026-00007", "INV-2025-00999"]), 8);
+  assert.equal(nextValueAfterLegacy("invoice", 2027, ["INV-2026-00007"]), 1);
+});
+
+test("repair and delivery state machines enforce terminal states", () => {
+  assert.equal(canTransition(REPAIR_TRANSITIONS, "received", "in_progress"), true);
+  assert.equal(canTransition(REPAIR_TRANSITIONS, "delivered", "ready"), false);
+  assert.equal(canTransition(DELIVERY_TRANSITIONS, "shipped", "returned"), true);
+  assert.equal(canTransition(DELIVERY_TRANSITIONS, "cancelled", "pending"), false);
+});
+
+test("delivery totals are calculated and rounded on the server", () => {
+  assert.deepEqual(calculateDeliveryAmounts([{ quantity: 2, unitPrice: 10.005 }], 5.005), {
+    totalAmount: 20.01, shippingCost: 5.01, grandTotal: 25.02,
+  });
+});
+
+test("ISO date validation rejects impossible calendar dates", () => {
+  assert.equal(isValidIsoDate("2026-02-28"), true);
+  assert.equal(isValidIsoDate("2026-02-30"), false);
+  assert.equal(isValidIsoDate("20-02-01"), false);
 });
 
 test("invoice totals are calculated on trusted inputs", () => {

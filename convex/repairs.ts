@@ -1,6 +1,9 @@
 import { query, mutation } from "./_generated/server";
 import type { MutationCtx } from "./_generated/server";
 import { v, ConvexError } from "convex/values";
+import { canTransition, REPAIR_TRANSITIONS, isValidIsoDate, roundMoney } from "../shared/businessRules";
+import { nextDocumentNumber } from "./lib/documentNumbers";
+import { requireActiveBranch, requireActiveCustomer } from "./lib/references";
 import { assertBranchAccess, requireModuleEnabled, requireModulePermission, filterByBranch, resolveWriteBranch, logAction } from "./lib/auth";
 
 function createTrackingToken(): string {
@@ -98,16 +101,19 @@ export const create = mutation({
   },
   handler: async (ctx, args) => {
     const user = await requireModulePermission(ctx, "create_repairs", "repairs");
+    const branchId = resolveWriteBranch(user, args.branchId);
+    await requireActiveBranch(ctx, branchId);
+    for (const value of [args.customerName, args.customerPhone, args.deviceType, args.deviceBrand, args.deviceModel, args.problem]) if (!value.trim()) throw new ConvexError("جميع الحقول النصية المطلوبة يجب ألا تكون فارغة");
+    if (!Number.isFinite(args.laborCost) || args.laborCost < 0 || !Number.isFinite(args.deposit) || args.deposit < 0) throw new ConvexError("قيم الصيانة المالية غير صالحة");
+    if (args.deposit > args.laborCost) throw new ConvexError("العربون لا يمكن أن يتجاوز التكلفة الإجمالية");
+    if (args.expectedDate && !isValidIsoDate(args.expectedDate)) throw new ConvexError("التاريخ المتوقع غير صالح");
     if (args.customerId) {
-      const customer = await ctx.db.get(args.customerId);
-      if (!customer) throw new ConvexError("العميل غير موجود");
+      const customer = await requireActiveCustomer(ctx, args.customerId, branchId);
       assertBranchAccess(user, customer);
     }
-    const count = await ctx.db.query("repairs").collect();
-    const repairNumber = `REP-${String(count.length + 1).padStart(5, "0")}`;
+    const repairNumber = await nextDocumentNumber(ctx, "repair");
     const trackingToken = await createUniqueTrackingToken(ctx);
-    const totalCost = args.laborCost;
-    const branchId = resolveWriteBranch(user, args.branchId);
+    const totalCost = roundMoney(args.laborCost);
     const id = await ctx.db.insert("repairs", {
       ...args,
       branchId,
@@ -115,7 +121,8 @@ export const create = mutation({
       trackingToken,
       parts: [],
       totalCost,
-      remaining: totalCost - args.deposit,
+      laborCost: totalCost, deposit: roundMoney(args.deposit),
+      remaining: roundMoney(totalCost - args.deposit),
       status: "received",
       receivedDate: new Date().toISOString().split("T")[0],
     });
@@ -153,17 +160,23 @@ export const rotateTrackingToken = mutation({
 export const updateStatus = mutation({
   args: {
     id: v.id("repairs"),
-    status: v.string(),
+    status: v.union(v.literal("received"), v.literal("in_progress"), v.literal("ready"), v.literal("delivered"), v.literal("cancelled")),
     diagnosis: v.optional(v.string()),
-    deliveredDate: v.optional(v.string()),
+    reason: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const user = await requireModulePermission(ctx, "edit_repairs", "repairs");
     const repair = await ctx.db.get(args.id);
-    if (!repair) throw new Error("أمر الصيانة غير موجود");
+    if (!repair) throw new ConvexError("أمر الصيانة غير موجود");
     assertBranchAccess(user, repair);
-    const { id, ...rest } = args;
-    await ctx.db.patch(id, rest);
+    if (!canTransition(REPAIR_TRANSITIONS, repair.status, args.status)) throw new ConvexError(`لا يمكن تغيير حالة الصيانة من ${repair.status} إلى ${args.status}`);
+    if (args.status === "cancelled" && !args.reason?.trim()) throw new ConvexError("سبب الإلغاء مطلوب");
+    if (args.status === "delivered" && repair.remaining > 0) throw new ConvexError("لا يمكن تسليم صيانة عليها مبلغ متبقٍ");
+    await ctx.db.patch(args.id, {
+      status: args.status, diagnosis: args.diagnosis?.trim(),
+      ...(args.status === "delivered" ? { deliveredDate: new Date().toISOString().slice(0, 10) } : {}),
+      ...(args.status === "cancelled" ? { cancelledAt: Date.now(), cancelledBy: user.userId, cancellationReason: args.reason?.trim() } : {}),
+    });
     await logAction(ctx, user, {
       action: "update",
       module: "repairs",
@@ -186,6 +199,7 @@ export const getStats = query({
       inProgress: repairs.filter(r => r.status === "in_progress").length,
       ready: repairs.filter(r => r.status === "ready").length,
       delivered: repairs.filter(r => r.status === "delivered").length,
+      cancelled: repairs.filter(r => r.status === "cancelled").length,
     };
   },
 });

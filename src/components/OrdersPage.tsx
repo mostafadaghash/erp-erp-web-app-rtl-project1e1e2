@@ -80,7 +80,7 @@ export function OrdersPage() {
   const settings = useQuery(api.settings.getPublic);
   const updateStatus = useMutation(api.orders.updateStatus);
   const addPayment = useMutation(api.orders.addPayment);
-  const removeOrder = useMutation(api.orders.remove);
+  const removeOrder = useMutation(api.orders.cancel);
 
   const storeName = settings?.storeName ?? "المتجر";
   const storeWhatsApp = settings?.whatsappNumber ?? "";
@@ -114,10 +114,11 @@ export function OrdersPage() {
   };
 
   const handleDelete = async (id: Id<"orders">) => {
-    if (!confirm("هل أنت متأكد من حذف هذا الطلب؟")) return;
+    const reason = prompt("أدخل سبب إلغاء الطلب");
+    if (!reason?.trim() || !confirm("هل أنت متأكد من إلغاء هذا الطلب؟")) return;
     try {
-      await removeOrder({ id });
-      toast.success("تم حذف الطلب");
+      await removeOrder({ id, reason });
+      toast.success("تم إلغاء الطلب");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "حدث خطأ");
     }
@@ -333,7 +334,7 @@ export function OrdersPage() {
                           {canDelete && <button
                             onClick={() => handleDelete(order._id)}
                             className="p-1.5 bg-slate-50 text-slate-400 rounded-lg hover:bg-red-50 hover:text-red-500 transition-colors"
-                            title="حذف"
+                            title="إلغاء"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>}

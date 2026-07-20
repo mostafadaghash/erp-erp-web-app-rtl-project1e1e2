@@ -3,6 +3,10 @@ import { authTables } from "@convex-dev/auth/server";
 import { v } from "convex/values";
 
 const applicationTables = {
+  documentCounters: defineTable({
+    key: v.string(), documentType: v.string(), year: v.number(), nextValue: v.number(), updatedAt: v.number(),
+  }).index("by_key", ["key"]),
+
   // إعدادات النظام
   settings: defineTable({
     storeName: v.string(),
@@ -47,6 +51,7 @@ const applicationTables = {
     address: v.optional(v.string()),
     balance: v.number(),
     notes: v.optional(v.string()),
+    isActive: v.optional(v.boolean()),
   }),
 
   // الفئات
@@ -103,6 +108,7 @@ const applicationTables = {
     totalPurchases: v.number(),
     notes: v.optional(v.string()),
     branchId: v.optional(v.id("branches")),
+    isActive: v.optional(v.boolean()),
   }).index("by_phone", ["phone"]),
 
   // الفواتير / المبيعات
@@ -131,6 +137,7 @@ const applicationTables = {
     branchId: v.optional(v.id("branches")),
     userId: v.optional(v.string()),
     type: v.string(),
+    cancelledAt: v.optional(v.number()), cancelledBy: v.optional(v.string()), cancellationReason: v.optional(v.string()),
   }).index("by_invoice_number", ["invoiceNumber"]).index("by_customer", ["customerId"]).index("by_status", ["status"]),
 
   // الطلبات / الأوردرات
@@ -152,7 +159,8 @@ const applicationTables = {
     expectedDate: v.optional(v.string()),
     notes: v.optional(v.string()),
     branchId: v.optional(v.id("branches")),
-  }).index("by_status", ["status"]),
+    cancelledAt: v.optional(v.number()), cancelledBy: v.optional(v.string()), cancellationReason: v.optional(v.string()),
+  }).index("by_status", ["status"]).index("by_order_number", ["orderNumber"]),
 
   // الصيانة
   repairs: defineTable({
@@ -183,7 +191,8 @@ const applicationTables = {
     notes: v.optional(v.string()),
     branchId: v.optional(v.id("branches")),
     trackingToken: v.optional(v.string()),
-  }).index("by_status", ["status"]).index("by_tracking", ["trackingToken"]),
+    cancelledAt: v.optional(v.number()), cancelledBy: v.optional(v.string()), cancellationReason: v.optional(v.string()),
+  }).index("by_repair_number", ["repairNumber"]).index("by_status", ["status"]).index("by_tracking", ["trackingToken"]),
 
   // الشحن
   shipments: defineTable({
@@ -205,7 +214,8 @@ const applicationTables = {
     arrivedDate: v.optional(v.string()),
     notes: v.optional(v.string()),
     branchId: v.optional(v.id("branches")),
-  }).index("by_status", ["status"]),
+    cancelledAt: v.optional(v.number()), cancelledBy: v.optional(v.string()), cancellationReason: v.optional(v.string()),
+  }).index("by_status", ["status"]).index("by_shipment_number", ["shipmentNumber"]),
 
   // المصروفات
   expenses: defineTable({
@@ -217,6 +227,8 @@ const applicationTables = {
     notes: v.optional(v.string()),
     branchId: v.optional(v.id("branches")),
     userId: v.optional(v.string()),
+    status: v.optional(v.union(v.literal("active"), v.literal("voided"))),
+    voidedAt: v.optional(v.number()), voidedBy: v.optional(v.string()), voidReason: v.optional(v.string()),
   }).index("by_category", ["category"]),
 
   // المدفوعات / التحصيل
@@ -294,6 +306,7 @@ const applicationTables = {
       unitPrice: v.number(),
     })),
     totalAmount: v.number(),
+    grandTotal: v.optional(v.number()),
     paymentMethod: v.string(),   // cod, prepaid, partial
     codAmount: v.optional(v.number()),   // مبلغ الدفع عند الاستلام
     prepaidAmount: v.optional(v.number()),
@@ -305,7 +318,8 @@ const applicationTables = {
     deliveredDate: v.optional(v.string()),
     notes: v.optional(v.string()),
     branchId: v.optional(v.id("branches")),
-  }).index("by_status", ["status"]).index("by_city", ["city"]),
+    cancelledAt: v.optional(v.number()), cancelledBy: v.optional(v.string()), cancellationReason: v.optional(v.string()),
+  }).index("by_delivery_number", ["deliveryNumber"]).index("by_status", ["status"]).index("by_city", ["city"]),
 
   // سجل العمليات
   auditLogs: defineTable({
