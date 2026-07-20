@@ -267,8 +267,9 @@ export function ShipmentsPage() {
 
 function NewShipmentForm({ onClose }: { onClose: () => void }) {
   const createShipment = useMutation(api.shipments.create);
-  const suppliers = useQuery(api.suppliers.list);
-  const products = useQuery(api.products.list, {});
+  const options = useQuery(api.shipments.creationOptions);
+  const suppliers = options?.suppliers;
+  const products = options?.products;
 
   const [form, setForm] = useState({
     supplierName: "",
@@ -301,8 +302,8 @@ function NewShipmentForm({ onClose }: { onClose: () => void }) {
         ...item,
         productId,
         productName: product.name,
-        unitCost: product.costPrice,
-        total: item.quantity * product.costPrice,
+        unitCost: item.unitCost,
+        total: item.quantity * item.unitCost,
       } : item));
     }
   };

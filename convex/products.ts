@@ -2,6 +2,7 @@ import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
 import { ConvexError } from "convex/values";
 import { assertBranchAccess, filterByBranch, requirePermission, resolveWriteBranch, logAction } from "./lib/auth";
+import { redactProductFinancials, visibleProductStats } from "./lib/productVisibility";
 
 function assertNonNegativeNumber(value: number, label: string): void {
   if (!Number.isFinite(value) || value < 0) {
@@ -48,7 +49,7 @@ export const list = query({
     if (args.lowStock) {
       products = products.filter(p => p.stock <= (p.minStock ?? 0));
     }
-    return products;
+    return products.map((product) => redactProductFinancials(product, user.permissions));
   },
 });
 
@@ -58,7 +59,7 @@ export const get = query({
     const user = await requirePermission(ctx, "view_products");
     const product = await ctx.db.get(args.id);
     if (product) assertBranchAccess(user, product);
-    return product;
+    return product ? redactProductFinancials(product, user.permissions) : null;
   },
 });
 
@@ -246,14 +247,10 @@ export const stats = query({
     const user = await requirePermission(ctx, "view_products");
     let products = await ctx.db.query("products").collect();
     products = filterByBranch(products, user);
-    const totalValue = products.reduce((sum, p) => sum + p.costPrice * p.stock, 0);
-    const totalRetail = products.reduce((sum, p) => sum + p.sellPrice * p.stock, 0);
     const lowStock = products.filter(p => p.stock <= (p.minStock ?? 0)).length;
     return {
       total: products.length,
-      totalValue,
-      totalRetail,
-      potentialProfit: totalRetail - totalValue,
+      ...visibleProductStats(products, user.permissions),
       lowStock,
       outOfStock: products.filter(p => p.stock === 0).length,
     };

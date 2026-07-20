@@ -1,6 +1,6 @@
 import { query, mutation } from "./_generated/server";
 import { v, ConvexError } from "convex/values";
-import { requireModulePermission, logAction } from "./lib/auth";
+import { hasPermission, requireModulePermission, logAction } from "./lib/auth";
 
 export const list = query({
   args: {},
@@ -94,14 +94,16 @@ export const remove = mutation({
 export const stats = query({
   args: {},
   handler: async (ctx) => {
-    await requireModulePermission(ctx, "view_branches", "branches");
+    const user = await requireModulePermission(ctx, "view_branches", "branches");
     const branches = await ctx.db.query("branches").collect();
-    const employees = await ctx.db.query("userProfiles").collect();
+    const totalEmployees = hasPermission(user, "view_employees")
+      ? (await ctx.db.query("userProfiles").collect()).length
+      : undefined;
     return {
       total: branches.length,
       active: branches.filter(b => b.isActive).length,
       inactive: branches.filter(b => !b.isActive).length,
-      totalEmployees: employees.length,
+      totalEmployees,
     };
   },
 });

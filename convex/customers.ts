@@ -11,6 +11,16 @@ export const list = query({
   },
 });
 
+/** Minimal customer data for employees who may create repairs without viewing CRM records. */
+export const repairPicker = query({
+  args: {},
+  handler: async (ctx) => {
+    const user = await requirePermission(ctx, "create_repairs");
+    const customers = filterByBranch(await ctx.db.query("customers").collect(), user);
+    return customers.map(({ _id, name, phone }) => ({ _id, name, phone }));
+  },
+});
+
 export const get = query({
   args: { id: v.id("customers") },
   handler: async (ctx, args) => {
