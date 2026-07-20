@@ -5,7 +5,7 @@ import { requireAuth, requirePermission, logAction } from "./lib/auth";
 export const list = query({
   args: {},
   handler: async (ctx) => {
-    await requireAuth(ctx);
+    await requirePermission(ctx, "view_products");
     return await ctx.db.query("categories").collect();
   },
 });
