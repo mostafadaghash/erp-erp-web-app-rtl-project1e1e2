@@ -21,6 +21,7 @@ interface CartItem {
 export function NewInvoicePage({ onNavigate }: NewInvoicePageProps) {
   const products = useQuery(api.products.list, {}) ?? [];
   const customers = useQuery(api.customers.list) ?? [];
+  const settings = useQuery(api.settings.getPublic);
   const createInvoice = useMutation(api.invoices.create);
 
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -32,7 +33,7 @@ export function NewInvoicePage({ onNavigate }: NewInvoicePageProps) {
   const [paymentMethod, setPaymentMethod] = useState("cash");
   const [notes, setNotes] = useState("");
   const [productSearch, setProductSearch] = useState("");
-  const [taxRate] = useState(15);
+  const taxRate = settings?.taxRate ?? 14;
 
   const filteredProducts = products.filter(p =>
     p.name.toLowerCase().includes(productSearch.toLowerCase()) ||
@@ -154,7 +155,7 @@ export function NewInvoicePage({ onNavigate }: NewInvoicePageProps) {
               </div>
               <div>
                 <label className="form-label">رقم الهاتف</label>
-                <input className="form-input" value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} placeholder="05xxxxxxxx" />
+                <input className="form-input" value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} placeholder="01xxxxxxxxx" />
               </div>
             </div>
           </div>
@@ -183,7 +184,7 @@ export function NewInvoicePage({ onNavigate }: NewInvoicePageProps) {
                       <p className="text-sm font-medium text-slate-800">{p.name}</p>
                       <p className="text-xs text-slate-400">{p.sku} • متوفر: {p.stock}</p>
                     </div>
-                    <span className="text-indigo-600 font-bold text-sm">{p.sellPrice.toLocaleString("ar-SA")} ريال</span>
+                    <span className="text-indigo-600 font-bold text-sm">{p.sellPrice.toLocaleString("ar-EG")} ج.م</span>
                   </button>
                 ))}
                 {filteredProducts.length === 0 && (
@@ -199,7 +200,7 @@ export function NewInvoicePage({ onNavigate }: NewInvoicePageProps) {
                   <div key={item.productId} className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl">
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-slate-800 truncate">{item.productName}</p>
-                      <p className="text-xs text-slate-500">{item.unitPrice.toLocaleString("ar-SA")} ريال/قطعة</p>
+                      <p className="text-xs text-slate-500">{item.unitPrice.toLocaleString("ar-EG")} ج.م/قطعة</p>
                     </div>
                     <div className="flex items-center gap-2">
                       <button
@@ -213,7 +214,7 @@ export function NewInvoicePage({ onNavigate }: NewInvoicePageProps) {
                       >+</button>
                     </div>
                     <span className="font-bold text-indigo-600 text-sm w-24 text-left">
-                      {item.total.toLocaleString("ar-SA")} ريال
+                      {item.total.toLocaleString("ar-EG")} ج.م
                     </span>
                     <button
                       onClick={() => removeFromCart(item.productId)}
@@ -241,7 +242,7 @@ export function NewInvoicePage({ onNavigate }: NewInvoicePageProps) {
             <div className="space-y-3 mb-4">
               <div className="flex justify-between text-sm">
                 <span className="text-slate-500">المجموع الفرعي</span>
-                <span className="font-medium">{subtotal.toLocaleString("ar-SA")} ريال</span>
+                <span className="font-medium">{subtotal.toLocaleString("ar-EG")} ج.م</span>
               </div>
               <div className="flex items-center justify-between text-sm">
                 <span className="text-slate-500">خصم (%)</span>
@@ -256,16 +257,16 @@ export function NewInvoicePage({ onNavigate }: NewInvoicePageProps) {
               {discountAmount > 0 && (
                 <div className="flex justify-between text-sm text-red-500">
                   <span>قيمة الخصم</span>
-                  <span>- {discountAmount.toLocaleString("ar-SA")} ريال</span>
+                  <span>- {discountAmount.toLocaleString("ar-EG")} ج.م</span>
                 </div>
               )}
               <div className="flex justify-between text-sm">
                 <span className="text-slate-500">ضريبة القيمة المضافة ({taxRate}%)</span>
-                <span className="font-medium">{taxAmount.toLocaleString("ar-SA")} ريال</span>
+                <span className="font-medium">{taxAmount.toLocaleString("ar-EG")} ج.م</span>
               </div>
               <div className="border-t border-slate-200 pt-3 flex justify-between">
                 <span className="font-bold text-slate-800">الإجمالي</span>
-                <span className="font-black text-xl text-indigo-600">{total.toLocaleString("ar-SA")} ريال</span>
+                <span className="font-black text-xl text-indigo-600">{total.toLocaleString("ar-EG")} ج.م</span>
               </div>
             </div>
 
@@ -292,7 +293,7 @@ export function NewInvoicePage({ onNavigate }: NewInvoicePageProps) {
               {remaining > 0 && (
                 <div className="bg-amber-50 border border-amber-200 rounded-xl p-3">
                   <p className="text-sm text-amber-700 font-medium">
-                    المتبقي: {remaining.toLocaleString("ar-SA")} ريال
+                    المتبقي: {remaining.toLocaleString("ar-EG")} ج.م
                   </p>
                 </div>
               )}
