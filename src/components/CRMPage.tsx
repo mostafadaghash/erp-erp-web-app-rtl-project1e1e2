@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { usePermission } from "../lib/access";
+import { buildEgyptWhatsAppUrl } from "../lib/utils";
 import { Id } from "../../convex/_generated/dataModel";
 import { toast } from "sonner";
 import {
@@ -179,9 +180,7 @@ export function CRMPage() {
   };
 
   const buildWhatsApp = (phone: string, name: string) => {
-    const normalized = phone.startsWith("0") ? "966" + phone.slice(1) : phone;
-    const msg = encodeURIComponent(`مرحباً ${name}، شكراً لاهتمامك. هل يمكنني مساعدتك؟`);
-    return `https://wa.me/${normalized}?text=${msg}`;
+    return buildEgyptWhatsAppUrl(phone, `مرحباً ${name}، شكراً لاهتمامك. هل يمكنني مساعدتك؟`);
   };
 
   // ── Render ────────────────────────────────────────────────────────────────
@@ -281,7 +280,7 @@ export function CRMPage() {
                             <Phone className="w-3 h-3" /><span>{lead.phone}</span>
                           </div>
                           {lead.interest && <p className="text-xs text-slate-600 bg-slate-50 rounded-lg px-2 py-1 mb-2 truncate">🛍️ {lead.interest}</p>}
-                          {lead.budget && <p className="text-xs text-emerald-600 font-semibold mb-2">💰 {lead.budget.toLocaleString()} ر.س</p>}
+                          {lead.budget && <p className="text-xs text-emerald-600 font-semibold mb-2">💰 {lead.budget.toLocaleString("ar-EG")} ج.م</p>}
                           {lead.nextFollowUpDate && (
                             <div className="flex items-center gap-1 text-xs text-amber-600 mb-2">
                               <Calendar className="w-3 h-3" /><span>متابعة: {lead.nextFollowUpDate}</span>
@@ -352,7 +351,7 @@ export function CRMPage() {
                         </td>
                         <td><span className={`px-2 py-1 rounded-lg text-xs font-medium ${src.color}`}>{src.emoji} {src.label}</span></td>
                         <td><span className="text-sm text-slate-600 truncate max-w-32 block">{lead.interest ?? "—"}</span></td>
-                        <td><span className="text-sm font-semibold text-emerald-600">{lead.budget ? `${lead.budget.toLocaleString()} ر.س` : "—"}</span></td>
+                        <td><span className="text-sm font-semibold text-emerald-600">{lead.budget ? `${lead.budget.toLocaleString("ar-EG")} ج.م` : "—"}</span></td>
                         <td><span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${sts.color}`}>{sts.label}</span></td>
                         <td><span className={`text-xs ${lead.nextFollowUpDate ? "text-amber-600 font-medium" : "text-slate-400"}`}>{lead.nextFollowUpDate ?? "—"}</span></td>
                         <td>
@@ -405,7 +404,7 @@ export function CRMPage() {
                   <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${getSource(leadDetail.source).color}`}>{getSource(leadDetail.source).emoji} {getSource(leadDetail.source).label}</span>
                 </div>
                 {leadDetail.interest && <div className="flex items-center gap-2 text-sm"><Star className="w-4 h-4 text-slate-400" /><span className="text-slate-600">{leadDetail.interest}</span></div>}
-                {leadDetail.budget && <div className="flex items-center gap-2 text-sm"><TrendingUp className="w-4 h-4 text-slate-400" /><span className="text-emerald-600 font-semibold">{leadDetail.budget.toLocaleString()} ر.س</span></div>}
+                {leadDetail.budget && <div className="flex items-center gap-2 text-sm"><TrendingUp className="w-4 h-4 text-slate-400" /><span className="text-emerald-600 font-semibold">{leadDetail.budget.toLocaleString("ar-EG")} ج.م</span></div>}
                 {leadDetail.assignedTo && <div className="flex items-center gap-2 text-sm"><Users className="w-4 h-4 text-slate-400" /><span className="text-slate-600">مسؤول: {leadDetail.assignedTo}</span></div>}
                 {leadDetail.nextFollowUpDate && <div className="flex items-center gap-2 text-sm"><Calendar className="w-4 h-4 text-amber-500" /><span className="text-amber-600 font-medium">متابعة: {leadDetail.nextFollowUpDate}</span></div>}
                 {leadDetail.notes && <p className="text-xs text-slate-500 bg-white rounded-xl p-3 border border-slate-200">{leadDetail.notes}</p>}
@@ -501,7 +500,7 @@ export function CRMPage() {
                           <div className="flex items-center justify-between mb-1">
                             <span className="text-xs font-semibold text-slate-700">{aType.label}</span>
                             <div className="flex items-center gap-2">
-                              <span className="text-xs text-slate-400">{new Date(act._creationTime).toLocaleDateString("ar-SA")}</span>
+                              <span className="text-xs text-slate-400">{new Date(act._creationTime).toLocaleDateString("ar-EG")}</span>
                               {canEdit && <button onClick={() => deleteActivity({ id: act._id })} className="opacity-0 group-hover:opacity-100 p-0.5 hover:text-red-500 text-slate-400 transition-all">
                                 <X className="w-3 h-3" />
                               </button>}
@@ -540,7 +539,7 @@ export function CRMPage() {
                 </div>
                 <div>
                   <label className="form-label">رقم الهاتف *</label>
-                  <input className="form-input" placeholder="05xxxxxxxx" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} />
+                  <input className="form-input" placeholder="01xxxxxxxxx" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} />
                 </div>
               </div>
               <div>
@@ -571,7 +570,7 @@ export function CRMPage() {
                   <input className="form-input" placeholder="مثال: آيفون 15" value={form.interest} onChange={e => setForm({ ...form, interest: e.target.value })} />
                 </div>
                 <div>
-                  <label className="form-label">الميزانية (ر.س)</label>
+                  <label className="form-label">الميزانية (ج.م)</label>
                   <input className="form-input" type="number" placeholder="0" value={form.budget} onChange={e => setForm({ ...form, budget: e.target.value })} />
                 </div>
               </div>
