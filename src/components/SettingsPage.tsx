@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { toast } from "sonner";
+import { normalizeEgyptPhoneForWhatsApp } from "../lib/utils";
 import {
   Settings, Save, Palette, Store, Phone, MessageCircle,
   ToggleLeft, ToggleRight, Shield
@@ -41,8 +42,8 @@ export function SettingsPage() {
     secondaryColor: "#8b5cf6",
     phone: "",
     address: "",
-    currency: "ريال",
-    taxRate: 15,
+    currency: "EGP",
+    taxRate: 14,
     whatsappNumber: "",
   });
 
@@ -59,7 +60,7 @@ export function SettingsPage() {
         secondaryColor: settings.secondaryColor,
         phone: settings.phone ?? "",
         address: settings.address ?? "",
-        currency: settings.currency,
+        currency: "EGP",
         taxRate: settings.taxRate,
         whatsappNumber: settings.whatsappNumber ?? "",
       });
@@ -151,7 +152,7 @@ export function SettingsPage() {
             </div>
             <div>
               <label className="form-label">رقم الهاتف</label>
-              <input className="form-input" value={form.phone} onChange={e => setForm({...form, phone: e.target.value})} placeholder="05xxxxxxxx" />
+              <input className="form-input" value={form.phone} onChange={e => setForm({...form, phone: e.target.value})} placeholder="01xxxxxxxxx" />
             </div>
             <div>
               <label className="form-label">العنوان</label>
@@ -209,11 +210,7 @@ export function SettingsPage() {
             <div>
               <label className="form-label">العملة</label>
               <select className="form-input" value={form.currency} onChange={e => setForm({...form, currency: e.target.value})}>
-                <option value="ريال">ريال سعودي (SAR)</option>
-                <option value="درهم">درهم إماراتي (AED)</option>
-                <option value="دينار">دينار كويتي (KWD)</option>
-                <option value="جنيه">جنيه مصري (EGP)</option>
-                <option value="دولار">دولار أمريكي (USD)</option>
+                <option value="EGP">جنيه مصري (EGP)</option>
               </select>
             </div>
             <div>
@@ -231,13 +228,13 @@ export function SettingsPage() {
           </div>
           <div>
             <label className="form-label">رقم واتساب للإشعارات (مع رمز الدولة)</label>
-            <input className="form-input" value={form.whatsappNumber} onChange={e => setForm({...form, whatsappNumber: e.target.value})} placeholder="966501234567" dir="ltr" />
-            <p className="text-xs text-slate-400 mt-1.5">مثال: 966501234567 (بدون + أو 00)</p>
+            <input className="form-input" value={form.whatsappNumber} onChange={e => setForm({...form, whatsappNumber: e.target.value})} placeholder="201012345678" dir="ltr" />
+            <p className="text-xs text-slate-400 mt-1.5">مثال: 201012345678 (بدون + أو 00)</p>
           </div>
           {form.whatsappNumber && (
             <div className="mt-3">
               <a
-                href={`https://wa.me/${form.whatsappNumber}?text=مرحباً، أريد الاستفسار`}
+                href={`https://wa.me/${normalizeEgyptPhoneForWhatsApp(form.whatsappNumber)}?text=${encodeURIComponent("مرحباً، أريد الاستفسار")}`}
                 target="_blank" rel="noopener noreferrer"
                 className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-500 text-white rounded-xl text-sm font-medium hover:bg-emerald-600 transition-colors"
               >
