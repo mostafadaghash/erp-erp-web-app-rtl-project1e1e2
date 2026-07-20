@@ -1,10 +1,12 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
+import { usePermission } from "../lib/access";
 import { toast } from "sonner";
 import { Users, Plus, Search, Phone, Mail, MapPin } from "lucide-react";
 
 export function CustomersPage() {
+  const canCreate = usePermission("create_customers");
   const customers = useQuery(api.customers.list) ?? [];
   const createCustomer = useMutation(api.customers.create);
 
@@ -45,10 +47,10 @@ export function CustomersPage() {
           </h1>
           <p className="text-slate-500 text-sm mt-0.5">{customers.length} عميل</p>
         </div>
-        <button onClick={() => setShowForm(true)} className="btn-primary flex items-center gap-2">
+        {canCreate && <button onClick={() => setShowForm(true)} className="btn-primary flex items-center gap-2">
           <Plus className="w-4 h-4" />
           عميل جديد
-        </button>
+        </button>}
       </div>
 
       {/* Stats */}
