@@ -222,12 +222,15 @@ const applicationTables = {
     userId: v.string(),
     tokenIdentifier: v.optional(v.string()),
     name: v.string(),
+    email: v.optional(v.string()),
     role: v.string(),
     branchId: v.optional(v.id("branches")),
     permissions: v.array(v.string()),
     isActive: v.boolean(),
     phone: v.optional(v.string()),
-  }).index("by_user", ["userId"]).index("by_token", ["tokenIdentifier"]).index("by_role", ["role"]).index("by_branch", ["branchId"]),
+    inviteExpiresAt: v.optional(v.number()),
+    claimedAt: v.optional(v.number()),
+  }).index("by_user", ["userId"]).index("by_token", ["tokenIdentifier"]).index("by_email", ["email"]).index("by_role", ["role"]).index("by_branch", ["branchId"]),
 
   // CRM - العملاء المحتملون
   leads: defineTable({

@@ -4,7 +4,7 @@ import { api } from "../../convex/_generated/api";
 import { toast } from "sonner";
 import { Id } from "../../convex/_generated/dataModel";
 import {
-  Users, Plus, X, Search, Phone, Building2,
+  Users, Plus, X, Search, Phone, Building2, Mail, Link, Copy,
   Shield, Pencil, Trash2, CheckCircle, XCircle,
   ChevronDown, ChevronUp, Lock, Unlock
 } from "lucide-react";
@@ -68,6 +68,7 @@ const ROLE_DEFAULT_PERMISSIONS: Record<string, string[]> = {
 
 interface EmpForm {
   name: string;
+  email: string;
   phone: string;
   role: string;
   branchId: string;
@@ -76,7 +77,7 @@ interface EmpForm {
 }
 
 const emptyForm = (): EmpForm => ({
-  name: "", phone: "", role: "sales", branchId: "", isActive: true,
+  name: "", email: "", phone: "", role: "sales", branchId: "", isActive: true,
   permissions: ROLE_DEFAULT_PERMISSIONS["sales"],
 });
 
@@ -87,6 +88,7 @@ export function EmployeesPage() {
   const [editId, setEditId] = useState<Id<"userProfiles"> | null>(null);
   const [form, setForm] = useState<EmpForm>(emptyForm());
   const [showPermissions, setShowPermissions] = useState(false);
+  const [inviteLink, setInviteLink] = useState("");
 
   const employees = useQuery(api.employees.list, {});
   const branches = useQuery(api.branches.list);
@@ -95,9 +97,13 @@ export function EmployeesPage() {
   const updateEmployee = useMutation(api.employees.update);
   const removeEmployee = useMutation(api.employees.remove);
   const toggleActive = useMutation(api.employees.toggleActive);
+  const renewInvitation = useMutation(api.employees.renewInvitation);
 
   const filtered = (employees ?? []).filter(e => {
-    const matchSearch = e.name.includes(search) || (e.phone ?? "").includes(search);
+    const matchSearch =
+      e.name.includes(search) ||
+      (e.phone ?? "").includes(search) ||
+      (e.email ?? "").includes(search.toLowerCase());
     const matchRole = filterRole === "all" || e.role === filterRole;
     return matchSearch && matchRole;
   });
@@ -116,6 +122,7 @@ export function EmployeesPage() {
   const openEdit = (emp: NonNullable<typeof employees>[number]) => {
     setForm({
       name: emp.name,
+      email: emp.email ?? "",
       phone: emp.phone ?? "",
       role: emp.role,
       branchId: emp.branchId ?? "",
@@ -141,11 +148,13 @@ export function EmployeesPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.name.trim()) { toast.error("أدخل اسم الموظف"); return; }
+    if (!editId && !form.email.trim()) { toast.error("أدخل البريد الإلكتروني"); return; }
     try {
       if (editId) {
         await updateEmployee({
           id: editId,
           name: form.name,
+          email: form.email || undefined,
           phone: form.phone || undefined,
           role: form.role,
           branchId: form.branchId ? form.branchId as Id<"branches"> : undefined,
@@ -154,15 +163,25 @@ export function EmployeesPage() {
         });
         toast.success("تم تحديث بيانات الموظف");
       } else {
-        await createEmployee({
+        const invitation = await createEmployee({
           name: form.name,
+          email: form.email,
           phone: form.phone || undefined,
           role: form.role,
           branchId: form.branchId ? form.branchId as Id<"branches"> : undefined,
           permissions: form.permissions,
           isActive: form.isActive,
         });
-        toast.success("تم إضافة الموظف بنجاح");
+        const url = new URL(window.location.origin + window.location.pathname);
+        url.searchParams.set("invite", invitation.inviteCode);
+        url.searchParams.set("email", invitation.email);
+        setInviteLink(url.toString());
+        try {
+          await navigator.clipboard.writeText(url.toString());
+          toast.success("تم إنشاء الموظف ونسخ رابط الدعوة");
+        } catch {
+          toast.success("تم إنشاء الموظف. انسخ رابط الدعوة من النافذة");
+        }
       }
       setShowForm(false);
     } catch (err) {
@@ -171,12 +190,30 @@ export function EmployeesPage() {
   };
 
   const handleDelete = async (id: Id<"userProfiles">) => {
-    if (!confirm("هل أنت متأكد من حذف هذا الموظف؟")) return;
+    if (!confirm("هل أنت متأكد من إيقاف هذا الموظف؟ سيظل سجل الحساب محفوظاً.")) return;
     try {
       await removeEmployee({ id });
-      toast.success("تم حذف الموظف");
+      toast.success("تم إيقاف الموظف مع الاحتفاظ بسجله");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "حدث خطأ");
+    }
+  };
+
+  const handleRenewInvitation = async (id: Id<"userProfiles">) => {
+    try {
+      const invitation = await renewInvitation({ id });
+      const url = new URL(window.location.origin + window.location.pathname);
+      url.searchParams.set("invite", invitation.inviteCode);
+      url.searchParams.set("email", invitation.email);
+      setInviteLink(url.toString());
+      try {
+        await navigator.clipboard.writeText(url.toString());
+        toast.success("تم تجديد الدعوة ونسخ الرابط");
+      } catch {
+        toast.success("تم تجديد الدعوة");
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "تعذر تجديد الدعوة");
     }
   };
 
@@ -321,6 +358,7 @@ export function EmployeesPage() {
                           </div>
                           <div>
                             <p className="font-semibold text-slate-800">{emp.name}</p>
+                            {emp.email && <p className="text-xs text-slate-400">{emp.email}</p>}
                             {emp.phone && <p className="text-xs text-slate-400">{emp.phone}</p>}
                           </div>
                         </div>
@@ -338,6 +376,15 @@ export function EmployeesPage() {
                       </td>
                       <td>
                         <div className="flex items-center gap-1.5">
+                          {!emp.tokenIdentifier && emp.email && (
+                            <button
+                              onClick={() => handleRenewInvitation(emp._id)}
+                              className="p-1.5 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors"
+                              title="تجديد رابط الدعوة"
+                            >
+                              <Link className="w-3.5 h-3.5" />
+                            </button>
+                          )}
                           <Lock className="w-3.5 h-3.5 text-slate-400" />
                           <span className="text-sm text-slate-600">{emp.permissions.length} صلاحية</span>
                         </div>
@@ -366,7 +413,7 @@ export function EmployeesPage() {
                           <button
                             onClick={() => handleDelete(emp._id)}
                             className="p-1.5 bg-slate-50 text-slate-400 rounded-lg hover:bg-red-50 hover:text-red-500 transition-colors"
-                            title="حذف"
+                            title="إيقاف مع الاحتفاظ بالسجل"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>
@@ -410,6 +457,23 @@ export function EmployeesPage() {
                     <input className="form-input" placeholder="05xxxxxxxx" value={form.phone}
                       onChange={e => setForm({ ...form, phone: e.target.value })} />
                   </div>
+                </div>
+                <div>
+                  <label className="form-label">البريد الإلكتروني {!editId && "*"}</label>
+                  <div className="relative">
+                    <Mail className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                    <input
+                      type="email"
+                      dir="ltr"
+                      className="form-input pr-10"
+                      placeholder="employee@example.com"
+                      value={form.email}
+                      onChange={e => setForm({ ...form, email: e.target.value })}
+                    />
+                  </div>
+                  {!editId && (
+                    <p className="text-xs text-slate-400 mt-1">سيتم إنشاء رابط دعوة صالح لمدة 7 أيام.</p>
+                  )}
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
@@ -511,6 +575,39 @@ export function EmployeesPage() {
                 <button type="submit" className="btn-primary flex-1">{editId ? "حفظ التعديلات" : "إضافة الموظف"}</button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {inviteLink && (
+        <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="font-bold text-slate-800 flex items-center gap-2">
+                <Link className="w-5 h-5 text-indigo-600" />
+                رابط دعوة الموظف
+              </h2>
+              <button onClick={() => setInviteLink("")} className="p-1.5 hover:bg-slate-100 rounded-lg">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <p className="text-sm text-slate-500 mb-3">
+              أرسل هذا الرابط للموظف ليُنشئ كلمة المرور ويربط حسابه. الرابط صالح لمدة 7 أيام.
+            </p>
+            <div className="flex gap-2">
+              <input className="form-input flex-1" dir="ltr" readOnly value={inviteLink} />
+              <button
+                type="button"
+                className="btn-primary flex items-center gap-2"
+                onClick={async () => {
+                  await navigator.clipboard.writeText(inviteLink);
+                  toast.success("تم نسخ رابط الدعوة");
+                }}
+              >
+                <Copy className="w-4 h-4" />
+                نسخ
+              </button>
+            </div>
           </div>
         </div>
       )}
