@@ -1,7 +1,106 @@
 import { query, mutation } from "./_generated/server";
+import type { MutationCtx } from "./_generated/server";
+import type { Id } from "./_generated/dataModel";
 import { v } from "convex/values";
 import { ConvexError } from "convex/values";
-import { assertBranchAccess, filterByBranch, requireModulePermission, resolveWriteBranch, logAction } from "./lib/auth";
+import { assertBranchAccess, filterByBranch, requireModulePermission, resolveWriteBranch, logAction, type AuthUser } from "./lib/auth";
+
+type InvoiceItemInput = {
+  productId: Id<"products">;
+  productName: string;
+  quantity: number;
+  unitPrice: number;
+  discount: number;
+  total: number;
+};
+
+const roundMoney = (value: number) => Math.round((value + Number.EPSILON) * 100) / 100;
+
+async function prepareInvoice(
+  ctx: MutationCtx,
+  user: AuthUser,
+  items: InvoiceItemInput[],
+  overallDiscount: number,
+  paid: number,
+  stockCredits = new Map<string, number>(),
+) {
+  if (items.length === 0) throw new ConvexError("أضف منتجاً واحداً على الأقل");
+
+  const requested = new Map<string, number>();
+  for (const item of items) {
+    if (!Number.isInteger(item.quantity) || item.quantity <= 0) {
+      throw new ConvexError("كمية المنتج يجب أن تكون عدداً صحيحاً أكبر من صفر");
+    }
+    if (!Number.isFinite(item.discount) || item.discount < 0 || item.discount > 100) {
+      throw new ConvexError("خصم المنتج يجب أن يكون بين 0 و100%");
+    }
+    const key = String(item.productId);
+    requested.set(key, (requested.get(key) ?? 0) + item.quantity);
+  }
+
+  const productDocs = new Map<string, any>();
+  for (const item of items) {
+    const key = String(item.productId);
+    if (productDocs.has(key)) continue;
+    const product = await ctx.db.get(item.productId);
+    if (!product || !product.isActive) throw new ConvexError(`المنتج غير موجود أو غير نشط: ${item.productName}`);
+    assertBranchAccess(user, product);
+    const available = product.stock + (stockCredits.get(key) ?? 0);
+    if (available < (requested.get(key) ?? 0)) {
+      throw new ConvexError(`المخزون غير كافٍ للمنتج: ${product.name}`);
+    }
+    productDocs.set(key, product);
+  }
+
+  const normalizedItems = items.map((item) => {
+    const product = productDocs.get(String(item.productId));
+    const total = roundMoney(product.sellPrice * item.quantity * (1 - item.discount / 100));
+    return {
+      productId: item.productId,
+      productName: product.name,
+      quantity: item.quantity,
+      unitPrice: product.sellPrice,
+      discount: item.discount,
+      total,
+    };
+  });
+  const subtotal = roundMoney(normalizedItems.reduce((sum, item) => sum + item.total, 0));
+  if (!Number.isFinite(overallDiscount) || overallDiscount < 0 || overallDiscount > subtotal) {
+    throw new ConvexError("قيمة الخصم غير صالحة");
+  }
+  const discount = roundMoney(overallDiscount);
+  const settings = await ctx.db.query("settings").first();
+  const taxRate = settings?.taxRate ?? 14;
+  if (!Number.isFinite(taxRate) || taxRate < 0 || taxRate > 100) {
+    throw new ConvexError("نسبة الضريبة في الإعدادات غير صالحة");
+  }
+  const tax = roundMoney((subtotal - discount) * taxRate / 100);
+  const total = roundMoney(subtotal - discount + tax);
+  if (!Number.isFinite(paid) || paid < 0 || paid > total) {
+    throw new ConvexError("المبلغ المدفوع غير صالح");
+  }
+  const normalizedPaid = roundMoney(paid);
+  const remaining = roundMoney(total - normalizedPaid);
+  const status = remaining === 0 ? "paid" : normalizedPaid > 0 ? "partial" : "unpaid";
+
+  return { normalizedItems, productDocs, requested, subtotal, discount, tax, total, paid: normalizedPaid, remaining, status };
+}
+
+async function adjustCustomer(
+  ctx: MutationCtx,
+  user: AuthUser,
+  customerId: Id<"customers">,
+  purchasesDelta: number,
+  balanceDelta: number,
+) {
+  const customer = await ctx.db.get(customerId);
+  if (!customer) throw new ConvexError("العميل غير موجود");
+  assertBranchAccess(user, customer);
+  await ctx.db.patch(customerId, {
+    totalPurchases: Math.max(0, roundMoney(customer.totalPurchases + purchasesDelta)),
+    balance: Math.max(0, roundMoney(customer.balance + balanceDelta)),
+  });
+}
 
 export const list = query({
   args: {
@@ -62,17 +161,17 @@ export const create = mutation({
   handler: async (ctx, args) => {
     const user = await requireModulePermission(ctx, "create_invoices", "invoices");
     const branchId = resolveWriteBranch(user, args.branchId);
-
+    let customerName = args.customerName.trim();
+    let customerPhone = args.customerPhone;
+    if (!customerName) throw new ConvexError("اسم العميل مطلوب");
     if (args.customerId) {
       const customer = await ctx.db.get(args.customerId);
       if (!customer) throw new ConvexError("العميل غير موجود");
       assertBranchAccess(user, customer);
+      customerName = customer.name;
+      customerPhone = customer.phone;
     }
-    for (const item of args.items) {
-      const product = await ctx.db.get(item.productId);
-      if (!product) throw new ConvexError(`المنتج غير موجود: ${item.productName}`);
-      assertBranchAccess(user, product);
-    }
+    const prepared = await prepareInvoice(ctx, user, args.items, args.discount, args.paid);
 
     // Generate invoice number if not provided
     let invoiceNumber = args.invoiceNumber;
@@ -85,17 +184,17 @@ export const create = mutation({
     const id = await ctx.db.insert("invoices", {
       invoiceNumber,
       customerId: args.customerId,
-      customerName: args.customerName,
-      customerPhone: args.customerPhone,
-      items: args.items,
-      subtotal: args.subtotal,
-      discount: args.discount,
-      tax: args.tax,
-      total: args.total,
-      paid: args.paid,
-      remaining: args.total - args.paid,
+      customerName,
+      customerPhone,
+      items: prepared.normalizedItems,
+      subtotal: prepared.subtotal,
+      discount: prepared.discount,
+      tax: prepared.tax,
+      total: prepared.total,
+      paid: prepared.paid,
+      remaining: prepared.remaining,
       paymentMethod: args.paymentMethod ?? "cash",
-      status: args.paid >= args.total ? "paid" : args.paid > 0 ? "partial" : "unpaid",
+      status: prepared.status,
       notes: args.notes,
       branchId,
       userId: user.userId,
@@ -103,23 +202,13 @@ export const create = mutation({
     });
 
     // Decrement product stock
-    for (const item of args.items) {
-      const prod = await ctx.db.get(item.productId);
-      if (prod) {
-        await ctx.db.patch(item.productId, {
-          stock: Math.max(0, prod.stock - item.quantity),
-        });
-      }
+    for (const [productId, quantity] of prepared.requested) {
+      const product = prepared.productDocs.get(productId);
+      await ctx.db.patch(product._id, { stock: product.stock - quantity });
     }
 
-    // Update customer balance if applicable
-    if (args.customerId && args.paid < args.total) {
-      const customer = await ctx.db.get(args.customerId);
-      if (customer) {
-        await ctx.db.patch(args.customerId, {
-          balance: (customer.balance ?? 0) + (args.total - args.paid),
-        });
-      }
+    if (args.customerId) {
+      await adjustCustomer(ctx, user, args.customerId, prepared.total, prepared.remaining);
     }
 
     await logAction(ctx, user, {
@@ -127,7 +216,7 @@ export const create = mutation({
       module: "invoices",
       recordId: id,
       recordLabel: invoiceNumber,
-      details: `إنشاء فاتورة ${invoiceNumber} بقيمة ${args.total} للعميل ${args.customerName}`,
+      details: `إنشاء فاتورة ${invoiceNumber} بقيمة ${prepared.total} للعميل ${customerName}`,
     });
 
     return id;
@@ -163,33 +252,56 @@ export const update = mutation({
     const inv = await ctx.db.get(id);
     if (!inv) throw new ConvexError("الفاتورة غير موجودة");
     assertBranchAccess(user, inv);
+    let customerName = data.customerName.trim();
+    let customerPhone = data.customerPhone;
+    if (!customerName) throw new ConvexError("اسم العميل مطلوب");
     if (data.customerId) {
       const customer = await ctx.db.get(data.customerId);
       if (!customer) throw new ConvexError("العميل غير موجود");
       assertBranchAccess(user, customer);
+      customerName = customer.name;
+      customerPhone = customer.phone;
     }
-    for (const item of data.items) {
-      const product = await ctx.db.get(item.productId);
-      if (!product) throw new ConvexError(`المنتج غير موجود: ${item.productName}`);
-      assertBranchAccess(user, product);
+    const oldQuantities = new Map<string, number>();
+    for (const item of inv.items) {
+      const key = String(item.productId);
+      oldQuantities.set(key, (oldQuantities.get(key) ?? 0) + item.quantity);
     }
+    const prepared = await prepareInvoice(ctx, user, data.items, data.discount, data.paid, oldQuantities);
     const branchId = resolveWriteBranch(user, data.branchId ?? inv.branchId);
     await ctx.db.patch(id, {
       customerId: data.customerId,
-      customerName: data.customerName,
-      customerPhone: data.customerPhone,
-      items: data.items,
-      subtotal: data.subtotal,
-      discount: data.discount,
-      tax: data.tax,
-      total: data.total,
-      paid: data.paid,
-      remaining: data.total - data.paid,
+      customerName,
+      customerPhone,
+      items: prepared.normalizedItems,
+      subtotal: prepared.subtotal,
+      discount: prepared.discount,
+      tax: prepared.tax,
+      total: prepared.total,
+      paid: prepared.paid,
+      remaining: prepared.remaining,
       paymentMethod: data.paymentMethod ?? "cash",
-      status: data.paid >= data.total ? "paid" : data.paid > 0 ? "partial" : "unpaid",
+      status: prepared.status,
       notes: data.notes,
       branchId,
     });
+
+    const productIds = new Set([...oldQuantities.keys(), ...prepared.requested.keys()]);
+    for (const productId of productIds) {
+      const product = prepared.productDocs.get(productId) ?? await ctx.db.get(productId as Id<"products">);
+      if (!product) throw new ConvexError("تعذر استعادة مخزون منتج محذوف من الفاتورة القديمة");
+      assertBranchAccess(user, product);
+      const stock = product.stock + (oldQuantities.get(productId) ?? 0) - (prepared.requested.get(productId) ?? 0);
+      if (stock < 0) throw new ConvexError(`المخزون غير كافٍ للمنتج: ${product.name}`);
+      await ctx.db.patch(product._id, { stock });
+    }
+
+    if (inv.customerId === data.customerId && data.customerId) {
+      await adjustCustomer(ctx, user, data.customerId, prepared.total - inv.total, prepared.remaining - inv.remaining);
+    } else {
+      if (inv.customerId) await adjustCustomer(ctx, user, inv.customerId, -inv.total, -inv.remaining);
+      if (data.customerId) await adjustCustomer(ctx, user, data.customerId, prepared.total, prepared.remaining);
+    }
     await logAction(ctx, user, {
       action: "update",
       module: "invoices",
@@ -210,6 +322,10 @@ export const updateStatus = mutation({
     const inv = await ctx.db.get(args.id);
     if (!inv) throw new ConvexError("الفاتورة غير موجودة");
     assertBranchAccess(user, inv);
+    const expectedStatus = inv.remaining === 0 ? "paid" : inv.paid > 0 ? "partial" : "unpaid";
+    if (args.status !== expectedStatus) {
+      throw new ConvexError("حالة الفاتورة تُحتسب من المدفوع والمتبقي ولا يمكن تغييرها يدوياً");
+    }
     await ctx.db.patch(args.id, { status: args.status });
     await logAction(ctx, user, {
       action: "update",
@@ -228,6 +344,20 @@ export const remove = mutation({
     const inv = await ctx.db.get(args.id);
     if (!inv) throw new ConvexError("الفاتورة غير موجودة");
     assertBranchAccess(user, inv);
+    const quantities = new Map<string, number>();
+    for (const item of inv.items) {
+      const key = String(item.productId);
+      quantities.set(key, (quantities.get(key) ?? 0) + item.quantity);
+    }
+    for (const [productId, quantity] of quantities) {
+      const product = await ctx.db.get(productId as Id<"products">);
+      if (!product) throw new ConvexError("تعذر استعادة مخزون منتج محذوف من الفاتورة");
+      assertBranchAccess(user, product);
+      await ctx.db.patch(product._id, { stock: product.stock + quantity });
+    }
+    if (inv.customerId) {
+      await adjustCustomer(ctx, user, inv.customerId, -inv.total, -inv.remaining);
+    }
     await ctx.db.delete(args.id);
     await logAction(ctx, user, {
       action: "delete",
