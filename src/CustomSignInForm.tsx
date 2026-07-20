@@ -14,11 +14,19 @@ import { toast } from "sonner";
  */
 interface CustomSignInFormProps {
   allowSignUp: boolean;
+  inviteCode?: string;
+  invitedEmail?: string;
 }
 
-export function CustomSignInForm({ allowSignUp }: CustomSignInFormProps) {
+export function CustomSignInForm({
+  allowSignUp,
+  inviteCode,
+  invitedEmail,
+}: CustomSignInFormProps) {
   const { signIn } = useAuthActions();
-  const [flow, setFlow] = useState<"signIn" | "signUp">("signIn");
+  const [flow, setFlow] = useState<"signIn" | "signUp">(
+    inviteCode ? "signUp" : "signIn",
+  );
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
@@ -36,6 +44,9 @@ export function CustomSignInForm({ allowSignUp }: CustomSignInFormProps) {
         const formData = new FormData(e.target as HTMLFormElement);
         const allowedFlow = allowSignUp ? flow : "signIn";
         formData.set("flow", allowedFlow);
+        if (allowedFlow === "signUp" && inviteCode) {
+          formData.set("inviteCode", inviteCode);
+        }
         void signIn("password", formData)
           .then(() => {
             setSubmitting(false);
@@ -66,6 +77,7 @@ export function CustomSignInForm({ allowSignUp }: CustomSignInFormProps) {
         <input
           type="email"
           name="email"
+          defaultValue={invitedEmail}
           placeholder="you@example.com"
           required
           dir="ltr"
@@ -102,7 +114,7 @@ export function CustomSignInForm({ allowSignUp }: CustomSignInFormProps) {
       </button>
 
       {/* Toggle sign in / sign up */}
-      {allowSignUp && (
+      {allowSignUp && !inviteCode && (
         <div className="text-center text-sm text-white/60">
           <span>
             {flow === "signIn"
