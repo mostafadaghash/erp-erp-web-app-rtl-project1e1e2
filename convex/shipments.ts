@@ -1,12 +1,12 @@
 import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
 import { ConvexError } from "convex/values";
-import { requireAuth, requirePermission, filterByBranch, logAction } from "./lib/auth";
+import { assertBranchAccess, requireModulePermission, filterByBranch, resolveWriteBranch, logAction } from "./lib/auth";
 
 export const list = query({
   args: { status: v.optional(v.string()) },
   handler: async (ctx, args) => {
-    const user = await requirePermission(ctx, "view_shipments");
+    const user = await requireModulePermission(ctx, "view_shipments", "shipments");
     let shipments;
     if (args.status) {
       shipments = await ctx.db
@@ -24,15 +24,17 @@ export const list = query({
 export const get = query({
   args: { id: v.id("shipments") },
   handler: async (ctx, args) => {
-    await requirePermission(ctx, "view_shipments");
-    return await ctx.db.get(args.id);
+    const user = await requireModulePermission(ctx, "view_shipments", "shipments");
+    const shipment = await ctx.db.get(args.id);
+    if (shipment) assertBranchAccess(user, shipment);
+    return shipment;
   },
 });
 
 export const stats = query({
   args: {},
   handler: async (ctx) => {
-    const user = await requirePermission(ctx, "view_shipments");
+    const user = await requireModulePermission(ctx, "view_shipments", "shipments");
     const all = await ctx.db.query("shipments").collect();
     const s = filterByBranch(all, user);
     const ordered = s.filter((x) => x.status === "ordered").length;
@@ -65,10 +67,16 @@ export const create = mutation({
     branchId: v.optional(v.id("branches")),
   },
   handler: async (ctx, args) => {
-    const user = await requirePermission(ctx, "create_shipments");
+    const user = await requireModulePermission(ctx, "create_shipments", "shipments");
+    for (const item of args.items) {
+      if (!item.productId) continue;
+      const product = await ctx.db.get(item.productId);
+      if (!product) throw new ConvexError(`المنتج غير موجود: ${item.productName}`);
+      assertBranchAccess(user, product);
+    }
     const count = (await ctx.db.query("shipments").collect()).length + 1;
     const shipmentNumber = "SHP-" + String(count).padStart(4, "0");
-    const branchId = args.branchId ?? (user.branchId as any);
+    const branchId = resolveWriteBranch(user, args.branchId);
     const id = await ctx.db.insert("shipments", {
       ...args,
       branchId,
@@ -93,9 +101,10 @@ export const updateStatus = mutation({
     arrivedDate: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const user = await requirePermission(ctx, "edit_shipments");
+    const user = await requireModulePermission(ctx, "edit_shipments", "shipments");
     const shipment = await ctx.db.get(args.id);
     if (!shipment) throw new ConvexError("الشحنة غير موجودة");
+    assertBranchAccess(user, shipment);
     const patch: Record<string, string> = { status: args.status };
     if (args.arrivedDate) patch.arrivedDate = args.arrivedDate;
     await ctx.db.patch(args.id, patch);
@@ -106,6 +115,7 @@ export const updateStatus = mutation({
         if (item.productId) {
           const product = await ctx.db.get(item.productId);
           if (product) {
+            assertBranchAccess(user, product);
             await ctx.db.patch(item.productId, {
               stock: product.stock + item.quantity,
             });
@@ -126,9 +136,10 @@ export const updateStatus = mutation({
 export const remove = mutation({
   args: { id: v.id("shipments") },
   handler: async (ctx, args) => {
-    const user = await requirePermission(ctx, "delete_shipments");
+    const user = await requireModulePermission(ctx, "delete_shipments", "shipments");
     const shipment = await ctx.db.get(args.id);
     if (!shipment) throw new ConvexError("الشحنة غير موجودة");
+    assertBranchAccess(user, shipment);
     if (shipment.status === "arrived") throw new ConvexError("لا يمكن حذف شحنة تم استلامها");
     await ctx.db.delete(args.id);
     await logAction(ctx, user, {
