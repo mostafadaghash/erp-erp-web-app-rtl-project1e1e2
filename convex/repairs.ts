@@ -5,7 +5,7 @@ import { requireAuth, requirePermission, filterByBranch, logAction } from "./lib
 export const list = query({
   args: {},
   handler: async (ctx) => {
-    const user = await requireAuth(ctx);
+    const user = await requirePermission(ctx, "view_repairs");
     const repairs = await ctx.db.query("repairs").order("desc").collect();
     return filterByBranch(repairs, user);
   },
@@ -14,7 +14,7 @@ export const list = query({
 export const get = query({
   args: { id: v.id("repairs") },
   handler: async (ctx, args) => {
-    await requireAuth(ctx);
+    await requirePermission(ctx, "view_repairs");
     return await ctx.db.get(args.id);
   },
 });
@@ -99,7 +99,7 @@ export const updateStatus = mutation({
 export const getStats = query({
   args: {},
   handler: async (ctx) => {
-    const user = await requireAuth(ctx);
+    const user = await requirePermission(ctx, "view_repairs");
     const all = await ctx.db.query("repairs").collect();
     const repairs = filterByBranch(all, user);
     return {
