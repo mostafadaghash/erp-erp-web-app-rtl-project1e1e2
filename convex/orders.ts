@@ -3,6 +3,16 @@ import { v } from "convex/values";
 import { ConvexError } from "convex/values";
 import { assertBranchAccess, requireModulePermission, filterByBranch, resolveWriteBranch, logAction } from "./lib/auth";
 
+const ORDER_TRANSITIONS: Record<string, string[]> = {
+  pending: ["confirmed", "cancelled"],
+  confirmed: ["ready", "cancelled"],
+  ready: ["delivered", "cancelled"],
+  delivered: [],
+  cancelled: [],
+};
+
+const roundMoney = (value: number) => Math.round((value + Number.EPSILON) * 100) / 100;
+
 export const list = query({
   args: { status: v.optional(v.string()) },
   handler: async (ctx, args) => {
@@ -68,17 +78,41 @@ export const create = mutation({
   },
   handler: async (ctx, args) => {
     const user = await requireModulePermission(ctx, "create_orders", "orders");
+    let customerName = args.customerName.trim();
+    let customerPhone = args.customerPhone;
+    if (!customerName) throw new ConvexError("اسم العميل مطلوب");
     if (args.customerId) {
       const customer = await ctx.db.get(args.customerId);
       if (!customer) throw new ConvexError("العميل غير موجود");
       assertBranchAccess(user, customer);
+      customerName = customer.name;
+      customerPhone = customer.phone;
     }
+    if (args.items.length === 0) throw new ConvexError("أضف منتجاً واحداً على الأقل");
+    const items = args.items.map((item) => {
+      if (!item.productName.trim()) throw new ConvexError("اسم المنتج مطلوب");
+      if (!Number.isInteger(item.quantity) || item.quantity <= 0) throw new ConvexError("الكمية يجب أن تكون عدداً صحيحاً أكبر من صفر");
+      if (!Number.isFinite(item.unitPrice) || item.unitPrice < 0) throw new ConvexError("سعر المنتج غير صالح");
+      return { ...item, productName: item.productName.trim(), unitPrice: roundMoney(item.unitPrice) };
+    });
+    const total = roundMoney(items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0));
+    if (!Number.isFinite(args.deposit) || args.deposit < 0 || args.deposit > total) {
+      throw new ConvexError("العربون يجب أن يكون بين صفر وإجمالي الطلب");
+    }
+    const deposit = roundMoney(args.deposit);
     const count = (await ctx.db.query("orders").collect()).length + 1;
     const orderNumber = "ORD-" + String(count).padStart(4, "0");
-    const remaining = args.total - args.deposit;
+    const remaining = roundMoney(total - deposit);
     const branchId = resolveWriteBranch(user, args.branchId);
     const id = await ctx.db.insert("orders", {
-      ...args,
+      customerName,
+      customerPhone,
+      customerId: args.customerId,
+      items,
+      total,
+      deposit,
+      expectedDate: args.expectedDate,
+      notes: args.notes,
       branchId,
       orderNumber,
       remaining,
@@ -102,6 +136,9 @@ export const updateStatus = mutation({
     const order = await ctx.db.get(args.id);
     if (!order) throw new ConvexError("الطلب غير موجود");
     assertBranchAccess(user, order);
+    if (!(ORDER_TRANSITIONS[order.status] ?? []).includes(args.status)) {
+      throw new ConvexError(`لا يمكن تغيير حالة الطلب من ${order.status} إلى ${args.status}`);
+    }
     await ctx.db.patch(args.id, { status: args.status });
     await logAction(ctx, user, {
       action: "update",
@@ -120,13 +157,15 @@ export const addPayment = mutation({
     const order = await ctx.db.get(args.id);
     if (!order) throw new ConvexError("الطلب غير موجود");
     assertBranchAccess(user, order);
-    const newDeposit = order.deposit + args.amount;
-    const newRemaining = order.total - newDeposit;
-    if (newRemaining < 0) throw new ConvexError("المبلغ المدفوع أكبر من إجمالي الطلب");
+    if (order.status === "cancelled") throw new ConvexError("لا يمكن تسجيل دفعة لطلب ملغي");
+    if (!Number.isFinite(args.amount) || args.amount <= 0) throw new ConvexError("قيمة الدفعة يجب أن تكون أكبر من صفر");
+    const newDeposit = roundMoney(order.deposit + args.amount);
+    const newRemaining = roundMoney(order.total - newDeposit);
+    if (newRemaining < 0) throw new ConvexError("المبلغ المدفوع أكبر من المتبقي على الطلب");
     await ctx.db.patch(args.id, {
       deposit: newDeposit,
       remaining: newRemaining,
-      status: newRemaining === 0 ? "delivered" : order.status,
+      status: order.status,
     });
     await logAction(ctx, user, {
       action: "update",
