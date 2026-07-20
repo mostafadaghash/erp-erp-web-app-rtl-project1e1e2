@@ -3,6 +3,8 @@ import { v } from "convex/values";
 import { ConvexError } from "convex/values";
 import { assertBranchAccess, requireModulePermission, filterByBranch, resolveWriteBranch, logAction } from "./lib/auth";
 import { canTransition, roundMoney, SHIPMENT_TRANSITIONS } from "../shared/businessRules";
+import { changeProductStock } from "./lib/inventory";
+import { INVENTORY_MOVEMENT_TYPES } from "../shared/inventoryRules";
 
 export const list = query({
   args: { status: v.optional(v.string()) },
@@ -54,7 +56,7 @@ export const creationOptions = query({
   args: {},
   handler: async (ctx) => {
     const user = await requireModulePermission(ctx, "create_shipments", "shipments");
-    const products = filterByBranch(await ctx.db.query("products").collect(), user);
+    const products = filterByBranch(await ctx.db.query("products").collect(), user).filter((product) => product.isActive);
     const suppliers = await ctx.db.query("suppliers").collect();
     return {
       products: products.map(({ _id, name }) => ({ _id, name })),
@@ -98,7 +100,7 @@ export const create = mutation({
       let productName = item.productName.trim();
       if (item.productId) {
         const product = await ctx.db.get(item.productId);
-        if (!product) throw new ConvexError(`المنتج غير موجود: ${item.productName}`);
+        if (!product || !product.isActive) throw new ConvexError(`المنتج غير موجود أو غير نشط: ${item.productName}`);
         assertBranchAccess(user, product);
         productName = product.name;
       }
@@ -162,8 +164,13 @@ export const updateStatus = mutation({
           const product = await ctx.db.get(item.productId);
           if (product) {
             assertBranchAccess(user, product);
-            await ctx.db.patch(item.productId, {
-              stock: product.stock + item.quantity,
+            await changeProductStock(ctx, user, {
+              productId: item.productId,
+              quantityDelta: item.quantity,
+              type: INVENTORY_MOVEMENT_TYPES.shipmentReceipt,
+              reason: `استلام الشحنة ${shipment.shipmentNumber}`,
+              referenceId: String(args.id),
+              referenceType: "shipment",
             });
           }
         }

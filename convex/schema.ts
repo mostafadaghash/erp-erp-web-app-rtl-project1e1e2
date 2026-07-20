@@ -75,6 +75,24 @@ const applicationTables = {
     warrantyMonths: v.optional(v.number()),
   }).index("by_sku", ["sku"]).index("by_category", ["categoryId"]),
 
+  inventoryMovements: defineTable({
+    productId: v.id("products"),
+    productName: v.string(),
+    type: v.string(),
+    quantityDelta: v.number(),
+    stockBefore: v.number(),
+    stockAfter: v.number(),
+    reason: v.string(),
+    referenceId: v.optional(v.string()),
+    referenceType: v.optional(v.string()),
+    branchId: v.optional(v.id("branches")),
+    userId: v.string(),
+    createdAt: v.number(),
+  })
+    .index("by_product", ["productId"])
+    .index("by_branch", ["branchId"])
+    .index("by_type", ["type"]),
+
   // العملاء
   customers: defineTable({
     name: v.string(),

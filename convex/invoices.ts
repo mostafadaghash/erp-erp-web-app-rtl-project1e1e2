@@ -5,6 +5,8 @@ import { v } from "convex/values";
 import { ConvexError } from "convex/values";
 import { assertBranchAccess, filterByBranch, requireModulePermission, resolveWriteBranch, logAction, type AuthUser } from "./lib/auth";
 import { calculateInvoiceTotals, roundMoney } from "../shared/businessRules";
+import { changeProductStock } from "./lib/inventory";
+import { INVENTORY_MOVEMENT_TYPES } from "../shared/inventoryRules";
 
 type InvoiceItemInput = {
   productId: Id<"products">;
@@ -198,10 +200,16 @@ export const create = mutation({
       type: "sale",
     });
 
-    // Decrement product stock
     for (const [productId, quantity] of prepared.requested) {
       const product = prepared.productDocs.get(productId);
-      await ctx.db.patch(product._id, { stock: product.stock - quantity });
+      await changeProductStock(ctx, user, {
+        productId: product._id,
+        quantityDelta: -quantity,
+        type: INVENTORY_MOVEMENT_TYPES.sale,
+        reason: `بيع عبر الفاتورة ${invoiceNumber}`,
+        referenceId: String(id),
+        referenceType: "invoice",
+      });
     }
 
     if (args.customerId) {
@@ -283,14 +291,11 @@ export const update = mutation({
       branchId,
     });
 
-    const productIds = new Set([...oldQuantities.keys(), ...prepared.requested.keys()]);
-    for (const productId of productIds) {
-      const product = prepared.productDocs.get(productId) ?? await ctx.db.get(productId as Id<"products">);
-      if (!product) throw new ConvexError("تعذر استعادة مخزون منتج محذوف من الفاتورة القديمة");
-      assertBranchAccess(user, product);
-      const stock = product.stock + (oldQuantities.get(productId) ?? 0) - (prepared.requested.get(productId) ?? 0);
-      if (stock < 0) throw new ConvexError(`المخزون غير كافٍ للمنتج: ${product.name}`);
-      await ctx.db.patch(product._id, { stock });
+    for (const [productId, quantity] of oldQuantities) {
+      await changeProductStock(ctx, user, { productId: productId as Id<"products">, quantityDelta: quantity, type: INVENTORY_MOVEMENT_TYPES.saleReversal, reason: `عكس مخزون تعديل الفاتورة ${inv.invoiceNumber}`, referenceId: String(id), referenceType: "invoice" });
+    }
+    for (const [productId, quantity] of prepared.requested) {
+      await changeProductStock(ctx, user, { productId: productId as Id<"products">, quantityDelta: -quantity, type: INVENTORY_MOVEMENT_TYPES.sale, reason: `بيع بعد تعديل الفاتورة ${inv.invoiceNumber}`, referenceId: String(id), referenceType: "invoice" });
     }
 
     if (inv.customerId === data.customerId && data.customerId) {
@@ -350,7 +355,7 @@ export const remove = mutation({
       const product = await ctx.db.get(productId as Id<"products">);
       if (!product) throw new ConvexError("تعذر استعادة مخزون منتج محذوف من الفاتورة");
       assertBranchAccess(user, product);
-      await ctx.db.patch(product._id, { stock: product.stock + quantity });
+      await changeProductStock(ctx, user, { productId: product._id, quantityDelta: quantity, type: INVENTORY_MOVEMENT_TYPES.saleReversal, reason: `عكس مخزون حذف الفاتورة ${inv.invoiceNumber}`, referenceId: String(args.id), referenceType: "invoice" });
     }
     if (inv.customerId) {
       await adjustCustomer(ctx, user, inv.customerId, -inv.total, -inv.remaining);

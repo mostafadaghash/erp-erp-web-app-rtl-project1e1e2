@@ -1,54 +1,37 @@
 import { query, mutation } from "./_generated/server";
-import { v } from "convex/values";
-import { ConvexError } from "convex/values";
-import { assertBranchAccess, filterByBranch, requirePermission, resolveWriteBranch, logAction } from "./lib/auth";
+import type { Id } from "./_generated/dataModel";
+import type { QueryCtx, MutationCtx } from "./_generated/server";
+import { ConvexError, v } from "convex/values";
+import { assertBranchAccess, filterByBranch, requirePermission, resolveWriteBranch, logAction, type AuthUser } from "./lib/auth";
+import { changeProductStock } from "./lib/inventory";
+import { INVENTORY_MOVEMENT_TYPES } from "../shared/inventoryRules";
 import { redactProductFinancials, visibleProductStats } from "./lib/productVisibility";
+import { validateOpeningStock, validateProductInput } from "../shared/productRules";
 
-function assertNonNegativeNumber(value: number, label: string): void {
-  if (!Number.isFinite(value) || value < 0) {
-    throw new ConvexError(`${label} يجب أن يكون رقماً موجباً أو صفراً`);
-  }
+async function assertUniqueSku(ctx: QueryCtx | MutationCtx, sku: string, currentId?: Id<"products">) {
+  const existing = await ctx.db.query("products").withIndex("by_sku", (q) => q.eq("sku", sku)).first();
+  if (existing && existing._id !== currentId) throw new ConvexError("رمز SKU مستخدم لمنتج آخر");
 }
 
-async function assertUniqueSku(ctx: any, sku: string, currentId?: string) {
-  if (!sku) return;
-  const existing = await ctx.db
-    .query("products")
-    .withIndex("by_sku", (q: any) => q.eq("sku", sku))
-    .first();
-  if (existing && existing._id !== currentId) {
-    throw new ConvexError("رمز SKU مستخدم لمنتج آخر");
-  }
+async function validateRelations(ctx: MutationCtx, categoryId?: Id<"categories">, supplierId?: Id<"suppliers">) {
+  if (categoryId && !(await ctx.db.get(categoryId))) throw new ConvexError("الفئة المحددة غير موجودة أو تم حذفها");
+  if (supplierId && !(await ctx.db.get(supplierId))) throw new ConvexError("المورد المحدد غير موجود أو تم حذفه");
 }
+
+
 
 export const list = query({
-  args: {
-    branchId: v.optional(v.id("branches")),
-    search: v.optional(v.string()),
-    category: v.optional(v.string()),
-    lowStock: v.optional(v.boolean()),
-  },
+  args: { branchId: v.optional(v.id("branches")), search: v.optional(v.string()), category: v.optional(v.string()), lowStock: v.optional(v.boolean()) },
   handler: async (ctx, args) => {
     const user = await requirePermission(ctx, "view_products");
-    let products = await ctx.db.query("products").collect();
-    products = filterByBranch(products, user);
-    if (args.branchId && user.role === "admin") {
-      products = products.filter(p => p.branchId === args.branchId);
-    }
-    if (args.category) {
-      products = products.filter(p => p.categoryId === args.category);
-    }
+    let products = filterByBranch(await ctx.db.query("products").collect(), user);
+    if (args.branchId && user.role === "admin") products = products.filter((p) => p.branchId === args.branchId);
+    if (args.category) products = products.filter((p) => p.categoryId === args.category);
     if (args.search) {
-      const s = args.search.toLowerCase();
-      products = products.filter(p =>
-        p.name.toLowerCase().includes(s) ||
-        (p.sku ?? "").toLowerCase().includes(s) ||
-        (p.barcode ?? "").toLowerCase().includes(s)
-      );
+      const search = args.search.toLowerCase();
+      products = products.filter((p) => p.name.toLowerCase().includes(search) || p.sku.toLowerCase().includes(search) || (p.barcode ?? "").toLowerCase().includes(search));
     }
-    if (args.lowStock) {
-      products = products.filter(p => p.stock <= (p.minStock ?? 0));
-    }
+    if (args.lowStock) products = products.filter((p) => p.stock <= p.minStock);
     return products.map((product) => redactProductFinancials(product, user.permissions));
   },
 });
@@ -63,181 +46,104 @@ export const get = query({
   },
 });
 
-export const categories = query({
-  args: {},
-  handler: async (ctx) => {
-    await requirePermission(ctx, "view_products");
-    const all = await ctx.db.query("products").collect();
-    const cats = new Set<string>();
-    for (const p of all) {
-      if (p.categoryId) cats.add(p.categoryId);
-    }
-    return Array.from(cats).sort();
-  },
-});
-
 export const create = mutation({
   args: {
-    name: v.string(),
-    sku: v.optional(v.string()),
-    barcode: v.optional(v.string()),
-    category: v.optional(v.string()),
-    brand: v.optional(v.string()),
-    cost: v.number(),
-    price: v.number(),
-    stock: v.number(),
-    minStock: v.optional(v.number()),
-    unit: v.optional(v.string()),
-    branchId: v.optional(v.id("branches")),
+    name: v.string(), sku: v.string(), barcode: v.optional(v.string()), categoryId: v.optional(v.id("categories")),
+    supplierId: v.optional(v.id("suppliers")), warrantyMonths: v.optional(v.number()), costPrice: v.number(),
+    sellPrice: v.number(), stock: v.number(), minStock: v.number(), unit: v.string(), branchId: v.optional(v.id("branches")),
     description: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const user = await requirePermission(ctx, "create_products");
-    if (!args.name.trim()) throw new ConvexError("اسم المنتج مطلوب");
-    assertNonNegativeNumber(args.cost, "سعر التكلفة");
-    assertNonNegativeNumber(args.price, "سعر البيع");
-    assertNonNegativeNumber(args.stock, "المخزون");
-    assertNonNegativeNumber(args.minStock ?? 0, "الحد الأدنى للمخزون");
-    if (!Number.isInteger(args.stock)) throw new ConvexError("المخزون يجب أن يكون عدداً صحيحاً");
-    const sku = args.sku?.trim() ?? "";
-    await assertUniqueSku(ctx, sku);
+    await requirePermission(ctx, "view_prices");
+    await requirePermission(ctx, "view_profits");
+    let normalized;
+    try { normalized = validateProductInput(args); validateOpeningStock(args.stock); } catch (error) { throw new ConvexError(error instanceof Error ? error.message : "بيانات المنتج غير صالحة"); }
+    await assertUniqueSku(ctx, normalized.sku);
+    await validateRelations(ctx, args.categoryId, args.supplierId);
     const branchId = resolveWriteBranch(user, args.branchId);
     const id = await ctx.db.insert("products", {
-      name: args.name.trim(),
-      sku,
-      barcode: args.barcode,
-      categoryId: args.category ? args.category as any : undefined,
-      costPrice: args.cost,
-      sellPrice: args.price,
-      stock: args.stock,
-      minStock: args.minStock ?? 0,
-      unit: args.unit ?? "قطعة",
-      branchId,
-      description: args.description,
-      isActive: true,
+      name: normalized.name, sku: normalized.sku, barcode: args.barcode?.trim() || undefined,
+      categoryId: args.categoryId, supplierId: args.supplierId, warrantyMonths: args.warrantyMonths,
+      costPrice: args.costPrice, sellPrice: args.sellPrice, stock: 0, minStock: args.minStock,
+      unit: normalized.unit, branchId, description: args.description?.trim() || undefined, isActive: true,
     });
-    await logAction(ctx, user, {
-      action: "create",
-      module: "products",
-      recordId: id,
-      recordLabel: args.name,
-      details: `إضافة منتج جديد: ${args.name}`,
-    });
+    if (args.stock > 0) await changeProductStock(ctx, user, { productId: id, quantityDelta: args.stock, type: INVENTORY_MOVEMENT_TYPES.openingBalance, reason: "الرصيد الافتتاحي" });
+    await logAction(ctx, user, { action: "create", module: "products", recordId: id, recordLabel: normalized.name, details: `إضافة منتج جديد: ${normalized.name}` });
     return id;
   },
 });
 
 export const update = mutation({
   args: {
-    id: v.id("products"),
-    name: v.string(),
-    sku: v.optional(v.string()),
-    barcode: v.optional(v.string()),
-    category: v.optional(v.string()),
-    brand: v.optional(v.string()),
-    cost: v.number(),
-    price: v.number(),
-    stock: v.number(),
-    minStock: v.optional(v.number()),
-    unit: v.optional(v.string()),
-    branchId: v.optional(v.id("branches")),
-    description: v.optional(v.string()),
+    id: v.id("products"), name: v.string(), sku: v.string(), barcode: v.optional(v.string()),
+    categoryId: v.optional(v.id("categories")), supplierId: v.optional(v.id("suppliers")), warrantyMonths: v.optional(v.number()),
+    costPrice: v.number(), sellPrice: v.number(), minStock: v.number(), unit: v.string(),
+    branchId: v.optional(v.id("branches")), description: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const user = await requirePermission(ctx, "edit_products");
-    const { id, ...data } = args;
-    const prod = await ctx.db.get(id);
-    if (!prod) throw new ConvexError("المنتج غير موجود");
-    assertBranchAccess(user, prod);
-    if (!args.name.trim()) throw new ConvexError("اسم المنتج مطلوب");
-    assertNonNegativeNumber(args.cost, "سعر التكلفة");
-    assertNonNegativeNumber(args.price, "سعر البيع");
-    assertNonNegativeNumber(args.stock, "المخزون");
-    assertNonNegativeNumber(args.minStock ?? 0, "الحد الأدنى للمخزون");
-    if (!Number.isInteger(args.stock)) throw new ConvexError("المخزون يجب أن يكون عدداً صحيحاً");
-    const sku = args.sku?.trim() ?? "";
-    await assertUniqueSku(ctx, sku, String(id));
-    const branchId = resolveWriteBranch(user, data.branchId);
-    await ctx.db.patch(id, {
-      name: args.name.trim(),
-      sku,
-      barcode: args.barcode,
-      categoryId: args.category ? args.category as any : undefined,
-      costPrice: args.cost,
-      sellPrice: args.price,
-      stock: args.stock,
-      minStock: args.minStock ?? 0,
-      unit: args.unit ?? "قطعة",
-      branchId,
-      description: args.description,
+    const product = await ctx.db.get(args.id);
+    if (!product) throw new ConvexError("المنتج غير موجود");
+    assertBranchAccess(user, product);
+    if (args.sellPrice !== product.sellPrice) await requirePermission(ctx, "view_prices");
+    if (args.costPrice !== product.costPrice) await requirePermission(ctx, "view_profits");
+    let normalized;
+    try { normalized = validateProductInput(args); } catch (error) { throw new ConvexError(error instanceof Error ? error.message : "بيانات المنتج غير صالحة"); }
+    await assertUniqueSku(ctx, normalized.sku, args.id);
+    await validateRelations(ctx, args.categoryId, args.supplierId);
+    const branchId = resolveWriteBranch(user, args.branchId ?? product.branchId);
+    await ctx.db.patch(args.id, {
+      name: normalized.name, sku: normalized.sku, barcode: args.barcode?.trim() || undefined,
+      categoryId: args.categoryId, supplierId: args.supplierId, warrantyMonths: args.warrantyMonths,
+      costPrice: args.costPrice, sellPrice: args.sellPrice, minStock: args.minStock, unit: normalized.unit,
+      branchId, description: args.description?.trim() || undefined,
     });
-    await logAction(ctx, user, {
-      action: "update",
-      module: "products",
-      recordId: id,
-      recordLabel: args.name,
-      details: `تعديل المنتج: ${args.name}`,
-    });
+    await logAction(ctx, user, { action: "update", module: "products", recordId: args.id, recordLabel: normalized.name, details: `تعديل المنتج: ${normalized.name}` });
+  },
+});
+
+export const adjustStock = mutation({
+  args: { id: v.id("products"), adjustment: v.number(), reason: v.string() },
+  handler: async (ctx, args) => {
+    const user = await requirePermission(ctx, "edit_products");
+    await changeProductStock(ctx, user, { productId: args.id, quantityDelta: args.adjustment, type: INVENTORY_MOVEMENT_TYPES.manualAdjustment, reason: args.reason });
+    await logAction(ctx, user, { action: "update", module: "products", recordId: args.id, details: `تعديل يدوي للمخزون: ${args.adjustment > 0 ? "+" : ""}${args.adjustment} - ${args.reason.trim()}` });
+  },
+});
+
+export const movements = query({
+  args: { productId: v.id("products") },
+  handler: async (ctx, args) => {
+    const user = await requirePermission(ctx, "view_products");
+    const product = await ctx.db.get(args.productId);
+    if (!product) throw new ConvexError("المنتج غير موجود");
+    assertBranchAccess(user, product);
+    return await ctx.db.query("inventoryMovements").withIndex("by_product", (q) => q.eq("productId", args.productId)).order("desc").collect();
+  },
+});
+
+async function applyActiveState(ctx: MutationCtx, user: AuthUser, id: Id<"products">, isActive: boolean) {
+  const product = await ctx.db.get(id);
+  if (!product) throw new ConvexError("المنتج غير موجود");
+  assertBranchAccess(user, product);
+  await ctx.db.patch(id, { isActive });
+  await logAction(ctx, user, { action: "update", module: "products", recordId: id, recordLabel: product.name, details: `${isActive ? "إعادة تفعيل" : "تعطيل"} المنتج: ${product.name}` });
+}
+
+export const setActive = mutation({
+  args: { id: v.id("products"), isActive: v.boolean() },
+  handler: async (ctx, args) => {
+    const user = await requirePermission(ctx, "edit_products");
+    await applyActiveState(ctx, user, args.id, args.isActive);
   },
 });
 
 export const remove = mutation({
   args: { id: v.id("products") },
-  handler: async (ctx, args) => {
-    const user = await requirePermission(ctx, "delete_products");
-    const prod = await ctx.db.get(args.id);
-    if (!prod) throw new ConvexError("المنتج غير موجود");
-    assertBranchAccess(user, prod);
-    const referencedInvoice = await ctx.db
-      .query("invoices")
-      .filter((q) => q.eq(q.field("branchId"), prod.branchId))
-      .collect();
-    if (referencedInvoice.some((invoice) => invoice.items.some((item) => item.productId === args.id))) {
-      throw new ConvexError("لا يمكن حذف منتج مستخدم في فاتورة");
-    }
-    const referencedShipment = await ctx.db
-      .query("shipments")
-      .filter((q) => q.eq(q.field("branchId"), prod.branchId))
-      .collect();
-    if (referencedShipment.some((shipment) => shipment.items.some((item) => item.productId === args.id))) {
-      throw new ConvexError("لا يمكن حذف منتج مستخدم في شحنة واردة");
-    }
-    if (prod.stock !== 0) throw new ConvexError("يجب تصفير مخزون المنتج قبل حذفه");
-    await ctx.db.delete(args.id);
-    await logAction(ctx, user, {
-      action: "delete",
-      module: "products",
-      recordId: args.id,
-      recordLabel: prod.name,
-      details: `حذف المنتج: ${prod.name}`,
-    });
-  },
-});
-
-export const adjustStock = mutation({
-  args: {
-    id: v.id("products"),
-    adjustment: v.number(),
-    reason: v.optional(v.string()),
-  },
-  handler: async (ctx, args) => {
-    const user = await requirePermission(ctx, "edit_products");
-    const prod = await ctx.db.get(args.id);
-    if (!prod) throw new ConvexError("المنتج غير موجود");
-    assertBranchAccess(user, prod);
-    const newStock = prod.stock + args.adjustment;
-    if (!Number.isFinite(args.adjustment) || !Number.isInteger(args.adjustment)) {
-      throw new ConvexError("تعديل المخزون يجب أن يكون عدداً صحيحاً");
-    }
-    if (newStock < 0) throw new ConvexError("لا يمكن أن يصبح المخزون سالباً");
-    await ctx.db.patch(args.id, { stock: newStock });
-    await logAction(ctx, user, {
-      action: "update",
-      module: "products",
-      recordId: args.id,
-      recordLabel: prod.name,
-      details: `تعديل مخزون ${prod.name}: ${args.adjustment > 0 ? "+" : ""}${args.adjustment} (${args.reason ?? "بدون سبب"})`,
-    });
+  handler: async (ctx) => {
+    await requirePermission(ctx, "delete_products");
+    throw new ConvexError("الحذف النهائي للمنتجات غير مسموح؛ استخدم تعطيل المنتج بدلاً منه");
   },
 });
 
@@ -245,14 +151,7 @@ export const stats = query({
   args: {},
   handler: async (ctx) => {
     const user = await requirePermission(ctx, "view_products");
-    let products = await ctx.db.query("products").collect();
-    products = filterByBranch(products, user);
-    const lowStock = products.filter(p => p.stock <= (p.minStock ?? 0)).length;
-    return {
-      total: products.length,
-      ...visibleProductStats(products, user.permissions),
-      lowStock,
-      outOfStock: products.filter(p => p.stock === 0).length,
-    };
+    const products = filterByBranch(await ctx.db.query("products").collect(), user);
+    return { total: products.length, ...visibleProductStats(products, user.permissions), lowStock: products.filter((p) => p.stock <= p.minStock).length, outOfStock: products.filter((p) => p.stock === 0).length };
   },
 });

@@ -19,7 +19,7 @@ interface CartItem {
 }
 
 export function NewInvoicePage({ onNavigate }: NewInvoicePageProps) {
-  const products = useQuery(api.products.list, {}) ?? [];
+  const products = (useQuery(api.products.list, {}) ?? []).filter((product) => product.isActive);
   const customers = useQuery(api.customers.list) ?? [];
   const settings = useQuery(api.settings.getPublic);
   const createInvoice = useMutation(api.invoices.create);

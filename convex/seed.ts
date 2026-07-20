@@ -1,10 +1,12 @@
 import { mutation } from "./_generated/server";
 import { requireAdmin } from "./lib/auth";
+import { changeProductStock } from "./lib/inventory";
+import { INVENTORY_MOVEMENT_TYPES } from "../shared/inventoryRules";
 
 export const seedDemo = mutation({
   args: {},
   handler: async (ctx) => {
-    await requireAdmin(ctx);
+    const user = await requireAdmin(ctx);
     // Check if already seeded
     const existing = await ctx.db.query("settings").first();
     if (existing) return "تم البذر مسبقاً";
@@ -50,7 +52,7 @@ export const seedDemo = mutation({
       supplierId: sup1,
       costPrice: 3500,
       sellPrice: 4200,
-      stock: 8,
+      stock: 0,
       minStock: 2,
       unit: "قطعة",
       isActive: true,
@@ -63,7 +65,7 @@ export const seedDemo = mutation({
       supplierId: sup1,
       costPrice: 4500,
       sellPrice: 5200,
-      stock: 5,
+      stock: 0,
       minStock: 3,
       unit: "قطعة",
       isActive: true,
@@ -76,7 +78,7 @@ export const seedDemo = mutation({
       supplierId: sup2,
       costPrice: 1800,
       sellPrice: 2200,
-      stock: 3,
+      stock: 0,
       minStock: 2,
       unit: "قطعة",
       isActive: true,
@@ -89,7 +91,7 @@ export const seedDemo = mutation({
       supplierId: sup1,
       costPrice: 600,
       sellPrice: 850,
-      stock: 15,
+      stock: 0,
       minStock: 5,
       unit: "قطعة",
       isActive: true,
@@ -102,12 +104,16 @@ export const seedDemo = mutation({
       supplierId: sup1,
       costPrice: 4000,
       sellPrice: 4800,
-      stock: 1,
+      stock: 0,
       minStock: 3,
       unit: "قطعة",
       isActive: true,
       warrantyMonths: 12,
     });
+
+    for (const [productId, quantity] of [[prod1, 8], [prod2, 5], [prod3, 3], [prod4, 15], [prod5, 1]] as const) {
+      await changeProductStock(ctx, user, { productId, quantityDelta: quantity, type: INVENTORY_MOVEMENT_TYPES.openingBalance, reason: "رصيد افتتاحي للبيانات التجريبية" });
+    }
 
     // Customers
     const cust1 = await ctx.db.insert("customers", {
