@@ -130,7 +130,9 @@ export function TrackingPage() {
               placeholder="أدخل رمز التتبع"
               value={token}
               onChange={e => setToken(e.target.value.toUpperCase())}
-              maxLength={12}
+              maxLength={64}
+              autoComplete="off"
+              spellCheck={false}
               dir="ltr"
             />
             <button
@@ -274,12 +276,6 @@ export function TrackingPage() {
                     <div className="text-center">
                       <p className="text-slate-500 text-xs">التسليم المتوقع</p>
                       <p className="text-slate-300 font-medium mt-0.5">{repair.expectedDate}</p>
-                    </div>
-                  )}
-                  {repair.technicianName && (
-                    <div className="text-left">
-                      <p className="text-slate-500 text-xs">الفني المسؤول</p>
-                      <p className="text-slate-300 font-medium mt-0.5">{repair.technicianName}</p>
                     </div>
                   )}
                 </div>
