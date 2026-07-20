@@ -68,6 +68,10 @@ export const PERMISSIONS = [
 
 export type Permission = (typeof PERMISSIONS)[number];
 
+export function isPermission(value: string): value is Permission {
+  return PERMISSIONS.includes(value as Permission);
+}
+
 export const ROLE_PERMISSIONS: Record<string, string[]> = {
   admin: [...PERMISSIONS],
   manager: [
