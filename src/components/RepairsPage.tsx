@@ -3,7 +3,7 @@ import { useQuery, useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { usePermission } from "../lib/access";
 import { toast } from "sonner";
-import { Wrench, Plus, Search, Clock, CheckCircle, AlertCircle, Copy, MessageCircle, Printer } from "lucide-react";
+import { Wrench, Plus, Search, Clock, CheckCircle, AlertCircle, Copy, MessageCircle, Printer, RefreshCw } from "lucide-react";
 import { PrintModal } from "./PrintTemplate";
 import { buildEgyptWhatsAppUrl } from "../lib/utils";
 
@@ -22,6 +22,7 @@ export function RepairsPage() {
   const customers = useQuery(api.customers.list) ?? [];
   const createRepair = useMutation(api.repairs.create);
   const updateStatus = useMutation(api.repairs.updateStatus);
+  const rotateTrackingToken = useMutation(api.repairs.rotateTrackingToken);
 
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState("");
@@ -82,6 +83,18 @@ export function RepairsPage() {
     const c = customers.find(c => c._id === id);
     if (c) {
       setForm({ ...form, customerId: id, customerName: c.name, customerPhone: c.phone });
+    }
+  };
+
+  const handleRotateTrackingToken = async (id: string, repairNumber: string) => {
+    if (!confirm("سيتم إلغاء رابط التتبع القديم وإنشاء رابط جديد. هل تريد المتابعة؟")) return;
+    try {
+      const trackingToken = await rotateTrackingToken({ id: id as any });
+      const url = `${window.location.origin}${window.location.pathname}#track=${trackingToken}`;
+      await navigator.clipboard.writeText(url);
+      toast.success(`تم تجديد رابط ${repairNumber} ونسخه`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "تعذر تجديد رابط التتبع");
     }
   };
 
@@ -180,7 +193,7 @@ export function RepairsPage() {
                   <div className="flex items-center justify-between gap-2">
                     <div>
                       <p className="text-xs text-indigo-500 mb-0.5">رمز التتبع</p>
-                      <p className="font-mono font-black text-indigo-700 text-sm tracking-widest">{r.trackingToken}</p>
+                      <p className="font-mono font-black text-indigo-700 text-xs tracking-wide break-all">{r.trackingToken}</p>
                     </div>
                     <div className="flex gap-1.5">
                       <button
@@ -194,6 +207,15 @@ export function RepairsPage() {
                       >
                         <Copy className="w-3.5 h-3.5" />
                       </button>
+                      {canEdit && (
+                        <button
+                          onClick={() => void handleRotateTrackingToken(r._id, r.repairNumber)}
+                          className="p-1.5 bg-amber-100 hover:bg-amber-200 rounded-lg transition-colors text-amber-700"
+                          title="تجديد رابط التتبع وإلغاء الرابط القديم"
+                        >
+                          <RefreshCw className="w-3.5 h-3.5" />
+                        </button>
+                      )}
                       <a
                         href={buildEgyptWhatsAppUrl(r.customerPhone, `مرحباً ${r.customerName}،\nرابط متابعة طلب الصيانة الخاص بك:\n${window.location.origin}${window.location.pathname}#track=${r.trackingToken}\n\nرقم الطلب: ${r.repairNumber}`)}
                         target="_blank"
