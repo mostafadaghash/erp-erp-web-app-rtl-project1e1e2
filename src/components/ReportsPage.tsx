@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
+import { usePermission } from "../lib/access";
 import { BarChart3, TrendingUp, TrendingDown, DollarSign, Package, Users, Wrench, Target, Calendar, Filter } from "lucide-react";
 
 type Period = "all" | "today" | "week" | "month" | "year";
@@ -18,13 +19,22 @@ function filterByPeriod<T extends { _creationTime: number }>(items: T[], period:
 
 export function ReportsPage() {
   const [period, setPeriod] = useState<Period>("month");
+  const settings = useQuery(api.settings.getPublic);
+  const modules = (settings?.modules ?? {}) as Record<string, boolean | undefined>;
+  const enabled = (moduleName: string) => modules[moduleName] !== false;
+  const canViewInvoices = usePermission("view_invoices") && enabled("invoices");
+  const canViewExpenses = usePermission("view_expenses") && enabled("expenses");
+  const canViewProducts = usePermission("view_products");
+  const canViewCustomers = usePermission("view_customers");
+  const canViewRepairs = usePermission("view_repairs") && enabled("repairs");
+  const canViewLeads = usePermission("view_leads") && enabled("crm");
 
-  const allInvoices = useQuery(api.invoices.list, {}) ?? [];
-  const allExpenses = useQuery(api.expenses.list, {}) ?? [];
-  const products = useQuery(api.products.list, {}) ?? [];
-  const customers = useQuery(api.customers.list, {}) ?? [];
-  const allRepairs = useQuery(api.repairs.list, {}) ?? [];
-  const crmStats = useQuery(api.leads.stats, {});
+  const allInvoices = useQuery(api.invoices.list, canViewInvoices ? {} : "skip") ?? [];
+  const allExpenses = useQuery(api.expenses.list, canViewExpenses ? {} : "skip") ?? [];
+  const products = useQuery(api.products.list, canViewProducts ? {} : "skip") ?? [];
+  const customers = useQuery(api.customers.list, canViewCustomers ? {} : "skip") ?? [];
+  const allRepairs = useQuery(api.repairs.list, canViewRepairs ? {} : "skip") ?? [];
+  const crmStats = useQuery(api.leads.stats, canViewLeads ? {} : "skip");
 
   const invoices = filterByPeriod(allInvoices, period);
   const expenses = filterByPeriod(allExpenses, period);
