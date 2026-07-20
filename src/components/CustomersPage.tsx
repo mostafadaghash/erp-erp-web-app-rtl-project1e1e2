@@ -67,7 +67,7 @@ export function CustomersPage() {
         </div>
         <div className="bg-emerald-50 rounded-xl p-4 text-center">
           <p className="text-lg font-black text-emerald-600">
-            {customers.reduce((s, c) => s + c.balance, 0).toLocaleString("ar-SA")} ريال
+            {customers.reduce((s, c) => s + c.balance, 0).toLocaleString("ar-EG")} ج.م
           </p>
           <p className="text-xs text-slate-600 mt-0.5">إجمالي المديونيات</p>
         </div>
@@ -102,7 +102,7 @@ export function CustomersPage() {
                 </div>
               </div>
               {c.balance > 0 && (
-                <span className="badge badge-warning">{c.balance.toLocaleString("ar-SA")} ريال</span>
+                <span className="badge badge-warning">{c.balance.toLocaleString("ar-EG")} ج.م</span>
               )}
             </div>
             {c.email && (
@@ -120,12 +120,12 @@ export function CustomersPage() {
             <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
               <div>
                 <p className="text-xs text-slate-500">إجمالي المشتريات</p>
-                <p className="font-bold text-slate-800 text-sm">{c.totalPurchases.toLocaleString("ar-SA")} ريال</p>
+                <p className="font-bold text-slate-800 text-sm">{c.totalPurchases.toLocaleString("ar-EG")} ج.م</p>
               </div>
               {c.balance > 0 && (
                 <div className="text-left">
                   <p className="text-xs text-slate-500">المديونية</p>
-                  <p className="font-bold text-amber-600 text-sm">{c.balance.toLocaleString("ar-SA")} ريال</p>
+                  <p className="font-bold text-amber-600 text-sm">{c.balance.toLocaleString("ar-EG")} ج.م</p>
                 </div>
               )}
             </div>
@@ -158,7 +158,7 @@ export function CustomersPage() {
               </div>
               <div>
                 <label className="form-label">رقم الهاتف *</label>
-                <input className="form-input" required value={form.phone} onChange={e => setForm({...form, phone: e.target.value})} placeholder="05xxxxxxxx" />
+                <input className="form-input" required value={form.phone} onChange={e => setForm({...form, phone: e.target.value})} placeholder="01xxxxxxxxx" />
               </div>
               <div>
                 <label className="form-label">البريد الإلكتروني</label>
