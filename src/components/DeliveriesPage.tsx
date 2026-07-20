@@ -54,10 +54,10 @@ const SHIPPING_COMPANIES = [
 const CITIES = [
   "القاهرة", "الجيزة", "الإسكندرية", "الدقهلية", "الشرقية",
   "القليوبية", "المنوفية", "الغربية", "كفر الشيخ", "البحيرة",
-  "الفيوم", "بني سويف", "المنيا", "أسيوط", "سوهاج",
-  "قنا", "الأقصر", "أسوان", "البحر الأحمر", "سيناء",
-  "الرياض", "جدة", "الدمام", "مكة", "المدينة",
-  "دبي", "أبوظبي", "الشارقة", "الكويت", "عمان",
+  "دمياط", "بورسعيد", "الإسماعيلية", "السويس", "الفيوم",
+  "بني سويف", "المنيا", "أسيوط", "سوهاج", "قنا",
+  "الأقصر", "أسوان", "البحر الأحمر", "الوادي الجديد", "مطروح",
+  "شمال سيناء", "جنوب سيناء",
 ];
 
 const emptyForm = {
@@ -194,7 +194,7 @@ export function DeliveriesPage() {
             { label: "تم الشحن",    value: stats.shipped,   color: "bg-blue-100 text-blue-700" },
             { label: "تم التسليم",  value: stats.delivered, color: "bg-emerald-100 text-emerald-700" },
             { label: "مرتجع",       value: stats.returned,  color: "bg-red-100 text-red-700" },
-            { label: "COD محصل",    value: `${stats.totalCOD.toLocaleString()} ج`, color: "bg-purple-100 text-purple-700" },
+            { label: "COD محصل",    value: `${stats.totalCOD.toLocaleString("ar-EG")} ج.م`, color: "bg-purple-100 text-purple-700" },
           ].map(s => (
             <div key={s.label} className={`rounded-xl p-3 text-center ${s.color}`}>
               <p className="text-xl font-black">{s.value}</p>
@@ -278,9 +278,9 @@ export function DeliveriesPage() {
                         </span>
                       </td>
                       <td className="px-4 py-3">
-                        <p className="font-bold text-slate-800">{d.totalAmount.toLocaleString()} ج</p>
+                        <p className="font-bold text-slate-800">{d.totalAmount.toLocaleString("ar-EG")} ج.م</p>
                         {d.shippingCost > 0 && (
-                          <p className="text-xs text-slate-400">شحن: {d.shippingCost} ج</p>
+                          <p className="text-xs text-slate-400">شحن: {d.shippingCost} ج.م</p>
                         )}
                       </td>
                       <td className="px-4 py-3">
@@ -436,7 +436,7 @@ export function DeliveriesPage() {
                 </div>
                 <div className="mt-2 text-left">
                   <span className="text-sm font-bold text-slate-700">الإجمالي: </span>
-                  <span className="text-lg font-black text-indigo-600">{totalAmount.toLocaleString()} ج</span>
+                  <span className="text-lg font-black text-indigo-600">{totalAmount.toLocaleString("ar-EG")} ج.م</span>
                 </div>
               </div>
 
@@ -546,12 +546,12 @@ export function DeliveriesPage() {
                   {viewDelivery.items.map((item, i) => (
                     <div key={i} className="flex justify-between items-center bg-slate-50 rounded-lg px-3 py-2 text-sm">
                       <span className="text-slate-700">{item.productName} × {item.quantity}</span>
-                      <span className="font-bold text-slate-800">{(item.quantity * item.unitPrice).toLocaleString()} ج</span>
+                      <span className="font-bold text-slate-800">{(item.quantity * item.unitPrice).toLocaleString("ar-EG")} ج.م</span>
                     </div>
                   ))}
                   <div className="flex justify-between items-center px-3 py-2 text-sm font-black text-indigo-700">
                     <span>الإجمالي</span>
-                    <span>{viewDelivery.totalAmount.toLocaleString()} ج</span>
+                    <span>{viewDelivery.totalAmount.toLocaleString("ar-EG")} ج.م</span>
                   </div>
                 </div>
               </div>
