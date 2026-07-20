@@ -1,6 +1,6 @@
 import { query, mutation } from "./_generated/server";
-import { v } from "convex/values";
-import { requireAuth, requirePermission, logAction } from "./lib/auth";
+import { ConvexError, v } from "convex/values";
+import { requirePermission, logAction } from "./lib/auth";
 
 export const list = query({
   args: {},
@@ -34,7 +34,9 @@ export const remove = mutation({
   handler: async (ctx, args) => {
     const user = await requirePermission(ctx, "delete_products");
     const category = await ctx.db.get(args.id);
-    if (!category) throw new Error("الفئة غير موجودة");
+    if (!category) throw new ConvexError("الفئة غير موجودة");
+    const linkedProduct = await ctx.db.query("products").withIndex("by_category", (q) => q.eq("categoryId", args.id)).first();
+    if (linkedProduct) throw new ConvexError("لا يمكن حذف فئة مرتبطة بمنتج");
     await ctx.db.delete(args.id);
     await logAction(ctx, user, {
       action: "delete",
