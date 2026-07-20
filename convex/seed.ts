@@ -1,8 +1,10 @@
 import { mutation } from "./_generated/server";
+import { requireAdmin } from "./lib/auth";
 
 export const seedDemo = mutation({
   args: {},
   handler: async (ctx) => {
+    await requireAdmin(ctx);
     // Check if already seeded
     const existing = await ctx.db.query("settings").first();
     if (existing) return "تم البذر مسبقاً";
