@@ -4,6 +4,7 @@ import type { Id } from "./_generated/dataModel";
 import { v } from "convex/values";
 import { ConvexError } from "convex/values";
 import { assertBranchAccess, filterByBranch, requireModulePermission, resolveWriteBranch, logAction, type AuthUser } from "./lib/auth";
+import { calculateInvoiceTotals, roundMoney } from "../shared/businessRules";
 
 type InvoiceItemInput = {
   productId: Id<"products">;
@@ -13,8 +14,6 @@ type InvoiceItemInput = {
   discount: number;
   total: number;
 };
-
-const roundMoney = (value: number) => Math.round((value + Number.EPSILON) * 100) / 100;
 
 async function prepareInvoice(
   ctx: MutationCtx,
@@ -64,26 +63,24 @@ async function prepareInvoice(
       total,
     };
   });
-  const subtotal = roundMoney(normalizedItems.reduce((sum, item) => sum + item.total, 0));
-  if (!Number.isFinite(overallDiscount) || overallDiscount < 0 || overallDiscount > subtotal) {
-    throw new ConvexError("قيمة الخصم غير صالحة");
-  }
-  const discount = roundMoney(overallDiscount);
   const settings = await ctx.db.query("settings").first();
   const taxRate = settings?.taxRate ?? 14;
-  if (!Number.isFinite(taxRate) || taxRate < 0 || taxRate > 100) {
-    throw new ConvexError("نسبة الضريبة في الإعدادات غير صالحة");
-  }
-  const tax = roundMoney((subtotal - discount) * taxRate / 100);
-  const total = roundMoney(subtotal - discount + tax);
-  if (!Number.isFinite(paid) || paid < 0 || paid > total) {
+  let totals;
+  try {
+    totals = calculateInvoiceTotals(
+      normalizedItems.map((item) => item.total),
+      overallDiscount,
+      taxRate,
+      paid,
+    );
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "";
+    if (message === "invalid discount") throw new ConvexError("قيمة الخصم غير صالحة");
+    if (message === "invalid tax rate") throw new ConvexError("نسبة الضريبة في الإعدادات غير صالحة");
     throw new ConvexError("المبلغ المدفوع غير صالح");
   }
-  const normalizedPaid = roundMoney(paid);
-  const remaining = roundMoney(total - normalizedPaid);
-  const status = remaining === 0 ? "paid" : normalizedPaid > 0 ? "partial" : "unpaid";
 
-  return { normalizedItems, productDocs, requested, subtotal, discount, tax, total, paid: normalizedPaid, remaining, status };
+  return { normalizedItems, productDocs, requested, ...totals };
 }
 
 async function adjustCustomer(
