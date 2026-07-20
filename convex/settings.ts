@@ -18,6 +18,7 @@ export const getPublic = query({
       phone: settings.phone,
       address: settings.address,
       currency: settings.currency,
+      taxRate: settings.taxRate,
       whatsappNumber: settings.whatsappNumber,
       modules: settings.modules,
     };
@@ -48,13 +49,14 @@ export const upsert = mutation({
   },
   handler: async (ctx, args) => {
     const user = await requireAdmin(ctx);
+    const normalizedArgs = { ...args, currency: "EGP" };
     const existing = await ctx.db.query("settings").first();
     let id;
     if (existing) {
-      await ctx.db.patch(existing._id, args);
+      await ctx.db.patch(existing._id, normalizedArgs);
       id = existing._id;
     } else {
-      id = await ctx.db.insert("settings", args);
+      id = await ctx.db.insert("settings", normalizedArgs);
     }
     await logAction(ctx, user, {
       action: "update",

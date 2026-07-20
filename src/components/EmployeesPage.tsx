@@ -461,7 +461,7 @@ export function EmployeesPage() {
                   </div>
                   <div>
                     <label className="form-label">رقم الهاتف</label>
-                    <input className="form-input" placeholder="05xxxxxxxx" value={form.phone}
+                    <input className="form-input" placeholder="01xxxxxxxxx" value={form.phone}
                       onChange={e => setForm({ ...form, phone: e.target.value })} />
                   </div>
                 </div>

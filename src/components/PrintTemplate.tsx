@@ -100,7 +100,7 @@ const statusLabel: Record<string, string> = {
 
 function formatDate(ts: number | string) {
   const d = typeof ts === "number" ? new Date(ts) : new Date(ts);
-  return d.toLocaleDateString("ar-SA", { year: "numeric", month: "long", day: "numeric" });
+  return d.toLocaleDateString("ar-EG", { year: "numeric", month: "long", day: "numeric" });
 }
 
 // ─── قالب الفاتورة ─────────────────────────────────────────────────────────────
@@ -171,13 +171,13 @@ function InvoiceTemplate({ data, settings }: { data: InvoiceData; settings: any 
             <tr key={i} className={i % 2 === 0 ? "print-tr-even" : ""}>
               <td className="print-td">{item.productName}</td>
               <td className="print-td" style={{ textAlign: "center" }}>{item.quantity}</td>
-              <td className="print-td" style={{ textAlign: "center" }}>{item.unitPrice.toLocaleString("ar-SA")} ر</td>
+              <td className="print-td" style={{ textAlign: "center" }}>{item.unitPrice.toLocaleString("ar-EG")} ج.م</td>
               {data.items.some(it => (it.discount ?? 0) > 0) && (
                 <td className="print-td" style={{ textAlign: "center", color: "#dc2626" }}>
-                  {(item.discount ?? 0) > 0 ? `${item.discount} ر` : "—"}
+                  {(item.discount ?? 0) > 0 ? `${item.discount} ج.م` : "—"}
                 </td>
               )}
-              <td className="print-td" style={{ textAlign: "center", fontWeight: "bold" }}>{item.total.toLocaleString("ar-SA")} ر</td>
+              <td className="print-td" style={{ textAlign: "center", fontWeight: "bold" }}>{item.total.toLocaleString("ar-EG")} ج.م</td>
             </tr>
           ))}
         </tbody>
@@ -188,32 +188,32 @@ function InvoiceTemplate({ data, settings }: { data: InvoiceData; settings: any 
         <div className="print-totals-box">
           <div className="print-total-row">
             <span>المجموع الفرعي</span>
-            <span>{data.subtotal.toLocaleString("ar-SA")} ريال</span>
+            <span>{data.subtotal.toLocaleString("ar-EG")} ج.م</span>
           </div>
           {data.discount > 0 && (
             <div className="print-total-row" style={{ color: "#dc2626" }}>
               <span>الخصم</span>
-              <span>- {data.discount.toLocaleString("ar-SA")} ريال</span>
+              <span>- {data.discount.toLocaleString("ar-EG")} ج.م</span>
             </div>
           )}
           {data.tax > 0 && (
             <div className="print-total-row">
               <span>ضريبة القيمة المضافة ({taxRate}%)</span>
-              <span>{data.tax.toLocaleString("ar-SA")} ريال</span>
+              <span>{data.tax.toLocaleString("ar-EG")} ج.م</span>
             </div>
           )}
           <div className="print-total-final">
             <span>الإجمالي</span>
-            <span>{data.total.toLocaleString("ar-SA")} ريال</span>
+            <span>{data.total.toLocaleString("ar-EG")} ج.م</span>
           </div>
           <div className="print-total-row" style={{ color: "#059669" }}>
             <span>المدفوع</span>
-            <span>{data.paid.toLocaleString("ar-SA")} ريال</span>
+            <span>{data.paid.toLocaleString("ar-EG")} ج.م</span>
           </div>
           {data.remaining > 0 && (
             <div className="print-total-row" style={{ color: "#d97706", fontWeight: "bold" }}>
               <span>المتبقي</span>
-              <span>{data.remaining.toLocaleString("ar-SA")} ريال</span>
+              <span>{data.remaining.toLocaleString("ar-EG")} ج.م</span>
             </div>
           )}
         </div>
@@ -308,9 +308,9 @@ function OrderTemplate({ data, settings }: { data: OrderData; settings: any }) {
                 {item.notes && <div style={{ fontSize: "11px", color: "#64748b", marginTop: "2px" }}>{item.notes}</div>}
               </td>
               <td className="print-td" style={{ textAlign: "center" }}>{item.quantity}</td>
-              <td className="print-td" style={{ textAlign: "center" }}>{item.unitPrice.toLocaleString("ar-SA")} ر</td>
+              <td className="print-td" style={{ textAlign: "center" }}>{item.unitPrice.toLocaleString("ar-EG")} ج.م</td>
               <td className="print-td" style={{ textAlign: "center", fontWeight: "bold" }}>
-                {(item.quantity * item.unitPrice).toLocaleString("ar-SA")} ر
+                {(item.quantity * item.unitPrice).toLocaleString("ar-EG")} ج.م
               </td>
             </tr>
           ))}
@@ -322,16 +322,16 @@ function OrderTemplate({ data, settings }: { data: OrderData; settings: any }) {
         <div className="print-totals-box">
           <div className="print-total-final">
             <span>إجمالي الطلب</span>
-            <span>{data.total.toLocaleString("ar-SA")} ريال</span>
+            <span>{data.total.toLocaleString("ar-EG")} ج.م</span>
           </div>
           <div className="print-total-row" style={{ color: "#059669" }}>
             <span>العربون المدفوع</span>
-            <span>{data.deposit.toLocaleString("ar-SA")} ريال</span>
+            <span>{data.deposit.toLocaleString("ar-EG")} ج.م</span>
           </div>
           {data.remaining > 0 && (
             <div className="print-total-row" style={{ color: "#d97706", fontWeight: "bold", fontSize: "15px" }}>
               <span>المبلغ المتبقي عند الاستلام</span>
-              <span>{data.remaining.toLocaleString("ar-SA")} ريال</span>
+              <span>{data.remaining.toLocaleString("ar-EG")} ج.م</span>
             </div>
           )}
         </div>
@@ -475,9 +475,9 @@ function RepairTemplate({ data, settings }: { data: RepairData; settings: any })
                 <tr key={i} className={i % 2 === 0 ? "print-tr-even" : ""}>
                   <td className="print-td">{part.name}</td>
                   <td className="print-td" style={{ textAlign: "center" }}>{part.quantity}</td>
-                  <td className="print-td" style={{ textAlign: "center" }}>{part.cost.toLocaleString("ar-SA")} ر</td>
+                  <td className="print-td" style={{ textAlign: "center" }}>{part.cost.toLocaleString("ar-EG")} ج.م</td>
                   <td className="print-td" style={{ textAlign: "center", fontWeight: "bold" }}>
-                    {(part.cost * part.quantity).toLocaleString("ar-SA")} ر
+                    {(part.cost * part.quantity).toLocaleString("ar-EG")} ج.م
                   </td>
                 </tr>
               ))}
@@ -492,27 +492,27 @@ function RepairTemplate({ data, settings }: { data: RepairData; settings: any })
           {data.parts.length > 0 && (
             <div className="print-total-row">
               <span>تكلفة القطع</span>
-              <span>{data.parts.reduce((s, p) => s + p.cost * p.quantity, 0).toLocaleString("ar-SA")} ريال</span>
+              <span>{data.parts.reduce((s, p) => s + p.cost * p.quantity, 0).toLocaleString("ar-EG")} ج.م</span>
             </div>
           )}
           <div className="print-total-row">
             <span>أجرة الإصلاح</span>
-            <span>{data.laborCost.toLocaleString("ar-SA")} ريال</span>
+            <span>{data.laborCost.toLocaleString("ar-EG")} ج.م</span>
           </div>
           <div className="print-total-final">
             <span>الإجمالي</span>
-            <span>{data.totalCost.toLocaleString("ar-SA")} ريال</span>
+            <span>{data.totalCost.toLocaleString("ar-EG")} ج.م</span>
           </div>
           {data.deposit > 0 && (
             <div className="print-total-row" style={{ color: "#059669" }}>
               <span>العربون المدفوع</span>
-              <span>{data.deposit.toLocaleString("ar-SA")} ريال</span>
+              <span>{data.deposit.toLocaleString("ar-EG")} ج.م</span>
             </div>
           )}
           {data.remaining > 0 && (
             <div className="print-total-row" style={{ color: "#d97706", fontWeight: "bold" }}>
               <span>المتبقي</span>
-              <span>{data.remaining.toLocaleString("ar-SA")} ريال</span>
+              <span>{data.remaining.toLocaleString("ar-EG")} ج.م</span>
             </div>
           )}
         </div>
@@ -549,7 +549,7 @@ function RepairTemplate({ data, settings }: { data: RepairData; settings: any })
 
 // ─── المكوّن الرئيسي: نافذة الطباعة ──────────────────────────────────────────
 export function PrintModal({ type, data, onClose }: PrintTemplateProps) {
-  const settings = useQuery(api.settings.get);
+  const settings = useQuery(api.settings.getPublic);
 
   const handlePrint = () => {
     window.print();
