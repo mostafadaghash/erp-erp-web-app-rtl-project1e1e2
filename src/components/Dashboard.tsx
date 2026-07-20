@@ -87,7 +87,7 @@ export function Dashboard({ onNavigate, permissions, modules }: DashboardProps) 
         <div>
           <h1 className="text-2xl font-black text-slate-800">لوحة التحكم</h1>
           <p className="text-slate-500 text-sm mt-0.5">
-            {new Date().toLocaleDateString("ar-SA", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
+            {new Date().toLocaleDateString("ar-EG", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
           </p>
         </div>
         {can("create_invoices") && enabled("invoices") && <button
