@@ -77,9 +77,13 @@ function AuthedRouter() {
 function LoginPage() {
   const setupStatus = useQuery(api.employees.setupStatus);
   const publicSettings = useQuery(api.settings.getPublic);
+  const inviteParams = new URLSearchParams(window.location.search);
+  const inviteCode = inviteParams.get("invite")?.trim() || undefined;
+  const invitedEmail = inviteParams.get("email")?.trim() || undefined;
 
   const storeName = publicSettings?.storeName ?? "تك ستور ERP";
   const needsSetup = setupStatus?.needsSetup ?? false;
+  const allowSignUp = needsSetup || Boolean(inviteCode);
 
   return (
     <div className="min-h-screen relative flex items-center justify-center overflow-hidden bg-slate-900">
@@ -125,9 +129,13 @@ function LoginPage() {
         {/* Login Card */}
         <div className="bg-white/10 backdrop-blur-xl rounded-3xl border border-white/20 p-8 shadow-2xl">
           <h2 className="text-xl font-bold text-white mb-6 text-center">
-            {needsSetup ? "إنشاء حساب" : "تسجيل الدخول"}
+            {allowSignUp ? "إنشاء حساب" : "تسجيل الدخول"}
           </h2>
-          <CustomSignInForm allowSignUp={needsSetup} />
+          <CustomSignInForm
+            allowSignUp={allowSignUp}
+            inviteCode={inviteCode}
+            invitedEmail={invitedEmail}
+          />
         </div>
 
         <p className="text-center text-slate-500 text-xs mt-6">
