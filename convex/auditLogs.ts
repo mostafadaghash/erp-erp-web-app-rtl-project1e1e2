@@ -1,6 +1,6 @@
 import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
-import { requireAuth, requireAdmin } from "./lib/auth";
+import { requireAuth, requireAdmin, requirePermission } from "./lib/auth";
 
 export const list = query({
   args: {
@@ -11,7 +11,7 @@ export const list = query({
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    const user = await requireAuth(ctx);
+    const user = await requirePermission(ctx, "view_audit_logs");
     let logs = await ctx.db.query("auditLogs").collect();
     // Non-admins only see their own logs
     if (user.role !== "admin") {
@@ -40,7 +40,7 @@ export const list = query({
 export const getStats = query({
   args: {},
   handler: async (ctx) => {
-    const user = await requireAuth(ctx);
+    const user = await requirePermission(ctx, "view_audit_logs");
     let logs = await ctx.db.query("auditLogs").collect();
     if (user.role !== "admin") {
       logs = logs.filter(l => l.userId === user.userId);
