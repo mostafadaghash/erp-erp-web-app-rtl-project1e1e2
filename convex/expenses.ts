@@ -5,7 +5,7 @@ import { requireAuth, requirePermission, filterByBranch, logAction } from "./lib
 export const list = query({
   args: {},
   handler: async (ctx) => {
-    const user = await requireAuth(ctx);
+    const user = await requirePermission(ctx, "view_expenses");
     const all = await ctx.db.query("expenses").order("desc").collect();
     return filterByBranch(all, user);
   },
@@ -60,7 +60,7 @@ export const remove = mutation({
 export const getStats = query({
   args: {},
   handler: async (ctx) => {
-    const user = await requireAuth(ctx);
+    const user = await requirePermission(ctx, "view_expenses");
     const all = await ctx.db.query("expenses").collect();
     const expenses = filterByBranch(all, user);
     const today = new Date().toDateString();
