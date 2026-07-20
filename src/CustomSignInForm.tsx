@@ -1,6 +1,6 @@
 "use client";
 import { useAuthActions } from "@convex-dev/auth/react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 /**
@@ -12,10 +12,20 @@ import { toast } from "sonner";
  * - Sign Up is kept temporarily (will be disabled after first admin is created).
  * - Styled to blend inside the glassmorphism login card in App.tsx.
  */
-export function CustomSignInForm() {
+interface CustomSignInFormProps {
+  allowSignUp: boolean;
+}
+
+export function CustomSignInForm({ allowSignUp }: CustomSignInFormProps) {
   const { signIn } = useAuthActions();
   const [flow, setFlow] = useState<"signIn" | "signUp">("signIn");
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (!allowSignUp && flow === "signUp") {
+      setFlow("signIn");
+    }
+  }, [allowSignUp, flow]);
 
   return (
     <form
@@ -24,7 +34,8 @@ export function CustomSignInForm() {
         e.preventDefault();
         setSubmitting(true);
         const formData = new FormData(e.target as HTMLFormElement);
-        formData.set("flow", flow);
+        const allowedFlow = allowSignUp ? flow : "signIn";
+        formData.set("flow", allowedFlow);
         void signIn("password", formData)
           .then(() => {
             setSubmitting(false);
@@ -38,7 +49,7 @@ export function CustomSignInForm() {
               toastTitle = "كلمة المرور غير صحيحة. حاول مرة أخرى.";
             } else {
               toastTitle =
-                flow === "signIn"
+                allowedFlow === "signIn"
                   ? "تعذّر تسجيل الدخول. هل تقصد إنشاء حساب جديد؟"
                   : "تعذّر إنشاء الحساب. هل تقصد تسجيل الدخول؟";
             }
@@ -91,20 +102,22 @@ export function CustomSignInForm() {
       </button>
 
       {/* Toggle sign in / sign up */}
-      <div className="text-center text-sm text-white/60">
-        <span>
-          {flow === "signIn"
-            ? "ليس لديك حساب؟ "
-            : "لديك حساب بالفعل؟ "}
-        </span>
-        <button
-          type="button"
-          className="font-semibold text-indigo-300 hover:text-indigo-200 underline-offset-2 hover:underline transition-colors duration-200"
-          onClick={() => setFlow(flow === "signIn" ? "signUp" : "signIn")}
-        >
-          {flow === "signIn" ? "إنشاء حساب" : "تسجيل الدخول"}
-        </button>
-      </div>
+      {allowSignUp && (
+        <div className="text-center text-sm text-white/60">
+          <span>
+            {flow === "signIn"
+              ? "ليس لديك حساب؟ "
+              : "لديك حساب بالفعل؟ "}
+          </span>
+          <button
+            type="button"
+            className="font-semibold text-indigo-300 hover:text-indigo-200 underline-offset-2 hover:underline transition-colors duration-200"
+            onClick={() => setFlow(flow === "signIn" ? "signUp" : "signIn")}
+          >
+            {flow === "signIn" ? "إنشاء حساب" : "تسجيل الدخول"}
+          </button>
+        </div>
+      )}
     </form>
   );
 }

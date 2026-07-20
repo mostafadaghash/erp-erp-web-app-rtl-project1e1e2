@@ -157,7 +157,7 @@ function LoginPage() {
           <h2 className="text-xl font-bold text-white mb-6 text-center">
             {needsSetup ? "إنشاء حساب" : "تسجيل الدخول"}
           </h2>
-          <CustomSignInForm />
+          <CustomSignInForm allowSignUp={needsSetup} />
         </div>
 
         <p className="text-center text-slate-500 text-xs mt-6">
