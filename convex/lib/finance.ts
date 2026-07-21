@@ -15,6 +15,19 @@ export function financialIdempotencyKey(type: string, userId: string, requestId:
   return `${type}:${userId}:${request}`;
 }
 
+export async function findFinancialTransactionByRequest(
+  ctx: QueryCtx | MutationCtx,
+  type: FinancialTransactionType,
+  userId: string,
+  requestId: string,
+) {
+  const idempotencyKey = financialIdempotencyKey(type, userId, requestId);
+  return await ctx.db
+    .query("financialTransactions")
+    .withIndex("by_idempotency_key", (q) => q.eq("idempotencyKey", idempotencyKey))
+    .unique();
+}
+
 export async function requireActiveFinancialAccount(ctx: QueryCtx | MutationCtx, accountId: Id<"financialAccounts">) {
   const account = await ctx.db.get(accountId);
   if (!account) throw new ConvexError("الحساب المالي غير موجود");

@@ -36,6 +36,7 @@ export function RepairsPage() {
   const accounts = useQuery(api.finance.collectionAccountPicker, canCollect ? {} : "skip") ?? [];
   const [accountId, setAccountId] = useState("");
   const [requestId, setRequestId] = useState(() => crypto.randomUUID());
+  const [saving, setSaving] = useState(false);
 
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState("");
@@ -59,6 +60,9 @@ export function RepairsPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (saving) return;
+    if (Number(form.deposit) > 0 && !accountId) { toast.error("اختر حساب تحصيل العربون"); return; }
+    setSaving(true);
     try {
       await createRepair({
         customerName: form.customerName,
@@ -81,6 +85,8 @@ export function RepairsPage() {
       setForm({ customerName: "", customerPhone: "", customerId: "", deviceType: "موبايل", deviceBrand: "", deviceModel: "", problem: "", laborCost: "", deposit: "", expectedDate: "", notes: "", technicianName: "" });
     } catch (error) {
       toast.error(getErrorMessage(error, "تعذر إضافة طلب الصيانة"));
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -149,7 +155,7 @@ export function RepairsPage() {
           </h1>
           <p className="text-slate-500 text-sm mt-0.5">{repairs.length} طلب صيانة</p>
         </div>
-        {canCreate && <button onClick={() => setShowForm(true)} className="btn-primary flex items-center gap-2">
+        {canCreate && <button onClick={() => { setRequestId(crypto.randomUUID()); setShowForm(true); }} className="btn-primary flex items-center gap-2">
           <Plus className="w-4 h-4" />
           طلب صيانة جديد
         </button>}
@@ -392,7 +398,7 @@ export function RepairsPage() {
                 </div>
               </div>
               <div className="flex gap-3 pt-2">
-                <button type="submit" className="btn-primary flex-1">حفظ طلب الصيانة</button>
+                <button type="submit" disabled={saving} className="btn-primary flex-1 disabled:opacity-50">حفظ طلب الصيانة</button>
                 <button type="button" onClick={() => setShowForm(false)} className="btn-secondary">إلغاء</button>
               </div>
             </form>

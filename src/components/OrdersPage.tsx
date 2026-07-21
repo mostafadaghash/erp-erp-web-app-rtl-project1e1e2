@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { PrintModal } from "./PrintTemplate";
 import { buildEgyptWhatsAppUrl } from "../lib/utils";
+import { getErrorMessage } from "../lib/errors";
 
 // ─── WhatsApp helper ───────────────────────────────────────────────────────────
 function buildWhatsAppLink(phone: string, message: string) {
@@ -415,6 +416,7 @@ function NewOrderForm({ onClose }: { onClose: () => void }) {
   const accounts = useQuery(api.finance.collectionAccountPicker, canCollect ? {} : "skip") ?? [];
   const [accountId, setAccountId] = useState("");
   const [requestId, setRequestId] = useState(() => crypto.randomUUID());
+  const [saving, setSaving] = useState(false);
 
   const [form, setForm] = useState({
     customerName: "",
@@ -443,12 +445,14 @@ function NewOrderForm({ onClose }: { onClose: () => void }) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (saving) return;
     if (!form.customerName.trim()) { toast.error("أدخل اسم العميل"); return; }
     if (items.some(i => !i.productName.trim())) { toast.error("أدخل اسم المنتج لكل عنصر"); return; }
     if (total === 0) { toast.error("أضف منتجاً واحداً على الأقل بسعر"); return; }
     const deposit = parseFloat(form.deposit) || 0;
     if (deposit > total) { toast.error("العربون أكبر من الإجمالي"); return; }
     if (deposit > 0 && !accountId) { toast.error("اختر حساب تحصيل العربون"); return; }
+    setSaving(true);
     try {
       await createOrder({
         customerName: form.customerName,
@@ -470,7 +474,9 @@ function NewOrderForm({ onClose }: { onClose: () => void }) {
       setRequestId(crypto.randomUUID());
       onClose();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "حدث خطأ");
+      toast.error(getErrorMessage(e, "تعذر إنشاء الطلب"));
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -597,7 +603,7 @@ function NewOrderForm({ onClose }: { onClose: () => void }) {
 
           <div className="flex gap-3 pt-2">
             <button type="button" onClick={onClose} className="btn-secondary flex-1">إلغاء</button>
-            <button type="submit" className="btn-primary flex-1">حفظ الأوردر</button>
+            <button type="submit" disabled={saving} className="btn-primary flex-1 disabled:opacity-50">حفظ الأوردر</button>
           </div>
         </form>
       </div>
