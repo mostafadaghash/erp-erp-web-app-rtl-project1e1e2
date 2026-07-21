@@ -40,3 +40,13 @@ All rows below are executable Convex Test Harness scenarios in `financeIntegrati
 | FIN-34 | Balance/movement consistency | Covered | `FIN-34 keeps currentBalance equal to the movement chain` |
 | FIN-35 | No new legacy payment writes | Covered | `FIN-35 never writes new rows to legacy payments` |
 | FIN-36 | Role and branch isolation | Covered | `FIN-36 isolates finance data and permissions by role and branch` |
+| FIN-37 | Atomic, idempotent invoice creation with initial payment | Covered | `FIN-37 invoice creation atomically posts one idempotent initial payment` |
+| FIN-38 | Atomic, idempotent order creation with initial deposit | Covered | `FIN-38 order creation atomically posts one idempotent initial deposit` |
+| FIN-39 | Atomic, idempotent repair creation with initial deposit | Covered | `FIN-39 repair creation atomically posts one idempotent initial deposit` |
+| FIN-40 | Document creation without initial payments leaves finance untouched | Covered | `FIN-40 document creation without an initial payment leaves finance untouched` |
+| FIN-41 | Reject invalid initial-payment account, branch, date, and amount | Covered | `FIN-41 initial payments reject inactive, cross-branch, pre-cutover, non-positive, and excess inputs` |
+| FIN-42 | Invoice refund idempotency, totals, status, and account balance | Covered | `FIN-42 invoice refund is idempotent and updates document and account` |
+| FIN-43 | Order refund idempotency, totals, and account balance | Covered | `FIN-43 order refund is idempotent and updates document and account` |
+| FIN-44 | Repair refund idempotency, totals, and account balance | Covered | `FIN-44 repair refund is idempotent and updates document and account` |
+| FIN-45 | Reject inactive and cross-branch refund accounts | Covered | `FIN-45 refunds reject inactive and cross-branch accounts` |
+| FIN-46 | Reject generic reversal for all document collection types | Covered | `FIN-46 generic reversal rejects every document collection type` |
