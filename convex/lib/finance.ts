@@ -4,6 +4,7 @@ import { ConvexError } from "convex/values";
 import { roundMoney } from "../../shared/businessRules";
 import { nextDocumentNumber } from "./documentNumbers";
 import type { AuthUser } from "./auth";
+import { isValidIsoDate } from "../../shared/businessRules";
 
 export type FinancialTransactionType = Doc<"financialTransactions">["type"];
 export type MovementInput = { accountId: Id<"financialAccounts">; signedAmount: number };
@@ -25,6 +26,14 @@ export function assertFinancialAccountBranch(account: Doc<"financialAccounts">, 
   if (account.branchId !== branchId) throw new ConvexError("الحساب المالي لا ينتمي إلى فرع المستند");
 }
 
+export async function requireFinanceInitialized(ctx: QueryCtx | MutationCtx, date: string) {
+  if (!isValidIsoDate(date)) throw new ConvexError("تاريخ المعاملة غير صالح");
+  const settings = await ctx.db.query("financeSettings").first();
+  if (!settings?.isInitialized) throw new ConvexError("النظام المالي غير مهيأ");
+  if (date < settings.cutoverDate) throw new ConvexError("تاريخ المعاملة يسبق تاريخ القطع");
+  return settings;
+}
+
 function availableAt(date: string, account: Doc<"financialAccounts">, signedAmount: number): string | undefined {
   if (signedAmount <= 0 || !["paymob_clearing", "fawry_clearing", "card_clearing"].includes(account.type)) return undefined;
   const value = new Date(`${date}T00:00:00.000Z`);
@@ -41,8 +50,10 @@ export async function postFinancialTransaction(ctx: MutationCtx, user: AuthUser,
   type: FinancialTransactionType; requestId: string; date: string; amount: number; feeAmount?: number;
   description: string; branchId: Id<"branches">; destinationBranchId?: Id<"branches">;
   referenceType?: string; referenceId?: string; referenceNumber?: string; customerId?: Id<"customers">;
-  movements: MovementInput[]; originalTransactionId?: Id<"financialTransactions">;
+  movements: MovementInput[]; originalTransactionId?: Id<"financialTransactions">; allowBeforeInitialization?: boolean;
 }): Promise<{ transactionId: Id<"financialTransactions">; duplicate: boolean }> {
+  if (!isValidIsoDate(input.date)) throw new ConvexError("تاريخ المعاملة غير صالح");
+  if (!input.allowBeforeInitialization) await requireFinanceInitialized(ctx, input.date);
   const idempotencyKey = financialIdempotencyKey(input.type, user.userId, input.requestId);
   const duplicate = await ctx.db.query("financialTransactions").withIndex("by_idempotency_key", q => q.eq("idempotencyKey", idempotencyKey)).unique();
   if (duplicate) return { transactionId: duplicate._id, duplicate: true };

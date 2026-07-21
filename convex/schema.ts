@@ -18,7 +18,7 @@ const applicationTables = {
     type: v.union(v.literal("cash"), v.literal("instapay"), v.literal("vodafone_cash"), v.literal("fawry_clearing"), v.literal("paymob_clearing"), v.literal("card_clearing"), v.literal("bank"), v.literal("other")),
     branchId: v.id("branches"), isActive: v.boolean(), currentBalance: v.number(),
     allowNegative: v.boolean(), settlementDelayDays: v.number(), createdAt: v.number(),
-    createdBy: v.string(), updatedAt: v.number(),
+    createdBy: v.string(), updatedAt: v.number(), openingBalancePostedAt: v.optional(v.number()),
   }).index("by_branch", ["branchId"]).index("by_type", ["type"]).index("by_unique_key", ["uniqueKey"]).index("by_active", ["isActive"]),
 
   financialTransactions: defineTable({
@@ -164,9 +164,10 @@ const applicationTables = {
     notes: v.optional(v.string()),
     branchId: v.optional(v.id("branches")),
     userId: v.optional(v.string()),
+    creationRequestId: v.optional(v.string()),
     type: v.string(),
     cancelledAt: v.optional(v.number()), cancelledBy: v.optional(v.string()), cancellationReason: v.optional(v.string()),
-  }).index("by_invoice_number", ["invoiceNumber"]).index("by_customer", ["customerId"]).index("by_status", ["status"]),
+  }).index("by_invoice_number", ["invoiceNumber"]).index("by_customer", ["customerId"]).index("by_status", ["status"]).index("by_creation_request", ["creationRequestId"]),
 
   // الطلبات / الأوردرات
   orders: defineTable({
@@ -187,8 +188,9 @@ const applicationTables = {
     expectedDate: v.optional(v.string()),
     notes: v.optional(v.string()),
     branchId: v.optional(v.id("branches")),
+    creationRequestId: v.optional(v.string()),
     cancelledAt: v.optional(v.number()), cancelledBy: v.optional(v.string()), cancellationReason: v.optional(v.string()),
-  }).index("by_status", ["status"]).index("by_order_number", ["orderNumber"]),
+  }).index("by_status", ["status"]).index("by_order_number", ["orderNumber"]).index("by_creation_request", ["creationRequestId"]),
 
   // الصيانة
   repairs: defineTable({
@@ -219,8 +221,9 @@ const applicationTables = {
     notes: v.optional(v.string()),
     branchId: v.optional(v.id("branches")),
     trackingToken: v.optional(v.string()),
+    creationRequestId: v.optional(v.string()),
     cancelledAt: v.optional(v.number()), cancelledBy: v.optional(v.string()), cancellationReason: v.optional(v.string()),
-  }).index("by_repair_number", ["repairNumber"]).index("by_status", ["status"]).index("by_tracking", ["trackingToken"]),
+  }).index("by_repair_number", ["repairNumber"]).index("by_status", ["status"]).index("by_tracking", ["trackingToken"]).index("by_creation_request", ["creationRequestId"]),
 
   // الشحن
   shipments: defineTable({

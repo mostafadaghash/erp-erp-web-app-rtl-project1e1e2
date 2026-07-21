@@ -155,13 +155,17 @@ export const create = mutation({
     discount: v.number(),
     tax: v.number(),
     total: v.number(),
-    paid: v.number(),
-    paymentMethod: v.optional(v.string()),
+    creationRequestId: v.string(),
+    initialPayment: v.optional(v.object({ amount: v.number(), accountId: v.id("financialAccounts"), paymentDate: v.string(), requestId: v.string(), notes: v.optional(v.string()) })),
     notes: v.optional(v.string()),
     branchId: v.optional(v.id("branches")),
   },
   handler: async (ctx, args) => {
     const user = await requireModulePermission(ctx, "create_invoices", "invoices");
+    const creationRequestId = `${user.userId}:${args.creationRequestId.trim()}`;
+    if (!args.creationRequestId.trim()) throw new ConvexError("معرف طلب إنشاء الفاتورة مطلوب");
+    const existing = await ctx.db.query("invoices").withIndex("by_creation_request", q => q.eq("creationRequestId", creationRequestId)).unique();
+    if (existing) return existing._id;
     const branchId = resolveWriteBranch(user, args.branchId);
     await requireActiveBranch(ctx, branchId);
     let customerName = args.customerName.trim();
@@ -173,7 +177,10 @@ export const create = mutation({
       customerName = customer.name;
       customerPhone = customer.phone;
     }
-    const prepared = await prepareInvoice(ctx, user, args.items, args.discount, args.paid);
+    const prepared = await prepareInvoice(ctx, user, args.items, args.discount, args.initialPayment?.amount ?? 0);
+    if (prepared.remaining > 0 && !args.customerId) throw new ConvexError("الفاتورة الآجلة تتطلب عميلاً مسجلاً");
+    let paymentAccount;
+    if (args.initialPayment) { await requirePermission(ctx, "record_collections"); paymentAccount = await requireActiveFinancialAccount(ctx, args.initialPayment.accountId); assertFinancialAccountBranch(paymentAccount, branchId!); }
 
     const invoiceNumber = await nextDocumentNumber(ctx, "invoice");
 
@@ -189,12 +196,13 @@ export const create = mutation({
       total: prepared.total,
       paid: prepared.paid,
       remaining: prepared.remaining,
-      paymentMethod: args.paymentMethod ?? "cash",
+      paymentMethod: paymentAccount?.type ?? "unpaid",
       status: prepared.status,
       notes: args.notes,
       branchId,
       userId: user.userId,
       type: "sale",
+      creationRequestId,
     });
 
     for (const [productId, quantity] of prepared.requested) {
@@ -213,6 +221,10 @@ export const create = mutation({
       await adjustCustomer(ctx, user, args.customerId, prepared.total, prepared.remaining);
     }
 
+    if (args.initialPayment && paymentAccount) {
+      await postFinancialTransaction(ctx, user, { type: "invoice_payment", requestId: args.initialPayment.requestId, date: args.initialPayment.paymentDate, amount: args.initialPayment.amount, description: args.initialPayment.notes?.trim() || `تحصيل أولي للفاتورة ${invoiceNumber}`, branchId: branchId!, referenceType: "invoice", referenceId: String(id), referenceNumber: invoiceNumber, customerId: args.customerId, movements: [{ accountId: paymentAccount._id, signedAmount: args.initialPayment.amount }] });
+    }
+
     await logAction(ctx, user, {
       action: "create",
       module: "invoices",
@@ -227,7 +239,7 @@ export const create = mutation({
 
 export const recordPayment = mutation({ args: { invoiceId: v.id("invoices"), amount: v.number(), accountId: v.id("financialAccounts"), paymentDate: v.string(), requestId: v.string(), notes: v.optional(v.string()) }, handler: async (ctx, args) => { const user = await requirePermission(ctx, "record_collections"); const invoice = await ctx.db.get(args.invoiceId); if (!invoice || !invoice.branchId) throw new ConvexError("الفاتورة غير موجودة"); assertBranchAccess(user, invoice); if (invoice.status === "cancelled") throw new ConvexError("الفاتورة ملغاة"); if (!Number.isFinite(args.amount) || args.amount <= 0 || args.amount > invoice.remaining) throw new ConvexError("مبلغ التحصيل غير صالح"); const account = await requireActiveFinancialAccount(ctx, args.accountId); assertFinancialAccountBranch(account, invoice.branchId); const posted = await postFinancialTransaction(ctx, user, { type: "invoice_payment", requestId: args.requestId, date: args.paymentDate, amount: args.amount, description: args.notes?.trim() || `تحصيل الفاتورة ${invoice.invoiceNumber}`, branchId: invoice.branchId, referenceType: "invoice", referenceId: String(invoice._id), referenceNumber: invoice.invoiceNumber, customerId: invoice.customerId, movements: [{ accountId: account._id, signedAmount: args.amount }] }); if (!posted.duplicate) { const paid = roundMoney(invoice.paid + args.amount), remaining = roundMoney(invoice.remaining - args.amount); await ctx.db.patch(invoice._id, { paid, remaining, status: remaining === 0 ? "paid" : "partial", paymentMethod: account.type }); if (invoice.customerId) { const customer = await ctx.db.get(invoice.customerId); if (!customer || customer.balance < args.amount) throw new ConvexError("رصيد العميل غير متسق"); await ctx.db.patch(customer._id, { balance: roundMoney(customer.balance - args.amount) }); } } return posted.transactionId; } });
 
-export const refundPayment = mutation({ args: { invoiceId: v.id("invoices"), amount: v.number(), accountId: v.id("financialAccounts"), date: v.string(), reason: v.string(), requestId: v.string() }, handler: async (ctx, args) => { const user = await requirePermission(ctx, "refund_collections"); const invoice = await ctx.db.get(args.invoiceId); if (!invoice || !invoice.branchId) throw new ConvexError("الفاتورة غير موجودة"); assertBranchAccess(user, invoice); if (!Number.isFinite(args.amount) || args.amount <= 0 || args.amount > invoice.paid) throw new ConvexError("مبلغ الاسترداد غير صالح"); const account = await requireActiveFinancialAccount(ctx, args.accountId); assertFinancialAccountBranch(account, invoice.branchId); const posted = await postFinancialTransaction(ctx, user, { type: "invoice_refund", requestId: args.requestId, date: args.date, amount: args.amount, description: args.reason.trim(), branchId: invoice.branchId, referenceType: "invoice", referenceId: String(invoice._id), referenceNumber: invoice.invoiceNumber, customerId: invoice.customerId, movements: [{ accountId: account._id, signedAmount: -args.amount }] }); if (!posted.duplicate) { await ctx.db.patch(invoice._id, { paid: roundMoney(invoice.paid - args.amount), remaining: roundMoney(invoice.remaining + args.amount), status: "partial" }); if (invoice.customerId) { const customer = await ctx.db.get(invoice.customerId); if (customer) await ctx.db.patch(customer._id, { balance: roundMoney(customer.balance + args.amount) }); } } return posted.transactionId; } });
+export const refundPayment = mutation({ args: { invoiceId: v.id("invoices"), amount: v.number(), accountId: v.id("financialAccounts"), date: v.string(), reason: v.string(), requestId: v.string() }, handler: async (ctx, args) => { const user = await requirePermission(ctx, "refund_collections"); const invoice = await ctx.db.get(args.invoiceId); if (!invoice || !invoice.branchId) throw new ConvexError("الفاتورة غير موجودة"); assertBranchAccess(user, invoice); if (!args.reason.trim()) throw new ConvexError("سبب الاسترداد مطلوب"); if (!Number.isFinite(args.amount) || args.amount <= 0 || args.amount > invoice.paid) throw new ConvexError("مبلغ الاسترداد غير صالح"); const account = await requireActiveFinancialAccount(ctx, args.accountId); assertFinancialAccountBranch(account, invoice.branchId); const posted = await postFinancialTransaction(ctx, user, { type: "invoice_refund", requestId: args.requestId, date: args.date, amount: args.amount, description: args.reason.trim(), branchId: invoice.branchId, referenceType: "invoice", referenceId: String(invoice._id), referenceNumber: invoice.invoiceNumber, customerId: invoice.customerId, movements: [{ accountId: account._id, signedAmount: -args.amount }] }); if (!posted.duplicate) { await ctx.db.patch(invoice._id, { paid: roundMoney(invoice.paid - args.amount), remaining: roundMoney(invoice.remaining + args.amount), status: "partial" }); if (invoice.customerId) { const customer = await ctx.db.get(invoice.customerId); if (customer) await ctx.db.patch(customer._id, { balance: roundMoney(customer.balance + args.amount) }); } } return posted.transactionId; } });
 
 export const update = mutation({
   args: {

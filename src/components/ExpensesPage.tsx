@@ -1,3 +1,4 @@
+import { FinancialHistory } from "./FinancialHistory";
 import { useState } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
@@ -5,6 +6,7 @@ import { usePermission } from "../lib/access";
 import { toast } from "sonner";
 import { DollarSign, Plus, Search } from "lucide-react";
 import type { Doc } from "../../convex/_generated/dataModel";
+import type { Id } from "../../convex/_generated/dataModel";
 import { getErrorMessage } from "../lib/errors";
 
 const expenseCategories = ["إيجار", "رواتب", "مرافق", "تسويق", "صيانة", "مشتريات", "نقل", "أخرى"];
@@ -16,6 +18,8 @@ export function ExpensesPage() {
   const expenseStats = useQuery(api.expenses.getStats);
   const createExpense = useMutation(api.expenses.create);
   const voidExpense = useMutation(api.expenses.void);
+  const accounts = useQuery(api.finance.disbursementAccountPicker, canCreate ? {} : "skip") ?? [];
+  const financeStatus = useQuery(api.finance.initializationStatus, canCreate ? {} : "skip");
 
   const [search, setSearch] = useState("");
   const [filterCategory, setFilterCategory] = useState("");
@@ -26,7 +30,7 @@ export function ExpensesPage() {
   const [form, setForm] = useState({
     title: "", category: "إيجار", amount: "",
     date: new Date().toISOString().split("T")[0],
-    paymentMethod: "cash", notes: "",
+    accountId: "", notes: "",
   });
 
   const filtered = expenses.filter(e =>
@@ -35,18 +39,20 @@ export function ExpensesPage() {
 
   const handleSubmit = async (ev: React.FormEvent) => {
     ev.preventDefault();
+    if (!form.accountId) return toast.error("اختر حساب الصرف");
     try {
       await createExpense({
         title: form.title,
         category: form.category,
         amount: Number(form.amount),
         date: form.date,
-        paymentMethod: form.paymentMethod,
+        accountId: form.accountId as Id<"financialAccounts">,
+        requestId: crypto.randomUUID(),
         notes: form.notes || undefined,
       });
       toast.success("تم إضافة المصروف بنجاح");
       setShowForm(false);
-      setForm({ title: "", category: "إيجار", amount: "", date: new Date().toISOString().split("T")[0], paymentMethod: "cash", notes: "" });
+      setForm({ title: "", category: "إيجار", amount: "", date: new Date().toISOString().split("T")[0], accountId: "", notes: "" });
     } catch (error) {
       toast.error(getErrorMessage(error, "تعذر إضافة المصروف"));
     }
@@ -57,7 +63,7 @@ export function ExpensesPage() {
     if (!voidTarget || isVoiding || !voidReason.trim()) return;
     setIsVoiding(true);
     try {
-      await voidExpense({ id: voidTarget._id, reason: voidReason.trim() });
+      await voidExpense({ id: voidTarget._id, reason: voidReason.trim(), date: new Date().toISOString().slice(0, 10), requestId: crypto.randomUUID() });
       toast.success("تم إبطال المصروف بنجاح");
       setVoidTarget(null);
       setVoidReason("");
@@ -85,7 +91,7 @@ export function ExpensesPage() {
           </h1>
           <p className="text-slate-500 text-sm mt-0.5">{expenses.length} مصروف</p>
         </div>
-        {canCreate && <button onClick={() => setShowForm(true)} className="btn-primary flex items-center gap-2">
+        {canCreate && <button disabled={financeStatus?.state !== "initialized"} onClick={() => setShowForm(true)} className="btn-primary flex items-center gap-2">
           <Plus className="w-4 h-4" />
           مصروف جديد
         </button>}
@@ -153,7 +159,7 @@ export function ExpensesPage() {
             <tbody>
               {filtered.map(e => (
                 <tr key={e._id} className={e.status === "voided" ? "bg-slate-50 opacity-70" : ""}>
-                  <td className="font-medium text-slate-800">{e.title}</td>
+                  <td className="font-medium text-slate-800">{e.title}<FinancialHistory referenceType="expense" referenceId={String(e._id)} /></td>
                   <td><span className="badge badge-info">{e.category}</span></td>
                   <td className="font-bold text-red-600">{e.amount.toLocaleString("ar-EG")} ج.م</td>
                   <td className="text-slate-500 text-xs">{e.date}</td>
@@ -219,12 +225,8 @@ export function ExpensesPage() {
                   <input className="form-input" type="date" value={form.date} onChange={e => setForm({...form, date: e.target.value})} />
                 </div>
                 <div>
-                  <label className="form-label">طريقة الدفع</label>
-                  <select className="form-input" value={form.paymentMethod} onChange={e => setForm({...form, paymentMethod: e.target.value})}>
-                    <option value="cash">نقدي</option>
-                    <option value="card">بطاقة</option>
-                    <option value="transfer">تحويل</option>
-                  </select>
+                  <label className="form-label">حساب الصرف *</label>
+                  <select required className="form-input" value={form.accountId} onChange={e => setForm({...form, accountId: e.target.value})}><option value="">اختر الحساب</option>{accounts.map(a => <option key={a._id} value={a._id}>{a.name}</option>)}</select>
                 </div>
               </div>
               <div>
