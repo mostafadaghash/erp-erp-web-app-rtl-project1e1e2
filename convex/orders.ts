@@ -65,13 +65,16 @@ export const create = mutation({
       notes: v.optional(v.string()),
     })),
     total: v.number(),
-    deposit: v.number(),
+    creationRequestId: v.string(),
+    initialDeposit: v.optional(v.object({ amount: v.number(), accountId: v.id("financialAccounts"), paymentDate: v.string(), requestId: v.string(), notes: v.optional(v.string()) })),
     expectedDate: v.optional(v.string()),
     notes: v.optional(v.string()),
     branchId: v.optional(v.id("branches")),
   },
   handler: async (ctx, args) => {
     const user = await requireModulePermission(ctx, "create_orders", "orders");
+    const creationRequestId = `${user.userId}:${args.creationRequestId.trim()}`; if (!args.creationRequestId.trim()) throw new ConvexError("معرف طلب إنشاء الطلب مطلوب");
+    const existing = await ctx.db.query("orders").withIndex("by_creation_request", q => q.eq("creationRequestId", creationRequestId)).unique(); if (existing) return existing._id;
     const branchId = resolveWriteBranch(user, args.branchId);
     await requireActiveBranch(ctx, branchId);
     let customerName = args.customerName.trim();
@@ -91,10 +94,12 @@ export const create = mutation({
       return { ...item, productName: item.productName.trim(), unitPrice: roundMoney(item.unitPrice) };
     });
     const total = roundMoney(items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0));
-    if (!Number.isFinite(args.deposit) || args.deposit < 0 || args.deposit > total) {
+    const initialAmount = args.initialDeposit?.amount ?? 0;
+    if (!Number.isFinite(initialAmount) || initialAmount < 0 || initialAmount > total) {
       throw new ConvexError("العربون يجب أن يكون بين صفر وإجمالي الطلب");
     }
-    const deposit = roundMoney(args.deposit);
+    const deposit = roundMoney(initialAmount);
+    let account; if (args.initialDeposit) { await requirePermission(ctx, "record_collections"); account = await requireActiveFinancialAccount(ctx, args.initialDeposit.accountId); assertFinancialAccountBranch(account, branchId!); }
     const orderNumber = await nextDocumentNumber(ctx, "order");
     const remaining = roundMoney(total - deposit);
     const id = await ctx.db.insert("orders", {
@@ -110,7 +115,9 @@ export const create = mutation({
       orderNumber,
       remaining,
       status: "pending",
+      creationRequestId,
     });
+    if (args.initialDeposit && account) await postFinancialTransaction(ctx, user, { type: "order_deposit", requestId: args.initialDeposit.requestId, date: args.initialDeposit.paymentDate, amount: deposit, description: args.initialDeposit.notes?.trim() || `عربون الطلب ${orderNumber}`, branchId: branchId!, referenceType: "order", referenceId: String(id), referenceNumber: orderNumber, customerId: args.customerId, movements: [{ accountId: account._id, signedAmount: deposit }] });
     await logAction(ctx, user, {
       action: "create",
       module: "orders",
@@ -176,7 +183,7 @@ export const addPayment = mutation({
   },
 });
 
-export const refundDeposit = mutation({ args: { id: v.id("orders"), amount: v.number(), accountId: v.id("financialAccounts"), date: v.string(), reason: v.string(), requestId: v.string() }, handler: async (ctx, args) => { const user = await requirePermission(ctx, "refund_collections"); const order = await ctx.db.get(args.id); if (!order || !order.branchId) throw new ConvexError("الطلب غير موجود"); assertBranchAccess(user, order); if (!Number.isFinite(args.amount) || args.amount <= 0 || args.amount > order.deposit) throw new ConvexError("مبلغ الاسترداد غير صالح"); const account = await requireActiveFinancialAccount(ctx, args.accountId); assertFinancialAccountBranch(account, order.branchId); const posted = await postFinancialTransaction(ctx, user, { type: "order_refund", requestId: args.requestId, date: args.date, amount: args.amount, description: args.reason.trim(), branchId: order.branchId, referenceType: "order", referenceId: String(order._id), referenceNumber: order.orderNumber, movements: [{ accountId: account._id, signedAmount: -args.amount }] }); if (!posted.duplicate) await ctx.db.patch(order._id, { deposit: roundMoney(order.deposit - args.amount), remaining: roundMoney(order.remaining + args.amount) }); return posted.transactionId; } });
+export const refundDeposit = mutation({ args: { id: v.id("orders"), amount: v.number(), accountId: v.id("financialAccounts"), date: v.string(), reason: v.string(), requestId: v.string() }, handler: async (ctx, args) => { const user = await requirePermission(ctx, "refund_collections"); const order = await ctx.db.get(args.id); if (!order || !order.branchId) throw new ConvexError("الطلب غير موجود"); assertBranchAccess(user, order); const reason = args.reason.trim(); if (!reason) throw new ConvexError("سبب الاسترداد مطلوب"); if (!Number.isFinite(args.amount) || args.amount <= 0 || args.amount > order.deposit) throw new ConvexError("مبلغ الاسترداد غير صالح"); const account = await requireActiveFinancialAccount(ctx, args.accountId); assertFinancialAccountBranch(account, order.branchId); const posted = await postFinancialTransaction(ctx, user, { type: "order_refund", requestId: args.requestId, date: args.date, amount: args.amount, description: reason, branchId: order.branchId, referenceType: "order", referenceId: String(order._id), referenceNumber: order.orderNumber, movements: [{ accountId: account._id, signedAmount: -args.amount }] }); if (!posted.duplicate) await ctx.db.patch(order._id, { deposit: roundMoney(order.deposit - args.amount), remaining: roundMoney(order.remaining + args.amount) }); return posted.transactionId; } });
 
 export const cancel = mutation({
   args: { id: v.id("orders"), reason: v.string() },

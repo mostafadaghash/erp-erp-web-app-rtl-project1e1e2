@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { toast } from "sonner";
 import type { Page } from "./ERPApp";
 import { Plus, Trash2, ShoppingCart, Search } from "lucide-react";
 import type { Id } from "../../convex/_generated/dataModel";
+import { usePermission } from "../lib/access";
 
 interface NewInvoicePageProps {
   onNavigate: (page: Page) => void;
@@ -24,6 +25,10 @@ export function NewInvoicePage({ onNavigate }: NewInvoicePageProps) {
   const customers = useQuery(api.customers.list) ?? [];
   const settings = useQuery(api.settings.getPublic);
   const createInvoice = useMutation(api.invoices.create);
+  const canCollect = usePermission("record_collections");
+  const accounts = useQuery(api.finance.collectionAccountPicker, canCollect ? {} : "skip") ?? [];
+  const requestId = useRef(crypto.randomUUID());
+  const [saving, setSaving] = useState(false);
 
   const [cart, setCart] = useState<CartItem[]>([]);
   const [customerName, setCustomerName] = useState("");
@@ -31,7 +36,7 @@ export function NewInvoicePage({ onNavigate }: NewInvoicePageProps) {
   const [customerId, setCustomerId] = useState("");
   const [discount, setDiscount] = useState(0);
   const [paid, setPaid] = useState(0);
-  const [paymentMethod, setPaymentMethod] = useState("cash");
+  const [accountId, setAccountId] = useState("");
   const [notes, setNotes] = useState("");
   const [productSearch, setProductSearch] = useState("");
   const taxRate = settings?.taxRate ?? 14;
@@ -94,6 +99,9 @@ export function NewInvoicePage({ onNavigate }: NewInvoicePageProps) {
   const handleSubmit = async () => {
     if (cart.length === 0) return toast.error("أضف منتجاً واحداً على الأقل");
     if (!customerName) return toast.error("أدخل اسم العميل");
+    if (paid > 0 && !accountId) return toast.error("اختر الحساب المالي");
+    if (saving) return;
+    setSaving(true);
     try {
       await createInvoice({
         customerId: customerId ? customerId as Id<"customers"> : undefined,
@@ -111,14 +119,17 @@ export function NewInvoicePage({ onNavigate }: NewInvoicePageProps) {
         discount: discountAmount,
         tax: taxAmount,
         total,
-        paid,
-        paymentMethod,
+        creationRequestId: requestId.current,
+        initialPayment: paid > 0 ? { amount: paid, accountId: accountId as Id<"financialAccounts">, paymentDate: new Date().toISOString().slice(0, 10), requestId: requestId.current } : undefined,
         notes: notes || undefined,
       });
       toast.success("تم إنشاء الفاتورة بنجاح");
+      requestId.current = crypto.randomUUID();
       onNavigate("invoices");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "حدث خطأ أثناء إنشاء الفاتورة");
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -273,12 +284,10 @@ export function NewInvoicePage({ onNavigate }: NewInvoicePageProps) {
 
             <div className="space-y-3 mb-4">
               <div>
-                <label className="form-label">طريقة الدفع</label>
-                <select className="form-input" value={paymentMethod} onChange={e => setPaymentMethod(e.target.value)}>
-                  <option value="cash">نقدي</option>
-                  <option value="card">بطاقة</option>
-                  <option value="transfer">تحويل بنكي</option>
-                  <option value="credit">آجل</option>
+                <label className="form-label">حساب التحصيل</label>
+                <select className="form-input" value={accountId} onChange={e => setAccountId(e.target.value)} disabled={!canCollect || paid <= 0}>
+                  <option value="">{canCollect ? "اختر الحساب المالي" : "يسجل مسؤول التحصيل الدفعة لاحقاً"}</option>
+                  {accounts.map(account => <option key={account._id} value={account._id}>{account.name}</option>)}
                 </select>
               </div>
               <div>

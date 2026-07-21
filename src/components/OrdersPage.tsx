@@ -1,3 +1,4 @@
+import { FinancialHistory } from "./FinancialHistory";
 import { useState } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
@@ -73,6 +74,9 @@ export function OrdersPage() {
   const [selectedOrder, setSelectedOrder] = useState<Id<"orders"> | null>(null);
   const [showPayment, setShowPayment] = useState<Id<"orders"> | null>(null);
   const [paymentAmount, setPaymentAmount] = useState("");
+  const [paymentAccountId, setPaymentAccountId] = useState("");
+  const [paymentDate, setPaymentDate] = useState(new Date().toISOString().slice(0, 10));
+  const [paymentNotes, setPaymentNotes] = useState("");
   const [printOrder, setPrintOrder] = useState<any>(null);
 
   const orders = useQuery(api.orders.list, filterStatus !== "all" ? { status: filterStatus } : {});
@@ -80,6 +84,8 @@ export function OrdersPage() {
   const settings = useQuery(api.settings.getPublic);
   const updateStatus = useMutation(api.orders.updateStatus);
   const addPayment = useMutation(api.orders.addPayment);
+  const refundDeposit = useMutation(api.orders.refundDeposit);
+  const accounts = useQuery(api.finance.collectionAccountPicker, {} as const) ?? [];
   const removeOrder = useMutation(api.orders.cancel);
 
   const storeName = settings?.storeName ?? "المتجر";
@@ -104,7 +110,8 @@ export function OrdersPage() {
     const amount = parseFloat(paymentAmount);
     if (!amount || amount <= 0) { toast.error("أدخل مبلغاً صحيحاً"); return; }
     try {
-      await addPayment({ id, amount });
+      if (!paymentAccountId) return toast.error("اختر الحساب المالي");
+      await addPayment({ id, amount, accountId: paymentAccountId as Id<"financialAccounts">, paymentDate, requestId: crypto.randomUUID(), notes: paymentNotes || undefined });
       toast.success("تم تسجيل الدفعة بنجاح");
       setShowPayment(null);
       setPaymentAmount("");
@@ -159,6 +166,9 @@ export function OrdersPage() {
                 <p className="text-2xl font-black text-slate-800">{s.value}</p>
                 <p className="text-xs text-slate-500">{s.label}</p>
               </div>
+              <select className="form-input" value={paymentAccountId} onChange={e => setPaymentAccountId(e.target.value)}><option value="">اختر حساب التحصيل</option>{accounts.map(a => <option key={a._id} value={a._id}>{a.name}</option>)}</select>
+              <input className="form-input" type="date" value={paymentDate} onChange={e => setPaymentDate(e.target.value)} />
+              <textarea className="form-input" placeholder="ملاحظات" value={paymentNotes} onChange={e => setPaymentNotes(e.target.value)} />
             </div>
           );
         })}
@@ -246,7 +256,7 @@ export function OrdersPage() {
                   return (
                     <tr key={order._id}>
                       <td>
-                        <span className="font-mono font-bold text-indigo-600 text-xs">{order.orderNumber}</span>
+                        <span className="font-mono font-bold text-indigo-600 text-xs">{order.orderNumber}<FinancialHistory referenceType="order" referenceId={String(order._id)} /></span>
                       </td>
                       <td>
                         <p className="font-medium text-slate-800">{order.customerName}</p>
@@ -401,6 +411,10 @@ export function OrdersPage() {
 function NewOrderForm({ onClose }: { onClose: () => void }) {
   const createOrder = useMutation(api.orders.create);
   const customers = useQuery(api.customers.list);
+  const canCollect = usePermission("record_collections");
+  const accounts = useQuery(api.finance.collectionAccountPicker, canCollect ? {} : "skip") ?? [];
+  const [accountId, setAccountId] = useState("");
+  const [requestId, setRequestId] = useState(() => crypto.randomUUID());
 
   const [form, setForm] = useState({
     customerName: "",
@@ -434,6 +448,7 @@ function NewOrderForm({ onClose }: { onClose: () => void }) {
     if (total === 0) { toast.error("أضف منتجاً واحداً على الأقل بسعر"); return; }
     const deposit = parseFloat(form.deposit) || 0;
     if (deposit > total) { toast.error("العربون أكبر من الإجمالي"); return; }
+    if (deposit > 0 && !accountId) { toast.error("اختر حساب تحصيل العربون"); return; }
     try {
       await createOrder({
         customerName: form.customerName,
@@ -446,11 +461,13 @@ function NewOrderForm({ onClose }: { onClose: () => void }) {
           notes: i.notes || undefined,
         })),
         total,
-        deposit,
+        creationRequestId: requestId,
+        initialDeposit: deposit > 0 ? { amount: deposit, accountId: accountId as Id<"financialAccounts">, paymentDate: new Date().toISOString().slice(0, 10), requestId } : undefined,
         expectedDate: form.expectedDate || undefined,
         notes: form.notes || undefined,
       });
       toast.success("تم إنشاء الأوردر بنجاح");
+      setRequestId(crypto.randomUUID());
       onClose();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "حدث خطأ");
@@ -549,8 +566,10 @@ function NewOrderForm({ onClose }: { onClose: () => void }) {
             </div>
             <div>
               <label className="form-label">العربون / الدفعة الأولى (ج.م)</label>
-              <input className="form-input" type="number" placeholder="0" min="0"
+              <input className="form-input" type="number" placeholder="0" min="0" disabled={!canCollect}
                 value={form.deposit} onChange={e => setForm({ ...form, deposit: e.target.value })} />
+              {canCollect && Number(form.deposit) > 0 && <select className="form-input mt-2" value={accountId} onChange={e => setAccountId(e.target.value)}><option value="">اختر حساب التحصيل</option>{accounts.map(a => <option key={a._id} value={a._id}>{a.name}</option>)}</select>}
+              {!canCollect && <p className="text-xs text-amber-700">يسجل مسؤول التحصيل العربون لاحقاً.</p>}
             </div>
             {form.deposit && (
               <div className="flex items-center justify-between text-sm">

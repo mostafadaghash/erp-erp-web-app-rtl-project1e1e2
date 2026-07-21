@@ -1,3 +1,4 @@
+import { FinancialHistory } from "./FinancialHistory";
 import { useState } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
@@ -23,11 +24,18 @@ export function RepairsPage() {
   const canCreate = usePermission("create_repairs");
   const canEdit = usePermission("edit_repairs");
   const canPrint = usePermission("print_repairs");
+  const canRefund = usePermission("refund_collections");
   const repairs = useQuery(api.repairs.list) ?? [];
   const customers = useQuery(api.customers.repairPicker, canCreate ? {} : "skip") ?? [];
   const createRepair = useMutation(api.repairs.create);
   const updateStatus = useMutation(api.repairs.updateStatus);
   const rotateTrackingToken = useMutation(api.repairs.rotateTrackingToken);
+  const recordPayment = useMutation(api.repairs.recordPayment);
+  const refundPayment = useMutation(api.repairs.refundPayment);
+  const canCollect = usePermission("record_collections");
+  const accounts = useQuery(api.finance.collectionAccountPicker, canCollect ? {} : "skip") ?? [];
+  const [accountId, setAccountId] = useState("");
+  const [requestId, setRequestId] = useState(() => crypto.randomUUID());
 
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState("");
@@ -61,12 +69,14 @@ export function RepairsPage() {
         deviceModel: form.deviceModel,
         problem: form.problem,
         laborCost: Number(form.laborCost),
-        deposit: Number(form.deposit),
+        creationRequestId: requestId,
+        initialDeposit: Number(form.deposit) > 0 ? { amount: Number(form.deposit), accountId: accountId as Id<"financialAccounts">, paymentDate: new Date().toISOString().slice(0, 10), requestId } : undefined,
         expectedDate: form.expectedDate || undefined,
         notes: form.notes || undefined,
         technicianName: form.technicianName || undefined,
       });
       toast.success("تم إضافة طلب الصيانة بنجاح");
+      setRequestId(crypto.randomUUID());
       setShowForm(false);
       setForm({ customerName: "", customerPhone: "", customerId: "", deviceType: "موبايل", deviceBrand: "", deviceModel: "", problem: "", laborCost: "", deposit: "", expectedDate: "", notes: "", technicianName: "" });
     } catch (error) {
@@ -86,6 +96,15 @@ export function RepairsPage() {
     } finally {
       setUpdatingId(null);
     }
+  };
+
+  const collectRepair = async (repair: Doc<"repairs">) => {
+    const amount = Number(prompt("قيمة التحصيل")); const selected = accounts[0]; if (!amount || !selected) return toast.error("اختر حساباً متاحاً وأدخل مبلغاً صحيحاً");
+    try { await recordPayment({ repairId: repair._id, amount, accountId: selected._id, paymentDate: new Date().toISOString().slice(0, 10), requestId: crypto.randomUUID() }); toast.success("تم التحصيل"); } catch (error) { toast.error(getErrorMessage(error, "تعذر التحصيل")); }
+  };
+  const refundRepair = async (repair: Doc<"repairs">) => {
+    const amount = Number(prompt("قيمة الاسترداد")); const reason = prompt("سبب الاسترداد")?.trim(); const selected = accounts[0]; if (!amount || !reason || !selected) return;
+    try { await refundPayment({ repairId: repair._id, amount, accountId: selected._id, date: new Date().toISOString().slice(0, 10), reason, requestId: crypto.randomUUID() }); toast.success("تم الاسترداد"); } catch (error) { toast.error(getErrorMessage(error, "تعذر الاسترداد")); }
   };
 
   const handleStatusSelection = (repair: Doc<"repairs">, value: string) => {
@@ -177,7 +196,7 @@ export function RepairsPage() {
             <div key={r._id} className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 hover:shadow-md transition-all">
               <div className="flex items-start justify-between mb-3">
                 <div>
-                  <p className="font-mono text-xs text-indigo-600 font-bold">{r.repairNumber}</p>
+                  <p className="font-mono text-xs text-indigo-600 font-bold">{r.repairNumber}</p><FinancialHistory referenceType="repair" referenceId={String(r._id)} />
                   <p className="font-bold text-slate-800 mt-0.5">{r.customerName}</p>
                   <p className="text-xs text-slate-500">{r.customerPhone}</p>
                 </div>
@@ -254,6 +273,8 @@ export function RepairsPage() {
               )}
 
               <div className="flex gap-2">
+                {canCollect && r.remaining > 0 && <button className="btn-secondary text-xs" onClick={() => void collectRepair(r)}>تحصيل دفعة</button>}
+                {canRefund && r.deposit > 0 && <button className="btn-secondary text-xs" onClick={() => void refundRepair(r)}>استرداد مبلغ</button>}
                 {canEdit && r.status !== "delivered" && r.status !== "cancelled" && (
                   <select
                     className="flex-1 text-xs border border-slate-200 rounded-lg px-2 py-1.5 bg-white text-slate-700"
@@ -354,7 +375,8 @@ export function RepairsPage() {
                 </div>
                 <div>
                   <label className="form-label">العربون (ج.م)</label>
-                  <input className="form-input" type="number" value={form.deposit} onChange={e => setForm({...form, deposit: e.target.value})} placeholder="0" />
+                  <input className="form-input" type="number" disabled={!canCollect} value={form.deposit} onChange={e => setForm({...form, deposit: e.target.value})} placeholder="0" />
+                  {canCollect && Number(form.deposit) > 0 && <select className="form-input mt-2" value={accountId} onChange={e => setAccountId(e.target.value)}><option value="">اختر حساب التحصيل</option>{accounts.map(a => <option key={a._id} value={a._id}>{a.name}</option>)}</select>}
                 </div>
                 <div>
                   <label className="form-label">الفني المسؤول</label>

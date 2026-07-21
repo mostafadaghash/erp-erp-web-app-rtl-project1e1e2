@@ -1,3 +1,4 @@
+import { FinancialHistory } from "./FinancialHistory";
 import { useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
@@ -18,8 +19,13 @@ export function InvoicesPage({ onNavigate }: InvoicesPageProps) {
   const canCreate = usePermission("create_invoices");
   const canPrint = usePermission("print_invoices");
   const canCancel = usePermission("delete_invoices");
+  const canCollect = usePermission("record_collections");
+  const canRefund = usePermission("refund_collections");
   const invoices = useQuery(api.invoices.list, {}) ?? [];
   const cancelInvoice = useMutation(api.invoices.cancel);
+  const recordPayment = useMutation(api.invoices.recordPayment);
+  const refundPayment = useMutation(api.invoices.refundPayment);
+  const accounts = useQuery(api.finance.collectionAccountPicker, canCollect || canRefund ? {} : "skip") ?? [];
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState("");
   const [printInvoice, setPrintInvoice] = useState<Doc<"invoices"> | null>(null);
@@ -42,6 +48,8 @@ export function InvoicesPage({ onNavigate }: InvoicesPageProps) {
       setIsCancelling(false);
     }
   };
+  const collect = async (invoice: Doc<"invoices">) => { const amount = Number(prompt("المبلغ المراد تحصيله")); const account = accounts[0]; if (!amount || !account) return toast.error("لا يوجد حساب تحصيل متاح"); try { await recordPayment({ invoiceId: invoice._id, amount, accountId: account._id, paymentDate: new Date().toISOString().slice(0, 10), requestId: crypto.randomUUID() }); toast.success("تم التحصيل"); } catch (error) { toast.error(getErrorMessage(error, "تعذر التحصيل")); } };
+  const refund = async (invoice: Doc<"invoices">) => { const amount = Number(prompt("المبلغ المراد استرداده")); const reason = prompt("سبب الاسترداد")?.trim(); const account = accounts[0]; if (!amount || !reason || !account) return; try { await refundPayment({ invoiceId: invoice._id, amount, accountId: account._id, date: new Date().toISOString().slice(0, 10), reason, requestId: crypto.randomUUID() }); toast.success("تم الاسترداد"); } catch (error) { toast.error(getErrorMessage(error, "تعذر الاسترداد")); } };
 
   const filtered = invoices.filter(inv =>
     inv.invoiceNumber.includes(search) ||
@@ -127,8 +135,10 @@ export function InvoicesPage({ onNavigate }: InvoicesPageProps) {
             <tbody>
               {filtered.map((inv) => (
                 <tr key={inv._id}>
-                  <td className="font-mono text-xs text-indigo-600 font-bold">{inv.invoiceNumber}</td>
+                  <td className="font-mono text-xs text-indigo-600 font-bold">{inv.invoiceNumber}<details><summary>السجل المالي</summary><FinancialHistory referenceType="invoice" referenceId={String(inv._id)} /></details></td>
                   <td>
+                    {canCollect && inv.status !== "cancelled" && inv.remaining > 0 && <button className="mr-1 rounded-lg bg-emerald-50 px-2 py-1.5 text-xs font-bold text-emerald-700" onClick={() => void collect(inv)}>تحصيل دفعة</button>}
+                    {canRefund && inv.status !== "cancelled" && inv.paid > 0 && <button className="mr-1 rounded-lg bg-amber-50 px-2 py-1.5 text-xs font-bold text-amber-700" onClick={() => void refund(inv)}>استرداد مبلغ</button>}
                     <p className="font-medium text-slate-800">{inv.customerName}</p>
                     {inv.customerPhone && <p className="text-xs text-slate-400">{inv.customerPhone}</p>}
                   </td>

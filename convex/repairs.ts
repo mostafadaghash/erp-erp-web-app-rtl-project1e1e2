@@ -94,7 +94,8 @@ export const create = mutation({
     deviceModel: v.string(),
     problem: v.string(),
     laborCost: v.number(),
-    deposit: v.number(),
+    creationRequestId: v.string(),
+    initialDeposit: v.optional(v.object({ amount: v.number(), accountId: v.id("financialAccounts"), paymentDate: v.string(), requestId: v.string(), notes: v.optional(v.string()) })),
     expectedDate: v.optional(v.string()),
     notes: v.optional(v.string()),
     branchId: v.optional(v.id("branches")),
@@ -102,11 +103,14 @@ export const create = mutation({
   },
   handler: async (ctx, args) => {
     const user = await requireModulePermission(ctx, "create_repairs", "repairs");
+    const creationRequestId = `${user.userId}:${args.creationRequestId.trim()}`; if (!args.creationRequestId.trim()) throw new ConvexError("معرف طلب إنشاء الصيانة مطلوب");
+    const existing = await ctx.db.query("repairs").withIndex("by_creation_request", q => q.eq("creationRequestId", creationRequestId)).unique(); if (existing) return existing._id;
     const branchId = resolveWriteBranch(user, args.branchId);
     await requireActiveBranch(ctx, branchId);
     for (const value of [args.customerName, args.customerPhone, args.deviceType, args.deviceBrand, args.deviceModel, args.problem]) if (!value.trim()) throw new ConvexError("جميع الحقول النصية المطلوبة يجب ألا تكون فارغة");
-    if (!Number.isFinite(args.laborCost) || args.laborCost < 0 || !Number.isFinite(args.deposit) || args.deposit < 0) throw new ConvexError("قيم الصيانة المالية غير صالحة");
-    if (args.deposit > args.laborCost) throw new ConvexError("العربون لا يمكن أن يتجاوز التكلفة الإجمالية");
+    const initialAmount = args.initialDeposit?.amount ?? 0;
+    if (!Number.isFinite(args.laborCost) || args.laborCost < 0 || !Number.isFinite(initialAmount) || initialAmount < 0) throw new ConvexError("قيم الصيانة المالية غير صالحة");
+    if (initialAmount > args.laborCost) throw new ConvexError("العربون لا يمكن أن يتجاوز التكلفة الإجمالية");
     if (args.expectedDate && !isValidIsoDate(args.expectedDate)) throw new ConvexError("التاريخ المتوقع غير صالح");
     if (args.customerId) {
       const customer = await requireActiveCustomer(ctx, args.customerId, branchId);
@@ -115,18 +119,21 @@ export const create = mutation({
     const repairNumber = await nextDocumentNumber(ctx, "repair");
     const trackingToken = await createUniqueTrackingToken(ctx);
     const totalCost = roundMoney(args.laborCost);
+    let account; if (args.initialDeposit) { await requirePermission(ctx, "record_collections"); account = await requireActiveFinancialAccount(ctx, args.initialDeposit.accountId); assertFinancialAccountBranch(account, branchId!); }
+    const { initialDeposit: _initialDeposit, ...documentArgs } = args;
     const id = await ctx.db.insert("repairs", {
-      ...args,
+      ...documentArgs,
       branchId,
       repairNumber,
       trackingToken,
       parts: [],
       totalCost,
-      laborCost: totalCost, deposit: roundMoney(args.deposit),
-      remaining: roundMoney(totalCost - args.deposit),
+      laborCost: totalCost, deposit: roundMoney(initialAmount),
+      remaining: roundMoney(totalCost - initialAmount), creationRequestId,
       status: "received",
       receivedDate: new Date().toISOString().split("T")[0],
     });
+    if (args.initialDeposit && account) await postFinancialTransaction(ctx, user, { type: "repair_payment", requestId: args.initialDeposit.requestId, date: args.initialDeposit.paymentDate, amount: initialAmount, description: args.initialDeposit.notes?.trim() || `عربون الصيانة ${repairNumber}`, branchId: branchId!, referenceType: "repair", referenceId: String(id), referenceNumber: repairNumber, customerId: args.customerId, movements: [{ accountId: account._id, signedAmount: initialAmount }] });
     await logAction(ctx, user, {
       action: "create",
       module: "repairs",
@@ -207,4 +214,4 @@ export const getStats = query({
 
 export const recordPayment = mutation({ args: { repairId: v.id("repairs"), amount: v.number(), accountId: v.id("financialAccounts"), paymentDate: v.string(), requestId: v.string(), notes: v.optional(v.string()) }, handler: async (ctx, args) => { const user = await requirePermission(ctx, "record_collections"); const repair = await ctx.db.get(args.repairId); if (!repair || !repair.branchId) throw new ConvexError("أمر الصيانة غير موجود"); assertBranchAccess(user, repair); if (["cancelled", "delivered"].includes(repair.status)) throw new ConvexError("لا يمكن التحصيل لأمر ملغي أو مسلم"); if (!Number.isFinite(args.amount) || args.amount <= 0 || args.amount > repair.remaining) throw new ConvexError("مبلغ التحصيل غير صالح"); const account = await requireActiveFinancialAccount(ctx, args.accountId); assertFinancialAccountBranch(account, repair.branchId); const posted = await postFinancialTransaction(ctx, user, { type: "repair_payment", requestId: args.requestId, date: args.paymentDate, amount: args.amount, description: args.notes?.trim() || `تحصيل الصيانة ${repair.repairNumber}`, branchId: repair.branchId, referenceType: "repair", referenceId: String(repair._id), referenceNumber: repair.repairNumber, customerId: repair.customerId, movements: [{ accountId: account._id, signedAmount: args.amount }] }); if (!posted.duplicate) await ctx.db.patch(repair._id, { deposit: roundMoney(repair.deposit + args.amount), remaining: roundMoney(repair.remaining - args.amount) }); return posted.transactionId; } });
 
-export const refundPayment = mutation({ args: { repairId: v.id("repairs"), amount: v.number(), accountId: v.id("financialAccounts"), date: v.string(), reason: v.string(), requestId: v.string() }, handler: async (ctx, args) => { const user = await requirePermission(ctx, "refund_collections"); const repair = await ctx.db.get(args.repairId); if (!repair || !repair.branchId) throw new ConvexError("أمر الصيانة غير موجود"); assertBranchAccess(user, repair); if (!Number.isFinite(args.amount) || args.amount <= 0 || args.amount > repair.deposit) throw new ConvexError("مبلغ الاسترداد غير صالح"); const account = await requireActiveFinancialAccount(ctx, args.accountId); assertFinancialAccountBranch(account, repair.branchId); const posted = await postFinancialTransaction(ctx, user, { type: "repair_refund", requestId: args.requestId, date: args.date, amount: args.amount, description: args.reason.trim(), branchId: repair.branchId, referenceType: "repair", referenceId: String(repair._id), referenceNumber: repair.repairNumber, movements: [{ accountId: account._id, signedAmount: -args.amount }] }); if (!posted.duplicate) await ctx.db.patch(repair._id, { deposit: roundMoney(repair.deposit - args.amount), remaining: roundMoney(repair.remaining + args.amount) }); return posted.transactionId; } });
+export const refundPayment = mutation({ args: { repairId: v.id("repairs"), amount: v.number(), accountId: v.id("financialAccounts"), date: v.string(), reason: v.string(), requestId: v.string() }, handler: async (ctx, args) => { const user = await requirePermission(ctx, "refund_collections"); const repair = await ctx.db.get(args.repairId); if (!repair || !repair.branchId) throw new ConvexError("أمر الصيانة غير موجود"); assertBranchAccess(user, repair); const reason = args.reason.trim(); if (!reason) throw new ConvexError("سبب الاسترداد مطلوب"); if (!Number.isFinite(args.amount) || args.amount <= 0 || args.amount > repair.deposit) throw new ConvexError("مبلغ الاسترداد غير صالح"); const account = await requireActiveFinancialAccount(ctx, args.accountId); assertFinancialAccountBranch(account, repair.branchId); const posted = await postFinancialTransaction(ctx, user, { type: "repair_refund", requestId: args.requestId, date: args.date, amount: args.amount, description: reason, branchId: repair.branchId, referenceType: "repair", referenceId: String(repair._id), referenceNumber: repair.repairNumber, movements: [{ accountId: account._id, signedAmount: -args.amount }] }); if (!posted.duplicate) await ctx.db.patch(repair._id, { deposit: roundMoney(repair.deposit - args.amount), remaining: roundMoney(repair.remaining + args.amount) }); return posted.transactionId; } });

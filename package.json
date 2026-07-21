@@ -12,7 +12,8 @@
     "test": "node --test --experimental-strip-types tests/*.test.ts",
     "security:check": "node scripts/security-check.mjs",
     "verify": "npm run typecheck && npm test && npm run security:check && npm run build",
-    "lint": "npm run verify"
+    "lint": "npm run verify",
+    "pretest": "node scripts/install-convex-test.mjs"
   },
   "dependencies": {
     "@convex-dev/auth": "^0.0.80",
