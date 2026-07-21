@@ -1,10 +1,11 @@
 import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
 import { ConvexError } from "convex/values";
-import { assertBranchAccess, requireModulePermission, filterByBranch, resolveWriteBranch, logAction } from "./lib/auth";
+import { assertBranchAccess, requireModulePermission, requirePermission, filterByBranch, resolveWriteBranch, logAction } from "./lib/auth";
 import { canTransition, ORDER_TRANSITIONS, roundMoney } from "../shared/businessRules";
 import { nextDocumentNumber } from "./lib/documentNumbers";
 import { requireActiveBranch, requireActiveCustomer } from "./lib/references";
+import { postFinancialTransaction, requireActiveFinancialAccount, assertFinancialAccountBranch } from "./lib/finance";
 
 export const list = query({
   args: { status: v.optional(v.string()) },
@@ -145,9 +146,9 @@ export const updateStatus = mutation({
 });
 
 export const addPayment = mutation({
-  args: { id: v.id("orders"), amount: v.number() },
+  args: { id: v.id("orders"), amount: v.number(), accountId: v.id("financialAccounts"), paymentDate: v.string(), requestId: v.string(), notes: v.optional(v.string()) },
   handler: async (ctx, args) => {
-    const user = await requireModulePermission(ctx, "edit_orders", "orders");
+    const user = await requireModulePermission(ctx, "record_collections", "orders");
     const order = await ctx.db.get(args.id);
     if (!order) throw new ConvexError("الطلب غير موجود");
     assertBranchAccess(user, order);
@@ -156,6 +157,9 @@ export const addPayment = mutation({
     const newDeposit = roundMoney(order.deposit + args.amount);
     const newRemaining = roundMoney(order.total - newDeposit);
     if (newRemaining < 0) throw new ConvexError("المبلغ المدفوع أكبر من المتبقي على الطلب");
+    const account = await requireActiveFinancialAccount(ctx, args.accountId); if (!order.branchId) throw new ConvexError("الطلب غير مرتبط بفرع"); assertFinancialAccountBranch(account, order.branchId);
+    const posted = await postFinancialTransaction(ctx, user, { type: "order_deposit", requestId: args.requestId, date: args.paymentDate, amount: args.amount, description: args.notes?.trim() || `تحصيل الطلب ${order.orderNumber}`, branchId: order.branchId, referenceType: "order", referenceId: String(order._id), referenceNumber: order.orderNumber, customerId: order.customerId, movements: [{ accountId: account._id, signedAmount: args.amount }] });
+    if (posted.duplicate) return posted.transactionId;
     await ctx.db.patch(args.id, {
       deposit: newDeposit,
       remaining: newRemaining,
@@ -168,8 +172,11 @@ export const addPayment = mutation({
       recordLabel: order.orderNumber,
       details: `دفعة جديدة بقيمة ${args.amount} للطلب ${order.orderNumber}`,
     });
+    return posted.transactionId;
   },
 });
+
+export const refundDeposit = mutation({ args: { id: v.id("orders"), amount: v.number(), accountId: v.id("financialAccounts"), date: v.string(), reason: v.string(), requestId: v.string() }, handler: async (ctx, args) => { const user = await requirePermission(ctx, "refund_collections"); const order = await ctx.db.get(args.id); if (!order || !order.branchId) throw new ConvexError("الطلب غير موجود"); assertBranchAccess(user, order); if (!Number.isFinite(args.amount) || args.amount <= 0 || args.amount > order.deposit) throw new ConvexError("مبلغ الاسترداد غير صالح"); const account = await requireActiveFinancialAccount(ctx, args.accountId); assertFinancialAccountBranch(account, order.branchId); const posted = await postFinancialTransaction(ctx, user, { type: "order_refund", requestId: args.requestId, date: args.date, amount: args.amount, description: args.reason.trim(), branchId: order.branchId, referenceType: "order", referenceId: String(order._id), referenceNumber: order.orderNumber, movements: [{ accountId: account._id, signedAmount: -args.amount }] }); if (!posted.duplicate) await ctx.db.patch(order._id, { deposit: roundMoney(order.deposit - args.amount), remaining: roundMoney(order.remaining + args.amount) }); return posted.transactionId; } });
 
 export const cancel = mutation({
   args: { id: v.id("orders"), reason: v.string() },

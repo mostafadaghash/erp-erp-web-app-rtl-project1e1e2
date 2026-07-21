@@ -1,8 +1,9 @@
 import { query, mutation } from "./_generated/server";
 import { v, ConvexError } from "convex/values";
-import { isValidIsoDate, PAYMENT_METHODS, roundMoney } from "../shared/businessRules";
+import { isValidIsoDate, roundMoney } from "../shared/businessRules";
 import { requireActiveBranch } from "./lib/references";
 import { assertBranchAccess, requireModulePermission, filterByBranch, resolveWriteBranch, logAction } from "./lib/auth";
+import { postFinancialTransaction, requireActiveFinancialAccount, assertFinancialAccountBranch } from "./lib/finance";
 
 export const list = query({
   args: {},
@@ -19,23 +20,27 @@ export const create = mutation({
     category: v.string(),
     amount: v.number(),
     date: v.string(),
-    paymentMethod: v.string(),
+    accountId: v.id("financialAccounts"), requestId: v.string(),
     notes: v.optional(v.string()),
     branchId: v.optional(v.id("branches")),
   },
   handler: async (ctx, args) => {
     const user = await requireModulePermission(ctx, "create_expenses", "expenses");
+    if (!user.permissions.includes("record_disbursements")) throw new ConvexError("ليس لديك صلاحية تسجيل الصرف");
     const branchId = resolveWriteBranch(user, args.branchId);
     await requireActiveBranch(ctx, branchId);
     const title = args.title.trim(), category = args.category.trim();
     if (!title || !category) throw new ConvexError("العنوان والتصنيف مطلوبان");
     if (!Number.isFinite(args.amount) || args.amount <= 0) throw new ConvexError("المبلغ يجب أن يكون أكبر من صفر");
     if (!isValidIsoDate(args.date)) throw new ConvexError("تاريخ المصروف غير صالح");
-    if (!PAYMENT_METHODS.includes(args.paymentMethod as typeof PAYMENT_METHODS[number])) throw new ConvexError("طريقة الدفع غير صالحة");
+    const account = await requireActiveFinancialAccount(ctx, args.accountId); if (!branchId) throw new ConvexError("الفرع مطلوب"); assertFinancialAccountBranch(account, branchId);
+    const existingKey = `expense_payment:${user.userId}:${args.requestId.trim()}`; const duplicate = await ctx.db.query("financialTransactions").withIndex("by_idempotency_key", q => q.eq("idempotencyKey", existingKey)).unique(); if (duplicate?.referenceId) return duplicate.referenceId;
     const id = await ctx.db.insert("expenses", {
-      ...args, title, category, amount: roundMoney(args.amount), notes: args.notes?.trim(),
+      title, category, amount: roundMoney(args.amount), date: args.date, paymentMethod: account.type, notes: args.notes?.trim(),
       branchId, userId: user.userId, status: "active",
     });
+    const posted = await postFinancialTransaction(ctx, user, { type: "expense_payment", requestId: args.requestId, date: args.date, amount: args.amount, description: `مصروف: ${title}`, branchId, referenceType: "expense", referenceId: String(id), movements: [{ accountId: account._id, signedAmount: -args.amount }] });
+    await ctx.db.patch(id, { financialTransactionId: posted.transactionId });
     await logAction(ctx, user, {
       action: "create",
       module: "expenses",

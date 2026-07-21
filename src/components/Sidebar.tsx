@@ -69,6 +69,7 @@ const ALL_NAV_GROUPS: NavGroup[] = [
     label: "المالية",
     items: [
       { id: "expenses", label: "المصروفات", icon: DollarSign, moduleKey: "expenses", permission: "view_expenses" },
+      { id: "treasury", label: "الخزائن والحسابات", icon: DollarSign, permission: "view_finance" },
       { id: "reports",  label: "التقارير",  icon: BarChart3,  moduleKey: "reports", permission: "view_reports" },
     ],
   },

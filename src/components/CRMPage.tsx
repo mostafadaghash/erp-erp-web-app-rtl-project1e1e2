@@ -442,7 +442,7 @@ export function CRMPage() {
                     <CheckCircle className="w-4 h-4" /> تم التحويل ✓
                   </div>
                 ) : null}
-                {canEdit && <button onClick={() => { openEdit(leadDetail as any); setSelectedLead(null); }}
+                {canEdit && <button onClick={() => { openEdit(leadDetail); setSelectedLead(null); }}
                   className="flex items-center justify-center gap-2 py-3 bg-indigo-50 text-indigo-600 rounded-xl font-medium text-sm hover:bg-indigo-100 transition-colors col-span-1">
                   <Pencil className="w-4 h-4" /> تعديل
                 </button>}

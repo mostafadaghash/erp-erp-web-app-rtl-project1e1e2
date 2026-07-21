@@ -4,13 +4,14 @@ import { api } from "../../convex/_generated/api";
 import { toast } from "sonner";
 import type { Page } from "./ERPApp";
 import { Plus, Trash2, ShoppingCart, Search } from "lucide-react";
+import type { Id } from "../../convex/_generated/dataModel";
 
 interface NewInvoicePageProps {
   onNavigate: (page: Page) => void;
 }
 
 interface CartItem {
-  productId: string;
+  productId: Id<"products">;
   productName: string;
   quantity: number;
   unitPrice: number;
@@ -95,11 +96,11 @@ export function NewInvoicePage({ onNavigate }: NewInvoicePageProps) {
     if (!customerName) return toast.error("أدخل اسم العميل");
     try {
       await createInvoice({
-        customerId: customerId ? customerId as any : undefined,
+        customerId: customerId ? customerId as Id<"customers"> : undefined,
         customerName,
         customerPhone: customerPhone || undefined,
         items: cart.map(i => ({
-          productId: i.productId as any,
+          productId: i.productId,
           productName: i.productName,
           quantity: i.quantity,
           unitPrice: i.unitPrice,
