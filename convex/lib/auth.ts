@@ -181,7 +181,7 @@ export async function logAction(
   params: {
     action: string;
     module: string;
-    recordId?: Id<any>;
+    recordId?: string;
     recordLabel?: string;
     details?: string;
   }
@@ -192,7 +192,7 @@ export async function logAction(
     branchId: user.branchId,
     action: params.action,
     module: params.module,
-    recordId: params.recordId ? (params.recordId as any) : undefined,
+    recordId: params.recordId ? String(params.recordId) : undefined,
     recordLabel: params.recordLabel,
     details: params.details ?? "",
   });

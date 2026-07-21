@@ -7,6 +7,34 @@ const applicationTables = {
     key: v.string(), documentType: v.string(), year: v.number(), nextValue: v.number(), updatedAt: v.number(),
   }).index("by_key", ["key"]),
 
+  financeSettings: defineTable({
+    isInitialized: v.boolean(), cutoverDate: v.string(),
+    initializedAt: v.optional(v.number()), initializedBy: v.optional(v.string()),
+    defaultClearingDelayDays: v.number(), updatedAt: v.number(),
+  }),
+
+  financialAccounts: defineTable({
+    name: v.string(), code: v.string(), uniqueKey: v.string(),
+    type: v.union(v.literal("cash"), v.literal("instapay"), v.literal("vodafone_cash"), v.literal("fawry_clearing"), v.literal("paymob_clearing"), v.literal("card_clearing"), v.literal("bank"), v.literal("other")),
+    branchId: v.id("branches"), isActive: v.boolean(), currentBalance: v.number(),
+    allowNegative: v.boolean(), settlementDelayDays: v.number(), createdAt: v.number(),
+    createdBy: v.string(), updatedAt: v.number(),
+  }).index("by_branch", ["branchId"]).index("by_type", ["type"]).index("by_unique_key", ["uniqueKey"]).index("by_active", ["isActive"]),
+
+  financialTransactions: defineTable({
+    transactionNumber: v.string(), idempotencyKey: v.string(),
+    type: v.union(v.literal("opening_balance"), v.literal("invoice_payment"), v.literal("order_deposit"), v.literal("repair_payment"), v.literal("expense_payment"), v.literal("account_transfer"), v.literal("paymob_settlement"), v.literal("clearing_settlement"), v.literal("invoice_refund"), v.literal("order_refund"), v.literal("repair_refund"), v.literal("reversal")),
+    status: v.union(v.literal("posted"), v.literal("reversed")), date: v.string(), amount: v.number(), feeAmount: v.number(), netAmount: v.number(),
+    description: v.string(), referenceType: v.optional(v.string()), referenceId: v.optional(v.string()), referenceNumber: v.optional(v.string()),
+    customerId: v.optional(v.id("customers")), branchId: v.id("branches"), destinationBranchId: v.optional(v.id("branches")), userId: v.string(), createdAt: v.number(),
+    reversedAt: v.optional(v.number()), reversedBy: v.optional(v.string()), reversalReason: v.optional(v.string()),
+    reversalTransactionId: v.optional(v.id("financialTransactions")), originalTransactionId: v.optional(v.id("financialTransactions")),
+  }).index("by_transaction_number", ["transactionNumber"]).index("by_idempotency_key", ["idempotencyKey"]).index("by_branch_date", ["branchId", "date"]).index("by_reference", ["referenceType", "referenceId"]).index("by_status", ["status"]).index("by_type", ["type"]),
+
+  financialMovements: defineTable({
+    transactionId: v.id("financialTransactions"), accountId: v.id("financialAccounts"), signedAmount: v.number(), balanceBefore: v.number(), balanceAfter: v.number(), branchId: v.id("branches"), date: v.string(), availableAt: v.optional(v.string()), createdAt: v.number(),
+  }).index("by_account", ["accountId"]).index("by_transaction", ["transactionId"]).index("by_branch_date", ["branchId", "date"]).index("by_account_date", ["accountId", "date"]),
+
   // إعدادات النظام
   settings: defineTable({
     storeName: v.string(),
@@ -228,6 +256,7 @@ const applicationTables = {
     branchId: v.optional(v.id("branches")),
     userId: v.optional(v.string()),
     status: v.optional(v.union(v.literal("active"), v.literal("voided"))),
+    financialTransactionId: v.optional(v.id("financialTransactions")),
     voidedAt: v.optional(v.number()), voidedBy: v.optional(v.string()), voidReason: v.optional(v.string()),
   }).index("by_category", ["category"]),
 

@@ -76,7 +76,7 @@ export const createFirstAdmin = mutation({
       userName: args.name,
       action: "setup",
       module: "system",
-      recordId: id as any,
+      recordId: String(id),
       recordLabel: args.name,
       details: `إعداد النظام وإنشاء أول مدير: ${args.name}`,
     });
