@@ -7,7 +7,7 @@ import { assertBranchAccess, filterByBranch, requireModulePermission, requirePer
 import { postFinancialTransaction, requireActiveFinancialAccount, assertFinancialAccountBranch, findFinancialTransactionByRequest } from "./lib/finance";
 import { calculateInvoiceTotals, roundMoney } from "../shared/businessRules";
 import { changeProductStock } from "./lib/inventory";
-import { INVENTORY_MOVEMENT_TYPES } from "../shared/inventoryRules";
+import { allocateProportionally, INVENTORY_MOVEMENT_TYPES } from "../shared/inventoryRules";
 import { nextDocumentNumber } from "./lib/documentNumbers";
 import { requireActiveBranch, requireActiveCustomer } from "./lib/references";
 
@@ -66,6 +66,9 @@ async function prepareInvoice(
       unitPrice: product.sellPrice,
       discount: item.discount,
       total,
+      unitCost: product.costPrice,
+      costTotal: roundMoney(product.costPrice * item.quantity),
+      lineNetTotal: 0,
     };
   });
   const settings = await ctx.db.query("settings").first();
@@ -85,7 +88,9 @@ async function prepareInvoice(
     throw new ConvexError("المبلغ المدفوع غير صالح");
   }
 
-  return { normalizedItems, productDocs, requested, ...totals };
+  const netAllocations = allocateProportionally(totals.total, normalizedItems.map(item => item.total));
+  normalizedItems.forEach((item, index) => { item.lineNetTotal = netAllocations[index]; });
+  return { normalizedItems, productDocs, requested, cogsTotal: roundMoney(normalizedItems.reduce((sum, item) => sum + item.costTotal, 0)), ...totals };
 }
 
 async function adjustCustomer(
@@ -124,7 +129,9 @@ export const list = query({
     if (args.customerId) {
       invoices = invoices.filter(i => i.customerId === args.customerId);
     }
-    return invoices.sort((a, b) => b._creationTime - a._creationTime);
+    const sorted = invoices.sort((a, b) => b._creationTime - a._creationTime);
+    if (user.permissions.includes("view_profits")) return sorted;
+    return sorted.map(({ cogsTotal: _cogs, ...invoice }) => ({ ...invoice, items: invoice.items.map(({ unitCost: _unit, costTotal: _cost, ...item }) => item) }));
   },
 });
 
@@ -134,7 +141,9 @@ export const get = query({
     const user = await requireModulePermission(ctx, "view_invoices", "invoices");
     const invoice = await ctx.db.get(args.id);
     if (invoice) assertBranchAccess(user, invoice);
-    return invoice;
+    if (!invoice || user.permissions.includes("view_profits")) return invoice;
+    const { cogsTotal: _cogs, ...visible } = invoice;
+    return { ...visible, items: invoice.items.map(({ unitCost: _unit, costTotal: _cost, ...item }) => item) };
   },
 });
 
@@ -195,6 +204,7 @@ export const create = mutation({
       discount: prepared.discount,
       tax: prepared.tax,
       total: prepared.total,
+      cogsTotal: prepared.cogsTotal, creditedTotal: 0, netTotal: prepared.total, costingVersion: 1,
       paid: prepared.paid,
       remaining: prepared.remaining,
       paymentMethod: paymentAccount?.type ?? "unpaid",
@@ -211,6 +221,7 @@ export const create = mutation({
       await changeProductStock(ctx, user, {
         productId: product._id,
         quantityDelta: -quantity,
+        unitCost: product.costPrice,
         type: INVENTORY_MOVEMENT_TYPES.sale,
         reason: `بيع عبر الفاتورة ${invoiceNumber}`,
         referenceId: String(id),
@@ -272,6 +283,7 @@ export const update = mutation({
     if (!inv) throw new ConvexError("الفاتورة غير موجودة");
     assertBranchAccess(user, inv);
     if (inv.status === "cancelled") throw new ConvexError("لا يمكن تعديل فاتورة ملغاة");
+    if (await ctx.db.query("salesReturns").withIndex("by_invoice", q => q.eq("invoiceId", inv._id)).first()) throw new ConvexError("لا يمكن تعديل فاتورة لها إشعار دائن؛ استخدم مسار المرتجع");
     if (inv.paid > 0) throw new ConvexError("لا يمكن تعديل فاتورة مدفوعة قبل تنفيذ التسوية المالية");
     let customerName = data.customerName.trim();
     let customerPhone = data.customerPhone;
@@ -298,7 +310,7 @@ export const update = mutation({
       subtotal: prepared.subtotal,
       discount: prepared.discount,
       tax: prepared.tax,
-      total: prepared.total,
+      total: prepared.total, cogsTotal: prepared.cogsTotal, creditedTotal: 0, netTotal: prepared.total, costingVersion: 1,
       paid: prepared.paid,
       remaining: prepared.remaining,
       paymentMethod: data.paymentMethod ?? "cash",
@@ -308,10 +320,10 @@ export const update = mutation({
     });
 
     for (const [productId, quantity] of oldQuantities) {
-      await changeProductStock(ctx, user, { productId: productId as Id<"products">, quantityDelta: quantity, type: INVENTORY_MOVEMENT_TYPES.saleReversal, reason: `عكس مخزون تعديل الفاتورة ${inv.invoiceNumber}`, referenceId: String(id), referenceType: "invoice" });
+      await changeProductStock(ctx, user, { productId: productId as Id<"products">, quantityDelta: quantity, unitCost: inv.items.find(item => String(item.productId) === productId)?.unitCost ?? (() => { throw new ConvexError("الفاتورة القديمة بلا تكلفة تاريخية ولا يمكن عكسها آلياً"); })(), type: INVENTORY_MOVEMENT_TYPES.saleReversal, reason: `عكس مخزون تعديل الفاتورة ${inv.invoiceNumber}`, referenceId: String(id), referenceType: "invoice" });
     }
     for (const [productId, quantity] of prepared.requested) {
-      await changeProductStock(ctx, user, { productId: productId as Id<"products">, quantityDelta: -quantity, type: INVENTORY_MOVEMENT_TYPES.sale, reason: `بيع بعد تعديل الفاتورة ${inv.invoiceNumber}`, referenceId: String(id), referenceType: "invoice" });
+      await changeProductStock(ctx, user, { productId: productId as Id<"products">, quantityDelta: -quantity, unitCost: prepared.productDocs.get(productId).costPrice, type: INVENTORY_MOVEMENT_TYPES.sale, reason: `بيع بعد تعديل الفاتورة ${inv.invoiceNumber}`, referenceId: String(id), referenceType: "invoice" });
     }
 
     if (inv.customerId === data.customerId && data.customerId) {
@@ -365,6 +377,7 @@ export const cancel = mutation({
     const reason = args.reason.trim();
     if (!reason) throw new ConvexError("سبب الإلغاء مطلوب");
     if (inv.status === "cancelled") throw new ConvexError("الفاتورة ملغاة بالفعل");
+    if (await ctx.db.query("salesReturns").withIndex("by_invoice", q => q.eq("invoiceId", inv._id)).first()) throw new ConvexError("لا يمكن إلغاء فاتورة لها إشعار دائن؛ استخدم مسار المرتجع");
     if (inv.paid > 0) throw new ConvexError("لا يمكن إلغاء فاتورة مدفوعة أو جزئية قبل تنفيذ الاسترداد المالي");
     const quantities = new Map<string, number>();
     for (const item of inv.items) {
@@ -375,7 +388,7 @@ export const cancel = mutation({
       const product = await ctx.db.get(productId as Id<"products">);
       if (!product) throw new ConvexError("تعذر استعادة مخزون منتج محذوف من الفاتورة");
       assertBranchAccess(user, product);
-      await changeProductStock(ctx, user, { productId: product._id, quantityDelta: quantity, type: INVENTORY_MOVEMENT_TYPES.saleReversal, reason: `عكس مخزون إلغاء الفاتورة ${inv.invoiceNumber}`, referenceId: String(args.id), referenceType: "invoice" });
+      await changeProductStock(ctx, user, { productId: product._id, quantityDelta: quantity, unitCost: inv.items.find(item => String(item.productId) === productId)?.unitCost ?? (() => { throw new ConvexError("الفاتورة القديمة بلا تكلفة تاريخية ولا يمكن عكسها آلياً"); })(), type: INVENTORY_MOVEMENT_TYPES.saleReversal, reason: `عكس مخزون إلغاء الفاتورة ${inv.invoiceNumber}`, referenceId: String(args.id), referenceType: "invoice" });
     }
     if (inv.customerId) {
       await adjustCustomer(ctx, user, inv.customerId, -inv.total, -inv.remaining);

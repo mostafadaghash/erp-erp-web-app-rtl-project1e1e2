@@ -23,7 +23,7 @@ const applicationTables = {
 
   financialTransactions: defineTable({
     transactionNumber: v.string(), idempotencyKey: v.string(),
-    type: v.union(v.literal("opening_balance"), v.literal("invoice_payment"), v.literal("order_deposit"), v.literal("repair_payment"), v.literal("expense_payment"), v.literal("account_transfer"), v.literal("paymob_settlement"), v.literal("clearing_settlement"), v.literal("invoice_refund"), v.literal("order_refund"), v.literal("repair_refund"), v.literal("reversal")),
+    type: v.union(v.literal("opening_balance"), v.literal("invoice_payment"), v.literal("order_deposit"), v.literal("repair_payment"), v.literal("expense_payment"), v.literal("account_transfer"), v.literal("paymob_settlement"), v.literal("clearing_settlement"), v.literal("invoice_refund"), v.literal("sales_return_refund"), v.literal("order_refund"), v.literal("repair_refund"), v.literal("reversal")),
     status: v.union(v.literal("posted"), v.literal("reversed")), date: v.string(), amount: v.number(), feeAmount: v.number(), netAmount: v.number(),
     description: v.string(), referenceType: v.optional(v.string()), referenceId: v.optional(v.string()), referenceNumber: v.optional(v.string()),
     customerId: v.optional(v.id("customers")), branchId: v.id("branches"), destinationBranchId: v.optional(v.id("branches")), userId: v.string(), createdAt: v.number(),
@@ -97,6 +97,7 @@ const applicationTables = {
     categoryId: v.optional(v.id("categories")),
     supplierId: v.optional(v.id("suppliers")),
     costPrice: v.number(),
+    inventoryValue: v.optional(v.number()),
     sellPrice: v.number(),
     stock: v.number(),
     minStock: v.number(),
@@ -121,6 +122,9 @@ const applicationTables = {
     branchId: v.optional(v.id("branches")),
     userId: v.string(),
     createdAt: v.number(),
+    unitCost: v.optional(v.number()), valueDelta: v.optional(v.number()),
+    inventoryValueBefore: v.optional(v.number()), inventoryValueAfter: v.optional(v.number()),
+    averageCostBefore: v.optional(v.number()), averageCostAfter: v.optional(v.number()),
   })
     .index("by_product", ["productId"])
     .index("by_branch", ["branchId"])
@@ -152,11 +156,13 @@ const applicationTables = {
       unitPrice: v.number(),
       discount: v.number(),
       total: v.number(),
+      unitCost: v.optional(v.number()), costTotal: v.optional(v.number()), lineNetTotal: v.optional(v.number()),
     })),
     subtotal: v.number(),
     discount: v.number(),
     tax: v.number(),
     total: v.number(),
+    cogsTotal: v.optional(v.number()), creditedTotal: v.optional(v.number()), netTotal: v.optional(v.number()), costingVersion: v.optional(v.number()),
     paid: v.number(),
     remaining: v.number(),
     paymentMethod: v.string(),
@@ -168,6 +174,16 @@ const applicationTables = {
     type: v.string(),
     cancelledAt: v.optional(v.number()), cancelledBy: v.optional(v.string()), cancellationReason: v.optional(v.string()),
   }).index("by_invoice_number", ["invoiceNumber"]).index("by_customer", ["customerId"]).index("by_status", ["status"]).index("by_creation_request", ["creationRequestId"]),
+
+  salesReturns: defineTable({
+    creditNoteNumber: v.string(), invoiceId: v.id("invoices"), invoiceNumber: v.string(),
+    customerId: v.optional(v.id("customers")), customerName: v.string(),
+    items: v.array(v.object({ productId: v.id("products"), productName: v.string(), quantityReturned: v.number(), unitPrice: v.number(), creditAmount: v.number(), historicalUnitCost: v.number(), returnedCostTotal: v.number() })),
+    subtotal: v.number(), totalCredit: v.number(), totalCogsReversed: v.number(), debtReduction: v.number(), cashRefund: v.number(),
+    reason: v.string(), date: v.string(), branchId: v.id("branches"), status: v.union(v.literal("posted"), v.literal("reversed")),
+    creationRequestId: v.string(), createdBy: v.string(), createdAt: v.number(), financialTransactionId: v.optional(v.id("financialTransactions")),
+    reversedAt: v.optional(v.number()), reversedBy: v.optional(v.string()), reversalReason: v.optional(v.string()),
+  }).index("by_credit_note_number", ["creditNoteNumber"]).index("by_invoice", ["invoiceId"]).index("by_customer", ["customerId"]).index("by_branch_date", ["branchId", "date"]).index("by_creation_request", ["creationRequestId"]),
 
   // الطلبات / الأوردرات
   orders: defineTable({

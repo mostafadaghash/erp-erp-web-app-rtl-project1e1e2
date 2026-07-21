@@ -3,7 +3,7 @@ import type { Id } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
 import { assertBranchAccess, type AuthUser } from "./auth";
 
-import { calculateStockAfter, INVENTORY_MOVEMENT_TYPES, type InventoryMovementType } from "../../shared/inventoryRules";
+import { calculateInventoryChange, INVENTORY_MOVEMENT_TYPES, type InventoryMovementType } from "../../shared/inventoryRules";
 
 type ChangeStockInput = {
   productId: Id<"products">;
@@ -12,26 +12,33 @@ type ChangeStockInput = {
   reason: string;
   referenceId?: string;
   referenceType?: string;
+  unitCost: number;
 };
 
 export async function changeProductStock(ctx: MutationCtx, user: AuthUser, input: ChangeStockInput) {
   const product = await ctx.db.get(input.productId);
   if (!product) throw new ConvexError("المنتج غير موجود");
   assertBranchAccess(user, product);
-  let stockAfter: number;
+  let valuation;
   try {
-    stockAfter = calculateStockAfter(product.stock, input.quantityDelta, input.reason);
+    valuation = calculateInventoryChange(product.stock, product.costPrice, product.inventoryValue, input.quantityDelta, input.unitCost);
   } catch (error) {
     throw new ConvexError(error instanceof Error ? error.message : "حركة المخزون غير صالحة");
   }
-  await ctx.db.patch(product._id, { stock: stockAfter });
+  await ctx.db.patch(product._id, { stock: valuation.stockAfter, costPrice: valuation.averageCostAfter, inventoryValue: valuation.inventoryValueAfter });
   await ctx.db.insert("inventoryMovements", {
     productId: product._id,
     productName: product.name,
     type: input.type,
     quantityDelta: input.quantityDelta,
     stockBefore: product.stock,
-    stockAfter,
+    stockAfter: valuation.stockAfter,
+    unitCost: input.unitCost,
+    valueDelta: valuation.valueDelta,
+    inventoryValueBefore: valuation.inventoryValueBefore,
+    inventoryValueAfter: valuation.inventoryValueAfter,
+    averageCostBefore: product.costPrice,
+    averageCostAfter: valuation.averageCostAfter,
     reason: input.reason.trim(),
     referenceId: input.referenceId,
     referenceType: input.referenceType,
@@ -39,5 +46,5 @@ export async function changeProductStock(ctx: MutationCtx, user: AuthUser, input
     userId: user.userId,
     createdAt: Date.now(),
   });
-  return stockAfter;
+  return valuation;
 }

@@ -32,6 +32,7 @@ export const PERMISSIONS = [
   "refund_collections",
   "reverse_financial_transactions",
   "view_financial_reports",
+  "view_sales_returns", "create_sales_returns", "print_credit_notes",
   // ── Create ──
   "create_products",
   "create_customers",
@@ -97,6 +98,7 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
     "edit_expenses", "edit_leads",
     "export_data", "print_invoices", "print_repairs", "print_shipping",
     "view_finance", "record_collections", "record_disbursements", "transfer_funds", "view_financial_reports",
+    "view_sales_returns", "create_sales_returns", "print_credit_notes",
   ],
   sales: [
     "view_products", "view_customers", "view_orders", "view_invoices",
@@ -126,6 +128,7 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
     "view_finance", "manage_financial_accounts", "initialize_finance", "record_collections",
     "record_disbursements", "transfer_funds", "settle_clearing_accounts",
     "refund_collections", "reverse_financial_transactions", "view_financial_reports",
+    "view_sales_returns", "create_sales_returns", "print_credit_notes",
   ],
   shipping: [
     "view_orders", "view_shipments", "view_deliveries",

@@ -4,7 +4,7 @@ import { ConvexError } from "convex/values";
 import { assertBranchAccess, requireModulePermission, filterByBranch, resolveWriteBranch, logAction } from "./lib/auth";
 import { canTransition, roundMoney, SHIPMENT_TRANSITIONS } from "../shared/businessRules";
 import { changeProductStock } from "./lib/inventory";
-import { INVENTORY_MOVEMENT_TYPES } from "../shared/inventoryRules";
+import { allocateProportionally, INVENTORY_MOVEMENT_TYPES } from "../shared/inventoryRules";
 import { nextDocumentNumber } from "./lib/documentNumbers";
 import { requireActiveBranch, requireActiveSupplier } from "./lib/references";
 
@@ -163,21 +163,21 @@ export const updateStatus = mutation({
 
     // When arrived, update product stock
     if (args.status === "arrived") {
-      for (const item of shipment.items) {
-        if (item.productId) {
-          const product = await ctx.db.get(item.productId);
-          if (product) {
-            assertBranchAccess(user, product);
-            await changeProductStock(ctx, user, {
-              productId: item.productId,
-              quantityDelta: item.quantity,
-              type: INVENTORY_MOVEMENT_TYPES.shipmentReceipt,
-              reason: `استلام الشحنة ${shipment.shipmentNumber}`,
-              referenceId: String(args.id),
-              referenceType: "shipment",
-            });
-          }
-        }
+      const eligible = shipment.items.map(item => item.productId ? item.total : 0);
+      const allocations = allocateProportionally(shipment.shippingCost, eligible);
+      for (const [index, item] of shipment.items.entries()) {
+        if (!item.productId) continue;
+        const product = await ctx.db.get(item.productId);
+        if (!product) throw new ConvexError("منتج الشحنة غير موجود");
+        assertBranchAccess(user, product);
+        const receivedValue = roundMoney(item.total + allocations[index]);
+        await changeProductStock(ctx, user, {
+          productId: item.productId, quantityDelta: item.quantity,
+          unitCost: receivedValue / item.quantity,
+          type: INVENTORY_MOVEMENT_TYPES.shipmentReceipt,
+          reason: `استلام الشحنة ${shipment.shipmentNumber}`,
+          referenceId: String(args.id), referenceType: "shipment",
+        });
       }
     }
     await logAction(ctx, user, {

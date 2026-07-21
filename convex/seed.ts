@@ -112,7 +112,8 @@ export const seedDemo = mutation({
     });
 
     for (const [productId, quantity] of [[prod1, 8], [prod2, 5], [prod3, 3], [prod4, 15], [prod5, 1]] as const) {
-      await changeProductStock(ctx, user, { productId, quantityDelta: quantity, type: INVENTORY_MOVEMENT_TYPES.openingBalance, reason: "رصيد افتتاحي للبيانات التجريبية" });
+      const product = await ctx.db.get(productId); if (!product) continue;
+      await changeProductStock(ctx, user, { productId, quantityDelta: quantity, unitCost: product.costPrice, type: INVENTORY_MOVEMENT_TYPES.openingBalance, reason: "رصيد افتتاحي للبيانات التجريبية" });
     }
 
     // Customers

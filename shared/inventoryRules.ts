@@ -3,6 +3,7 @@ export const INVENTORY_MOVEMENT_TYPES = {
   manualAdjustment: "manual_adjustment",
   sale: "sale",
   saleReversal: "sale_reversal",
+  salesReturn: "sales_return",
   shipmentReceipt: "shipment_receipt",
 } as const;
 
@@ -15,4 +16,27 @@ export function calculateStockAfter(stockBefore: number, quantityDelta: number, 
   const stockAfter = stockBefore + quantityDelta;
   if (stockAfter < 0) throw new Error("لا يمكن أن يصبح المخزون سالباً");
   return stockAfter;
+}
+
+export const roundAverageCost = (value: number) => Math.round((value + Number.EPSILON) * 10_000) / 10_000;
+export const money = (value: number) => Math.round((value + Number.EPSILON) * 100) / 100;
+
+export function calculateInventoryChange(stock: number, averageCost: number, inventoryValue: number | undefined, quantityDelta: number, unitCost?: number) {
+  const oldValue = inventoryValue ?? money(stock * averageCost);
+  const nextStock = calculateStockAfter(stock, quantityDelta, "inventory valuation");
+  if (unitCost === undefined || !Number.isFinite(unitCost) || unitCost < 0) throw new Error("تكلفة حركة المخزون مطلوبة");
+  const valueDelta = money(quantityDelta * unitCost);
+  const nextValue = nextStock === 0 ? 0 : money(oldValue + valueDelta);
+  if (nextValue < 0) throw new Error("لا يمكن أن تصبح قيمة المخزون سالبة");
+  return { stockAfter: nextStock, inventoryValueBefore: oldValue, inventoryValueAfter: nextValue, valueDelta: money(nextValue - oldValue), averageCostAfter: nextStock === 0 ? averageCost : roundAverageCost(nextValue / nextStock) };
+}
+
+export function allocateProportionally(total: number, weights: number[]) {
+  const result = weights.map(() => 0); const sum = weights.reduce((a, b) => a + b, 0);
+  const eligible = weights.map((w, i) => w > 0 ? i : -1).filter(i => i >= 0);
+  if (!eligible.length || total === 0) return result;
+  let allocated = 0;
+  for (const i of eligible.slice(0, -1)) { result[i] = money(total * weights[i] / sum); allocated = money(allocated + result[i]); }
+  result[eligible[eligible.length - 1]] = money(total - allocated);
+  return result;
 }
