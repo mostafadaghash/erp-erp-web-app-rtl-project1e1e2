@@ -65,10 +65,10 @@ export const create = mutation({
     const id = await ctx.db.insert("products", {
       name: normalized.name, sku: normalized.sku, barcode: args.barcode?.trim() || undefined,
       categoryId: args.categoryId, supplierId: args.supplierId, warrantyMonths: args.warrantyMonths,
-      costPrice: args.costPrice, sellPrice: args.sellPrice, stock: 0, minStock: args.minStock,
+      costPrice: args.costPrice, inventoryValue: 0, sellPrice: args.sellPrice, stock: 0, minStock: args.minStock,
       unit: normalized.unit, branchId, description: args.description?.trim() || undefined, isActive: true,
     });
-    if (args.stock > 0) await changeProductStock(ctx, user, { productId: id, quantityDelta: args.stock, type: INVENTORY_MOVEMENT_TYPES.openingBalance, reason: "الرصيد الافتتاحي" });
+    if (args.stock > 0) await changeProductStock(ctx, user, { productId: id, quantityDelta: args.stock, unitCost: args.costPrice, type: INVENTORY_MOVEMENT_TYPES.openingBalance, reason: "الرصيد الافتتاحي" });
     await logAction(ctx, user, { action: "create", module: "products", recordId: id, recordLabel: normalized.name, details: `إضافة منتج جديد: ${normalized.name}` });
     return id;
   },
@@ -96,7 +96,7 @@ export const update = mutation({
     await ctx.db.patch(args.id, {
       name: normalized.name, sku: normalized.sku, barcode: args.barcode?.trim() || undefined,
       categoryId: args.categoryId, supplierId: args.supplierId, warrantyMonths: args.warrantyMonths,
-      costPrice: args.costPrice, sellPrice: args.sellPrice, minStock: args.minStock, unit: normalized.unit,
+      sellPrice: args.sellPrice, minStock: args.minStock, unit: normalized.unit,
       branchId, description: args.description?.trim() || undefined,
     });
     await logAction(ctx, user, { action: "update", module: "products", recordId: args.id, recordLabel: normalized.name, details: `تعديل المنتج: ${normalized.name}` });
@@ -107,7 +107,8 @@ export const adjustStock = mutation({
   args: { id: v.id("products"), adjustment: v.number(), reason: v.string() },
   handler: async (ctx, args) => {
     const user = await requirePermission(ctx, "edit_products");
-    await changeProductStock(ctx, user, { productId: args.id, quantityDelta: args.adjustment, type: INVENTORY_MOVEMENT_TYPES.manualAdjustment, reason: args.reason });
+    const current = await ctx.db.get(args.id); if (!current) throw new ConvexError("المنتج غير موجود");
+    await changeProductStock(ctx, user, { productId: args.id, quantityDelta: args.adjustment, unitCost: current.costPrice, type: INVENTORY_MOVEMENT_TYPES.manualAdjustment, reason: args.reason });
     await logAction(ctx, user, { action: "update", module: "products", recordId: args.id, details: `تعديل يدوي للمخزون: ${args.adjustment > 0 ? "+" : ""}${args.adjustment} - ${args.reason.trim()}` });
   },
 });
@@ -119,7 +120,9 @@ export const movements = query({
     const product = await ctx.db.get(args.productId);
     if (!product) throw new ConvexError("المنتج غير موجود");
     assertBranchAccess(user, product);
-    return await ctx.db.query("inventoryMovements").withIndex("by_product", (q) => q.eq("productId", args.productId)).order("desc").collect();
+    const movements = await ctx.db.query("inventoryMovements").withIndex("by_product", (q) => q.eq("productId", args.productId)).order("desc").collect();
+    if (user.permissions.includes("view_profits")) return movements;
+    return movements.map(({ unitCost: _unit, valueDelta: _delta, inventoryValueBefore: _before, inventoryValueAfter: _after, averageCostBefore: _averageBefore, averageCostAfter: _averageAfter, ...movement }) => movement);
   },
 });
 

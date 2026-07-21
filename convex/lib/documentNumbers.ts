@@ -1,7 +1,7 @@
 import type { MutationCtx } from "../_generated/server";
 import { ConvexError } from "convex/values";
 
-export type DocumentType = "invoice" | "order" | "shipment" | "repair" | "delivery" | "finance";
+export type DocumentType = "invoice" | "order" | "shipment" | "repair" | "delivery" | "finance" | "creditNote";
 const config = {
   invoice: { prefix: "INV", table: "invoices", field: "invoiceNumber" },
   order: { prefix: "ORD", table: "orders", field: "orderNumber" },
@@ -9,6 +9,7 @@ const config = {
   repair: { prefix: "REP", table: "repairs", field: "repairNumber" },
   delivery: { prefix: "DEL", table: "deliveries", field: "deliveryNumber" },
   finance: { prefix: "FIN", table: "financialTransactions", field: "transactionNumber" },
+  creditNote: { prefix: "CRN", table: "salesReturns", field: "creditNoteNumber" },
 } as const;
 
 export function formatDocumentNumber(type: DocumentType, year: number, value: number): string {
@@ -33,6 +34,7 @@ async function legacyNumbersForYear(ctx: MutationCtx, type: DocumentType, year: 
     case "repair": return (await ctx.db.query("repairs").withIndex("by_repair_number", q => q.gte("repairNumber", lower).lt("repairNumber", upper)).collect()).map(x => x.repairNumber);
     case "delivery": return (await ctx.db.query("deliveries").withIndex("by_delivery_number", q => q.gte("deliveryNumber", lower).lt("deliveryNumber", upper)).collect()).map(x => x.deliveryNumber);
     case "finance": return (await ctx.db.query("financialTransactions").withIndex("by_transaction_number", q => q.gte("transactionNumber", lower).lt("transactionNumber", upper)).collect()).map(x => x.transactionNumber);
+    case "creditNote": return (await ctx.db.query("salesReturns").withIndex("by_credit_note_number", q => q.gte("creditNoteNumber", lower).lt("creditNoteNumber", upper)).collect()).map(x => x.creditNoteNumber);
   }
 }
 
@@ -44,6 +46,7 @@ export async function documentNumberExists(ctx: MutationCtx, type: DocumentType,
     case "repair": return (await ctx.db.query("repairs").withIndex("by_repair_number", q => q.eq("repairNumber", number)).first()) !== null;
     case "delivery": return (await ctx.db.query("deliveries").withIndex("by_delivery_number", q => q.eq("deliveryNumber", number)).first()) !== null;
     case "finance": return (await ctx.db.query("financialTransactions").withIndex("by_transaction_number", q => q.eq("transactionNumber", number)).first()) !== null;
+    case "creditNote": return (await ctx.db.query("salesReturns").withIndex("by_credit_note_number", q => q.eq("creditNoteNumber", number)).first()) !== null;
   }
 }
 

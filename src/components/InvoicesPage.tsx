@@ -1,4 +1,5 @@
 import { FinancialHistory } from "./FinancialHistory";
+import { SalesReturnsPanel } from "./SalesReturnsPanel";
 import { useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
@@ -79,6 +80,8 @@ export function InvoicesPage({ onNavigate }: InvoicesPageProps) {
         </button>}
       </div>
 
+      <SalesReturnsPanel invoices={invoices} />
+
       {/* Stats */}
       <div className="grid grid-cols-3 gap-3">
         <div className="bg-indigo-50 rounded-xl p-4 text-center">
@@ -124,7 +127,7 @@ export function InvoicesPage({ onNavigate }: InvoicesPageProps) {
                 <th>رقم الفاتورة</th>
                 <th>العميل</th>
                 <th>التاريخ</th>
-                <th>الإجمالي</th>
+                <th>الإجمالي الأصلي</th><th>الإشعارات الدائنة</th><th>الصافي</th>
                 <th>المدفوع</th>
                 <th>المتبقي</th>
                 <th>طريقة الدفع</th>
@@ -145,7 +148,7 @@ export function InvoicesPage({ onNavigate }: InvoicesPageProps) {
                   <td className="text-slate-500 text-xs">
                     {new Date(inv._creationTime).toLocaleDateString("ar-EG")}
                   </td>
-                  <td className="font-bold">{inv.total.toLocaleString("ar-EG")} ج.م</td>
+                  <td className="font-bold">{inv.total.toLocaleString("ar-EG")} ج.م</td><td>{(inv.creditedTotal ?? 0).toLocaleString("ar-EG")} ج.م</td><td className="font-bold">{(inv.netTotal ?? inv.total).toLocaleString("ar-EG")} ج.م</td>
                   <td className="text-emerald-600 font-medium">{inv.paid.toLocaleString("ar-EG")} ج.م</td>
                   <td className={`font-medium ${inv.remaining > 0 ? "text-amber-600" : "text-slate-400"}`}>
                     {inv.remaining.toLocaleString("ar-EG")} ج.م
@@ -191,7 +194,7 @@ export function InvoicesPage({ onNavigate }: InvoicesPageProps) {
               ))}
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={9} className="text-center py-12 text-slate-400">
+                  <td colSpan={11} className="text-center py-12 text-slate-400">
                     <FileText className="w-10 h-10 mx-auto mb-2 opacity-30" />
                     لا توجد فواتير
                   </td>
