@@ -91,7 +91,7 @@ const applicationTables = {
     type: v.union(v.literal("opening_balance"), v.literal("purchase_receipt"), v.literal("purchase_return"), v.literal("supplier_payment"), v.literal("supplier_refund"), v.literal("adjustment"), v.literal("reversal")),
     status: v.union(v.literal("posted"), v.literal("reversed")), date: v.string(), amountDelta: v.number(), balanceBefore: v.number(), balanceAfter: v.number(),
     referenceType: v.string(), referenceId: v.string(), referenceNumber: v.string(), externalInvoiceNumber: v.optional(v.string()), dueDate: v.optional(v.string()), description: v.string(), userId: v.string(), createdAt: v.number(),
-    reversedAt: v.optional(v.number()), reversedBy: v.optional(v.string()), reversalReason: v.optional(v.string()), reversalEntryId: v.optional(v.id("supplierLedgerEntries")), originalEntryId: v.optional(v.id("supplierLedgerEntries")),
+    reversedAt: v.optional(v.number()), reversedBy: v.optional(v.string()), reversalReason: v.optional(v.string()), reversalDate: v.optional(v.string()), reversalEntryId: v.optional(v.id("supplierLedgerEntries")), originalEntryId: v.optional(v.id("supplierLedgerEntries")),
   }).index("by_entry_number", ["entryNumber"]).index("by_idempotency_key", ["idempotencyKey"]).index("by_supplier_branch_date", ["supplierId", "branchId", "date"]).index("by_branch_date", ["branchId", "date"]).index("by_reference", ["referenceType", "referenceId"]).index("by_status", ["status"]).index("by_type", ["type"]),
 
   supplierPayments: defineTable({
@@ -99,7 +99,7 @@ const applicationTables = {
     supplierId: v.id("suppliers"), supplierName: v.string(), branchId: v.id("branches"), accountId: v.id("financialAccounts"), accountName: v.string(),
     date: v.string(), amount: v.number(), notes: v.optional(v.string()), status: v.union(v.literal("posted"), v.literal("reversed")),
     financialTransactionId: v.optional(v.id("financialTransactions")), supplierLedgerEntryId: v.optional(v.id("supplierLedgerEntries")), createdBy: v.string(), createdAt: v.number(),
-    reversedAt: v.optional(v.number()), reversedBy: v.optional(v.string()), reversalReason: v.optional(v.string()), reversalRequestId: v.optional(v.string()),
+    reversedAt: v.optional(v.number()), reversedBy: v.optional(v.string()), reversalReason: v.optional(v.string()), reversalDate: v.optional(v.string()), reversalFingerprint: v.optional(v.string()), reversalRequestId: v.optional(v.string()),
     reversalFinancialTransactionId: v.optional(v.id("financialTransactions")), reversalSupplierLedgerEntryId: v.optional(v.id("supplierLedgerEntries")),
   }).index("by_payment_number", ["paymentNumber"]).index("by_idempotency_key", ["idempotencyKey"]).index("by_supplier_branch_date", ["supplierId", "branchId", "date"]).index("by_branch_date", ["branchId", "date"]).index("by_account_date", ["accountId", "date"]).index("by_status", ["status"]),
 

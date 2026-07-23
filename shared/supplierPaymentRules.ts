@@ -3,6 +3,9 @@ const roundMoney = (value: number) => Math.round((value + Number.EPSILON) * 100)
 export type AllocationInput<T extends string = string> = { purchaseReceiptId: T; amount: number };
 
 export function canonicalAllocations<T extends string>(allocations: readonly AllocationInput<T>[]): AllocationInput<T>[] {
+  if (allocations.some(row => row.amount <= 0 || !hasAtMostTwoDecimals(row.amount))) {
+    throw new Error("كل مبلغ توزيع يجب أن يمثل عدداً صحيحاً من القروش");
+  }
   return [...allocations].map(row => ({ ...row, amount: roundMoney(row.amount) })).sort((a, b) => String(a.purchaseReceiptId).localeCompare(String(b.purchaseReceiptId)));
 }
 
