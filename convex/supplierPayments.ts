@@ -1,0 +1,65 @@
+import { mutation, query } from "./_generated/server";
+import { paginationOptsValidator } from "convex/server";
+import { ConvexError, v } from "convex/values";
+import { assertBranchAccess, logAction, requirePermission, resolveWriteBranch } from "./lib/auth";
+import { assertFinancialAccountBranch, postFinancialTransaction, requireActiveFinancialAccount, reversePostedFinancialTransaction } from "./lib/finance";
+import { nextDocumentNumber } from "./lib/documentNumbers";
+import { postSupplierBalanceMovement } from "./lib/supplierLedger";
+import { canonicalAllocations, allocationTotal, derivePurchaseReceiptState, hasAtMostTwoDecimals, reverseAllocatedPayment } from "../shared/supplierPaymentRules";
+import type { Id } from "./_generated/dataModel";
+
+const allocationValidator = v.object({ purchaseReceiptId: v.id("purchaseReceipts"), amount: v.number() });
+const allowedAccounts = ["cash", "bank", "instapay", "vodafone_cash", "other"] as const;
+function fingerprint(input: { supplierId: string; branchId: string; accountId: string; date: string; notes?: string; allocations: readonly { purchaseReceiptId: string; amount: number }[] }) {
+  return JSON.stringify({ ...input, notes: input.notes?.trim() || undefined, allocations: canonicalAllocations(input.allocations) });
+}
+
+export const create = mutation({ args: { supplierId: v.id("suppliers"), branchId: v.optional(v.id("branches")), accountId: v.id("financialAccounts"), date: v.string(), requestId: v.string(), notes: v.optional(v.string()), allocations: v.array(allocationValidator) }, handler: async (ctx, args) => {
+  const user = await requirePermission(ctx, "record_supplier_payments");
+  if (!user.permissions.includes("record_disbursements")) throw new ConvexError("تسجيل دفعة المورد يتطلب صلاحية تسجيل الصرف");
+  const branchId = resolveWriteBranch(user, args.branchId); if (!branchId) throw new ConvexError("اختر الفرع");
+  const requestId = args.requestId.trim(); if (!requestId || requestId.length > 200) throw new ConvexError("معرف الطلب غير صالح");
+  const sorted = canonicalAllocations(args.allocations), requestFingerprint = fingerprint({ ...args, branchId: String(branchId), supplierId: String(args.supplierId), accountId: String(args.accountId), allocations: sorted });
+  const idempotencyKey = `supplier_payment:${user.userId}:${requestId}`;
+  const retry = await ctx.db.query("supplierPayments").withIndex("by_idempotency_key", q => q.eq("idempotencyKey", idempotencyKey)).unique();
+  if (retry) { if (retry.requestFingerprint !== requestFingerprint) throw new ConvexError("أعيد استخدام معرف طلب الدفع ببيانات مختلفة"); return retry._id; }
+  if (!sorted.length) throw new ConvexError("يجب توزيع الدفعة على مستند شراء واحد على الأقل");
+  if (new Set(sorted.map(x => x.purchaseReceiptId)).size !== sorted.length) throw new ConvexError("لا يجوز تكرار مستند الشراء في التوزيعات");
+  if (sorted.some(x => !Number.isFinite(x.amount) || x.amount <= 0 || !hasAtMostTwoDecimals(x.amount))) throw new ConvexError("كل مبلغ توزيع يجب أن يكون موجباً ومقرباً إلى منزلتين");
+  const supplier = await ctx.db.get(args.supplierId); if (!supplier || supplier.isActive === false) throw new ConvexError("المورد غير موجود أو معطل");
+  const branch = await ctx.db.get(branchId); if (!branch || !branch.isActive) throw new ConvexError("الفرع غير موجود أو معطل");
+  const account = await requireActiveFinancialAccount(ctx, args.accountId); assertFinancialAccountBranch(account, branchId);
+  if (!allowedAccounts.some(type => type === account.type)) throw new ConvexError("لا يمكن صرف دفعة مورد من حساب وسيط");
+  const receipts = await Promise.all(sorted.map(async allocation => { const receipt = await ctx.db.get(allocation.purchaseReceiptId); if (!receipt) throw new ConvexError("مستند شراء غير موجود"); if (receipt.supplierId !== args.supplierId) throw new ConvexError("مستند شراء يخص مورداً آخر"); if (receipt.branchId !== branchId) throw new ConvexError("مستند شراء من فرع آخر"); if (receipt.status === "paid" || receipt.remainingAmount === 0) throw new ConvexError("مستند الشراء مدفوع بالكامل"); if (allocation.amount > receipt.remainingAmount) throw new ConvexError("مبلغ التوزيع يتجاوز المتبقي للمستند"); return receipt; }));
+  const amount = allocationTotal(sorted); const balance = await ctx.db.query("supplierBalances").withIndex("by_supplier_branch", q => q.eq("supplierId", args.supplierId).eq("branchId", branchId)).unique();
+  if (!balance || amount > balance.balance) throw new ConvexError("رصيد المورد لا يكفي للدفعة");
+  const paymentNumber = await nextDocumentNumber(ctx, "supplierPayment", new Date(`${args.date}T00:00:00.000Z`)), now = Date.now();
+  const paymentId = await ctx.db.insert("supplierPayments", { paymentNumber, idempotencyKey, requestId, requestFingerprint, supplierId: supplier._id, supplierName: supplier.name, branchId, accountId: account._id, accountName: account.name, date: args.date, amount, notes: args.notes?.trim() || undefined, status: "posted", createdBy: user.userId, createdAt: now });
+  for (let index = 0; index < sorted.length; index++) await ctx.db.insert("supplierPaymentAllocations", { paymentId, purchaseReceiptId: receipts[index]._id, receiptNumber: receipts[index].receiptNumber, supplierId: supplier._id, branchId, amount: sorted[index].amount, date: args.date, createdAt: now });
+  const financial = await postFinancialTransaction(ctx, user, { type: "supplier_payment", requestId, date: args.date, amount, description: args.notes?.trim() || `دفعة مورد ${paymentNumber}`, branchId, referenceType: "supplier_payment", referenceId: String(paymentId), referenceNumber: paymentNumber, supplierId: supplier._id, movements: [{ accountId: account._id, signedAmount: -amount }] });
+  const ledger = await postSupplierBalanceMovement(ctx, user, { type: "supplier_payment", requestId, supplierId: supplier._id, branchId, date: args.date, amountDelta: -amount, referenceType: "supplier_payment", referenceId: String(paymentId), referenceNumber: paymentNumber, description: `دفعة مورد ${paymentNumber}` });
+  for (let index = 0; index < sorted.length; index++) await ctx.db.patch(receipts[index]._id, derivePurchaseReceiptState(receipts[index].payableAmount, receipts[index].paidAmount + sorted[index].amount));
+  await ctx.db.patch(paymentId, { financialTransactionId: financial.transactionId, supplierLedgerEntryId: ledger._id });
+  await logAction(ctx, user, { action: "post", module: "supplier_payments", recordId: paymentId, recordLabel: paymentNumber, details: JSON.stringify({ amount, allocations: sorted.length }) });
+  return paymentId;
+} });
+
+export const reverse = mutation({ args: { paymentId: v.id("supplierPayments"), reason: v.string(), date: v.string(), requestId: v.string() }, handler: async (ctx, args) => {
+  const user = await requirePermission(ctx, "reverse_supplier_payments"); if (!user.permissions.includes("reverse_financial_transactions")) throw new ConvexError("عكس دفعة المورد يتطلب صلاحية عكس المعاملات المالية");
+  const payment = await ctx.db.get(args.paymentId); if (!payment) throw new ConvexError("سند الدفع غير موجود"); assertBranchAccess(user, payment);
+  if (payment.status === "reversed") { if (payment.reversalRequestId === args.requestId.trim()) return payment.reversalFinancialTransactionId; throw new ConvexError("تم عكس سند الدفع سابقاً بطلب مختلف"); }
+  const reason = args.reason.trim(), requestId = args.requestId.trim(); if (!reason) throw new ConvexError("سبب العكس مطلوب"); if (!payment.financialTransactionId || !payment.supplierLedgerEntryId) throw new ConvexError("روابط سند الدفع غير مكتملة");
+  const financialId = await reversePostedFinancialTransaction(ctx, user, { transactionId: payment.financialTransactionId, reason, date: args.date, requestId, referenceType: "supplier_payment_reversal", referenceId: String(payment._id), referenceNumber: payment.paymentNumber });
+  const ledger = await postSupplierBalanceMovement(ctx, user, { type: "reversal", requestId, supplierId: payment.supplierId, branchId: payment.branchId, date: args.date, amountDelta: payment.amount, referenceType: "supplier_payment_reversal", referenceId: String(payment._id), referenceNumber: payment.paymentNumber, description: `عكس دفعة ${payment.paymentNumber}: ${reason}`, originalEntryId: payment.supplierLedgerEntryId });
+  const allocations = await ctx.db.query("supplierPaymentAllocations").withIndex("by_payment", q => q.eq("paymentId", payment._id)).collect();
+  for (const allocation of allocations) { const receipt = await ctx.db.get(allocation.purchaseReceiptId); if (!receipt) throw new ConvexError("مستند شراء مرتبط مفقود"); await ctx.db.patch(receipt._id, reverseAllocatedPayment(receipt.payableAmount, receipt.paidAmount, allocation.amount)); }
+  await ctx.db.patch(payment._id, { status: "reversed", reversedAt: Date.now(), reversedBy: user.userId, reversalReason: reason, reversalRequestId: requestId, reversalFinancialTransactionId: financialId, reversalSupplierLedgerEntryId: ledger._id });
+  await logAction(ctx, user, { action: "reverse", module: "supplier_payments", recordId: payment._id, recordLabel: payment.paymentNumber, details: reason }); return financialId;
+} });
+
+export const openPurchaseReceipts = query({ args: { supplierId: v.id("suppliers"), branchId: v.optional(v.id("branches")) }, handler: async (ctx, args) => { const user = await requirePermission(ctx, "record_supplier_payments"); const branchId = resolveWriteBranch(user, args.branchId); if (!branchId) throw new ConvexError("اختر الفرع"); return (await ctx.db.query("purchaseReceipts").withIndex("by_supplier_branch_date", q => q.eq("supplierId", args.supplierId).eq("branchId", branchId)).collect()).filter(x => x.remainingAmount > 0 && x.status !== "paid").map(x => ({ _id: x._id, receiptNumber: x.receiptNumber, receiptDate: x.receiptDate, dueDate: x.dueDate, payableAmount: x.payableAmount, paidAmount: x.paidAmount, remainingAmount: x.remainingAmount, status: x.status, supplierId: x.supplierId, supplierName: x.supplierName, branchId: x.branchId })); } });
+export const list = query({ args: { branchId: v.optional(v.id("branches")), supplierId: v.optional(v.id("suppliers")), paginationOpts: paginationOptsValidator }, handler: async (ctx, args) => { const user = await requirePermission(ctx, "view_supplier_ledger"); const branchId = resolveWriteBranch(user, args.branchId); if (!branchId) throw new ConvexError("اختر الفرع"); return args.supplierId ? await ctx.db.query("supplierPayments").withIndex("by_supplier_branch_date", q => q.eq("supplierId", args.supplierId!).eq("branchId", branchId)).order("desc").paginate(args.paginationOpts) : await ctx.db.query("supplierPayments").withIndex("by_branch_date", q => q.eq("branchId", branchId)).order("desc").paginate(args.paginationOpts); } });
+export const receiptHistory = query({ args: { purchaseReceiptId: v.id("purchaseReceipts") }, handler: async (ctx, args) => { const user = await requirePermission(ctx, "view_supplier_ledger"); const receipt = await ctx.db.get(args.purchaseReceiptId); if (!receipt) return []; assertBranchAccess(user, receipt); const rows = await ctx.db.query("supplierPaymentAllocations").withIndex("by_purchase_receipt", q => q.eq("purchaseReceiptId", args.purchaseReceiptId)).collect(); return await Promise.all(rows.map(async allocation => ({ ...allocation, payment: await ctx.db.get(allocation.paymentId) }))); } });
+export const print = query({ args: { paymentId: v.id("supplierPayments") }, handler: async (ctx, args) => { const user = await requirePermission(ctx, "print_supplier_payments"); const payment = await ctx.db.get(args.paymentId); if (!payment) throw new ConvexError("سند الدفع غير موجود"); assertBranchAccess(user, payment); const allocations = await ctx.db.query("supplierPaymentAllocations").withIndex("by_payment", q => q.eq("paymentId", payment._id)).collect(); return { payment, allocations }; } });
+export const supplierOptions = query({ args: {}, handler: async ctx => { await requirePermission(ctx, "record_supplier_payments"); return (await ctx.db.query("suppliers").collect()).filter(s => s.isActive !== false).map(s => ({ _id: s._id, name: s.name })); } });
+export const supplierBalance = query({ args: { supplierId: v.id("suppliers"), branchId: v.optional(v.id("branches")) }, handler: async (ctx, args) => { const user = await requirePermission(ctx, "view_supplier_ledger"); const branchId = resolveWriteBranch(user, args.branchId); if (!branchId) throw new ConvexError("اختر الفرع"); const row = await ctx.db.query("supplierBalances").withIndex("by_supplier_branch", q => q.eq("supplierId", args.supplierId).eq("branchId", branchId)).unique(); return { balance: row?.balance ?? 0, branchId }; } });
