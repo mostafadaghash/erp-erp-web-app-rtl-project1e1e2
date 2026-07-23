@@ -4,6 +4,7 @@ import { api } from "../../convex/_generated/api";
 import { usePermission } from "../lib/access";
 import { toast } from "sonner";
 import { Id } from "../../convex/_generated/dataModel";
+import { getErrorMessage } from "../lib/errors";
 import {
   Ship, Plus, X, Search, Clock, Plane,
   CheckCircle, XCircle, Trash2, Package,
@@ -35,11 +36,13 @@ export function ShipmentsPage() {
   const canCreate = usePermission("create_shipments");
   const canEdit = usePermission("edit_shipments");
   const canDelete = usePermission("delete_shipments");
+  const canPostPurchaseReceipts = usePermission("post_purchase_receipts");
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [search, setSearch] = useState("");
   const [showForm, setShowForm] = useState(false);
 
   const shipments = useQuery(api.shipments.list, filterStatus !== "all" ? { status: filterStatus } : {});
+  const [receiving, setReceiving] = useState<NonNullable<typeof shipments>[number] | null>(null);
   const stats = useQuery(api.shipments.stats);
   const updateStatus = useMutation(api.shipments.updateStatus);
 
@@ -221,9 +224,9 @@ export function ShipmentsPage() {
                       </td>
                       <td>
                         <div className="flex items-center gap-1.5">
-                          {canEdit && nextStatus && shipment.status !== "cancelled" && (
+                          {canEdit && nextStatus && shipment.status !== "cancelled" && (nextStatus !== "arrived" || canPostPurchaseReceipts) && (
                             <button
-                              onClick={() => handleStatusChange(shipment._id, nextStatus)}
+                              onClick={() => nextStatus === "arrived" ? setReceiving(shipment) : void handleStatusChange(shipment._id, nextStatus)}
                               className={`px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors whitespace-nowrap ${
                                 nextStatus === "arrived"
                                   ? "bg-emerald-50 text-emerald-600 hover:bg-emerald-100"
@@ -262,6 +265,7 @@ export function ShipmentsPage() {
 
       {/* New Shipment Form */}
       {showForm && <NewShipmentForm onClose={() => setShowForm(false)} />}
+      {receiving && <ReceiveShipmentModal shipment={receiving} onClose={() => setReceiving(null)} />}
     </div>
   );
 }
@@ -317,13 +321,13 @@ function NewShipmentForm({ onClose }: { onClose: () => void }) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.supplierName.trim()) { toast.error("أدخل اسم المورد"); return; }
+    if (!form.supplierId) { toast.error("اختر مورداً نشطاً"); return; }
     if (items.some(i => !i.productName.trim())) { toast.error("أدخل اسم المنتج لكل عنصر"); return; }
     if (totalCost === 0) { toast.error("أضف منتجاً واحداً على الأقل بتكلفة"); return; }
     try {
       await createShipment({
         supplierName: form.supplierName,
-        supplierId: form.supplierId ? form.supplierId as Id<"suppliers"> : undefined,
+        supplierId: form.supplierId as Id<"suppliers">,
         items: items.map(i => ({
           productId: i.productId ? i.productId as Id<"products"> : undefined,
           productName: i.productName,
@@ -364,7 +368,7 @@ function NewShipmentForm({ onClose }: { onClose: () => void }) {
             <div>
               <label className="form-label">اختر مورداً</label>
               <select className="form-input" value={form.supplierId} onChange={handleSupplierSelect}>
-                <option value="">— مورد جديد —</option>
+                <option value="">— اختر المورد —</option>
                 {(suppliers ?? []).map(s => (
                   <option key={s._id} value={s._id}>{s.name}</option>
                 ))}
@@ -372,8 +376,7 @@ function NewShipmentForm({ onClose }: { onClose: () => void }) {
             </div>
             <div>
               <label className="form-label">اسم المورد *</label>
-              <input className="form-input" value={form.supplierName}
-                onChange={e => setForm({ ...form, supplierName: e.target.value })} placeholder="اسم المورد" />
+              <input className="form-input" value={form.supplierName} readOnly placeholder="اسم المورد" />
             </div>
           </div>
 
@@ -469,4 +472,51 @@ function NewShipmentForm({ onClose }: { onClose: () => void }) {
       </div>
     </div>
   );
+}
+
+function ReceiveShipmentModal({ shipment, onClose }: { shipment: { _id: Id<"shipments">; shipmentNumber: string; supplierName: string; totalCost: number; shippingCost: number; grandTotal: number }; onClose: () => void }) {
+  const receiveShipment = useMutation(api.shipments.receive);
+  const [requestId] = useState(() => crypto.randomUUID());
+  const [submitting, setSubmitting] = useState(false);
+  const [receiptDate, setReceiptDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [externalInvoiceNumber, setExternalInvoiceNumber] = useState("");
+  const [invoiceDate, setInvoiceDate] = useState("");
+  const [dueDate, setDueDate] = useState("");
+  const [supplierFreightAmount, setSupplierFreightAmount] = useState(String(shipment.shippingCost));
+  const supplierFreight = Number(supplierFreightAmount) || 0;
+  const externalFreight = shipment.shippingCost - supplierFreight;
+  const payable = shipment.totalCost + supplierFreight;
+  const submit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (submitting) return;
+    setSubmitting(true);
+    try {
+      const result = await receiveShipment({ shipmentId: shipment._id, receiptDate, requestId, externalInvoiceNumber: externalInvoiceNumber.trim() || undefined, invoiceDate: invoiceDate || undefined, dueDate: dueDate || undefined, supplierFreightAmount: supplierFreight });
+      toast.success(`تم الاستلام بمستند ${result.receiptNumber ?? "PUR"}`);
+      onClose();
+    } catch (error) {
+      toast.error(getErrorMessage(error, "تعذر استلام الشحنة"));
+    } finally { setSubmitting(false); }
+  };
+  return <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" dir="rtl">
+    <form onSubmit={submit} className="w-full max-w-xl space-y-4 rounded-2xl bg-white p-6 shadow-2xl">
+      <div className="flex justify-between"><div><h2 className="font-black text-lg">استلام شحنة شراء</h2><p className="font-mono text-indigo-600">{shipment.shipmentNumber}</p><p>{shipment.supplierName}</p></div><button type="button" onClick={onClose}><X /></button></div>
+      <div className="grid grid-cols-2 gap-2 rounded-xl bg-slate-50 p-3 text-sm">
+        <span>إجمالي البضاعة</span><b>{shipment.totalCost.toLocaleString("ar-EG")} ج.م</b>
+        <span>إجمالي الشحن</span><b>{shipment.shippingCost.toLocaleString("ar-EG")} ج.م</b>
+        <span>الشحن المحمل على المورد</span><b>{supplierFreight.toLocaleString("ar-EG")} ج.م</b>
+        <span>الشحن الخارجي</span><b>{externalFreight.toLocaleString("ar-EG")} ج.م</b>
+        <span>قيمة المخزون الواصلة</span><b>{shipment.grandTotal.toLocaleString("ar-EG")} ج.م</b>
+        <span>مديونية المورد</span><b>{payable.toLocaleString("ar-EG")} ج.م</b>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <label className="form-label">تاريخ الاستلام *<input required type="date" className="form-input" value={receiptDate} onChange={e => setReceiptDate(e.target.value)} /></label>
+        <label className="form-label">رقم فاتورة المورد<input className="form-input" value={externalInvoiceNumber} onChange={e => setExternalInvoiceNumber(e.target.value)} /></label>
+        <label className="form-label">تاريخ الفاتورة<input type="date" className="form-input" value={invoiceDate} onChange={e => setInvoiceDate(e.target.value)} /></label>
+        <label className="form-label">تاريخ الاستحقاق<input type="date" className="form-input" value={dueDate} onChange={e => setDueDate(e.target.value)} /></label>
+        <label className="form-label col-span-2">قيمة الشحن المستحقة للمورد<input required type="number" min="0" max={shipment.shippingCost} step="0.01" className="form-input" value={supplierFreightAmount} onChange={e => setSupplierFreightAmount(e.target.value)} /></label>
+      </div>
+      <div className="flex gap-3"><button type="button" className="btn-secondary flex-1" onClick={onClose}>إلغاء</button><button disabled={submitting} className="btn-primary flex-1">{submitting ? "جارٍ الترحيل..." : "استلام وترحيل المديونية"}</button></div>
+    </form>
+  </div>;
 }

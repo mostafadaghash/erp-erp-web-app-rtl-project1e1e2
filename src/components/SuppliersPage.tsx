@@ -10,7 +10,10 @@ import type { Id } from "../../convex/_generated/dataModel";
 export function SuppliersPage() {
   const canCreate = usePermission("create_suppliers");
   const canEdit = usePermission("edit_suppliers");
+  const canViewSupplierLedger = usePermission("view_supplier_ledger");
+  const me = useQuery(api.employees.me);
   const suppliers = useQuery(api.suppliers.list) ?? [];
+  const supplierBalances = useQuery(api.suppliers.branchBalances, canViewSupplierLedger && me?.branchId ? { branchId: me.branchId } : "skip");
   const createSupplier = useMutation(api.suppliers.create);
   const setSupplierActive = useMutation(api.suppliers.setActive);
 
@@ -103,14 +106,14 @@ export function SuppliersPage() {
               </p>
             )}
             {s.address && <p className="text-xs text-slate-500 mb-3">{s.address}</p>}
-            <div className="pt-3 border-t border-slate-100">
+            {canViewSupplierLedger && me?.branchId && <div className="pt-3 border-t border-slate-100">
               <div className="flex items-center justify-between">
                 <p className="text-xs text-slate-500">الرصيد المستحق</p>
-                <p className={`font-bold text-sm ${s.balance > 0 ? "text-amber-600" : "text-emerald-600"}`}>
-                  {s.balance.toLocaleString("ar-EG")} ج.م
+                <p className="font-bold text-sm text-amber-600">
+                  {(supplierBalances?.find(balance => balance.supplierId === s._id)?.balance ?? 0).toLocaleString("ar-EG")} ج.م
                 </p>
               </div>
-            </div>
+            </div>}
           </div>
         ))}
         {filtered.length === 0 && (
