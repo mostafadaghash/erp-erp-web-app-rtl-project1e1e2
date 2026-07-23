@@ -95,7 +95,7 @@ export function RepairsPage() {
     if (updatingId) return;
     setUpdatingId(id);
     try {
-      await updateStatus({ id, status, reason });
+      await updateStatus({ id, status, reason, ...(status === "cancelled" ? { date: new Date().toISOString().slice(0, 10), requestId: crypto.randomUUID() } : {}) });
       toast.success("تم تحديث الحالة");
       if (status === "cancelled") { setCancelTarget(null); setCancelReason(""); }
     } catch (error) {

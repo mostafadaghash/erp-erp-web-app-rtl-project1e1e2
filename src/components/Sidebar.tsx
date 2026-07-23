@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Package, Users, FileText, Wrench,
   DollarSign, Truck, BarChart3, Settings, X,
   ShoppingCart, Ship, Building2, UserCog, ChevronDown, ChevronUp,
-  Target, Shield
+  Target, Shield, BookOpen
 } from "lucide-react";
 import { useState } from "react";
 import { useQuery } from "convex/react";
@@ -71,6 +71,7 @@ const ALL_NAV_GROUPS: NavGroup[] = [
     items: [
       { id: "expenses", label: "المصروفات", icon: DollarSign, moduleKey: "expenses", permission: "view_expenses" },
       { id: "treasury", label: "الخزائن والحسابات", icon: DollarSign, permission: "view_finance" },
+      { id: "customer-ledger", label: "دفتر العملاء", icon: BookOpen, permission: "view_customer_ledger" },
       { id: "supplier-payments", label: "مدفوعات الموردين", icon: DollarSign, permission: "view_supplier_ledger" },
       { id: "reports",  label: "التقارير",  icon: BarChart3,  moduleKey: "reports", permission: "view_reports" },
     ],
