@@ -1,5 +1,5 @@
 import { ConvexError } from "convex/values";
-import type { MutationCtx } from "../_generated/server";
+import type { MutationCtx, QueryCtx } from "../_generated/server";
 import type { Id } from "../_generated/dataModel";
 import type { AuthUser } from "./auth";
 import { logAction } from "./auth";
@@ -10,6 +10,52 @@ export const CUSTOMER_LEDGER_TYPES = ["opening_balance", "invoice_charge", "invo
 export type CustomerLedgerType = (typeof CUSTOMER_LEDGER_TYPES)[number];
 
 const precise = (value: number) => Number.isFinite(value) && Math.abs(value * 100 - Math.round(value * 100)) < 1e-7;
+
+export type CustomerLedgerOpeningState = {
+  openingState: "not_started" | "posted" | "blocked_by_activity";
+  requiresOpeningReview: boolean;
+  canInitializeOpening: boolean;
+  canPostOperatingEntry: boolean;
+  legacyReasons: Array<"legacy_balance" | "legacy_purchases" | "unposted_documents">;
+};
+
+/** The single policy boundary for legacy customer-ledger initialization. */
+export async function deriveCustomerLedgerOpeningState(
+  ctx: QueryCtx | MutationCtx,
+  customerId: Id<"customers">,
+  branchId: Id<"branches">,
+  currentReference?: { type: string; id: string },
+): Promise<CustomerLedgerOpeningState> {
+  const customer = await ctx.db.get(customerId);
+  if (!customer || customer.branchId !== branchId) throw new ConvexError("العميل لا ينتمي إلى الفرع المحدد");
+  const balance = await ctx.db.query("customerBalances").withIndex("by_customer_branch", q => q.eq("customerId", customerId).eq("branchId", branchId)).unique();
+  const entries = await ctx.db.query("customerLedgerEntries").withIndex("by_customer_branch_date", q => q.eq("customerId", customerId).eq("branchId", branchId)).collect();
+  const references = new Set(entries.map(entry => `${entry.referenceType}:${entry.referenceId}`));
+  const [invoices, orders, repairs] = await Promise.all([
+    ctx.db.query("invoices").withIndex("by_customer", q => q.eq("customerId", customerId)).collect(),
+    ctx.db.query("orders").withIndex("by_customer", q => q.eq("customerId", customerId)).collect(),
+    ctx.db.query("repairs").withIndex("by_customer", q => q.eq("customerId", customerId)).collect(),
+  ]);
+  const isUnposted = (type: string, id: string) =>
+    !(currentReference?.type === type && currentReference.id === id) && !references.has(`${type}:${id}`);
+  const hasUnpostedDocuments = invoices.some(row => isUnposted("invoice", String(row._id)))
+    || orders.some(row => isUnposted("order", String(row._id)))
+    || repairs.some(row => isUnposted("repair", String(row._id)));
+  const legacyReasons: CustomerLedgerOpeningState["legacyReasons"] = [];
+  if (customer.balance !== 0) legacyReasons.push("legacy_balance");
+  if (customer.totalPurchases !== 0) legacyReasons.push("legacy_purchases");
+  if (hasUnpostedDocuments) legacyReasons.push("unposted_documents");
+  const posted = balance?.openingBalancePostedAt !== undefined;
+  const operatingStarted = entries.some(entry => entry.type !== "opening_balance");
+  const requiresOpeningReview = !posted && !operatingStarted && legacyReasons.length > 0;
+  return {
+    openingState: posted ? "posted" : operatingStarted ? "blocked_by_activity" : "not_started",
+    requiresOpeningReview,
+    canInitializeOpening: !posted && !operatingStarted,
+    canPostOperatingEntry: posted || operatingStarted || !requiresOpeningReview,
+    legacyReasons,
+  };
+}
 
 export async function postCustomerLedgerEntry(ctx: MutationCtx, user: AuthUser, input: {
   type: CustomerLedgerType; requestId: string; customerId: Id<"customers">; branchId: Id<"branches">; date: string;
@@ -41,7 +87,9 @@ export async function postCustomerLedgerEntry(ctx: MutationCtx, user: AuthUser, 
   const key = `${input.customerId}:${input.branchId}`;
   const snapshot = await ctx.db.query("customerBalances").withIndex("by_key", q => q.eq("key", key)).unique();
   const existingEntries = await ctx.db.query("customerLedgerEntries").withIndex("by_customer_branch_date", q => q.eq("customerId", input.customerId).eq("branchId", input.branchId)).first();
-  if (input.openingBalance && (snapshot?.openingBalancePostedAt !== undefined || existingEntries)) throw new ConvexError("سبق تسجيل رصيد أو حركة تشغيلية لهذا العميل");
+  const openingPolicy = await deriveCustomerLedgerOpeningState(ctx, input.customerId, input.branchId, { type: input.referenceType, id: input.referenceId });
+  if (input.openingBalance && !openingPolicy.canInitializeOpening) throw new ConvexError("سبق تسجيل رصيد أو حركة تشغيلية لهذا العميل");
+  if (!input.openingBalance && !openingPolicy.canPostOperatingEntry) throw new ConvexError("يجب مراجعة واعتماد الرصيد الافتتاحي للعميل قبل تسجيل حركة تشغيلية جديدة");
   const receivableBefore = snapshot?.receivableBalance ?? 0, advanceBefore = snapshot?.advanceBalance ?? 0, totalPurchasesBefore = snapshot?.totalPurchases ?? 0;
   const receivableAfter = roundMoney(receivableBefore + input.receivableDelta), advanceAfter = roundMoney(advanceBefore + input.advanceDelta), totalPurchasesAfter = roundMoney(totalPurchasesBefore + input.purchasesDelta);
   if (receivableAfter < 0) throw new ConvexError("لا يمكن أن تصبح مديونية العميل سالبة");
