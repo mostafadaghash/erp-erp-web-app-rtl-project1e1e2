@@ -23,6 +23,7 @@ import type * as lib_auth from "../lib/auth.js";
 import type * as lib_permissions from "../lib/permissions.js";
 import type * as orders from "../orders.js";
 import type * as products from "../products.js";
+import type * as purchaseReturns from "../purchaseReturns.js";
 import type * as repairs from "../repairs.js";
 import type * as router from "../router.js";
 import type * as seed from "../seed.js";
@@ -60,6 +61,7 @@ declare const fullApi: ApiFromModules<{
   "lib/permissions": typeof lib_permissions;
   orders: typeof orders;
   products: typeof products;
+  purchaseReturns: typeof purchaseReturns;
   repairs: typeof repairs;
   router: typeof router;
   seed: typeof seed;

@@ -11,7 +11,7 @@ import { roundMoney } from "../../shared/businessRules";
 function hasAtMostTwoDecimals(value: number): boolean { return Number.isFinite(value) && Math.abs(value * 100 - Math.round(value * 100)) < 1e-7; }
 
 export const SUPPLIER_LEDGER_TYPES = ["opening_balance", "purchase_receipt", "purchase_return", "supplier_payment", "supplier_refund", "adjustment", "reversal"] as const;
-type PostingType = "purchase_receipt" | "supplier_payment" | "reversal";
+type PostingType = "purchase_receipt" | "purchase_return" | "supplier_refund" | "supplier_payment" | "reversal";
 
 export async function postSupplierBalanceMovement(ctx: MutationCtx, user: AuthUser, input: {
   type: PostingType; requestId: string; supplierId: Id<"suppliers">; branchId: Id<"branches">; date: string; amountDelta: number;
@@ -23,7 +23,7 @@ export async function postSupplierBalanceMovement(ctx: MutationCtx, user: AuthUs
   if (!requestId || requestId.length > 200) throw new ConvexError("معرف طلب حركة المورد غير صالح");
   if (!Number.isFinite(input.amountDelta) || !hasAtMostTwoDecimals(input.amountDelta)) throw new ConvexError("قيمة حركة المورد يجب أن تكون مقربة إلى منزلتين");
   const amountDelta = roundMoney(input.amountDelta);
-  if ((input.type === "purchase_receipt" && amountDelta <= 0) || (input.type === "supplier_payment" && amountDelta >= 0) || (input.type === "reversal" && amountDelta === 0)) throw new ConvexError("اتجاه حركة المورد لا يتوافق مع نوعها");
+  if (((input.type === "purchase_receipt" || input.type === "supplier_refund") && amountDelta <= 0) || ((input.type === "supplier_payment" || input.type === "purchase_return") && amountDelta >= 0) || (input.type === "reversal" && amountDelta === 0)) throw new ConvexError("اتجاه حركة المورد لا يتوافق مع نوعها");
   await requireFinanceInitialized(ctx, input.date);
   const supplier = await requireActiveSupplier(ctx, input.supplierId);
   await requireActiveBranch(ctx, input.branchId);

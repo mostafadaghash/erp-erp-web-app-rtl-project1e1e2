@@ -5,6 +5,7 @@ export const INVENTORY_MOVEMENT_TYPES = {
   saleReversal: "sale_reversal",
   salesReturn: "sales_return",
   shipmentReceipt: "shipment_receipt",
+  purchaseReturn: "purchase_return",
 } as const;
 
 export type InventoryMovementType = typeof INVENTORY_MOVEMENT_TYPES[keyof typeof INVENTORY_MOVEMENT_TYPES];
