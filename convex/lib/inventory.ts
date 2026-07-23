@@ -13,6 +13,8 @@ type ChangeStockInput = {
   referenceId?: string;
   referenceType?: string;
   unitCost: number;
+  /** Exact, two-decimal total for documents whose rounded unit cost is not additive. */
+  valueDelta?: number;
 };
 
 export async function changeProductStock(ctx: MutationCtx, user: AuthUser, input: ChangeStockInput) {
@@ -21,7 +23,7 @@ export async function changeProductStock(ctx: MutationCtx, user: AuthUser, input
   assertBranchAccess(user, product);
   let valuation;
   try {
-    valuation = calculateInventoryChange(product.stock, product.costPrice, product.inventoryValue, input.quantityDelta, input.unitCost);
+    valuation = calculateInventoryChange(product.stock, product.costPrice, product.inventoryValue, input.quantityDelta, input.unitCost, input.valueDelta);
   } catch (error) {
     throw new ConvexError(error instanceof Error ? error.message : "حركة المخزون غير صالحة");
   }
