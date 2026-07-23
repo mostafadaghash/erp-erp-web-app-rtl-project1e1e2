@@ -26,7 +26,8 @@ export function InvoicesPage({ onNavigate }: InvoicesPageProps) {
   const cancelInvoice = useMutation(api.invoices.cancel);
   const recordPayment = useMutation(api.invoices.recordPayment);
   const refundPayment = useMutation(api.invoices.refundPayment);
-  const accounts = useQuery(api.finance.collectionAccountPicker, canCollect || canRefund ? {} : "skip") ?? [];
+  const collectionAccounts = useQuery(api.finance.collectionAccountPicker, canCollect ? {} : "skip") ?? [];
+  const refundAccounts = useQuery(api.finance.refundAccountPicker, canRefund ? {} : "skip") ?? [];
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState("");
   const [printInvoice, setPrintInvoice] = useState<Doc<"invoices"> | null>(null);
@@ -49,8 +50,8 @@ export function InvoicesPage({ onNavigate }: InvoicesPageProps) {
       setIsCancelling(false);
     }
   };
-  const collect = async (invoice: Doc<"invoices">) => { const amount = Number(prompt("المبلغ المراد تحصيله")); const account = accounts[0]; if (!amount || !account) return toast.error("لا يوجد حساب تحصيل متاح"); try { await recordPayment({ invoiceId: invoice._id, amount, accountId: account._id, paymentDate: new Date().toISOString().slice(0, 10), requestId: crypto.randomUUID() }); toast.success("تم التحصيل"); } catch (error) { toast.error(getErrorMessage(error, "تعذر التحصيل")); } };
-  const refund = async (invoice: Doc<"invoices">) => { const amount = Number(prompt("المبلغ المراد استرداده")); const reason = prompt("سبب الاسترداد")?.trim(); const account = accounts[0]; if (!amount || !reason || !account) return; try { await refundPayment({ invoiceId: invoice._id, amount, accountId: account._id, date: new Date().toISOString().slice(0, 10), reason, requestId: crypto.randomUUID() }); toast.success("تم الاسترداد"); } catch (error) { toast.error(getErrorMessage(error, "تعذر الاسترداد")); } };
+  const collect = async (invoice: Doc<"invoices">) => { const amount = Number(prompt("المبلغ المراد تحصيله")); const account = collectionAccounts[0]; if (!amount || !account) return toast.error("لا يوجد حساب تحصيل متاح"); try { await recordPayment({ invoiceId: invoice._id, amount, accountId: account._id, paymentDate: new Date().toISOString().slice(0, 10), requestId: crypto.randomUUID() }); toast.success("تم التحصيل"); } catch (error) { toast.error(getErrorMessage(error, "تعذر التحصيل")); } };
+  const refund = async (invoice: Doc<"invoices">) => { const amount = Number(prompt("المبلغ المراد استرداده")); const reason = prompt("سبب الاسترداد")?.trim(); const account = refundAccounts[0]; if (!amount || !reason || !account) return; try { await refundPayment({ invoiceId: invoice._id, amount, accountId: account._id, date: new Date().toISOString().slice(0, 10), reason, requestId: crypto.randomUUID() }); toast.success("تم الاسترداد"); } catch (error) { toast.error(getErrorMessage(error, "تعذر الاسترداد")); } };
 
   const filtered = invoices.filter(inv =>
     inv.invoiceNumber.includes(search) ||

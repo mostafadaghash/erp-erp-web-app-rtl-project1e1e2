@@ -1,0 +1,17 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+const orders = readFileSync("src/components/OrdersPage.tsx", "utf8");
+const invoices = readFileSync("src/components/InvoicesPage.tsx", "utf8");
+const repairs = readFileSync("src/components/RepairsPage.tsx", "utf8");
+const expenses = readFileSync("src/components/ExpensesPage.tsx", "utf8");
+test("Orders collection picker is permission and action gated", () => assert.match(orders, /collectionAccountPicker, canCollect && showPayment !== null \? \{\} : "skip"/));
+test("Orders collection action uses financial permission", () => assert.match(orders, /canCollect && order\.remaining > 0/));
+test("Orders invokes refundDeposit mutation", () => assert.match(orders, /await refundDeposit\(\{/));
+test("Orders refund action uses refund permission", () => assert.match(orders, /canRefund && order\.deposit > 0/));
+test("Orders preserves request ids across failed retries", () => { assert.match(orders, /requestId: paymentRequestId/); assert.match(orders, /requestId: refundRequestId/); assert.doesNotMatch(orders, /catch[^}]+set(?:Payment|Refund)RequestId/s); });
+test("Orders financial submit buttons prevent duplicate clicks", () => { assert.ok((orders.match(/disabled=\{isSubmitting/g) ?? []).length >= 4); });
+test("invoice and repair refunds use refund picker", () => { assert.match(invoices, /refundAccountPicker/); assert.match(repairs, /refundAccountPicker/); });
+test("expenses gate account and initialization queries independently", () => { assert.match(expenses, /disbursementAccountPicker, canDisburse \?/); assert.match(expenses, /initializationStatus, canViewFinance \?/); });
+test("order printing uses print_orders and guarded handler", () => { assert.match(orders, /usePermission\("print_orders"\)/); assert.match(orders, /if \(!canPrint\) return/); });
+test("Orders contains no unsafe state or empty-args assertion", () => { assert.doesNotMatch(orders, /useState<any>/); assert.doesNotMatch(orders, /\{\} as const/); });

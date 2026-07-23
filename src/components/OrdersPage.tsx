@@ -4,7 +4,7 @@ import { useQuery, useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { usePermission } from "../lib/access";
 import { toast } from "sonner";
-import { Id } from "../../convex/_generated/dataModel";
+import type { Doc, Id } from "../../convex/_generated/dataModel";
 import {
   ShoppingCart, Plus, X, Search,
   Clock, CheckCircle, Package, Truck, XCircle,
@@ -69,6 +69,9 @@ export function OrdersPage() {
   const canCreate = usePermission("create_orders");
   const canEdit = usePermission("edit_orders");
   const canDelete = usePermission("delete_orders");
+  const canCollect = usePermission("record_collections");
+  const canRefund = usePermission("refund_collections");
+  const canPrint = usePermission("print_orders");
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [search, setSearch] = useState("");
   const [showForm, setShowForm] = useState(false);
@@ -78,7 +81,15 @@ export function OrdersPage() {
   const [paymentAccountId, setPaymentAccountId] = useState("");
   const [paymentDate, setPaymentDate] = useState(new Date().toISOString().slice(0, 10));
   const [paymentNotes, setPaymentNotes] = useState("");
-  const [printOrder, setPrintOrder] = useState<any>(null);
+  const [paymentRequestId, setPaymentRequestId] = useState(() => crypto.randomUUID());
+  const [refundTarget, setRefundTarget] = useState<Doc<"orders"> | null>(null);
+  const [refundAmount, setRefundAmount] = useState("");
+  const [refundAccountId, setRefundAccountId] = useState("");
+  const [refundDate, setRefundDate] = useState(new Date().toISOString().slice(0, 10));
+  const [refundReason, setRefundReason] = useState("");
+  const [refundRequestId, setRefundRequestId] = useState(() => crypto.randomUUID());
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [printOrder, setPrintOrder] = useState<Doc<"orders"> | null>(null);
 
   const orders = useQuery(api.orders.list, filterStatus !== "all" ? { status: filterStatus } : {});
   const stats = useQuery(api.orders.stats);
@@ -86,7 +97,8 @@ export function OrdersPage() {
   const updateStatus = useMutation(api.orders.updateStatus);
   const addPayment = useMutation(api.orders.addPayment);
   const refundDeposit = useMutation(api.orders.refundDeposit);
-  const accounts = useQuery(api.finance.collectionAccountPicker, {} as const) ?? [];
+  const collectionAccounts = useQuery(api.finance.collectionAccountPicker, canCollect && showPayment !== null ? {} : "skip") ?? [];
+  const refundAccounts = useQuery(api.finance.refundAccountPicker, canRefund && refundTarget !== null ? {} : "skip") ?? [];
   const removeOrder = useMutation(api.orders.cancel);
 
   const storeName = settings?.storeName ?? "المتجر";
@@ -108,18 +120,43 @@ export function OrdersPage() {
   };
 
   const handlePayment = async (id: Id<"orders">) => {
+    if (isSubmitting) return;
     const amount = parseFloat(paymentAmount);
     if (!amount || amount <= 0) { toast.error("أدخل مبلغاً صحيحاً"); return; }
+    setIsSubmitting(true);
     try {
       if (!paymentAccountId) return toast.error("اختر الحساب المالي");
-      await addPayment({ id, amount, accountId: paymentAccountId as Id<"financialAccounts">, paymentDate, requestId: crypto.randomUUID(), notes: paymentNotes || undefined });
+      await addPayment({ id, amount, accountId: paymentAccountId as Id<"financialAccounts">, paymentDate, requestId: paymentRequestId, notes: paymentNotes || undefined });
       toast.success("تم تسجيل الدفعة بنجاح");
       setShowPayment(null);
       setPaymentAmount("");
+      setPaymentRequestId(crypto.randomUUID());
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "حدث خطأ");
+      toast.error(getErrorMessage(e, "تعذر تسجيل الدفعة"));
+    } finally {
+      setIsSubmitting(false);
     }
   };
+
+  const openRefund = (order: Doc<"orders">) => {
+    setRefundTarget(order); setRefundAmount(""); setRefundAccountId(""); setRefundReason("");
+    setRefundDate(new Date().toISOString().slice(0, 10)); setRefundRequestId(crypto.randomUUID());
+  };
+  const handleRefund = async (event: React.FormEvent) => {
+    event.preventDefault();
+    const amount = Number(refundAmount), reason = refundReason.trim();
+    if (!refundTarget || isSubmitting || !amount || amount <= 0) return;
+    if (!refundAccountId) return toast.error("اختر حساب الاسترداد");
+    if (!reason) return toast.error("سبب الاسترداد مطلوب");
+    setIsSubmitting(true);
+    try {
+      await refundDeposit({ id: refundTarget._id, amount, accountId: refundAccountId as Id<"financialAccounts">, date: refundDate, reason, requestId: refundRequestId });
+      toast.success("تم استرداد العربون بنجاح"); setRefundTarget(null); setRefundRequestId(crypto.randomUUID());
+    } catch (error) { toast.error(getErrorMessage(error, "تعذر استرداد العربون")); }
+    finally { setIsSubmitting(false); }
+  };
+
+  const openPrint = (order: Doc<"orders">) => { if (!canPrint) return; setPrintOrder(order); };
 
   const handleDelete = async (id: Id<"orders">) => {
     const reason = prompt("أدخل سبب إلغاء الطلب");
@@ -167,9 +204,6 @@ export function OrdersPage() {
                 <p className="text-2xl font-black text-slate-800">{s.value}</p>
                 <p className="text-xs text-slate-500">{s.label}</p>
               </div>
-              <select className="form-input" value={paymentAccountId} onChange={e => setPaymentAccountId(e.target.value)}><option value="">اختر حساب التحصيل</option>{accounts.map(a => <option key={a._id} value={a._id}>{a.name}</option>)}</select>
-              <input className="form-input" type="date" value={paymentDate} onChange={e => setPaymentDate(e.target.value)} />
-              <textarea className="form-input" placeholder="ملاحظات" value={paymentNotes} onChange={e => setPaymentNotes(e.target.value)} />
             </div>
           );
         })}
@@ -297,15 +331,16 @@ export function OrdersPage() {
                               {statusConfig[nextStatus].label}
                             </button>
                           )}
-                          {canEdit && order.remaining > 0 && order.status !== "cancelled" && (
+                          {canCollect && order.remaining > 0 && order.status !== "cancelled" && order.status !== "delivered" && (
                             <button
-                              onClick={() => { setShowPayment(order._id); setPaymentAmount(""); }}
+                              onClick={() => { setShowPayment(order._id); setPaymentAmount(""); setPaymentAccountId(""); setPaymentRequestId(crypto.randomUUID()); }}
                               className="p-1.5 bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-100 transition-colors"
                               title="تسجيل دفعة"
                             >
                               <CreditCard className="w-3.5 h-3.5" />
                             </button>
                           )}
+                          {canRefund && order.deposit > 0 && order.status !== "cancelled" && order.status !== "delivered" && <button onClick={() => openRefund(order)} className="p-1.5 bg-amber-50 text-amber-700 rounded-lg" title="استرداد عربون"><CreditCard className="w-3.5 h-3.5" /></button>}
                           {/* WhatsApp notification button */}
                           {showWA && waLink && (
                             <a
@@ -335,13 +370,13 @@ export function OrdersPage() {
                               <XCircle className="w-3.5 h-3.5" />
                             </button>
                           )}
-                          <button
-                            onClick={() => setPrintOrder(order)}
+                          {canPrint && <button
+                            onClick={() => openPrint(order)}
                             className="p-1.5 bg-slate-50 text-slate-400 rounded-lg hover:bg-indigo-50 hover:text-indigo-600 transition-colors"
                             title="طباعة إيصال"
                           >
                             <Printer className="w-3.5 h-3.5" />
-                          </button>
+                          </button>}
                           {canDelete && <button
                             onClick={() => handleDelete(order._id)}
                             className="p-1.5 bg-slate-50 text-slate-400 rounded-lg hover:bg-red-50 hover:text-red-500 transition-colors"
@@ -385,20 +420,25 @@ export function OrdersPage() {
                   autoFocus
                 />
               </div>
+              <select className="form-input" value={paymentAccountId} onChange={e => setPaymentAccountId(e.target.value)}><option value="">اختر حساب التحصيل</option>{collectionAccounts.map(a => <option key={a._id} value={a._id}>{a.name}</option>)}</select>
+              <input className="form-input" type="date" value={paymentDate} onChange={e => setPaymentDate(e.target.value)} />
+              <textarea className="form-input" placeholder="ملاحظات" value={paymentNotes} onChange={e => setPaymentNotes(e.target.value)} />
               <div className="flex gap-3">
-                <button onClick={() => setShowPayment(null)} className="btn-secondary flex-1">إلغاء</button>
-                <button onClick={() => handlePayment(showPayment)} className="btn-success flex-1">تسجيل</button>
+                <button disabled={isSubmitting} onClick={() => setShowPayment(null)} className="btn-secondary flex-1">إلغاء</button>
+                <button disabled={isSubmitting} onClick={() => handlePayment(showPayment)} className="btn-success flex-1">{isSubmitting ? "جارٍ التسجيل..." : "تسجيل"}</button>
               </div>
             </div>
           </div>
         </div>
       )}
 
+      {refundTarget && <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"><form onSubmit={handleRefund} className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 space-y-4"><h2 className="font-bold text-slate-800">استرداد عربون {refundTarget.orderNumber}</h2><div><label className="form-label">المبلغ *</label><input required min="0.01" max={refundTarget.deposit} step="0.01" type="number" className="form-input" value={refundAmount} onChange={e => setRefundAmount(e.target.value)} /></div><div><label className="form-label">حساب الاسترداد *</label><select required className="form-input" value={refundAccountId} onChange={e => setRefundAccountId(e.target.value)}><option value="">اختر الحساب</option>{refundAccounts.map(a => <option key={a._id} value={a._id}>{a.name}</option>)}</select></div><div><label className="form-label">التاريخ *</label><input required type="date" className="form-input" value={refundDate} onChange={e => setRefundDate(e.target.value)} /></div><div><label className="form-label">السبب *</label><textarea required className="form-input" value={refundReason} onChange={e => setRefundReason(e.target.value)} /></div><div className="flex gap-3"><button type="submit" disabled={isSubmitting || !refundReason.trim()} className="btn-primary flex-1">{isSubmitting ? "جارٍ الاسترداد..." : "استرداد"}</button><button type="button" disabled={isSubmitting} className="btn-secondary" onClick={() => setRefundTarget(null)}>إلغاء</button></div></form></div>}
+
       {/* New Order Form */}
       {showForm && <NewOrderForm onClose={() => setShowForm(false)} />}
 
       {/* Print Modal */}
-      {printOrder && (
+      {canPrint && printOrder && (
         <PrintModal
           type="order"
           data={printOrder}

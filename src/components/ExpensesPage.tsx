@@ -13,13 +13,15 @@ const expenseCategories = ["إيجار", "رواتب", "مرافق", "تسويق
 
 export function ExpensesPage() {
   const canCreate = usePermission("create_expenses");
+  const canDisburse = usePermission("record_disbursements");
+  const canViewFinance = usePermission("view_finance");
   const canVoid = usePermission("delete_expenses");
   const expenses = useQuery(api.expenses.list) ?? [];
   const expenseStats = useQuery(api.expenses.getStats);
   const createExpense = useMutation(api.expenses.create);
   const voidExpense = useMutation(api.expenses.void);
-  const accounts = useQuery(api.finance.disbursementAccountPicker, canCreate ? {} : "skip") ?? [];
-  const financeStatus = useQuery(api.finance.initializationStatus, canCreate ? {} : "skip");
+  const accounts = useQuery(api.finance.disbursementAccountPicker, canDisburse ? {} : "skip") ?? [];
+  const financeStatus = useQuery(api.finance.initializationStatus, canViewFinance ? {} : "skip");
 
   const [search, setSearch] = useState("");
   const [filterCategory, setFilterCategory] = useState("");
@@ -91,7 +93,7 @@ export function ExpensesPage() {
           </h1>
           <p className="text-slate-500 text-sm mt-0.5">{expenses.length} مصروف</p>
         </div>
-        {canCreate && <button disabled={financeStatus?.state !== "initialized"} onClick={() => setShowForm(true)} className="btn-primary flex items-center gap-2">
+        {canCreate && canDisburse && <button disabled={canViewFinance && financeStatus?.state !== "initialized"} onClick={() => setShowForm(true)} className="btn-primary flex items-center gap-2">
           <Plus className="w-4 h-4" />
           مصروف جديد
         </button>}

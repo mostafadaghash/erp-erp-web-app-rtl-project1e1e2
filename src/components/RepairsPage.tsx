@@ -33,7 +33,8 @@ export function RepairsPage() {
   const recordPayment = useMutation(api.repairs.recordPayment);
   const refundPayment = useMutation(api.repairs.refundPayment);
   const canCollect = usePermission("record_collections");
-  const accounts = useQuery(api.finance.collectionAccountPicker, canCollect ? {} : "skip") ?? [];
+  const collectionAccounts = useQuery(api.finance.collectionAccountPicker, canCollect ? {} : "skip") ?? [];
+  const refundAccounts = useQuery(api.finance.refundAccountPicker, canRefund ? {} : "skip") ?? [];
   const [accountId, setAccountId] = useState("");
   const [requestId, setRequestId] = useState(() => crypto.randomUUID());
   const [saving, setSaving] = useState(false);
@@ -105,11 +106,11 @@ export function RepairsPage() {
   };
 
   const collectRepair = async (repair: Doc<"repairs">) => {
-    const amount = Number(prompt("قيمة التحصيل")); const selected = accounts[0]; if (!amount || !selected) return toast.error("اختر حساباً متاحاً وأدخل مبلغاً صحيحاً");
+    const amount = Number(prompt("قيمة التحصيل")); const selected = collectionAccounts[0]; if (!amount || !selected) return toast.error("اختر حساباً متاحاً وأدخل مبلغاً صحيحاً");
     try { await recordPayment({ repairId: repair._id, amount, accountId: selected._id, paymentDate: new Date().toISOString().slice(0, 10), requestId: crypto.randomUUID() }); toast.success("تم التحصيل"); } catch (error) { toast.error(getErrorMessage(error, "تعذر التحصيل")); }
   };
   const refundRepair = async (repair: Doc<"repairs">) => {
-    const amount = Number(prompt("قيمة الاسترداد")); const reason = prompt("سبب الاسترداد")?.trim(); const selected = accounts[0]; if (!amount || !reason || !selected) return;
+    const amount = Number(prompt("قيمة الاسترداد")); const reason = prompt("سبب الاسترداد")?.trim(); const selected = refundAccounts[0]; if (!amount || !reason || !selected) return;
     try { await refundPayment({ repairId: repair._id, amount, accountId: selected._id, date: new Date().toISOString().slice(0, 10), reason, requestId: crypto.randomUUID() }); toast.success("تم الاسترداد"); } catch (error) { toast.error(getErrorMessage(error, "تعذر الاسترداد")); }
   };
 
@@ -382,7 +383,7 @@ export function RepairsPage() {
                 <div>
                   <label className="form-label">العربون (ج.م)</label>
                   <input className="form-input" type="number" disabled={!canCollect} value={form.deposit} onChange={e => setForm({...form, deposit: e.target.value})} placeholder="0" />
-                  {canCollect && Number(form.deposit) > 0 && <select className="form-input mt-2" value={accountId} onChange={e => setAccountId(e.target.value)}><option value="">اختر حساب التحصيل</option>{accounts.map(a => <option key={a._id} value={a._id}>{a.name}</option>)}</select>}
+                  {canCollect && Number(form.deposit) > 0 && <select className="form-input mt-2" value={accountId} onChange={e => setAccountId(e.target.value)}><option value="">اختر حساب التحصيل</option>{collectionAccounts.map(a => <option key={a._id} value={a._id}>{a.name}</option>)}</select>}
                 </div>
                 <div>
                   <label className="form-label">الفني المسؤول</label>
