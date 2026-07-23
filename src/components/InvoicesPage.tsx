@@ -58,7 +58,7 @@ export function InvoicesPage({ onNavigate }: InvoicesPageProps) {
   ).filter(inv => !filterStatus || inv.status === filterStatus);
 
   const activeFiltered = filtered.filter(invoice => invoice.status !== "cancelled");
-  const totalRevenue = activeFiltered.reduce((s, i) => s + i.total, 0);
+  const totalRevenue = activeFiltered.reduce((s, i) => s + (i.netTotal ?? i.total), 0);
   const totalPaid = activeFiltered.reduce((s, i) => s + i.paid, 0);
   const totalPending = activeFiltered.reduce((s, i) => s + i.remaining, 0);
 
@@ -80,7 +80,7 @@ export function InvoicesPage({ onNavigate }: InvoicesPageProps) {
         </button>}
       </div>
 
-      <SalesReturnsPanel invoices={invoices} />
+      <SalesReturnsPanel />
 
       {/* Stats */}
       <div className="grid grid-cols-3 gap-3">
@@ -115,6 +115,9 @@ export function InvoicesPage({ onNavigate }: InvoicesPageProps) {
           <option value="partial">جزئي</option>
           <option value="unpaid">معلقة</option>
           <option value="cancelled">ملغاة</option>
+          <option value="partial_return">مرتجعة جزئيًا</option>
+          <option value="paid_returned_partial">مدفوعة ومرتجعة جزئيًا</option>
+          <option value="returned">مرتجعة بالكامل</option>
         </select>
       </div>
 
@@ -140,8 +143,8 @@ export function InvoicesPage({ onNavigate }: InvoicesPageProps) {
                 <tr key={inv._id}>
                   <td className="font-mono text-xs text-indigo-600 font-bold">{inv.invoiceNumber}<details><summary>السجل المالي</summary><FinancialHistory referenceType="invoice" referenceId={String(inv._id)} /></details></td>
                   <td>
-                    {canCollect && inv.status !== "cancelled" && inv.remaining > 0 && <button className="mr-1 rounded-lg bg-emerald-50 px-2 py-1.5 text-xs font-bold text-emerald-700" onClick={() => void collect(inv)}>تحصيل دفعة</button>}
-                    {canRefund && inv.status !== "cancelled" && inv.paid > 0 && <button className="mr-1 rounded-lg bg-amber-50 px-2 py-1.5 text-xs font-bold text-amber-700" onClick={() => void refund(inv)}>استرداد مبلغ</button>}
+                    {canCollect && ["unpaid", "partial"].includes(inv.status) && inv.remaining > 0 && <button className="mr-1 rounded-lg bg-emerald-50 px-2 py-1.5 text-xs font-bold text-emerald-700" onClick={() => void collect(inv)}>تحصيل دفعة</button>}
+                    {canRefund && ["paid", "partial"].includes(inv.status) && inv.paid > 0 && <button className="mr-1 rounded-lg bg-amber-50 px-2 py-1.5 text-xs font-bold text-amber-700" onClick={() => void refund(inv)}>استرداد مبلغ</button>}
                     <p className="font-medium text-slate-800">{inv.customerName}</p>
                     {inv.customerPhone && <p className="text-xs text-slate-400">{inv.customerPhone}</p>}
                   </td>
@@ -164,10 +167,12 @@ export function InvoicesPage({ onNavigate }: InvoicesPageProps) {
                     <span className={`badge ${
                       inv.status === "cancelled" ? "badge-danger" :
                       inv.status === "paid" ? "badge-success" :
-                      inv.status === "partial" ? "badge-warning" : "badge-danger"
+                      ["partial", "partial_return", "paid_returned_partial"].includes(inv.status) ? "badge-warning" :
+                      inv.status === "returned" ? "badge-info" : "badge-danger"
                     }`}>
                       {inv.status === "cancelled" ? "ملغاة" : inv.status === "paid" ? "مدفوعة" :
-                       inv.status === "partial" ? "جزئي" : "معلقة"}
+                       inv.status === "partial" ? "جزئي" : inv.status === "partial_return" ? "مرتجعة جزئيًا" :
+                       inv.status === "paid_returned_partial" ? "مدفوعة ومرتجعة جزئيًا" : inv.status === "returned" ? "مرتجعة بالكامل" : "معلقة"}
                     </span>
                   </td>
                   <td>
@@ -178,7 +183,7 @@ export function InvoicesPage({ onNavigate }: InvoicesPageProps) {
                     >
                       <Printer className="w-4 h-4" />
                     </button>}
-                    {canCancel && inv.status !== "cancelled" && inv.paid === 0 && (
+                    {canCancel && ["unpaid", "partial", "paid"].includes(inv.status) && (inv.creditedTotal ?? 0) === 0 && inv.paid === 0 && (
                       <button
                         onClick={() => { setCancelTarget(inv); setCancelReason(""); }}
                         className="mr-1 rounded-lg bg-red-50 px-2 py-1.5 text-xs font-bold text-red-700 hover:bg-red-100"

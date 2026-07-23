@@ -182,7 +182,8 @@ const applicationTables = {
     subtotal: v.number(), totalCredit: v.number(), totalCogsReversed: v.number(), debtReduction: v.number(), cashRefund: v.number(),
     reason: v.string(), date: v.string(), branchId: v.id("branches"), status: v.union(v.literal("posted"), v.literal("reversed")),
     creationRequestId: v.string(), createdBy: v.string(), createdAt: v.number(), financialTransactionId: v.optional(v.id("financialTransactions")),
-    reversedAt: v.optional(v.number()), reversedBy: v.optional(v.string()), reversalReason: v.optional(v.string()),
+    reversedAt: v.optional(v.number()), reversedBy: v.optional(v.string()), reversalReason: v.optional(v.string()), reversalDate: v.optional(v.string()),
+    reversalRequestId: v.optional(v.string()), reversalTransactionId: v.optional(v.id("financialTransactions")),
   }).index("by_credit_note_number", ["creditNoteNumber"]).index("by_invoice", ["invoiceId"]).index("by_customer", ["customerId"]).index("by_branch_date", ["branchId", "date"]).index("by_creation_request", ["creationRequestId"]),
 
   // الطلبات / الأوردرات
