@@ -1,0 +1,13 @@
+import test from "node:test";import assert from "node:assert/strict";import {readFileSync} from "node:fs";const page=readFileSync("src/components/PurchaseReturnsPage.tsx","utf8"),app=readFileSync("src/components/ERPApp.tsx","utf8"),sidebar=readFileSync("src/components/Sidebar.tsx","utf8");
+test("PRT-UI-01 route and sidebar expose purchase returns",()=>{assert.match(app,/purchase-returns/);assert.match(sidebar,/مرتجعات المشتريات/)});
+test("PRT-UI-02 page is permission protected",()=>assert.match(app,/view_purchase_returns/));
+test("PRT-UI-03 protected queries use skip",()=>assert.match(page,/record_supplier_refunds[^?]+\?\{\}:"skip"/));
+test("PRT-UI-04 receiptItemIndex is the line identity",()=>assert.match(page,/receiptItemIndex/));
+test("PRT-UI-05 quantity controls carry server-provided max",()=>assert.match(page,/max=\{item\.availableQuantity\}/));
+test("PRT-UI-06 freight control carries available limit",()=>assert.match(page,/availableFreight/));
+test("PRT-UI-07 cash refund reveals an account picker",()=>assert.match(page,/preview\.cashRefund>0/));
+test("PRT-UI-08 request id remains in a ref during retry",()=>assert.match(page,/requestId=useRef/));
+test("PRT-UI-09 busy guard prevents double submit",()=>assert.match(page,/if\(busy/));
+test("PRT-UI-10 backend errors use getErrorMessage",()=>assert.match(page,/getErrorMessage\(error\)/));
+test("PRT-UI-11 reversal requires both permissions",()=>{assert.match(page,/reverse_purchase_returns/);assert.match(page,/reverse_financial_transactions/)});
+test("PRT-UI-12 modified UI has no unsafe TypeScript escapes",()=>assert.doesNotMatch(page,/as any|@ts-ignore/));

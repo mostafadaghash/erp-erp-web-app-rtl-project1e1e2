@@ -1,0 +1,11 @@
+import test from "node:test";import assert from "node:assert/strict";import {availableSupplierFreight,canonicalPurchaseReturnItems,cumulativeGoodsCredit,incrementalGoodsCredit,inventoryValueForPurchaseReturn,purchaseReceiptAfterCredit,purchaseReceiptAfterReversal,totalPurchaseCredit} from "../shared/purchaseReturnRules.ts";
+test("PRT-RULE-01 canonicalization orders receipt item indexes",()=>assert.deepEqual(canonicalPurchaseReturnItems([{receiptItemIndex:2,quantity:1},{receiptItemIndex:0,quantity:2}]).map(x=>x.receiptItemIndex),[0,2]));
+test("PRT-RULE-02 duplicate receipt item indexes are rejected",()=>assert.throws(()=>canonicalPurchaseReturnItems([{receiptItemIndex:0,quantity:1},{receiptItemIndex:0,quantity:2}]),/تكرار/));
+test("PRT-RULE-03 invalid quantities are rejected without rounding",()=>{for(const quantity of [0,-1,1.5])assert.throws(()=>canonicalPurchaseReturnItems([{receiptItemIndex:0,quantity}]),/كمية/)});
+test("PRT-RULE-04 cumulative full return absorbs rounding",()=>{assert.equal(cumulativeGoodsCredit(10,3,2),6.67);assert.equal(incrementalGoodsCredit(10,3,2,1),3.33)});
+test("PRT-RULE-05 supplier freight excludes already credited amount",()=>assert.equal(availableSupplierFreight(12.5,2.25),10.25));
+test("PRT-RULE-06 total credit adds goods and supplier freight",()=>assert.equal(totalPurchaseCredit(10.11,2.22),12.33));
+test("PRT-RULE-07 moving average removes a proportional value",()=>assert.equal(inventoryValueForPurchaseReturn(4,10,1),2.5));
+test("PRT-RULE-08 zero stock return removes the exact residual value",()=>assert.equal(inventoryValueForPurchaseReturn(3,10,3),10));
+test("PRT-RULE-09 credit splits debt and cash and preserves invariant",()=>assert.deepEqual(purchaseReceiptAfterCredit(100,40,60,75),{netPayableAmount:25,paidAmount:25,remainingAmount:0,debtReduction:60,cashRefund:15,status:"paid"}));
+test("PRT-RULE-10 reversal restores the exact receipt state",()=>assert.deepEqual(purchaseReceiptAfterReversal(25,25,0,75,60,15),{netPayableAmount:100,paidAmount:40,remainingAmount:60,status:"partial"}));

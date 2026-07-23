@@ -55,6 +55,7 @@ const ALL_NAV_GROUPS: NavGroup[] = [
       { id: "products",  label: "المنتجات والمخزون",  icon: Package, permission: "view_products" },
       { id: "shipments", label: "الشحنات الواردة",    icon: Ship,   moduleKey: "shipments", permission: "view_shipments" },
       { id: "suppliers", label: "الموردين",            icon: Truck,  moduleKey: "suppliers", permission: "view_suppliers" },
+      { id: "purchase-returns", label: "مرتجعات المشتريات", icon: ShoppingCart, permission: "view_purchase_returns" },
     ],
   },
   {
