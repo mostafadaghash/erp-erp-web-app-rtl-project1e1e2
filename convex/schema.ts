@@ -194,7 +194,7 @@ const applicationTables = {
     notes: v.optional(v.string()),
     branchId: v.optional(v.id("branches")),
     isActive: v.optional(v.boolean()),
-  }).index("by_phone", ["phone"]),
+  }).index("by_phone", ["phone"]).index("by_branch", ["branchId"]),
 
   // الفواتير / المبيعات
   invoices: defineTable({
