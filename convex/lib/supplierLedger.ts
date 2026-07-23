@@ -17,6 +17,7 @@ export async function postSupplierBalanceMovement(ctx: MutationCtx, user: AuthUs
   type: PostingType; requestId: string; supplierId: Id<"suppliers">; branchId: Id<"branches">; date: string; amountDelta: number;
   referenceId: string; referenceNumber: string; referenceType: string; description: string; externalInvoiceNumber?: string; dueDate?: string;
   originalEntryId?: Id<"supplierLedgerEntries">;
+  reversalReason?: string; reversalDate?: string;
 }) {
   const requestId = input.requestId.trim();
   if (!requestId || requestId.length > 200) throw new ConvexError("معرف طلب حركة المورد غير صالح");
@@ -44,7 +45,7 @@ export async function postSupplierBalanceMovement(ctx: MutationCtx, user: AuthUs
     type: input.type, status: "posted", date: input.date, amountDelta, balanceBefore, balanceAfter, referenceType: input.referenceType,
     referenceId: input.referenceId, referenceNumber: input.referenceNumber, externalInvoiceNumber: input.externalInvoiceNumber, dueDate: input.dueDate,
     description: input.description, userId: user.userId, createdAt: now, originalEntryId: input.originalEntryId });
-  if (input.originalEntryId) await ctx.db.patch(input.originalEntryId, { status: "reversed", reversedAt: now, reversedBy: user.userId, reversalEntryId: id });
+  if (input.originalEntryId) await ctx.db.patch(input.originalEntryId, { status: "reversed", reversedAt: now, reversedBy: user.userId, reversalReason: input.reversalReason, reversalDate: input.reversalDate, reversalEntryId: id });
   await logAction(ctx, user, { action: input.type === "reversal" ? "reverse" : "post", module: "supplier_ledger", recordId: id, recordLabel: entryNumber, details: JSON.stringify({ type: input.type, amountDelta, balanceBefore, balanceAfter, branchId: input.branchId }) });
   const entry = await ctx.db.get(id);
   if (!entry) throw new ConvexError("تعذر إنشاء حركة المورد");
