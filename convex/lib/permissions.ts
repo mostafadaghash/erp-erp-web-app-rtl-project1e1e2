@@ -73,6 +73,7 @@ export const PERMISSIONS = [
   // ── Other ──
   "export_data",
   "print_invoices",
+  "print_orders",
   "print_repairs",
   "print_shipping",
 ] as const;
@@ -96,7 +97,7 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
     "edit_products", "edit_customers", "edit_orders", "edit_invoices",
     "edit_repairs", "edit_shipments", "edit_deliveries", "edit_suppliers",
     "edit_expenses", "edit_leads",
-    "export_data", "print_invoices", "print_repairs", "print_shipping",
+    "export_data", "print_invoices", "print_orders", "print_repairs", "print_shipping",
     "view_finance", "record_collections", "record_disbursements", "transfer_funds", "view_financial_reports",
     "view_sales_returns", "create_sales_returns", "print_credit_notes",
   ],
@@ -105,7 +106,7 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
     "view_prices",
     "create_orders", "create_invoices", "create_customers",
     "edit_orders",
-    "print_invoices",
+    "print_invoices", "print_orders",
     "record_collections",
   ],
   customer_service: [
@@ -113,7 +114,7 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
     "create_customers", "edit_customers",
     "create_orders", "edit_orders",
     "create_repairs",
-    "view_prices",
+    "view_prices", "print_orders",
   ],
   technician: [
     "view_repairs", "view_products", "view_prices",
@@ -134,7 +135,7 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
     "view_orders", "view_shipments", "view_deliveries",
     "create_shipments", "edit_shipments",
     "create_deliveries", "edit_deliveries",
-    "print_shipping",
+    "print_shipping", "print_orders",
   ],
   viewer: [
     "view_products", "view_customers", "view_orders",
