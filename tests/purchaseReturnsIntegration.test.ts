@@ -1090,12 +1090,82 @@ test("PRT-36 سياسة admin تمنع خلط الفروع والموردين", 
 
 test("PRT-37 pagination معزولة بلا تكرار", async () => {
   const e = await fixture({ items: [], payable: 10, supplierFreight: 10 });
+  const foreign = await e.raw.run(async (ctx) => {
+    const branchId = await ctx.db.insert("branches", {
+      name: "فرع PRT-37 الثاني",
+      address: "الإسكندرية",
+      isActive: true,
+    });
+    const supplierId = await ctx.db.insert("suppliers", {
+      name: "مورد PRT-37 الثاني",
+      phone: "0200",
+      balance: 777,
+      isActive: true,
+    });
+    await ctx.db.insert("supplierBalances", {
+      key: `${supplierId}:${branchId}`,
+      supplierId,
+      branchId,
+      balance: 20,
+      updatedAt: Date.now(),
+    });
+    const shipmentId = await ctx.db.insert("shipments", {
+      shipmentNumber: "S-PRT-37-FOREIGN",
+      supplierId,
+      supplierName: "مورد PRT-37 الثاني",
+      items: [],
+      totalCost: 10,
+      shippingCost: 10,
+      grandTotal: 10,
+      status: "arrived",
+      branchId,
+    });
+    const receiptId = await ctx.db.insert("purchaseReceipts", {
+      receiptNumber: "PUR-PRT-37-FOREIGN",
+      shipmentId,
+      shipmentNumber: "S-PRT-37-FOREIGN",
+      supplierId,
+      supplierName: "مورد PRT-37 الثاني",
+      receiptDate: "2026-01-11",
+      items: [],
+      goodsTotal: 0,
+      totalFreight: 10,
+      supplierFreightAmount: 10,
+      externalFreightAmount: 0,
+      totalLandedCost: 10,
+      payableAmount: 10,
+      paidAmount: 0,
+      remainingAmount: 10,
+      status: "unpaid",
+      branchId,
+      arrivalRequestId: "arrival-prt-37-foreign",
+      createdBy: e.user,
+      createdAt: Date.now(),
+    });
+    return { branchId, supplierId, receiptId };
+  });
+  const ownIds: Id<"purchaseReturns">[] = [];
   for (const key of ["a", "b", "c"])
-    await e.client.mutation(
-      api.purchaseReturns.create,
-      createArgs(e, `prt-37-${key}`, { items: [], freightCreditAmount: 1 }),
+    ownIds.push(
+      await e.client.mutation(
+        api.purchaseReturns.create,
+        createArgs(e, `prt-37-${key}`, {
+          items: [],
+          freightCreditAmount: 1,
+        }),
+      ),
     );
+  const foreignId = await e.client.mutation(api.purchaseReturns.create, {
+    purchaseReceiptId: foreign.receiptId,
+    branchId: foreign.branchId,
+    date: "2026-02-01",
+    reason: "اختبار عزل الفرع الثاني",
+    freightCreditAmount: 1,
+    requestId: "prt-37-foreign",
+    items: [],
+  });
   const seen: string[] = [];
+  const cursors: string[] = [];
   let cursor: string | null = null;
   let done = false;
   while (!done) {
@@ -1103,38 +1173,95 @@ test("PRT-37 pagination معزولة بلا تكرار", async () => {
       branchId: e.branchId,
       paginationOpts: { numItems: 1, cursor },
     });
+    assert.ok(page.page.length <= 1);
     seen.push(...page.page.map((row) => String(row._id)));
+    if (!page.isDone) {
+      assert.notEqual(page.continueCursor, cursor);
+      cursors.push(page.continueCursor);
+    }
     cursor = page.continueCursor;
     done = page.isDone;
   }
+  assert.deepEqual(new Set(seen), new Set(ownIds.map(String)));
   assert.equal(new Set(seen).size, 3);
   assert.equal(seen.length, 3);
+  assert.equal(seen.includes(String(foreignId)), false);
+  assert.equal(new Set(cursors).size, cursors.length);
+  assert.ok(cursors.length >= 2);
+  const foreignRows = [];
+  cursor = null;
+  done = false;
+  while (!done) {
+    const page = await e.client.query(api.purchaseReturns.list, {
+      branchId: foreign.branchId,
+      paginationOpts: { numItems: 1, cursor },
+    });
+    foreignRows.push(...page.page);
+    cursor = page.continueCursor;
+    done = page.isDone;
+  }
+  assert.deepEqual(foreignRows.map((row) => row._id), [foreignId]);
+  assert.equal(foreignRows[0].branchId, foreign.branchId);
+  assert.equal(foreignRows[0].supplierName, "مورد PRT-37 الثاني");
+  assert.equal(foreignRows[0].receiptNumber, "PUR-PRT-37-FOREIGN");
 });
 
 test("PRT-38 DTO redaction وقت التشغيل", async () => {
-  const e = await fixture();
+  const e = await fixture({ payable: 100, paid: 100, supplierFreight: 0 });
+  const refundAccountId = await account(e);
   const id = await e.client.mutation(
     api.purchaseReturns.create,
-    createArgs(e, "prt-38"),
+    createArgs(e, "prt-38", { refundAccountId }),
   );
+  const source = await e.raw.run((ctx) => ctx.db.get(id));
+  assert.ok(source);
+  assert.equal(source.idempotencyKey, `purchase_return:${e.user}:prt-38`);
+  assert.equal(source.requestId, "prt-38");
+  assert.ok(source.requestFingerprint);
+  assert.ok(source.supplierLedgerEntryId);
+  assert.ok(source.supplierRefundLedgerEntryId);
+  assert.ok(source.financialTransactionId);
   const page = await e.client.query(api.purchaseReturns.list, {
     branchId: e.branchId,
     paginationOpts: { numItems: 10, cursor: null },
   });
   const dto = page.page[0];
-  for (const secret of [
-    "idempotencyKey",
-    "requestId",
-    "requestFingerprint",
-    "reversalFingerprint",
-    "createdBy",
-    "supplierLedgerEntryId",
-    "financialTransactionId",
-    "currentBalance",
-    "balance",
-  ])
-    assert.equal(secret in dto, false);
+  assert.deepEqual(Object.keys(dto).sort(), [
+    "_id", "branchId", "cashRefund", "date", "debtReduction",
+    "receiptNumber", "returnNumber", "status", "supplierName", "totalCredit",
+  ]);
   assert.equal(dto._id, id);
+  assert.equal(Object.values(dto).includes(e.user), false);
+
+  const suppliers = await e.client.query(api.purchaseReturns.supplierOptions, {});
+  const supplierDto = suppliers.find((row) => row._id === e.supplierId);
+  assert.ok(supplierDto);
+  assert.deepEqual(Object.keys(supplierDto).sort(), ["_id", "name"]);
+
+  const receipts = await e.client.query(api.purchaseReturns.eligibleReceipts, {
+    supplierId: e.supplierId,
+    branchId: e.branchId,
+  });
+  assert.equal(receipts.length, 1);
+  const receiptDto = receipts[0];
+  assert.deepEqual(Object.keys(receiptDto).sort(), [
+    "_id", "availableFreight", "items", "paidAmount", "payableAmount",
+    "receiptDate", "receiptNumber", "remainingAmount",
+    "returnedFreightTotal", "supplierFreightAmount",
+  ]);
+  assert.deepEqual(Object.keys(receiptDto.items[0]).sort(), [
+    "availableQuantity", "historicalLineTotal", "historicalUnitCost",
+    "originalQuantity", "productName", "receiptItemIndex", "returnedQuantity",
+  ]);
+  assert.equal(Object.values(receiptDto).includes(e.user), false);
+
+  const accounts = await e.client.query(
+    api.purchaseReturns.supplierRefundAccountPicker,
+    { branchId: e.branchId },
+  );
+  const accountDto = accounts.find((row) => row._id === refundAccountId);
+  assert.ok(accountDto);
+  assert.deepEqual(Object.keys(accountDto).sort(), ["_id", "branchId", "name", "type"]);
 });
 
 test("PRT-39 Print DTO والصلاحية واسم المستخدم", async () => {
@@ -1163,21 +1290,31 @@ test("PRT-39 Print DTO والصلاحية واسم المستخدم", async () =
   });
   assert.equal(byToken.createdBy, "مستخدم القبول");
   await e.raw.run(async (ctx) => {
-    const profile = await ctx.db
+    await ctx.db.patch(id, { createdBy: "missing-profile-identifier" });
+    const byMissingUser = await ctx.db
       .query("userProfiles")
-      .withIndex("by_token", (q) => q.eq("tokenIdentifier", e.user))
-      .unique();
-    if (profile)
-      await ctx.db.patch(profile._id, {
-        name: "مستخدم غير معروف",
-        userId: e.user,
-        tokenIdentifier: e.user,
-      });
+      .withIndex("by_user", (q) => q.eq("userId", "missing-profile-identifier"))
+      .first();
+    const byMissingToken = await ctx.db
+      .query("userProfiles")
+      .withIndex("by_token", (q) => q.eq("tokenIdentifier", "missing-profile-identifier"))
+      .first();
+    assert.equal(byMissingUser, null);
+    assert.equal(byMissingToken, null);
   });
   const unknown = await e.client.query(api.purchaseReturns.getForPrint, {
     purchaseReturnId: id,
   });
   assert.equal(unknown.createdBy, "مستخدم غير معروف");
+  assert.equal(JSON.stringify(unknown).includes("missing-profile-identifier"), false);
+  assert.deepEqual(Object.keys(unknown).sort(), [
+    "branchName", "cashRefund", "createdBy", "date", "debtReduction",
+    "freightCredit", "goodsCredit", "items", "receiptNumber", "returnNumber",
+    "status", "supplierName", "totalCredit",
+  ]);
+  assert.deepEqual(Object.keys(unknown.items[0]).sort(), [
+    "goodsCreditAmount", "historicalUnitCost", "productName", "quantityReturned",
+  ]);
   const source = await e.raw.run((ctx) => ctx.db.get(id));
   assert.ok(source);
   const {
