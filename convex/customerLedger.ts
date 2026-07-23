@@ -4,7 +4,7 @@ import { v, ConvexError } from "convex/values";
 import { requirePermission } from "./lib/auth";
 import type { AuthUser } from "./lib/auth";
 import type { Id } from "./_generated/dataModel";
-import { initializeCustomerBalance } from "./lib/customerLedger.ts";
+import { deriveCustomerLedgerOpeningState, initializeCustomerBalance } from "./lib/customerLedger.ts";
 
 function assertLedgerBranch(user: AuthUser, branchId: Id<"branches">) {
   if (user.role !== "admin" && user.role !== "accountant" && user.branchId !== branchId) throw new ConvexError("ليس لديك صلاحية للوصول إلى دفتر هذا الفرع");
@@ -31,18 +31,11 @@ export const customerOptions = query({ args: { branchId: v.id("branches") }, han
   const user = await requirePermission(ctx, "view_customer_ledger"); assertLedgerBranch(user, args.branchId);
   const branch = await ctx.db.get(args.branchId); if (!branch?.isActive) throw new ConvexError("الفرع غير موجود أو معطل");
   const settings = await ctx.db.query("financeSettings").first();
-  const customers = (await ctx.db.query("customers").withIndex("by_branch", q => q.eq("branchId", args.branchId)).collect()).filter(customer => customer.isActive === true);
+  const customers = (await ctx.db.query("customers").withIndex("by_branch", q => q.eq("branchId", args.branchId)).collect()).filter(customer => customer.isActive !== false);
   return { cutoverDate: settings?.cutoverDate ?? null, customers: await Promise.all(customers.map(async customer => {
     const balance = await ctx.db.query("customerBalances").withIndex("by_customer_branch", q => q.eq("customerId", customer._id).eq("branchId", args.branchId)).unique();
-    const firstEntry = await ctx.db.query("customerLedgerEntries").withIndex("by_customer_branch_date", q => q.eq("customerId", customer._id).eq("branchId", args.branchId)).first();
-    const hasLegacyDocuments = Boolean(
-      await ctx.db.query("invoices").withIndex("by_customer", q => q.eq("customerId", customer._id)).first()
-      || await ctx.db.query("orders").withIndex("by_customer", q => q.eq("customerId", customer._id)).first()
-      || await ctx.db.query("repairs").withIndex("by_customer", q => q.eq("customerId", customer._id)).first()
-    );
-    const openingState: "not_started" | "posted" | "blocked_by_activity" = balance?.openingBalancePostedAt !== undefined
-      ? "posted" : firstEntry || customer.balance !== 0 || customer.totalPurchases !== 0 || hasLegacyDocuments ? "blocked_by_activity" : "not_started";
-    return { customerId: customer._id, customerName: customer.name, phone: customer.phone, branchId: args.branchId, receivableBalance: balance?.receivableBalance ?? 0, advanceBalance: balance?.advanceBalance ?? 0, totalPurchases: balance?.totalPurchases ?? 0, openingState };
+    const policy = await deriveCustomerLedgerOpeningState(ctx, customer._id, args.branchId);
+    return { customerId: customer._id, customerName: customer.name, phone: customer.phone, branchId: args.branchId, receivableBalance: balance?.receivableBalance ?? 0, advanceBalance: balance?.advanceBalance ?? 0, totalPurchases: balance?.totalPurchases ?? 0, ...policy };
   })) };
 } });
 
@@ -65,5 +58,5 @@ export const statementForPrint = query({ args: { customerId: v.id("customers"), 
 export const legacyReview = query({ args: { branchId: v.id("branches") }, handler: async (ctx, args) => {
   const user = await requirePermission(ctx, "initialize_customer_ledger"); assertLedgerBranch(user, args.branchId);
   const customers = await ctx.db.query("customers").withIndex("by_branch", q => q.eq("branchId", args.branchId)).collect();
-  return (await Promise.all(customers.map(async customer => { const balance = await ctx.db.query("customerBalances").withIndex("by_customer_branch", q => q.eq("customerId", customer._id).eq("branchId", args.branchId)).unique(); const invoice = await ctx.db.query("invoices").withIndex("by_customer", q => q.eq("customerId", customer._id)).first(); const order = await ctx.db.query("orders").withIndex("by_customer", q => q.eq("customerId", customer._id)).first(); const repair = await ctx.db.query("repairs").withIndex("by_customer", q => q.eq("customerId", customer._id)).first(); const hasLegacyDocuments = Boolean(invoice || order || repair); return { customerId: customer._id, customerName: customer.name, phone: customer.phone, branchId: args.branchId, legacyBalance: customer.balance, legacyTotalPurchases: customer.totalPurchases, hasLegacyDocuments, requiresOpeningBalance: !balance && (customer.balance !== 0 || customer.totalPurchases !== 0 || hasLegacyDocuments) }; }))).filter(x => x.legacyBalance !== 0 || x.legacyTotalPurchases !== 0 || x.hasLegacyDocuments);
+  return (await Promise.all(customers.map(async customer => { const policy = await deriveCustomerLedgerOpeningState(ctx, customer._id, args.branchId); return { customerId: customer._id, customerName: customer.name, phone: customer.phone, branchId: args.branchId, legacyBalance: customer.balance, legacyTotalPurchases: customer.totalPurchases, hasLegacyDocuments: policy.legacyReasons.includes("unposted_documents"), requiresOpeningBalance: policy.requiresOpeningReview, openingState: policy.openingState, legacyReasons: policy.legacyReasons }; }))).filter(x => x.requiresOpeningBalance);
 } });
