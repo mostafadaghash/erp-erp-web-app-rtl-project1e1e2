@@ -20,6 +20,7 @@ import { CRMPage } from "./CRMPage";
 import { DeliveriesPage } from "./DeliveriesPage";
 import { AuditLogsPage } from "./AuditLogsPage";
 import { TreasuryPage } from "./TreasuryPage";
+import { SupplierPaymentsPage } from "./SupplierPaymentsPage";
 import { Menu } from "lucide-react";
 import { ShieldX } from "lucide-react";
 import type { Permission } from "../../convex/lib/permissions";
@@ -45,7 +46,8 @@ export type Page =
   | "reports"
   | "settings"
   | "audit-logs"
-  | "treasury";
+  | "treasury"
+  | "supplier-payments";
 
 const PAGE_PERMISSIONS: Partial<Record<Page, Permission>> = {
   products: "view_products",
@@ -65,6 +67,7 @@ const PAGE_PERMISSIONS: Partial<Record<Page, Permission>> = {
   settings: "manage_settings",
   "audit-logs": "view_audit_logs",
   treasury: "view_finance",
+  "supplier-payments": "view_supplier_ledger",
 };
 
 const PAGE_MODULES: Partial<Record<Page, string>> = {
@@ -239,6 +242,7 @@ export function ERPApp() {
             {authorized && currentPage === "settings"    && <SettingsPage />}
             {authorized && currentPage === "audit-logs"  && <AuditLogsPage />}
             {authorized && currentPage === "treasury"    && <TreasuryPage />}
+            {authorized && currentPage === "supplier-payments" && <SupplierPaymentsPage />}
           </div>
         </main>
       </div>

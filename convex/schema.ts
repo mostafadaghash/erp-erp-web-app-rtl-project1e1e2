@@ -23,10 +23,10 @@ const applicationTables = {
 
   financialTransactions: defineTable({
     transactionNumber: v.string(), idempotencyKey: v.string(),
-    type: v.union(v.literal("opening_balance"), v.literal("invoice_payment"), v.literal("order_deposit"), v.literal("repair_payment"), v.literal("expense_payment"), v.literal("account_transfer"), v.literal("paymob_settlement"), v.literal("clearing_settlement"), v.literal("invoice_refund"), v.literal("sales_return_refund"), v.literal("order_refund"), v.literal("repair_refund"), v.literal("reversal")),
+    type: v.union(v.literal("opening_balance"), v.literal("invoice_payment"), v.literal("order_deposit"), v.literal("repair_payment"), v.literal("expense_payment"), v.literal("supplier_payment"), v.literal("account_transfer"), v.literal("paymob_settlement"), v.literal("clearing_settlement"), v.literal("invoice_refund"), v.literal("sales_return_refund"), v.literal("order_refund"), v.literal("repair_refund"), v.literal("reversal")),
     status: v.union(v.literal("posted"), v.literal("reversed")), date: v.string(), amount: v.number(), feeAmount: v.number(), netAmount: v.number(),
     description: v.string(), referenceType: v.optional(v.string()), referenceId: v.optional(v.string()), referenceNumber: v.optional(v.string()),
-    customerId: v.optional(v.id("customers")), branchId: v.id("branches"), destinationBranchId: v.optional(v.id("branches")), userId: v.string(), createdAt: v.number(),
+    customerId: v.optional(v.id("customers")), supplierId: v.optional(v.id("suppliers")), branchId: v.id("branches"), destinationBranchId: v.optional(v.id("branches")), userId: v.string(), createdAt: v.number(),
     reversedAt: v.optional(v.number()), reversedBy: v.optional(v.string()), reversalReason: v.optional(v.string()),
     reversalTransactionId: v.optional(v.id("financialTransactions")), originalTransactionId: v.optional(v.id("financialTransactions")),
   }).index("by_transaction_number", ["transactionNumber"]).index("by_idempotency_key", ["idempotencyKey"]).index("by_branch_date", ["branchId", "date"]).index("by_reference", ["referenceType", "referenceId"]).index("by_status", ["status"]).index("by_type", ["type"]),
@@ -93,6 +93,19 @@ const applicationTables = {
     referenceType: v.string(), referenceId: v.string(), referenceNumber: v.string(), externalInvoiceNumber: v.optional(v.string()), dueDate: v.optional(v.string()), description: v.string(), userId: v.string(), createdAt: v.number(),
     reversedAt: v.optional(v.number()), reversedBy: v.optional(v.string()), reversalReason: v.optional(v.string()), reversalEntryId: v.optional(v.id("supplierLedgerEntries")), originalEntryId: v.optional(v.id("supplierLedgerEntries")),
   }).index("by_entry_number", ["entryNumber"]).index("by_idempotency_key", ["idempotencyKey"]).index("by_supplier_branch_date", ["supplierId", "branchId", "date"]).index("by_branch_date", ["branchId", "date"]).index("by_reference", ["referenceType", "referenceId"]).index("by_status", ["status"]).index("by_type", ["type"]),
+
+  supplierPayments: defineTable({
+    paymentNumber: v.string(), idempotencyKey: v.string(), requestId: v.string(), requestFingerprint: v.string(),
+    supplierId: v.id("suppliers"), supplierName: v.string(), branchId: v.id("branches"), accountId: v.id("financialAccounts"), accountName: v.string(),
+    date: v.string(), amount: v.number(), notes: v.optional(v.string()), status: v.union(v.literal("posted"), v.literal("reversed")),
+    financialTransactionId: v.optional(v.id("financialTransactions")), supplierLedgerEntryId: v.optional(v.id("supplierLedgerEntries")), createdBy: v.string(), createdAt: v.number(),
+    reversedAt: v.optional(v.number()), reversedBy: v.optional(v.string()), reversalReason: v.optional(v.string()), reversalRequestId: v.optional(v.string()),
+    reversalFinancialTransactionId: v.optional(v.id("financialTransactions")), reversalSupplierLedgerEntryId: v.optional(v.id("supplierLedgerEntries")),
+  }).index("by_payment_number", ["paymentNumber"]).index("by_idempotency_key", ["idempotencyKey"]).index("by_supplier_branch_date", ["supplierId", "branchId", "date"]).index("by_branch_date", ["branchId", "date"]).index("by_account_date", ["accountId", "date"]).index("by_status", ["status"]),
+
+  supplierPaymentAllocations: defineTable({
+    paymentId: v.id("supplierPayments"), purchaseReceiptId: v.id("purchaseReceipts"), receiptNumber: v.string(), supplierId: v.id("suppliers"), branchId: v.id("branches"), amount: v.number(), date: v.string(), createdAt: v.number(),
+  }).index("by_payment", ["paymentId"]).index("by_purchase_receipt", ["purchaseReceiptId"]).index("by_supplier_branch_date", ["supplierId", "branchId", "date"]),
 
   purchaseReceipts: defineTable({
     receiptNumber: v.string(), shipmentId: v.id("shipments"), shipmentNumber: v.string(), supplierId: v.id("suppliers"), supplierName: v.string(), externalInvoiceNumber: v.optional(v.string()), externalInvoiceKey: v.optional(v.string()), invoiceDate: v.optional(v.string()), receiptDate: v.string(), dueDate: v.optional(v.string()),

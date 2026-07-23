@@ -62,7 +62,7 @@ export async function calculateAvailableBalance(ctx: QueryCtx | MutationCtx, acc
 export async function postFinancialTransaction(ctx: MutationCtx, user: AuthUser, input: {
   type: FinancialTransactionType; requestId: string; date: string; amount: number; feeAmount?: number;
   description: string; branchId: Id<"branches">; destinationBranchId?: Id<"branches">;
-  referenceType?: string; referenceId?: string; referenceNumber?: string; customerId?: Id<"customers">;
+  referenceType?: string; referenceId?: string; referenceNumber?: string; customerId?: Id<"customers">; supplierId?: Id<"suppliers">;
   movements: MovementInput[]; originalTransactionId?: Id<"financialTransactions">; allowBeforeInitialization?: boolean;
 }): Promise<{ transactionId: Id<"financialTransactions">; duplicate: boolean }> {
   if (!isValidIsoDate(input.date)) throw new ConvexError("تاريخ المعاملة غير صالح");
@@ -90,7 +90,7 @@ export async function postFinancialTransaction(ctx: MutationCtx, user: AuthUser,
     transactionNumber, idempotencyKey, type: input.type, status: "posted", date: input.date,
     amount, feeAmount, netAmount: roundMoney(amount - feeAmount), description: input.description,
     referenceType: input.referenceType, referenceId: input.referenceId, referenceNumber: input.referenceNumber,
-    customerId: input.customerId, branchId: input.branchId, destinationBranchId: input.destinationBranchId,
+    customerId: input.customerId, supplierId: input.supplierId, branchId: input.branchId, destinationBranchId: input.destinationBranchId,
     userId: user.userId, createdAt: Date.now(), originalTransactionId: input.originalTransactionId,
   });
   for (const movement of prepared) {
@@ -121,7 +121,7 @@ export async function reversePostedFinancialTransaction(ctx: MutationCtx, user: 
   const posted = await postFinancialTransaction(ctx, user, { type: "reversal", requestId: input.requestId, date: input.date, amount: original.amount,
     description: `عكس ${original.transactionNumber}: ${input.reason}`, branchId: original.branchId, originalTransactionId: original._id,
     referenceType: input.referenceType ?? "financial_transaction", referenceId: input.referenceId ?? String(original._id), referenceNumber: input.referenceNumber ?? original.transactionNumber,
-    customerId: original.customerId, movements: movements.map(movement => ({ accountId: movement.accountId, signedAmount: -movement.signedAmount })) });
+    customerId: original.customerId, supplierId: original.supplierId, movements: movements.map(movement => ({ accountId: movement.accountId, signedAmount: -movement.signedAmount })) });
   await ctx.db.patch(original._id, { status: "reversed", reversedAt: Date.now(), reversedBy: user.userId, reversalReason: input.reason, reversalTransactionId: posted.transactionId });
   return posted.transactionId;
 }

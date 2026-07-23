@@ -1,7 +1,7 @@
 import type { MutationCtx } from "../_generated/server";
 import { ConvexError } from "convex/values";
 
-export type DocumentType = "invoice" | "order" | "shipment" | "repair" | "delivery" | "finance" | "creditNote" | "purchaseReceipt" | "supplierLedger";
+export type DocumentType = "invoice" | "order" | "shipment" | "repair" | "delivery" | "finance" | "creditNote" | "purchaseReceipt" | "supplierLedger" | "supplierPayment";
 const config = {
   invoice: { prefix: "INV", table: "invoices", field: "invoiceNumber" },
   order: { prefix: "ORD", table: "orders", field: "orderNumber" },
@@ -12,6 +12,7 @@ const config = {
   creditNote: { prefix: "CRN", table: "salesReturns", field: "creditNoteNumber" },
   purchaseReceipt: { prefix: "PUR", table: "purchaseReceipts", field: "receiptNumber" },
   supplierLedger: { prefix: "SUP", table: "supplierLedgerEntries", field: "entryNumber" },
+  supplierPayment: { prefix: "SPY", table: "supplierPayments", field: "paymentNumber" },
 } as const;
 
 export function formatDocumentNumber(type: DocumentType, year: number, value: number): string {
@@ -39,6 +40,7 @@ async function legacyNumbersForYear(ctx: MutationCtx, type: DocumentType, year: 
     case "creditNote": return (await ctx.db.query("salesReturns").withIndex("by_credit_note_number", q => q.gte("creditNoteNumber", lower).lt("creditNoteNumber", upper)).collect()).map(x => x.creditNoteNumber);
     case "purchaseReceipt": return (await ctx.db.query("purchaseReceipts").withIndex("by_receipt_number", q => q.gte("receiptNumber", lower).lt("receiptNumber", upper)).collect()).map(x => x.receiptNumber);
     case "supplierLedger": return (await ctx.db.query("supplierLedgerEntries").withIndex("by_entry_number", q => q.gte("entryNumber", lower).lt("entryNumber", upper)).collect()).map(x => x.entryNumber);
+    case "supplierPayment": return (await ctx.db.query("supplierPayments").withIndex("by_payment_number", q => q.gte("paymentNumber", lower).lt("paymentNumber", upper)).collect()).map(x => x.paymentNumber);
   }
 }
 
@@ -53,6 +55,7 @@ export async function documentNumberExists(ctx: MutationCtx, type: DocumentType,
     case "creditNote": return (await ctx.db.query("salesReturns").withIndex("by_credit_note_number", q => q.eq("creditNoteNumber", number)).first()) !== null;
     case "purchaseReceipt": return (await ctx.db.query("purchaseReceipts").withIndex("by_receipt_number", q => q.eq("receiptNumber", number)).first()) !== null;
     case "supplierLedger": return (await ctx.db.query("supplierLedgerEntries").withIndex("by_entry_number", q => q.eq("entryNumber", number)).first()) !== null;
+    case "supplierPayment": return (await ctx.db.query("supplierPayments").withIndex("by_payment_number", q => q.eq("paymentNumber", number)).first()) !== null;
   }
 }
 
