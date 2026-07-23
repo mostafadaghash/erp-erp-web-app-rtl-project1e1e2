@@ -9,3 +9,5 @@ test("UI-06 totals use net total",()=>assert.match(invoices,/s \+ \(i\.netTotal 
 test("UI-07 create print and reverse are permission guarded",()=>{assert.match(panel,/canCreate && canReverse/);assert.match(panel,/canPrint &&/);});
 test("UI-08 print query and modal are guarded",()=>assert.match(panel,/canPrint && printId/));
 test("UI-09 eligible response never exposes COGS",()=>{const body=backend.slice(backend.indexOf("eligibleInvoices"),backend.indexOf("export const create"));assert.doesNotMatch(body,/unitCost|costTotal|cogsTotal/i);});
+test("UI-10 partial returns expose collection when a balance remains",()=>assert.match(invoices,/inv\.status !== "returned" && inv\.remaining > 0/));
+test("UI-11 partially returned invoices retain financial refund action",()=>assert.match(invoices,/inv\.status !== "returned" && inv\.paid > 0/));

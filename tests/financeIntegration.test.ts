@@ -155,7 +155,7 @@ for (const [number, kind, refundApi] of [[42, "invoice", api.invoices.refundPaym
   const e = await setup({ initialized: true }), a = await account(e, "CASH", 50), id = await seedDocument(e, kind, 50);
   const args = kind === "invoice" ? { invoiceId: id, amount: 50, accountId: a, date, reason: "استرداد", requestId: "same-refund" } : kind === "order" ? { id, amount: 50, accountId: a, date, reason: "استرداد", requestId: "same-refund" } : { repairId: id, amount: 50, accountId: a, date, reason: "استرداد", requestId: "same-refund" };
   const tx = await e.t.mutation(refundApi, args); assert.equal(await e.t.mutation(refundApi, args), tx); const s = await snapshot(e), row = await e.raw.run(ctx => ctx.db.get(id));
-  assert.equal(s.transactions.filter(x => x.type.endsWith("refund")).length, 1); assert.equal(s.accounts.find(x => x._id === a)?.currentBalance, 0); assert.equal(kind === "invoice" ? row?.paid : row?.deposit, 0); assert.equal(row?.remaining, 100); if (kind === "invoice") assert.equal(row?.status, "pending");
+  assert.equal(s.transactions.filter(x => x.type.endsWith("refund")).length, 1); assert.equal(s.accounts.find(x => x._id === a)?.currentBalance, 0); assert.equal(kind === "invoice" ? row?.paid : row?.deposit, 0); assert.equal(row?.remaining, 100); if (kind === "invoice") assert.equal(row?.status, "unpaid");
   await assert.rejects(e.t.mutation(refundApi, { ...args, amount: 1, requestId: "excess-refund" }), /غير صالح/);
 });
 
