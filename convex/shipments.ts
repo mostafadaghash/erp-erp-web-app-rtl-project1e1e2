@@ -202,7 +202,9 @@ export const receive = mutation({
     const supplierFreightAmount = roundMoney(args.supplierFreightAmount);
     if (!Number.isFinite(supplierFreightAmount) || supplierFreightAmount < 0 || supplierFreightAmount > totalFreight) throw new ConvexError("قيمة الشحن المستحقة للمورد غير صالحة");
     const goodsTotal = roundMoney(shipment.items.reduce((sum, item) => sum + roundMoney(item.quantity * item.unitCost), 0));
-    const allocations = allocateProportionally(totalFreight, shipment.items.map(item => roundMoney(item.quantity * item.unitCost)));
+    // Paid lines carry freight by value. Quantities are only the fallback when
+    // every goods line is free, since value weights would otherwise all be zero.
+    const allocations = allocateProportionally(totalFreight, shipment.items.map(item => goodsTotal === 0 ? item.quantity : roundMoney(item.quantity * item.unitCost)));
     const items = [];
     for (const [index, item] of shipment.items.entries()) {
       if (!item.productId) throw new ConvexError("كل أصناف الشحنة يجب أن ترتبط بمنتج موجود");
@@ -215,10 +217,12 @@ export const receive = mutation({
     }
     const totalLandedCost = roundMoney(goodsTotal + totalFreight), payableAmount = roundMoney(goodsTotal + supplierFreightAmount);
     const receiptNumber = await nextDocumentNumber(ctx, "purchaseReceipt", new Date(`${args.receiptDate}T00:00:00.000Z`));
-    const purchaseReceiptId = await ctx.db.insert("purchaseReceipts", { receiptNumber, shipmentId: args.shipmentId, shipmentNumber: shipment.shipmentNumber, supplierId: shipment.supplierId, supplierName: supplier.name, externalInvoiceNumber, externalInvoiceKey, invoiceDate: args.invoiceDate, receiptDate: args.receiptDate, dueDate: args.dueDate, items, goodsTotal, totalFreight, supplierFreightAmount, externalFreightAmount: roundMoney(totalFreight - supplierFreightAmount), totalLandedCost, payableAmount, paidAmount: 0, remainingAmount: payableAmount, status: "unpaid", branchId: shipment.branchId, arrivalRequestId: requestId, createdBy: user.userId, createdAt: Date.now() });
+    const purchaseReceiptId = await ctx.db.insert("purchaseReceipts", { receiptNumber, shipmentId: args.shipmentId, shipmentNumber: shipment.shipmentNumber, supplierId: shipment.supplierId, supplierName: supplier.name, externalInvoiceNumber, externalInvoiceKey, invoiceDate: args.invoiceDate, receiptDate: args.receiptDate, dueDate: args.dueDate, items, goodsTotal, totalFreight, supplierFreightAmount, externalFreightAmount: roundMoney(totalFreight - supplierFreightAmount), totalLandedCost, payableAmount, paidAmount: 0, remainingAmount: payableAmount, status: payableAmount === 0 ? "paid" : "unpaid", branchId: shipment.branchId, arrivalRequestId: requestId, createdBy: user.userId, createdAt: Date.now() });
     for (const item of items) await changeProductStock(ctx, user, { productId: item.productId, quantityDelta: item.quantity, unitCost: item.landedUnitCost, valueDelta: item.inventoryValueAdded, type: INVENTORY_MOVEMENT_TYPES.shipmentReceipt, reason: `استلام الشحنة ${shipment.shipmentNumber}`, referenceId: String(purchaseReceiptId), referenceType: "purchase_receipt" });
-    const ledger = await postSupplierLedgerEntry(ctx, user, { requestId, supplierId: shipment.supplierId, branchId: shipment.branchId, date: args.receiptDate, amount: payableAmount, referenceId: String(purchaseReceiptId), referenceNumber: receiptNumber, externalInvoiceNumber, dueDate: args.dueDate });
-    await ctx.db.patch(purchaseReceiptId, { supplierLedgerEntryId: ledger._id });
+    if (payableAmount > 0) {
+      const ledger = await postSupplierLedgerEntry(ctx, user, { requestId, supplierId: shipment.supplierId, branchId: shipment.branchId, date: args.receiptDate, amount: payableAmount, referenceId: String(purchaseReceiptId), referenceNumber: receiptNumber, externalInvoiceNumber, dueDate: args.dueDate });
+      await ctx.db.patch(purchaseReceiptId, { supplierLedgerEntryId: ledger._id });
+    }
     await ctx.db.patch(args.shipmentId, { status: "arrived", arrivedDate: args.receiptDate, purchaseReceiptId, arrivalRequestId: requestId });
     await logAction(ctx, user, { action: "receive", module: "shipments", recordId: args.shipmentId, recordLabel: shipment.shipmentNumber, details: JSON.stringify({ purchaseReceiptId, receiptNumber, payableAmount, totalLandedCost }) });
     return { purchaseReceiptId, receiptNumber };

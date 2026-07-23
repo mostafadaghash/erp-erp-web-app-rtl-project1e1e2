@@ -25,7 +25,7 @@ export function calculateInventoryChange(stock: number, averageCost: number, inv
   const oldValue = inventoryValue ?? money(stock * averageCost);
   const nextStock = calculateStockAfter(stock, quantityDelta, "inventory valuation");
   if (unitCost === undefined || !Number.isFinite(unitCost) || unitCost < 0) throw new Error("تكلفة حركة المخزون مطلوبة");
-  if (exactValueDelta !== undefined && (!Number.isFinite(exactValueDelta) || money(exactValueDelta) !== exactValueDelta || Math.sign(exactValueDelta) !== Math.sign(quantityDelta))) {
+  if (exactValueDelta !== undefined && (!Number.isFinite(exactValueDelta) || money(exactValueDelta) !== exactValueDelta || (quantityDelta > 0 ? exactValueDelta < 0 : exactValueDelta > 0))) {
     throw new Error("قيمة حركة المخزون الدقيقة غير صالحة");
   }
   const valueDelta = exactValueDelta ?? money(quantityDelta * unitCost);
