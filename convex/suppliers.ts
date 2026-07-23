@@ -1,12 +1,18 @@
 import { query, mutation } from "./_generated/server";
 import { v, ConvexError } from "convex/values";
-import { requireModulePermission, logAction } from "./lib/auth";
+import { requireModulePermission, requirePermission, assertBranchAccess, logAction } from "./lib/auth";
+import { paginationOptsValidator } from "convex/server";
+
+function publicSupplier<T extends { balance: number }>(supplier: T) {
+  const { balance: _legacyBalance, ...safe } = supplier;
+  return safe;
+}
 
 export const list = query({
   args: {},
   handler: async (ctx) => {
     await requireModulePermission(ctx, "view_suppliers", "suppliers");
-    return await ctx.db.query("suppliers").collect();
+    return (await ctx.db.query("suppliers").collect()).map(publicSupplier);
   },
 });
 
@@ -14,9 +20,38 @@ export const get = query({
   args: { id: v.id("suppliers") },
   handler: async (ctx, args) => {
     await requireModulePermission(ctx, "view_suppliers", "suppliers");
-    return await ctx.db.get(args.id);
+    const supplier = await ctx.db.get(args.id);
+    return supplier ? publicSupplier(supplier) : null;
   },
 });
+
+export const branchBalances = query({
+  args: { branchId: v.id("branches") },
+  handler: async (ctx, args) => {
+    const user = await requirePermission(ctx, "view_supplier_ledger");
+    assertBranchAccess(user, { branchId: args.branchId });
+    return await ctx.db.query("supplierBalances").withIndex("by_branch", q => q.eq("branchId", args.branchId)).collect();
+  },
+});
+
+export const ledger = query({
+  args: { supplierId: v.id("suppliers"), branchId: v.id("branches"), paginationOpts: paginationOptsValidator },
+  handler: async (ctx, args) => {
+    const user = await requirePermission(ctx, "view_supplier_ledger");
+    assertBranchAccess(user, { branchId: args.branchId });
+    return await ctx.db.query("supplierLedgerEntries").withIndex("by_supplier_branch_date", q => q.eq("supplierId", args.supplierId).eq("branchId", args.branchId)).order("desc").paginate(args.paginationOpts);
+  },
+});
+
+export const purchaseReceipt = query({ args: { id: v.id("purchaseReceipts") }, handler: async (ctx, args) => { const user = await requirePermission(ctx, "view_supplier_ledger"); const receipt = await ctx.db.get(args.id); if (receipt) assertBranchAccess(user, receipt); return receipt; } });
+
+export const legacyReview = query({ args: {}, handler: async (ctx) => {
+  await requirePermission(ctx, "initialize_finance");
+  const arrived = await ctx.db.query("shipments").withIndex("by_status", q => q.eq("status", "arrived")).collect();
+  const legacy = arrived.filter(shipment => !shipment.purchaseReceiptId);
+  const suppliers = await ctx.db.query("suppliers").collect();
+  return { arrivedWithoutPurchaseReceiptCount: legacy.length, arrivedWithoutPurchaseReceiptValue: legacy.reduce((sum, shipment) => sum + shipment.grandTotal, 0), shipmentIdsWithoutSupplier: legacy.filter(shipment => !shipment.supplierId).map(shipment => shipment._id), suppliersWithLegacyBalance: suppliers.filter(supplier => supplier.balance !== 0).map(supplier => ({ supplierId: supplier._id, legacyBalance: supplier.balance })), requiresManualMigrationDecision: true };
+} });
 
 export const create = mutation({
   args: {

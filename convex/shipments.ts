@@ -1,12 +1,15 @@
 import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
 import { ConvexError } from "convex/values";
-import { assertBranchAccess, requireModulePermission, filterByBranch, resolveWriteBranch, logAction } from "./lib/auth";
+import { assertBranchAccess, requireModulePermission, requirePermission, filterByBranch, resolveWriteBranch, logAction } from "./lib/auth";
 import { canTransition, roundMoney, SHIPMENT_TRANSITIONS } from "../shared/businessRules";
 import { changeProductStock } from "./lib/inventory";
 import { allocateProportionally, INVENTORY_MOVEMENT_TYPES } from "../shared/inventoryRules";
 import { nextDocumentNumber } from "./lib/documentNumbers";
 import { requireActiveBranch, requireActiveSupplier } from "./lib/references";
+import { postSupplierLedgerEntry } from "./lib/supplierLedger";
+import { requireFinanceInitialized } from "./lib/finance";
+import { isValidIsoDate } from "../shared/businessRules";
 
 export const list = query({
   args: { status: v.optional(v.string()) },
@@ -70,7 +73,7 @@ export const creationOptions = query({
 export const create = mutation({
   args: {
     supplierName: v.string(),
-    supplierId: v.optional(v.id("suppliers")),
+    supplierId: v.id("suppliers"),
     items: v.array(v.object({
       productId: v.optional(v.id("products")),
       productName: v.string(),
@@ -89,11 +92,8 @@ export const create = mutation({
     const user = await requireModulePermission(ctx, "create_shipments", "shipments");
     const branchId = resolveWriteBranch(user, args.branchId);
     await requireActiveBranch(ctx, branchId);
-    let supplierName = args.supplierName.trim();
-    if (args.supplierId) {
-      const supplier = await requireActiveSupplier(ctx, args.supplierId);
-      supplierName = supplier.name;
-    }
+    const supplier = await requireActiveSupplier(ctx, args.supplierId);
+    const supplierName = supplier.name;
     if (!supplierName) throw new ConvexError("اسم المورد مطلوب");
     if (args.items.length === 0) throw new ConvexError("أضف منتجاً واحداً على الأقل");
     const items = [];
@@ -151,6 +151,7 @@ export const updateStatus = mutation({
     const user = await requireModulePermission(ctx, "edit_shipments", "shipments");
     const shipment = await ctx.db.get(args.id);
     if (!shipment) throw new ConvexError("الشحنة غير موجودة");
+    if (args.status === "arrived") throw new ConvexError("استخدم عملية استلام الشحنة لإنشاء مستند الشراء ومديونية المورد");
     assertBranchAccess(user, shipment);
     if (args.status === "cancelled" && !args.reason?.trim()) throw new ConvexError("سبب الإلغاء مطلوب");
     if (!canTransition(SHIPMENT_TRANSITIONS, shipment.status, args.status)) {
@@ -158,28 +159,7 @@ export const updateStatus = mutation({
     }
     const patch: Record<string, string | number> = { status: args.status };
     if (args.status === "cancelled") { patch.cancelledAt = Date.now(); patch.cancelledBy = user.userId; patch.cancellationReason = args.reason?.trim() ?? ""; }
-    if (args.status === "arrived") patch.arrivedDate = new Date().toISOString().split("T")[0];
     await ctx.db.patch(args.id, patch);
-
-    // When arrived, update product stock
-    if (args.status === "arrived") {
-      const eligible = shipment.items.map(item => item.productId ? item.total : 0);
-      const allocations = allocateProportionally(shipment.shippingCost, eligible);
-      for (const [index, item] of shipment.items.entries()) {
-        if (!item.productId) continue;
-        const product = await ctx.db.get(item.productId);
-        if (!product) throw new ConvexError("منتج الشحنة غير موجود");
-        assertBranchAccess(user, product);
-        const receivedValue = roundMoney(item.total + allocations[index]);
-        await changeProductStock(ctx, user, {
-          productId: item.productId, quantityDelta: item.quantity,
-          unitCost: receivedValue / item.quantity,
-          type: INVENTORY_MOVEMENT_TYPES.shipmentReceipt,
-          reason: `استلام الشحنة ${shipment.shipmentNumber}`,
-          referenceId: String(args.id), referenceType: "shipment",
-        });
-      }
-    }
     await logAction(ctx, user, {
       action: "update",
       module: "shipments",
@@ -187,6 +167,61 @@ export const updateStatus = mutation({
       recordLabel: shipment.shipmentNumber,
       details: `تحديث حالة الشحنة ${shipment.shipmentNumber} إلى: ${args.status}`,
     });
+  },
+});
+
+export const receive = mutation({
+  args: { shipmentId: v.id("shipments"), receiptDate: v.string(), requestId: v.string(), externalInvoiceNumber: v.optional(v.string()), invoiceDate: v.optional(v.string()), dueDate: v.optional(v.string()), supplierFreightAmount: v.number() },
+  handler: async (ctx, args) => {
+    const user = await requireModulePermission(ctx, "edit_shipments", "shipments");
+    await requirePermission(ctx, "post_purchase_receipts");
+    const shipment = await ctx.db.get(args.shipmentId);
+    if (!shipment) throw new ConvexError("الشحنة غير موجودة");
+    assertBranchAccess(user, shipment);
+    if (shipment.status === "arrived") {
+      if (shipment.arrivalRequestId === args.requestId && shipment.purchaseReceiptId) return { purchaseReceiptId: shipment.purchaseReceiptId, receiptNumber: (await ctx.db.get(shipment.purchaseReceiptId))?.receiptNumber };
+      throw new ConvexError("تم استلام هذه الشحنة مسبقاً بطلب مختلف");
+    }
+    if (shipment.status !== "in_transit") throw new ConvexError("يجب أن تكون الشحنة في الطريق قبل استلامها");
+    if (!shipment.supplierId) throw new ConvexError("لا يمكن استلام شحنة دون مورد محدد");
+    if (!shipment.branchId) throw new ConvexError("لا يمكن استلام شحنة دون فرع محدد");
+    if (!isValidIsoDate(args.receiptDate)) throw new ConvexError("تاريخ الاستلام غير صالح");
+    if (args.invoiceDate && !isValidIsoDate(args.invoiceDate)) throw new ConvexError("تاريخ الفاتورة غير صالح");
+    if (args.dueDate && (!isValidIsoDate(args.dueDate) || args.dueDate < (args.invoiceDate ?? args.receiptDate))) throw new ConvexError("تاريخ الاستحقاق غير صالح");
+    await requireFinanceInitialized(ctx, args.receiptDate);
+    const supplier = await requireActiveSupplier(ctx, shipment.supplierId);
+    await requireActiveBranch(ctx, shipment.branchId);
+    const requestId = args.requestId.trim();
+    if (!requestId || requestId.length > 200) throw new ConvexError("معرف طلب الاستلام غير صالح");
+    const existingReceipt = await ctx.db.query("purchaseReceipts").withIndex("by_shipment", q => q.eq("shipmentId", args.shipmentId)).unique();
+    if (existingReceipt) throw new ConvexError("يوجد مستند استلام لهذه الشحنة بالفعل");
+    const externalInvoiceNumber = args.externalInvoiceNumber?.trim().replace(/\s+/g, " ");
+    const externalInvoiceKey = externalInvoiceNumber ? `${shipment.supplierId}:${externalInvoiceNumber.toLocaleLowerCase("ar")}` : undefined;
+    if (externalInvoiceKey && await ctx.db.query("purchaseReceipts").withIndex("by_external_invoice_key", q => q.eq("externalInvoiceKey", externalInvoiceKey)).first()) throw new ConvexError("رقم فاتورة المورد مستخدم مسبقاً لهذا المورد");
+    const totalFreight = roundMoney(shipment.shippingCost);
+    const supplierFreightAmount = roundMoney(args.supplierFreightAmount);
+    if (!Number.isFinite(supplierFreightAmount) || supplierFreightAmount < 0 || supplierFreightAmount > totalFreight) throw new ConvexError("قيمة الشحن المستحقة للمورد غير صالحة");
+    const goodsTotal = roundMoney(shipment.items.reduce((sum, item) => sum + roundMoney(item.quantity * item.unitCost), 0));
+    const allocations = allocateProportionally(totalFreight, shipment.items.map(item => roundMoney(item.quantity * item.unitCost)));
+    const items = [];
+    for (const [index, item] of shipment.items.entries()) {
+      if (!item.productId) throw new ConvexError("كل أصناف الشحنة يجب أن ترتبط بمنتج موجود");
+      if (!Number.isInteger(item.quantity) || item.quantity <= 0) throw new ConvexError("كمية الشحنة غير صالحة");
+      const product = await ctx.db.get(item.productId);
+      if (!product || !product.isActive) throw new ConvexError("منتج الشحنة غير موجود أو غير نشط");
+      if (product.branchId !== shipment.branchId) throw new ConvexError("منتج الشحنة لا ينتمي إلى فرعها");
+      const lineTotal = roundMoney(item.quantity * item.unitCost), allocatedFreight = allocations[index], inventoryValueAdded = roundMoney(lineTotal + allocatedFreight);
+      items.push({ productId: item.productId, productName: product.name, quantity: item.quantity, unitCost: roundMoney(item.unitCost), lineTotal, allocatedFreight, landedUnitCost: roundMoney(inventoryValueAdded / item.quantity), inventoryValueAdded });
+    }
+    const totalLandedCost = roundMoney(goodsTotal + totalFreight), payableAmount = roundMoney(goodsTotal + supplierFreightAmount);
+    const receiptNumber = await nextDocumentNumber(ctx, "purchaseReceipt", new Date(`${args.receiptDate}T00:00:00.000Z`));
+    const purchaseReceiptId = await ctx.db.insert("purchaseReceipts", { receiptNumber, shipmentId: args.shipmentId, shipmentNumber: shipment.shipmentNumber, supplierId: shipment.supplierId, supplierName: supplier.name, externalInvoiceNumber, externalInvoiceKey, invoiceDate: args.invoiceDate, receiptDate: args.receiptDate, dueDate: args.dueDate, items, goodsTotal, totalFreight, supplierFreightAmount, externalFreightAmount: roundMoney(totalFreight - supplierFreightAmount), totalLandedCost, payableAmount, paidAmount: 0, remainingAmount: payableAmount, status: "unpaid", branchId: shipment.branchId, arrivalRequestId: requestId, createdBy: user.userId, createdAt: Date.now() });
+    for (const item of items) await changeProductStock(ctx, user, { productId: item.productId, quantityDelta: item.quantity, unitCost: item.landedUnitCost, type: INVENTORY_MOVEMENT_TYPES.shipmentReceipt, reason: `استلام الشحنة ${shipment.shipmentNumber}`, referenceId: String(purchaseReceiptId), referenceType: "purchase_receipt" });
+    const ledger = await postSupplierLedgerEntry(ctx, user, { requestId, supplierId: shipment.supplierId, branchId: shipment.branchId, date: args.receiptDate, amount: payableAmount, referenceId: String(purchaseReceiptId), referenceNumber: receiptNumber, externalInvoiceNumber, dueDate: args.dueDate });
+    await ctx.db.patch(purchaseReceiptId, { supplierLedgerEntryId: ledger._id });
+    await ctx.db.patch(args.shipmentId, { status: "arrived", arrivedDate: args.receiptDate, purchaseReceiptId, arrivalRequestId: requestId });
+    await logAction(ctx, user, { action: "receive", module: "shipments", recordId: args.shipmentId, recordLabel: shipment.shipmentNumber, details: JSON.stringify({ purchaseReceiptId, receiptNumber, payableAmount, totalLandedCost }) });
+    return { purchaseReceiptId, receiptNumber };
   },
 });
 

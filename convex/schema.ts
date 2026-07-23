@@ -82,6 +82,24 @@ const applicationTables = {
     isActive: v.optional(v.boolean()),
   }),
 
+  supplierBalances: defineTable({
+    key: v.string(), supplierId: v.id("suppliers"), branchId: v.id("branches"), balance: v.number(), updatedAt: v.number(),
+  }).index("by_key", ["key"]).index("by_supplier", ["supplierId"]).index("by_branch", ["branchId"]).index("by_supplier_branch", ["supplierId", "branchId"]),
+
+  supplierLedgerEntries: defineTable({
+    entryNumber: v.string(), idempotencyKey: v.string(), supplierId: v.id("suppliers"), supplierName: v.string(), branchId: v.id("branches"),
+    type: v.union(v.literal("opening_balance"), v.literal("purchase_receipt"), v.literal("purchase_return"), v.literal("supplier_payment"), v.literal("supplier_refund"), v.literal("adjustment"), v.literal("reversal")),
+    status: v.union(v.literal("posted"), v.literal("reversed")), date: v.string(), amountDelta: v.number(), balanceBefore: v.number(), balanceAfter: v.number(),
+    referenceType: v.string(), referenceId: v.string(), referenceNumber: v.string(), externalInvoiceNumber: v.optional(v.string()), dueDate: v.optional(v.string()), description: v.string(), userId: v.string(), createdAt: v.number(),
+    reversedAt: v.optional(v.number()), reversedBy: v.optional(v.string()), reversalReason: v.optional(v.string()), reversalEntryId: v.optional(v.id("supplierLedgerEntries")), originalEntryId: v.optional(v.id("supplierLedgerEntries")),
+  }).index("by_entry_number", ["entryNumber"]).index("by_idempotency_key", ["idempotencyKey"]).index("by_supplier_branch_date", ["supplierId", "branchId", "date"]).index("by_branch_date", ["branchId", "date"]).index("by_reference", ["referenceType", "referenceId"]).index("by_status", ["status"]).index("by_type", ["type"]),
+
+  purchaseReceipts: defineTable({
+    receiptNumber: v.string(), shipmentId: v.id("shipments"), shipmentNumber: v.string(), supplierId: v.id("suppliers"), supplierName: v.string(), externalInvoiceNumber: v.optional(v.string()), externalInvoiceKey: v.optional(v.string()), invoiceDate: v.optional(v.string()), receiptDate: v.string(), dueDate: v.optional(v.string()),
+    items: v.array(v.object({ productId: v.id("products"), productName: v.string(), quantity: v.number(), unitCost: v.number(), lineTotal: v.number(), allocatedFreight: v.number(), landedUnitCost: v.number(), inventoryValueAdded: v.number() })),
+    goodsTotal: v.number(), totalFreight: v.number(), supplierFreightAmount: v.number(), externalFreightAmount: v.number(), totalLandedCost: v.number(), payableAmount: v.number(), paidAmount: v.number(), remainingAmount: v.number(), status: v.union(v.literal("unpaid"), v.literal("partial"), v.literal("paid")), branchId: v.id("branches"), supplierLedgerEntryId: v.optional(v.id("supplierLedgerEntries")), arrivalRequestId: v.string(), createdBy: v.string(), createdAt: v.number(),
+  }).index("by_receipt_number", ["receiptNumber"]).index("by_shipment", ["shipmentId"]).index("by_supplier_branch_date", ["supplierId", "branchId", "receiptDate"]).index("by_branch_date", ["branchId", "receiptDate"]).index("by_external_invoice_key", ["externalInvoiceKey"]).index("by_arrival_request", ["arrivalRequestId"]),
+
   // الفئات
   categories: defineTable({
     name: v.string(),
@@ -262,6 +280,7 @@ const applicationTables = {
     arrivedDate: v.optional(v.string()),
     notes: v.optional(v.string()),
     branchId: v.optional(v.id("branches")),
+    purchaseReceiptId: v.optional(v.id("purchaseReceipts")), arrivalRequestId: v.optional(v.string()),
     cancelledAt: v.optional(v.number()), cancelledBy: v.optional(v.string()), cancellationReason: v.optional(v.string()),
   }).index("by_status", ["status"]).index("by_shipment_number", ["shipmentNumber"]),
 

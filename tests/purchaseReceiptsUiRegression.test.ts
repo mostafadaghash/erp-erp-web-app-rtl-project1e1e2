@@ -1,0 +1,5 @@
+import test from "node:test";import assert from "node:assert/strict";import {readFileSync} from "node:fs";
+const shipments=readFileSync("src/components/ShipmentsPage.tsx","utf8"),suppliers=readFileSync("src/components/SuppliersPage.tsx","utf8");
+test("purchase receipt UI uses dedicated guarded mutation and stable request",()=>{assert.match(shipments,/api\.shipments\.receive/);assert.doesNotMatch(shipments,/updateStatus\([^)]*arrived/);assert.match(shipments,/post_purchase_receipts/);assert.match(shipments,/useState\(\(\) => crypto\.randomUUID\(\)\)/);assert.match(shipments,/if \(submitting\) return/);assert.match(shipments,/رقم فاتورة المورد/);assert.doesNotMatch(shipments,/receiveShipment\(\{[^}]*goodsTotal/);});
+test("supplier UI gates branch balances and never renders legacy balance",()=>{assert.match(suppliers,/view_supplier_ledger/);assert.match(suppliers,/canViewSupplierLedger && me\?\.branchId[^\n]*"skip"/);assert.doesNotMatch(suppliers,/s\.balance|supplier\.balance/);});
+test("modified UI has no unsafe TypeScript escapes",()=>assert.doesNotMatch(shipments+suppliers,/as any|@ts-ignore/));
