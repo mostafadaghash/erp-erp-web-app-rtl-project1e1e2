@@ -1,6 +1,17 @@
 export const roundMoney = (value: number): number =>
   Math.round((value + Number.EPSILON) * 100) / 100;
 
+export type InvoiceStatusInput = { cancelled?: boolean; netTotal: number; creditedTotal: number; paid: number; remaining: number };
+
+/** The single source of truth for invoice settlement/return status. */
+export function deriveInvoiceStatus(input: InvoiceStatusInput): string {
+  if (input.cancelled) return "cancelled";
+  if (input.netTotal === 0) return "returned";
+  if (input.creditedTotal > 0) return input.remaining === 0 ? "paid_returned_partial" : "partial_return";
+  if (input.remaining === 0) return "paid";
+  return input.paid > 0 ? "partial" : "unpaid";
+}
+
 export function calculateInvoiceTotals(
   lineTotals: number[],
   discount: number,

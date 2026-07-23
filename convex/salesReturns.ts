@@ -5,7 +5,7 @@ import { assertFinancialAccountBranch, postFinancialTransaction, requireActiveFi
 import { changeProductStock } from "./lib/inventory";
 import { nextDocumentNumber } from "./lib/documentNumbers";
 import { INVENTORY_MOVEMENT_TYPES } from "../shared/inventoryRules";
-import { roundMoney } from "../shared/businessRules";
+import { deriveInvoiceStatus, roundMoney } from "../shared/businessRules";
 
 function redactCosts<T extends { items: Array<Record<string, unknown>>; totalCogsReversed: number }>(note: T, allowed: boolean) {
   if (allowed) return note;
@@ -73,7 +73,7 @@ export const create = mutation({ args: {
   for (const item of normalized) await changeProductStock(ctx, user, { productId: item.productId, quantityDelta: item.quantityReturned, unitCost: item.historicalUnitCost, type: INVENTORY_MOVEMENT_TYPES.salesReturn, reason: `مرتجع بيع ${creditNoteNumber}`, referenceId: String(id), referenceType: "sales_return" });
   let transactionId; if (cashRefund > 0 && account) { const posted = await postFinancialTransaction(ctx, user, { type: "sales_return_refund", requestId: args.requestId, date: args.date, amount: cashRefund, description: `رد نقدي للإشعار ${creditNoteNumber}`, branchId: invoice.branchId, referenceType: "sales_return", referenceId: String(id), referenceNumber: creditNoteNumber, customerId: invoice.customerId, movements: [{ accountId: account._id, signedAmount: -cashRefund }] }); transactionId = posted.transactionId; await ctx.db.patch(id, { financialTransactionId: transactionId }); }
   const creditedTotal = roundMoney((invoice.creditedTotal ?? 0) + totalCredit), netTotal = roundMoney(invoice.total - creditedTotal), paid = roundMoney(invoice.paid - cashRefund), remaining = roundMoney(invoice.remaining - debtReduction);
-  await ctx.db.patch(invoice._id, { creditedTotal, netTotal, paid, remaining, status: netTotal === 0 ? "returned" : remaining === 0 ? "paid_returned_partial" : "partial_return" });
+  await ctx.db.patch(invoice._id, { creditedTotal, netTotal, paid, remaining, status: deriveInvoiceStatus({ netTotal, creditedTotal, paid, remaining }) });
   if (invoice.customerId) { const customer = await ctx.db.get(invoice.customerId); if (!customer) throw new ConvexError("العميل غير موجود"); if (customer.balance < debtReduction || customer.totalPurchases < totalCredit) throw new ConvexError("رصيد العميل غير متسق"); await ctx.db.patch(customer._id, { balance: roundMoney(customer.balance - debtReduction), totalPurchases: roundMoney(customer.totalPurchases - totalCredit) }); }
   await logAction(ctx, user, { action: "create", module: "sales_returns", recordId: id, recordLabel: creditNoteNumber, details: `إنشاء إشعار دائن ${creditNoteNumber} بقيمة ${totalCredit} وإعادة المخزون` });
   return id;
@@ -88,7 +88,8 @@ export const reverse = mutation({ args: { id: v.id("salesReturns"), reason: v.st
   const invoice = await ctx.db.get(note.invoiceId); if (!invoice) throw new ConvexError("الفاتورة غير موجودة");
   for (const item of note.items) await changeProductStock(ctx, user, { productId: item.productId, quantityDelta: -item.quantityReturned, unitCost: item.historicalUnitCost, type: INVENTORY_MOVEMENT_TYPES.sale, reason: `عكس مرتجع ${note.creditNoteNumber}`, referenceId: String(note._id), referenceType: "sales_return_reversal" });
   let reversalTransactionId; if (note.financialTransactionId) reversalTransactionId = await reversePostedFinancialTransaction(ctx, user, { transactionId: note.financialTransactionId, reason: args.reason.trim(), date: args.date, requestId: args.requestId, referenceType: "sales_return_reversal", referenceId: String(note._id), referenceNumber: note.creditNoteNumber });
-  await ctx.db.patch(invoice._id, { creditedTotal: roundMoney((invoice.creditedTotal ?? 0) - note.totalCredit), netTotal: roundMoney((invoice.netTotal ?? invoice.total) + note.totalCredit), paid: roundMoney(invoice.paid + note.cashRefund), remaining: roundMoney(invoice.remaining + note.debtReduction), status: invoice.remaining + note.debtReduction === 0 ? "paid" : invoice.paid + note.cashRefund > 0 ? "partial" : "unpaid" });
+  const creditedTotal = roundMoney((invoice.creditedTotal ?? 0) - note.totalCredit), netTotal = roundMoney((invoice.netTotal ?? invoice.total) + note.totalCredit), paid = roundMoney(invoice.paid + note.cashRefund), remaining = roundMoney(invoice.remaining + note.debtReduction);
+  await ctx.db.patch(invoice._id, { creditedTotal, netTotal, paid, remaining, status: deriveInvoiceStatus({ netTotal, creditedTotal, paid, remaining }) });
   if (note.customerId) { const customer = await ctx.db.get(note.customerId); if (!customer) throw new ConvexError("العميل غير موجود"); await ctx.db.patch(customer._id, { balance: roundMoney(customer.balance + note.debtReduction), totalPurchases: roundMoney(customer.totalPurchases + note.totalCredit) }); }
   await ctx.db.patch(note._id, { status: "reversed", reversedAt: Date.now(), reversedBy: user.userId, reversalReason: args.reason.trim(), reversalDate: args.date, reversalRequestId: requestKey, reversalTransactionId });
   await logAction(ctx, user, { action: "reverse", module: "sales_returns", recordId: note._id, recordLabel: note.creditNoteNumber, details: `عكس الإشعار الدائن: ${args.reason.trim()}` }); return note._id;
