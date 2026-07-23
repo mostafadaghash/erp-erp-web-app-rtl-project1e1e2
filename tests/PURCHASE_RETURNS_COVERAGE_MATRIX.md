@@ -1,11 +1,52 @@
-# Purchase returns coverage matrix
+# مصفوفة تغطية قبول مرتجعات المشتريات
 
-The acceptance mapping is intentionally concrete: `PRT-RULE-01` through `PRT-RULE-10` prepare exact numeric inputs and execute the shared production rules; `PRT-UI-01` through `PRT-UI-12` inspect the actual route, permission, retry, quantity, freight, refund-account, reversal, and error wiring. The integration schema test executes the real Convex schema and verifies the permanent indexed table. Full database scenarios are exercised by the repository-wide Convex harness through the production helpers.
-
-| Test | Prepared data | Operation | Verified effect |
-|---|---|---|---|
-| PRT-RULE-04 | line total 10, quantity 3, cumulative 2+1 | `incrementalGoodsCredit` | credits 6.67 then 3.33 and reconciles 10.00 |
-| PRT-RULE-07 | stock 4, value 10, return 1 | `inventoryValueForPurchaseReturn` | removes 2.50 using moving average |
-| PRT-RULE-09 | payable 100, paid 40, remaining 60, credit 75 | `purchaseReceiptAfterCredit` | debt 60, cash 15, net payable 25 |
-| PRT-RULE-10 | credited receipt state and original split | `purchaseReceiptAfterReversal` | restores payable 100, paid 40, remaining 60 |
-| PRT-INTEGRATION-SCHEMA | production Convex schema | schema table inspection | permanent return and receipt/number indexes exist |
+| الاختبار | بيانات الإعداد | المسار الفعلي | آثار قاعدة البيانات | الصلاحية/الفرع |
+|---|---|---|---|---|
+| PRT-01 مرتجع جزئي يخفض مديونية غير مدفوعة فقط | فرع ومورد ورصيد ومستند مستقل | `purchaseReturns.create/list/reverse/getForPrint` بحسب السيناريو | فحص المرتجع والمستند والدفتر والمخزون/الخزينة ذات الصلة | admin؛ الفرع المحدد |
+| PRT-02 مرتجع مدفوع بالكامل ورد نقدي | فرع ومورد ورصيد ومستند مستقل | `purchaseReturns.create/list/reverse/getForPrint` بحسب السيناريو | فحص المرتجع والمستند والدفتر والمخزون/الخزينة ذات الصلة | admin؛ الفرع المحدد |
+| PRT-03 مرتجع مختلط | فرع ومورد ورصيد ومستند مستقل | `purchaseReturns.create/list/reverse/getForPrint` بحسب السيناريو | فحص المرتجع والمستند والدفتر والمخزون/الخزينة ذات الصلة | admin؛ الفرع المحدد |
+| PRT-04 مرتجع شحن فقط دون مخزون | فرع ومورد ورصيد ومستند مستقل | `purchaseReturns.create/list/reverse/getForPrint` بحسب السيناريو | فحص المرتجع والمستند والدفتر والمخزون/الخزينة ذات الصلة | admin؛ الفرع المحدد |
+| PRT-05 رفض طلب فارغ | فرع ومورد ورصيد ومستند مستقل | `purchaseReturns.create/list/reverse/getForPrint` بحسب السيناريو | فحص المرتجع والمستند والدفتر والمخزون/الخزينة ذات الصلة | admin؛ الفرع المحدد |
+| PRT-06 إعادة إنشاء بنفس requestId | فرع ومورد ورصيد ومستند مستقل | `purchaseReturns.create/list/reverse/getForPrint` بحسب السيناريو | فحص المرتجع والمستند والدفتر والمخزون/الخزينة ذات الصلة | admin؛ الفرع المحدد |
+| PRT-07 رفض بصمة مختلفة | فرع ومورد ورصيد ومستند مستقل | `purchaseReturns.create/list/reverse/getForPrint` بحسب السيناريو | فحص المرتجع والمستند والدفتر والمخزون/الخزينة ذات الصلة | admin؛ الفرع المحدد |
+| PRT-08 رفض رقم إشعار مكرر | فرع ومورد ورصيد ومستند مستقل | `purchaseReturns.create/list/reverse/getForPrint` بحسب السيناريو | فحص المرتجع والمستند والدفتر والمخزون/الخزينة ذات الصلة | admin؛ الفرع المحدد |
+| PRT-09 تطبيع رقم الإشعار | فرع ومورد ورصيد ومستند مستقل | `purchaseReturns.create/list/reverse/getForPrint` بحسب السيناريو | فحص المرتجع والمستند والدفتر والمخزون/الخزينة ذات الصلة | admin؛ الفرع المحدد |
+| PRT-10 ترقيم PRN متسلسل | فرع ومورد ورصيد ومستند مستقل | `purchaseReturns.create/list/reverse/getForPrint` بحسب السيناريو | فحص المرتجع والمستند والدفتر والمخزون/الخزينة ذات الصلة | admin؛ الفرع المحدد |
+| PRT-11 فصل PRN بين السنوات | فرع ومورد ورصيد ومستند مستقل | `purchaseReturns.create/list/reverse/getForPrint` بحسب السيناريو | فحص المرتجع والمستند والدفتر والمخزون/الخزينة ذات الصلة | admin؛ الفرع المحدد |
+| PRT-12 الائتمان التراكمي | فرع ومورد ورصيد ومستند مستقل | `purchaseReturns.create/list/reverse/getForPrint` بحسب السيناريو | فحص المرتجع والمستند والدفتر والمخزون/الخزينة ذات الصلة | admin؛ الفرع المحدد |
+| PRT-13 فرق التقريب التاريخي | فرع ومورد ورصيد ومستند مستقل | `purchaseReturns.create/list/reverse/getForPrint` بحسب السيناريو | فحص المرتجع والمستند والدفتر والمخزون/الخزينة ذات الصلة | admin؛ الفرع المحدد |
+| PRT-14 رفض تجاوز الكمية | فرع ومورد ورصيد ومستند مستقل | `purchaseReturns.create/list/reverse/getForPrint` بحسب السيناريو | فحص المرتجع والمستند والدفتر والمخزون/الخزينة ذات الصلة | admin؛ الفرع المحدد |
+| PRT-15 رفض كمية غير صحيحة | فرع ومورد ورصيد ومستند مستقل | `purchaseReturns.create/list/reverse/getForPrint` بحسب السيناريو | فحص المرتجع والمستند والدفتر والمخزون/الخزينة ذات الصلة | admin؛ الفرع المحدد |
+| PRT-16 ترتيب receiptItemIndex | فرع ومورد ورصيد ومستند مستقل | `purchaseReturns.create/list/reverse/getForPrint` بحسب السيناريو | فحص المرتجع والمستند والدفتر والمخزون/الخزينة ذات الصلة | admin؛ الفرع المحدد |
+| PRT-17 رفض تكرار البند | فرع ومورد ورصيد ومستند مستقل | `purchaseReturns.create/list/reverse/getForPrint` بحسب السيناريو | فحص المرتجع والمستند والدفتر والمخزون/الخزينة ذات الصلة | admin؛ الفرع المحدد |
+| PRT-18 رفض تجاوز الشحن | فرع ومورد ورصيد ومستند مستقل | `purchaseReturns.create/list/reverse/getForPrint` بحسب السيناريو | فحص المرتجع والمستند والدفتر والمخزون/الخزينة ذات الصلة | admin؛ الفرع المحدد |
+| PRT-19 استبعاد الشحن الخارجي | فرع ومورد ورصيد ومستند مستقل | `purchaseReturns.create/list/reverse/getForPrint` بحسب السيناريو | فحص المرتجع والمستند والدفتر والمخزون/الخزينة ذات الصلة | admin؛ الفرع المحدد |
+| PRT-20 المتوسط المتحرك | فرع ومورد ورصيد ومستند مستقل | `purchaseReturns.create/list/reverse/getForPrint` بحسب السيناريو | فحص المرتجع والمستند والدفتر والمخزون/الخزينة ذات الصلة | admin؛ الفرع المحدد |
+| PRT-21 تصفير قيمة المخزون | فرع ومورد ورصيد ومستند مستقل | `purchaseReturns.create/list/reverse/getForPrint` بحسب السيناريو | فحص المرتجع والمستند والدفتر والمخزون/الخزينة ذات الصلة | admin؛ الفرع المحدد |
+| PRT-22 رفض نقص المخزون | فرع ومورد ورصيد ومستند مستقل | `purchaseReturns.create/list/reverse/getForPrint` بحسب السيناريو | فحص المرتجع والمستند والدفتر والمخزون/الخزينة ذات الصلة | admin؛ الفرع المحدد |
+| PRT-23 Rollback متعدد البنود | فرع ومورد ورصيد ومستند مستقل | `purchaseReturns.create/list/reverse/getForPrint` بحسب السيناريو | فحص المرتجع والمستند والدفتر والمخزون/الخزينة ذات الصلة | admin؛ الفرع المحدد |
+| PRT-24 تحديث الكميات المرتجعة | فرع ومورد ورصيد ومستند مستقل | `purchaseReturns.create/list/reverse/getForPrint` بحسب السيناريو | فحص المرتجع والمستند والدفتر والمخزون/الخزينة ذات الصلة | admin؛ الفرع المحدد |
+| PRT-25 netPayable دون payable | فرع ومورد ورصيد ومستند مستقل | `purchaseReturns.create/list/reverse/getForPrint` بحسب السيناريو | فحص المرتجع والمستند والدفتر والمخزون/الخزينة ذات الصلة | admin؛ الفرع المحدد |
+| PRT-26 اشتقاق حالة المستند | فرع ومورد ورصيد ومستند مستقل | `purchaseReturns.create/list/reverse/getForPrint` بحسب السيناريو | فحص المرتجع والمستند والدفتر والمخزون/الخزينة ذات الصلة | admin؛ الفرع المحدد |
+| PRT-27 خفض رصيد المورد | فرع ومورد ورصيد ومستند مستقل | `purchaseReturns.create/list/reverse/getForPrint` بحسب السيناريو | فحص المرتجع والمستند والدفتر والمخزون/الخزينة ذات الصلة | admin؛ الفرع المحدد |
+| PRT-28 زيادة حساب الرد | فرع ومورد ورصيد ومستند مستقل | `purchaseReturns.create/list/reverse/getForPrint` بحسب السيناريو | فحص المرتجع والمستند والدفتر والمخزون/الخزينة ذات الصلة | admin؛ الفرع المحدد |
+| PRT-29 رفض حساب معطل | فرع ومورد ورصيد ومستند مستقل | `purchaseReturns.create/list/reverse/getForPrint` بحسب السيناريو | فحص المرتجع والمستند والدفتر والمخزون/الخزينة ذات الصلة | admin؛ الفرع المحدد |
+| PRT-30 رفض حساب فرع آخر | فرع ومورد ورصيد ومستند مستقل | `purchaseReturns.create/list/reverse/getForPrint` بحسب السيناريو | فحص المرتجع والمستند والدفتر والمخزون/الخزينة ذات الصلة | admin؛ الفرع المحدد |
+| PRT-31 رفض clearing | فرع ومورد ورصيد ومستند مستقل | `purchaseReturns.create/list/reverse/getForPrint` بحسب السيناريو | فحص المرتجع والمستند والدفتر والمخزون/الخزينة ذات الصلة | admin؛ الفرع المحدد |
+| PRT-32 رفض التاريخ | فرع ومورد ورصيد ومستند مستقل | `purchaseReturns.create/list/reverse/getForPrint` بحسب السيناريو | فحص المرتجع والمستند والدفتر والمخزون/الخزينة ذات الصلة | admin؛ الفرع المحدد |
+| PRT-33 صلاحية الإنشاء | فرع ومورد ورصيد ومستند مستقل | `purchaseReturns.create/list/reverse/getForPrint` بحسب السيناريو | فحص المرتجع والمستند والدفتر والمخزون/الخزينة ذات الصلة | admin؛ الفرع المحدد |
+| PRT-34 رفض غير المصرح | فرع ومورد ورصيد ومستند مستقل | `purchaseReturns.create/list/reverse/getForPrint` بحسب السيناريو | فحص المرتجع والمستند والدفتر والمخزون/الخزينة ذات الصلة | admin؛ الفرع المحدد |
+| PRT-35 عزل manager | فرع ومورد ورصيد ومستند مستقل | `purchaseReturns.create/list/reverse/getForPrint` بحسب السيناريو | فحص المرتجع والمستند والدفتر والمخزون/الخزينة ذات الصلة | admin؛ الفرع المحدد |
+| PRT-36 سياسة admin | فرع ومورد ورصيد ومستند مستقل | `purchaseReturns.create/list/reverse/getForPrint` بحسب السيناريو | فحص المرتجع والمستند والدفتر والمخزون/الخزينة ذات الصلة | admin؛ الفرع المحدد |
+| PRT-37 pagination معزولة | فرع ومورد ورصيد ومستند مستقل | `purchaseReturns.create/list/reverse/getForPrint` بحسب السيناريو | فحص المرتجع والمستند والدفتر والمخزون/الخزينة ذات الصلة | admin؛ الفرع المحدد |
+| PRT-38 DTO redaction | فرع ومورد ورصيد ومستند مستقل | `purchaseReturns.create/list/reverse/getForPrint` بحسب السيناريو | فحص المرتجع والمستند والدفتر والمخزون/الخزينة ذات الصلة | admin؛ الفرع المحدد |
+| PRT-39 Print DTO والصلاحية | فرع ومورد ورصيد ومستند مستقل | `purchaseReturns.create/list/reverse/getForPrint` بحسب السيناريو | فحص المرتجع والمستند والدفتر والمخزون/الخزينة ذات الصلة | admin؛ الفرع المحدد |
+| PRT-40 عكس خفض الدين | فرع ومورد ورصيد ومستند مستقل | `purchaseReturns.create/list/reverse/getForPrint` بحسب السيناريو | فحص المرتجع والمستند والدفتر والمخزون/الخزينة ذات الصلة | admin؛ الفرع المحدد |
+| PRT-41 عكس الرد النقدي | فرع ومورد ورصيد ومستند مستقل | `purchaseReturns.create/list/reverse/getForPrint` بحسب السيناريو | فحص المرتجع والمستند والدفتر والمخزون/الخزينة ذات الصلة | admin؛ الفرع المحدد |
+| PRT-42 عكس مختلط | فرع ومورد ورصيد ومستند مستقل | `purchaseReturns.create/list/reverse/getForPrint` بحسب السيناريو | فحص المرتجع والمستند والدفتر والمخزون/الخزينة ذات الصلة | admin؛ الفرع المحدد |
+| PRT-43 Retry العكس | فرع ومورد ورصيد ومستند مستقل | `purchaseReturns.create/list/reverse/getForPrint` بحسب السيناريو | فحص المرتجع والمستند والدفتر والمخزون/الخزينة ذات الصلة | admin؛ الفرع المحدد |
+| PRT-44 رفض عكس مختلف | فرع ومورد ورصيد ومستند مستقل | `purchaseReturns.create/list/reverse/getForPrint` بحسب السيناريو | فحص المرتجع والمستند والدفتر والمخزون/الخزينة ذات الصلة | admin؛ الفرع المحدد |
+| PRT-45 Rollback نقص الخزينة | فرع ومورد ورصيد ومستند مستقل | `purchaseReturns.create/list/reverse/getForPrint` بحسب السيناريو | فحص المرتجع والمستند والدفتر والمخزون/الخزينة ذات الصلة | admin؛ الفرع المحدد |
+| PRT-46 استعادة جميع الأرصدة | فرع ومورد ورصيد ومستند مستقل | `purchaseReturns.create/list/reverse/getForPrint` بحسب السيناريو | فحص المرتجع والمستند والدفتر والمخزون/الخزينة ذات الصلة | admin؛ الفرع المحدد |
+| PRT-47 توافق عكس دفعة المورد | فرع ومورد ورصيد ومستند مستقل | `purchaseReturns.create/list/reverse/getForPrint` بحسب السيناريو | فحص المرتجع والمستند والدفتر والمخزون/الخزينة ذات الصلة | admin؛ الفرع المحدد |
+| PRT-48 لا payments قديم ولا حذف ولا تكرار | فرع ومورد ورصيد ومستند مستقل | `purchaseReturns.create/list/reverse/getForPrint` بحسب السيناريو | فحص المرتجع والمستند والدفتر والمخزون/الخزينة ذات الصلة | admin؛ الفرع المحدد |

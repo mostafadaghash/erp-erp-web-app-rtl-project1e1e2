@@ -7,6 +7,7 @@ import { nextDocumentNumber } from "./lib/documentNumbers";
 import { postSupplierBalanceMovement } from "./lib/supplierLedger";
 import { canonicalAllocations, allocationTotal, derivePurchaseReceiptState, hasAtMostTwoDecimals, reverseAllocatedPayment } from "../shared/supplierPaymentRules";
 import type { Id } from "./_generated/dataModel";
+import { roundMoney } from "../shared/businessRules";
 
 const allocationValidator = v.object({ purchaseReceiptId: v.id("purchaseReceipts"), amount: v.number() });
 const allowedAccounts = ["cash", "bank", "instapay", "vodafone_cash", "other"] as const;
@@ -52,9 +53,10 @@ export const reverse = mutation({ args: { paymentId: v.id("supplierPayments"), r
   const reversalFingerprint = JSON.stringify({ requestId, date: args.date, reason });
   if (payment.status === "reversed") { if (payment.reversalRequestId !== requestId) throw new ConvexError("تم عكس سند الدفع سابقاً بطلب عكس مختلف"); if (payment.reversalFingerprint !== reversalFingerprint) throw new ConvexError("أعيد استخدام معرف طلب العكس بتاريخ أو سبب مختلف"); return payment.reversalFinancialTransactionId; }
   if (!payment.financialTransactionId || !payment.supplierLedgerEntryId) throw new ConvexError("روابط سند الدفع غير مكتملة");
+  const allocations = await ctx.db.query("supplierPaymentAllocations").withIndex("by_payment", q => q.eq("paymentId", payment._id)).collect();
+  for (const allocation of allocations) { const receipt = await ctx.db.get(allocation.purchaseReceiptId); if (!receipt) throw new ConvexError("مستند شراء مرتبط مفقود"); const net=receipt.netPayableAmount??receipt.payableAmount;let projected;try{projected=reverseAllocatedPayment(net,receipt.paidAmount,allocation.amount)}catch{throw new ConvexError("لا يمكن عكس دفعة المورد قبل عكس إشعار خصم الشراء المرتبط بالمستند.")}if(projected.paidAmount<0||projected.paidAmount>net||projected.remainingAmount<0||roundMoney(projected.paidAmount+projected.remainingAmount)!==net)throw new ConvexError("لا يمكن عكس دفعة المورد قبل عكس إشعار خصم الشراء المرتبط بالمستند."); }
   const financialId = await reversePostedFinancialTransaction(ctx, user, { transactionId: payment.financialTransactionId, reason, date: args.date, requestId, referenceType: "supplier_payment_reversal", referenceId: String(payment._id), referenceNumber: payment.paymentNumber });
   const ledger = await postSupplierBalanceMovement(ctx, user, { type: "reversal", requestId, supplierId: payment.supplierId, branchId: payment.branchId, date: args.date, amountDelta: payment.amount, referenceType: "supplier_payment_reversal", referenceId: String(payment._id), referenceNumber: payment.paymentNumber, description: `عكس دفعة ${payment.paymentNumber}: ${reason}`, originalEntryId: payment.supplierLedgerEntryId, reversalReason: reason, reversalDate: args.date });
-  const allocations = await ctx.db.query("supplierPaymentAllocations").withIndex("by_payment", q => q.eq("paymentId", payment._id)).collect();
   for (const allocation of allocations) { const receipt = await ctx.db.get(allocation.purchaseReceiptId); if (!receipt) throw new ConvexError("مستند شراء مرتبط مفقود"); await ctx.db.patch(receipt._id, reverseAllocatedPayment(receipt.netPayableAmount ?? receipt.payableAmount, receipt.paidAmount, allocation.amount)); }
   await ctx.db.patch(payment._id, { status: "reversed", reversedAt: Date.now(), reversedBy: user.userId, reversalReason: reason, reversalDate: args.date, reversalFingerprint, reversalRequestId: requestId, reversalFinancialTransactionId: financialId, reversalSupplierLedgerEntryId: ledger._id });
   await logAction(ctx, user, { action: "reverse", module: "supplier_payments", recordId: payment._id, recordLabel: payment.paymentNumber, details: reason }); return financialId;
