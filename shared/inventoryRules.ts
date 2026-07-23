@@ -21,11 +21,14 @@ export function calculateStockAfter(stockBefore: number, quantityDelta: number, 
 export const roundAverageCost = (value: number) => Math.round((value + Number.EPSILON) * 10_000) / 10_000;
 export const money = (value: number) => Math.round((value + Number.EPSILON) * 100) / 100;
 
-export function calculateInventoryChange(stock: number, averageCost: number, inventoryValue: number | undefined, quantityDelta: number, unitCost?: number) {
+export function calculateInventoryChange(stock: number, averageCost: number, inventoryValue: number | undefined, quantityDelta: number, unitCost?: number, exactValueDelta?: number) {
   const oldValue = inventoryValue ?? money(stock * averageCost);
   const nextStock = calculateStockAfter(stock, quantityDelta, "inventory valuation");
   if (unitCost === undefined || !Number.isFinite(unitCost) || unitCost < 0) throw new Error("تكلفة حركة المخزون مطلوبة");
-  const valueDelta = money(quantityDelta * unitCost);
+  if (exactValueDelta !== undefined && (!Number.isFinite(exactValueDelta) || money(exactValueDelta) !== exactValueDelta || Math.sign(exactValueDelta) !== Math.sign(quantityDelta))) {
+    throw new Error("قيمة حركة المخزون الدقيقة غير صالحة");
+  }
+  const valueDelta = exactValueDelta ?? money(quantityDelta * unitCost);
   const nextValue = nextStock === 0 ? 0 : money(oldValue + valueDelta);
   if (nextValue < 0) throw new Error("لا يمكن أن تصبح قيمة المخزون سالبة");
   return { stockAfter: nextStock, inventoryValueBefore: oldValue, inventoryValueAfter: nextValue, valueDelta: money(nextValue - oldValue), averageCostAfter: nextStock === 0 ? averageCost : roundAverageCost(nextValue / nextStock) };

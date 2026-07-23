@@ -4,7 +4,7 @@ import { ConvexError } from "convex/values";
 import { assertBranchAccess, requireModulePermission, requirePermission, filterByBranch, resolveWriteBranch, logAction } from "./lib/auth";
 import { canTransition, roundMoney, SHIPMENT_TRANSITIONS } from "../shared/businessRules";
 import { changeProductStock } from "./lib/inventory";
-import { allocateProportionally, INVENTORY_MOVEMENT_TYPES } from "../shared/inventoryRules";
+import { allocateProportionally, INVENTORY_MOVEMENT_TYPES, roundAverageCost } from "../shared/inventoryRules";
 import { nextDocumentNumber } from "./lib/documentNumbers";
 import { requireActiveBranch, requireActiveSupplier } from "./lib/references";
 import { postSupplierLedgerEntry } from "./lib/supplierLedger";
@@ -211,12 +211,12 @@ export const receive = mutation({
       if (!product || !product.isActive) throw new ConvexError("منتج الشحنة غير موجود أو غير نشط");
       if (product.branchId !== shipment.branchId) throw new ConvexError("منتج الشحنة لا ينتمي إلى فرعها");
       const lineTotal = roundMoney(item.quantity * item.unitCost), allocatedFreight = allocations[index], inventoryValueAdded = roundMoney(lineTotal + allocatedFreight);
-      items.push({ productId: item.productId, productName: product.name, quantity: item.quantity, unitCost: roundMoney(item.unitCost), lineTotal, allocatedFreight, landedUnitCost: roundMoney(inventoryValueAdded / item.quantity), inventoryValueAdded });
+      items.push({ productId: item.productId, productName: product.name, quantity: item.quantity, unitCost: roundMoney(item.unitCost), lineTotal, allocatedFreight, landedUnitCost: roundAverageCost(inventoryValueAdded / item.quantity), inventoryValueAdded });
     }
     const totalLandedCost = roundMoney(goodsTotal + totalFreight), payableAmount = roundMoney(goodsTotal + supplierFreightAmount);
     const receiptNumber = await nextDocumentNumber(ctx, "purchaseReceipt", new Date(`${args.receiptDate}T00:00:00.000Z`));
     const purchaseReceiptId = await ctx.db.insert("purchaseReceipts", { receiptNumber, shipmentId: args.shipmentId, shipmentNumber: shipment.shipmentNumber, supplierId: shipment.supplierId, supplierName: supplier.name, externalInvoiceNumber, externalInvoiceKey, invoiceDate: args.invoiceDate, receiptDate: args.receiptDate, dueDate: args.dueDate, items, goodsTotal, totalFreight, supplierFreightAmount, externalFreightAmount: roundMoney(totalFreight - supplierFreightAmount), totalLandedCost, payableAmount, paidAmount: 0, remainingAmount: payableAmount, status: "unpaid", branchId: shipment.branchId, arrivalRequestId: requestId, createdBy: user.userId, createdAt: Date.now() });
-    for (const item of items) await changeProductStock(ctx, user, { productId: item.productId, quantityDelta: item.quantity, unitCost: item.landedUnitCost, type: INVENTORY_MOVEMENT_TYPES.shipmentReceipt, reason: `استلام الشحنة ${shipment.shipmentNumber}`, referenceId: String(purchaseReceiptId), referenceType: "purchase_receipt" });
+    for (const item of items) await changeProductStock(ctx, user, { productId: item.productId, quantityDelta: item.quantity, unitCost: item.landedUnitCost, valueDelta: item.inventoryValueAdded, type: INVENTORY_MOVEMENT_TYPES.shipmentReceipt, reason: `استلام الشحنة ${shipment.shipmentNumber}`, referenceId: String(purchaseReceiptId), referenceType: "purchase_receipt" });
     const ledger = await postSupplierLedgerEntry(ctx, user, { requestId, supplierId: shipment.supplierId, branchId: shipment.branchId, date: args.receiptDate, amount: payableAmount, referenceId: String(purchaseReceiptId), referenceNumber: receiptNumber, externalInvoiceNumber, dueDate: args.dueDate });
     await ctx.db.patch(purchaseReceiptId, { supplierLedgerEntryId: ledger._id });
     await ctx.db.patch(args.shipmentId, { status: "arrived", arrivedDate: args.receiptDate, purchaseReceiptId, arrivalRequestId: requestId });
