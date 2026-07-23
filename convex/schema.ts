@@ -103,6 +103,21 @@ const applicationTables = {
     reversalFinancialTransactionId: v.optional(v.id("financialTransactions")), reversalSupplierLedgerEntryId: v.optional(v.id("supplierLedgerEntries")),
   }).index("by_payment_number", ["paymentNumber"]).index("by_idempotency_key", ["idempotencyKey"]).index("by_supplier_branch_date", ["supplierId", "branchId", "date"]).index("by_branch_date", ["branchId", "date"]).index("by_account_date", ["accountId", "date"]).index("by_status", ["status"]),
 
+  customerBalances: defineTable({
+    key: v.string(), customerId: v.id("customers"), branchId: v.id("branches"),
+    receivableBalance: v.number(), advanceBalance: v.number(), totalPurchases: v.number(),
+    openingBalancePostedAt: v.optional(v.number()), updatedAt: v.number(),
+  }).index("by_key", ["key"]).index("by_customer_branch", ["customerId", "branchId"]).index("by_branch", ["branchId"]),
+
+  customerLedgerEntries: defineTable({
+    entryNumber: v.string(), idempotencyKey: v.string(), requestId: v.string(), requestFingerprint: v.string(),
+    type: v.union(v.literal("opening_balance"), v.literal("invoice_charge"), v.literal("invoice_adjustment"), v.literal("invoice_cancel"), v.literal("invoice_payment"), v.literal("invoice_refund"), v.literal("sales_return"), v.literal("sales_return_reversal"), v.literal("order_deposit"), v.literal("order_refund"), v.literal("repair_charge"), v.literal("repair_adjustment"), v.literal("repair_cancel"), v.literal("repair_payment"), v.literal("repair_refund"), v.literal("reversal")),
+    status: v.union(v.literal("posted"), v.literal("reversed")), customerId: v.id("customers"), customerName: v.string(), branchId: v.id("branches"), date: v.string(),
+    receivableDelta: v.number(), advanceDelta: v.number(), purchasesDelta: v.number(), receivableBefore: v.number(), receivableAfter: v.number(), advanceBefore: v.number(), advanceAfter: v.number(), totalPurchasesBefore: v.number(), totalPurchasesAfter: v.number(),
+    description: v.string(), referenceType: v.string(), referenceId: v.string(), referenceNumber: v.string(), createdBy: v.string(), createdAt: v.number(),
+    reversedAt: v.optional(v.number()), reversedBy: v.optional(v.string()), reversalReason: v.optional(v.string()), reversalEntryId: v.optional(v.id("customerLedgerEntries")), originalEntryId: v.optional(v.id("customerLedgerEntries")),
+  }).index("by_entry_number", ["entryNumber"]).index("by_idempotency_key", ["idempotencyKey"]).index("by_customer_branch_date", ["customerId", "branchId", "date"]).index("by_branch_date", ["branchId", "date"]).index("by_reference", ["referenceType", "referenceId"]).index("by_type", ["type"]).index("by_status", ["status"]),
+
   supplierPaymentAllocations: defineTable({
     paymentId: v.id("supplierPayments"), purchaseReceiptId: v.id("purchaseReceipts"), receiptNumber: v.string(), supplierId: v.id("suppliers"), branchId: v.id("branches"), amount: v.number(), date: v.string(), createdAt: v.number(),
   }).index("by_payment", ["paymentId"]).index("by_purchase_receipt", ["purchaseReceiptId"]).index("by_supplier_branch_date", ["supplierId", "branchId", "date"]),
@@ -245,7 +260,7 @@ const applicationTables = {
     branchId: v.optional(v.id("branches")),
     creationRequestId: v.optional(v.string()),
     cancelledAt: v.optional(v.number()), cancelledBy: v.optional(v.string()), cancellationReason: v.optional(v.string()),
-  }).index("by_status", ["status"]).index("by_order_number", ["orderNumber"]).index("by_creation_request", ["creationRequestId"]),
+  }).index("by_status", ["status"]).index("by_customer", ["customerId"]).index("by_order_number", ["orderNumber"]).index("by_creation_request", ["creationRequestId"]),
 
   // الصيانة
   repairs: defineTable({
@@ -278,7 +293,7 @@ const applicationTables = {
     trackingToken: v.optional(v.string()),
     creationRequestId: v.optional(v.string()),
     cancelledAt: v.optional(v.number()), cancelledBy: v.optional(v.string()), cancellationReason: v.optional(v.string()),
-  }).index("by_repair_number", ["repairNumber"]).index("by_status", ["status"]).index("by_tracking", ["trackingToken"]).index("by_creation_request", ["creationRequestId"]),
+  }).index("by_repair_number", ["repairNumber"]).index("by_customer", ["customerId"]).index("by_status", ["status"]).index("by_tracking", ["trackingToken"]).index("by_creation_request", ["creationRequestId"]),
 
   // الشحن
   shipments: defineTable({

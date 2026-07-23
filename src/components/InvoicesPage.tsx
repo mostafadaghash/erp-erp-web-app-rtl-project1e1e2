@@ -1,6 +1,6 @@
 import { FinancialHistory } from "./FinancialHistory";
 import { SalesReturnsPanel } from "./SalesReturnsPanel";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { usePermission } from "../lib/access";
@@ -34,16 +34,18 @@ export function InvoicesPage({ onNavigate }: InvoicesPageProps) {
   const [cancelTarget, setCancelTarget] = useState<Doc<"invoices"> | null>(null);
   const [cancelReason, setCancelReason] = useState("");
   const [isCancelling, setIsCancelling] = useState(false);
+  const cancelRequestId = useRef(crypto.randomUUID());
 
   const handleCancel = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!cancelTarget || isCancelling || !cancelReason.trim()) return;
     setIsCancelling(true);
     try {
-      await cancelInvoice({ id: cancelTarget._id, reason: cancelReason.trim() });
+      await cancelInvoice({ id: cancelTarget._id, reason: cancelReason.trim(), date: new Date().toISOString().slice(0, 10), requestId: cancelRequestId.current });
       toast.success("تم إلغاء الفاتورة وعكس آثارها بنجاح");
       setCancelTarget(null);
       setCancelReason("");
+      cancelRequestId.current = crypto.randomUUID();
     } catch (error) {
       toast.error(getErrorMessage(error, "تعذر إلغاء الفاتورة"));
     } finally {

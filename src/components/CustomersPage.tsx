@@ -10,6 +10,10 @@ import type { Id } from "../../convex/_generated/dataModel";
 export function CustomersPage() {
   const canCreate = usePermission("create_customers");
   const canEdit = usePermission("edit_customers");
+  const canViewLedger = usePermission("view_customer_ledger");
+  const me = useQuery(api.employees.me);
+  const balances = useQuery(api.customerLedger.branchBalances, canViewLedger && me?.branchId ? { branchId: me.branchId } : "skip");
+  const balanceFor = (id: Id<"customers">) => balances?.find(balance => balance.customerId === id);
   const customers = useQuery(api.customers.list) ?? [];
   const createCustomer = useMutation(api.customers.create);
   const setCustomerActive = useMutation(api.customers.setActive);
@@ -82,13 +86,13 @@ export function CustomersPage() {
         </div>
         <div className="bg-amber-50 rounded-xl p-4 text-center">
           <p className="text-2xl font-black text-amber-600">
-            {customers.filter(c => c.balance > 0).length}
+            {canViewLedger ? customers.filter(c => (balanceFor(c._id)?.receivableBalance ?? 0) > 0).length : "—"}
           </p>
           <p className="text-xs text-slate-600 mt-0.5">عملاء بمديونية</p>
         </div>
         <div className="bg-emerald-50 rounded-xl p-4 text-center">
           <p className="text-lg font-black text-emerald-600">
-            {customers.reduce((s, c) => s + c.balance, 0).toLocaleString("ar-EG")} ج.م
+            {canViewLedger ? `${(balances ?? []).reduce((sum, balance) => sum + balance.receivableBalance, 0).toLocaleString("ar-EG")} ج.م` : "—"}
           </p>
           <p className="text-xs text-slate-600 mt-0.5">إجمالي المديونيات</p>
         </div>
@@ -123,9 +127,7 @@ export function CustomersPage() {
                   </p>
                 </div>
               </div>
-              {c.balance > 0 && (
-                <span className="badge badge-warning">{c.balance.toLocaleString("ar-EG")} ج.م</span>
-              )}
+              {canViewLedger && (balanceFor(c._id)?.receivableBalance ?? 0) > 0 && <span className="badge badge-warning">{balanceFor(c._id)?.receivableBalance.toLocaleString("ar-EG")} ج.م</span>}
             </div>
             {c.email && (
               <p className="text-xs text-slate-500 flex items-center gap-1 mb-1">
@@ -142,14 +144,9 @@ export function CustomersPage() {
             <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
               <div>
                 <p className="text-xs text-slate-500">إجمالي المشتريات</p>
-                <p className="font-bold text-slate-800 text-sm">{c.totalPurchases.toLocaleString("ar-EG")} ج.م</p>
+                <p className="font-bold text-slate-800 text-sm">{canViewLedger ? `${(balanceFor(c._id)?.totalPurchases ?? 0).toLocaleString("ar-EG")} ج.م` : "—"}</p>
               </div>
-              {c.balance > 0 && (
-                <div className="text-left">
-                  <p className="text-xs text-slate-500">المديونية</p>
-                  <p className="font-bold text-amber-600 text-sm">{c.balance.toLocaleString("ar-EG")} ج.م</p>
-                </div>
-              )}
+              {canViewLedger && (balanceFor(c._id)?.receivableBalance ?? 0) > 0 && <div className="text-left"><p className="text-xs text-slate-500">المديونية</p><p className="font-bold text-amber-600 text-sm">{balanceFor(c._id)?.receivableBalance.toLocaleString("ar-EG")} ج.م</p></div>}
             </div>
             {canEdit && <button disabled={updatingId !== null} onClick={() => void handleSetActive(c._id, c.name, c.isActive === false)} className={`mt-3 w-full rounded-lg px-3 py-2 text-xs font-bold ${c.isActive === false ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-800"}`}>{updatingId === c._id ? "جارٍ التحديث..." : c.isActive === false ? "إعادة تفعيل العميل" : "تعطيل العميل"}</button>}
           </div>

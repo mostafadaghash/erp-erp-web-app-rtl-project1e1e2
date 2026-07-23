@@ -10,6 +10,7 @@ import { changeProductStock } from "./lib/inventory";
 import { allocateProportionally, INVENTORY_MOVEMENT_TYPES } from "../shared/inventoryRules";
 import { nextDocumentNumber } from "./lib/documentNumbers";
 import { requireActiveBranch, requireActiveCustomer } from "./lib/references";
+import { postCustomerLedgerEntry } from "./lib/customerLedger.ts";
 
 type InvoiceItemInput = {
   productId: Id<"products">;
@@ -93,22 +94,6 @@ async function prepareInvoice(
   return { normalizedItems, productDocs, requested, cogsTotal: roundMoney(normalizedItems.reduce((sum, item) => sum + item.costTotal, 0)), ...totals };
 }
 
-async function adjustCustomer(
-  ctx: MutationCtx,
-  user: AuthUser,
-  customerId: Id<"customers">,
-  purchasesDelta: number,
-  balanceDelta: number,
-) {
-  const customer = await ctx.db.get(customerId);
-  if (!customer) throw new ConvexError("العميل غير موجود");
-  assertBranchAccess(user, customer);
-  if (customer.totalPurchases + purchasesDelta < 0 || customer.balance + balanceDelta < 0) throw new ConvexError("لا يمكن عكس رصيد العميل لأن البيانات الحالية غير متسقة");
-  await ctx.db.patch(customerId, {
-    totalPurchases: roundMoney(customer.totalPurchases + purchasesDelta),
-    balance: roundMoney(customer.balance + balanceDelta),
-  });
-}
 
 export const list = query({
   args: {
@@ -230,7 +215,9 @@ export const create = mutation({
     }
 
     if (args.customerId) {
-      await adjustCustomer(ctx, user, args.customerId, prepared.total, prepared.remaining);
+      const ledgerDate = args.initialPayment?.paymentDate ?? new Date().toISOString().slice(0, 10);
+      await postCustomerLedgerEntry(ctx, user, { type: "invoice_charge", requestId: `${args.creationRequestId}:charge`, customerId: args.customerId, branchId: branchId!, date: ledgerDate, receivableDelta: prepared.total, advanceDelta: 0, purchasesDelta: prepared.total, description: `استحقاق الفاتورة ${invoiceNumber}`, referenceType: "invoice", referenceId: String(id), referenceNumber: invoiceNumber });
+      if (args.initialPayment) await postCustomerLedgerEntry(ctx, user, { type: "invoice_payment", requestId: `${args.initialPayment.requestId}:ledger`, customerId: args.customerId, branchId: branchId!, date: args.initialPayment.paymentDate, receivableDelta: -args.initialPayment.amount, advanceDelta: 0, purchasesDelta: 0, description: `دفعة الفاتورة ${invoiceNumber}`, referenceType: "invoice", referenceId: String(id), referenceNumber: invoiceNumber });
     }
 
     if (args.initialPayment && paymentAccount) {
@@ -249,9 +236,9 @@ export const create = mutation({
   },
 });
 
-export const recordPayment = mutation({ args: { invoiceId: v.id("invoices"), amount: v.number(), accountId: v.id("financialAccounts"), paymentDate: v.string(), requestId: v.string(), notes: v.optional(v.string()) }, handler: async (ctx, args) => { const user = await requirePermission(ctx, "record_collections"); const invoice = await ctx.db.get(args.invoiceId); if (!invoice || !invoice.branchId) throw new ConvexError("الفاتورة غير موجودة"); assertBranchAccess(user, invoice); if (invoice.status === "cancelled") throw new ConvexError("الفاتورة ملغاة"); if (!Number.isFinite(args.amount) || args.amount <= 0 || args.amount > invoice.remaining) throw new ConvexError("مبلغ التحصيل غير صالح"); const account = await requireActiveFinancialAccount(ctx, args.accountId); assertFinancialAccountBranch(account, invoice.branchId); const posted = await postFinancialTransaction(ctx, user, { type: "invoice_payment", requestId: args.requestId, date: args.paymentDate, amount: args.amount, description: args.notes?.trim() || `تحصيل الفاتورة ${invoice.invoiceNumber}`, branchId: invoice.branchId, referenceType: "invoice", referenceId: String(invoice._id), referenceNumber: invoice.invoiceNumber, customerId: invoice.customerId, movements: [{ accountId: account._id, signedAmount: args.amount }] }); if (!posted.duplicate) { const paid = roundMoney(invoice.paid + args.amount), remaining = roundMoney(invoice.remaining - args.amount); const creditedTotal = invoice.creditedTotal ?? 0, netTotal = invoice.netTotal ?? invoice.total; await ctx.db.patch(invoice._id, { paid, remaining, status: deriveInvoiceStatus({ netTotal, creditedTotal, paid, remaining }), paymentMethod: account.type }); if (invoice.customerId) { const customer = await ctx.db.get(invoice.customerId); if (!customer || customer.balance < args.amount) throw new ConvexError("رصيد العميل غير متسق"); await ctx.db.patch(customer._id, { balance: roundMoney(customer.balance - args.amount) }); } } return posted.transactionId; } });
+export const recordPayment = mutation({ args: { invoiceId: v.id("invoices"), amount: v.number(), accountId: v.id("financialAccounts"), paymentDate: v.string(), requestId: v.string(), notes: v.optional(v.string()) }, handler: async (ctx, args) => { const user = await requirePermission(ctx, "record_collections"); const invoice = await ctx.db.get(args.invoiceId); if (!invoice || !invoice.branchId) throw new ConvexError("الفاتورة غير موجودة"); assertBranchAccess(user, invoice); if (invoice.status === "cancelled") throw new ConvexError("الفاتورة ملغاة"); if (!Number.isFinite(args.amount) || args.amount <= 0 || args.amount > invoice.remaining) throw new ConvexError("مبلغ التحصيل غير صالح"); const account = await requireActiveFinancialAccount(ctx, args.accountId); assertFinancialAccountBranch(account, invoice.branchId); const posted = await postFinancialTransaction(ctx, user, { type: "invoice_payment", requestId: args.requestId, date: args.paymentDate, amount: args.amount, description: args.notes?.trim() || `تحصيل الفاتورة ${invoice.invoiceNumber}`, branchId: invoice.branchId, referenceType: "invoice", referenceId: String(invoice._id), referenceNumber: invoice.invoiceNumber, customerId: invoice.customerId, movements: [{ accountId: account._id, signedAmount: args.amount }] }); if (!posted.duplicate) { const paid = roundMoney(invoice.paid + args.amount), remaining = roundMoney(invoice.remaining - args.amount); const creditedTotal = invoice.creditedTotal ?? 0, netTotal = invoice.netTotal ?? invoice.total; await ctx.db.patch(invoice._id, { paid, remaining, status: deriveInvoiceStatus({ netTotal, creditedTotal, paid, remaining }), paymentMethod: account.type }); if (invoice.customerId) await postCustomerLedgerEntry(ctx, user, { type: "invoice_payment", requestId: `${args.requestId}:ledger`, customerId: invoice.customerId, branchId: invoice.branchId, date: args.paymentDate, receivableDelta: -args.amount, advanceDelta: 0, purchasesDelta: 0, description: `تحصيل الفاتورة ${invoice.invoiceNumber}`, referenceType: "invoice", referenceId: String(invoice._id), referenceNumber: invoice.invoiceNumber }); } return posted.transactionId; } });
 
-export const refundPayment = mutation({ args: { invoiceId: v.id("invoices"), amount: v.number(), accountId: v.id("financialAccounts"), date: v.string(), reason: v.string(), requestId: v.string() }, handler: async (ctx, args) => { const user = await requirePermission(ctx, "refund_collections"); const invoice = await ctx.db.get(args.invoiceId); if (!invoice || !invoice.branchId) throw new ConvexError("الفاتورة غير موجودة"); assertBranchAccess(user, invoice); const duplicate = await findFinancialTransactionByRequest(ctx, "invoice_refund", user.userId, args.requestId); if (duplicate) return duplicate._id; if (!args.reason.trim()) throw new ConvexError("سبب الاسترداد مطلوب"); if (!Number.isFinite(args.amount) || args.amount <= 0 || args.amount > invoice.paid) throw new ConvexError("مبلغ الاسترداد غير صالح"); const account = await requireActiveFinancialAccount(ctx, args.accountId); assertFinancialAccountBranch(account, invoice.branchId); const posted = await postFinancialTransaction(ctx, user, { type: "invoice_refund", requestId: args.requestId, date: args.date, amount: args.amount, description: args.reason.trim(), branchId: invoice.branchId, referenceType: "invoice", referenceId: String(invoice._id), referenceNumber: invoice.invoiceNumber, customerId: invoice.customerId, movements: [{ accountId: account._id, signedAmount: -args.amount }] }); const paid = roundMoney(invoice.paid - args.amount), remaining = roundMoney(invoice.remaining + args.amount), creditedTotal = invoice.creditedTotal ?? 0, netTotal = invoice.netTotal ?? invoice.total; await ctx.db.patch(invoice._id, { paid, remaining, status: deriveInvoiceStatus({ netTotal, creditedTotal, paid, remaining }) }); if (invoice.customerId) { const customer = await ctx.db.get(invoice.customerId); if (customer) await ctx.db.patch(customer._id, { balance: roundMoney(customer.balance + args.amount) }); } return posted.transactionId; } });
+export const refundPayment = mutation({ args: { invoiceId: v.id("invoices"), amount: v.number(), accountId: v.id("financialAccounts"), date: v.string(), reason: v.string(), requestId: v.string() }, handler: async (ctx, args) => { const user = await requirePermission(ctx, "refund_collections"); const invoice = await ctx.db.get(args.invoiceId); if (!invoice || !invoice.branchId) throw new ConvexError("الفاتورة غير موجودة"); assertBranchAccess(user, invoice); const duplicate = await findFinancialTransactionByRequest(ctx, "invoice_refund", user.userId, args.requestId); if (duplicate) return duplicate._id; if (!args.reason.trim()) throw new ConvexError("سبب الاسترداد مطلوب"); if (!Number.isFinite(args.amount) || args.amount <= 0 || args.amount > invoice.paid) throw new ConvexError("مبلغ الاسترداد غير صالح"); const account = await requireActiveFinancialAccount(ctx, args.accountId); assertFinancialAccountBranch(account, invoice.branchId); const posted = await postFinancialTransaction(ctx, user, { type: "invoice_refund", requestId: args.requestId, date: args.date, amount: args.amount, description: args.reason.trim(), branchId: invoice.branchId, referenceType: "invoice", referenceId: String(invoice._id), referenceNumber: invoice.invoiceNumber, customerId: invoice.customerId, movements: [{ accountId: account._id, signedAmount: -args.amount }] }); const paid = roundMoney(invoice.paid - args.amount), remaining = roundMoney(invoice.remaining + args.amount), creditedTotal = invoice.creditedTotal ?? 0, netTotal = invoice.netTotal ?? invoice.total; await ctx.db.patch(invoice._id, { paid, remaining, status: deriveInvoiceStatus({ netTotal, creditedTotal, paid, remaining }) }); if (invoice.customerId) await postCustomerLedgerEntry(ctx, user, { type: "invoice_refund", requestId: `${args.requestId}:ledger`, customerId: invoice.customerId, branchId: invoice.branchId, date: args.date, receivableDelta: args.amount, advanceDelta: 0, purchasesDelta: 0, description: `استرداد تحصيل الفاتورة ${invoice.invoiceNumber}`, referenceType: "invoice", referenceId: String(invoice._id), referenceNumber: invoice.invoiceNumber }); return posted.transactionId; } });
 
 export const update = mutation({
   args: {
@@ -275,10 +262,12 @@ export const update = mutation({
     paymentMethod: v.optional(v.string()),
     notes: v.optional(v.string()),
     branchId: v.optional(v.id("branches")),
+    date: v.string(),
+    requestId: v.string(),
   },
   handler: async (ctx, args) => {
     const user = await requireModulePermission(ctx, "edit_invoices", "invoices");
-    const { id, ...data } = args;
+    const { id, date, requestId, ...data } = args;
     const inv = await ctx.db.get(id);
     if (!inv) throw new ConvexError("الفاتورة غير موجودة");
     assertBranchAccess(user, inv);
@@ -327,10 +316,10 @@ export const update = mutation({
     }
 
     if (inv.customerId === data.customerId && data.customerId) {
-      await adjustCustomer(ctx, user, data.customerId, prepared.total - inv.total, prepared.remaining - inv.remaining);
+      await postCustomerLedgerEntry(ctx, user, { type: "invoice_adjustment", requestId, customerId: data.customerId, branchId: branchId!, date, receivableDelta: prepared.total - inv.total, advanceDelta: 0, purchasesDelta: prepared.total - inv.total, description: `تعديل الفاتورة ${inv.invoiceNumber}`, referenceType: "invoice", referenceId: String(id), referenceNumber: inv.invoiceNumber });
     } else {
-      if (inv.customerId) await adjustCustomer(ctx, user, inv.customerId, -inv.total, -inv.remaining);
-      if (data.customerId) await adjustCustomer(ctx, user, data.customerId, prepared.total, prepared.remaining);
+      if (inv.customerId) await postCustomerLedgerEntry(ctx, user, { type: "invoice_adjustment", requestId: `${requestId}:old`, customerId: inv.customerId, branchId: inv.branchId!, date, receivableDelta: -inv.remaining, advanceDelta: 0, purchasesDelta: -(inv.netTotal ?? inv.total), description: `نقل الفاتورة ${inv.invoiceNumber} من العميل`, referenceType: "invoice", referenceId: String(id), referenceNumber: inv.invoiceNumber });
+      if (data.customerId) await postCustomerLedgerEntry(ctx, user, { type: "invoice_adjustment", requestId: `${requestId}:new`, customerId: data.customerId, branchId: branchId!, date, receivableDelta: prepared.remaining, advanceDelta: 0, purchasesDelta: prepared.total, description: `نقل الفاتورة ${inv.invoiceNumber} إلى العميل`, referenceType: "invoice", referenceId: String(id), referenceNumber: inv.invoiceNumber });
     }
     await logAction(ctx, user, {
       action: "update",
@@ -368,7 +357,7 @@ export const updateStatus = mutation({
 });
 
 export const cancel = mutation({
-  args: { id: v.id("invoices"), reason: v.string() },
+  args: { id: v.id("invoices"), reason: v.string(), date: v.string(), requestId: v.string() },
   handler: async (ctx, args) => {
     const user = await requireModulePermission(ctx, "delete_invoices", "invoices");
     const inv = await ctx.db.get(args.id);
@@ -391,7 +380,7 @@ export const cancel = mutation({
       await changeProductStock(ctx, user, { productId: product._id, quantityDelta: quantity, unitCost: inv.items.find(item => String(item.productId) === productId)?.unitCost ?? (() => { throw new ConvexError("الفاتورة القديمة بلا تكلفة تاريخية ولا يمكن عكسها آلياً"); })(), type: INVENTORY_MOVEMENT_TYPES.saleReversal, reason: `عكس مخزون إلغاء الفاتورة ${inv.invoiceNumber}`, referenceId: String(args.id), referenceType: "invoice" });
     }
     if (inv.customerId) {
-      await adjustCustomer(ctx, user, inv.customerId, -inv.total, -inv.remaining);
+      await postCustomerLedgerEntry(ctx, user, { type: "invoice_cancel", requestId: args.requestId, customerId: inv.customerId, branchId: inv.branchId!, date: args.date, receivableDelta: -inv.remaining, advanceDelta: 0, purchasesDelta: -(inv.netTotal ?? inv.total), description: `إلغاء الفاتورة ${inv.invoiceNumber}`, referenceType: "invoice", referenceId: String(inv._id), referenceNumber: inv.invoiceNumber });
     }
     await ctx.db.patch(args.id, { status: "cancelled", cancelledAt: Date.now(), cancelledBy: user.userId, cancellationReason: reason });
     await logAction(ctx, user, {

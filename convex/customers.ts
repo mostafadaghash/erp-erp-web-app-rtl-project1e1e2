@@ -1,13 +1,14 @@
 import { query, mutation } from "./_generated/server";
 import { v, ConvexError } from "convex/values";
 import { assertBranchAccess, requirePermission, filterByBranch, resolveWriteBranch, logAction } from "./lib/auth";
+import { initializeCustomerBalance } from "./lib/customerLedger.ts";
 
 export const list = query({
   args: {},
   handler: async (ctx) => {
     const user = await requirePermission(ctx, "view_customers");
     const all = await ctx.db.query("customers").collect();
-    return filterByBranch(all, user);
+    return filterByBranch(all, user).map(({ balance: _legacyBalance, totalPurchases: _legacyPurchases, ...customer }) => customer);
   },
 });
 
@@ -27,7 +28,9 @@ export const get = query({
     const user = await requirePermission(ctx, "view_customers");
     const customer = await ctx.db.get(args.id);
     if (customer) assertBranchAccess(user, customer);
-    return customer;
+    if (!customer) return null;
+    const { balance: _legacyBalance, totalPurchases: _legacyPurchases, ...visible } = customer;
+    return visible;
   },
 });
 
@@ -50,6 +53,8 @@ export const create = mutation({
       totalPurchases: 0,
       isActive: true,
     });
+    const financeSettings = await ctx.db.query("financeSettings").first();
+    if (financeSettings?.isInitialized && branchId) await initializeCustomerBalance(ctx, user, { customerId: id, branchId, receivableBalance: 0, advanceBalance: 0, totalPurchases: 0, date: financeSettings.cutoverDate, requestId: `new-customer:${id}`, notes: "تهيئة دفتر عميل جديد" });
     await logAction(ctx, user, {
       action: "create",
       module: "customers",
