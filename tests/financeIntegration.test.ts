@@ -36,8 +36,9 @@ async function setup(options: { initialized?: boolean; secondBranch?: boolean } 
     const branchId = await ctx.db.insert("branches", { name: "القاهرة", address: "القاهرة", isActive: true });
     const branch2Id = options.secondBranch ? await ctx.db.insert("branches", { name: "الجيزة", address: "الجيزة", isActive: true }) : undefined;
     await ctx.db.insert("userProfiles", { userId: "admin", tokenIdentifier: "admin", name: "مدير", role: "admin", branchId, permissions: [], isActive: true });
+    const customerId = await ctx.db.insert("customers", { name: "عميل", phone: "010", balance: 0, totalPurchases: 0, branchId, isActive: true });
     if (options.initialized) await ctx.db.insert("financeSettings", { isInitialized: true, cutoverDate: date, defaultClearingDelayDays: 1, updatedAt: Date.now() });
-    return { branchId, branch2Id };
+    return { branchId, branch2Id, customerId };
   });
   return { raw, t: raw.withIdentity({ subject: "admin", tokenIdentifier: "admin" }), ...ids };
 }
@@ -53,7 +54,7 @@ async function snapshot(env: Awaited<ReturnType<typeof setup>>) {
 async function seedDocument(env: Awaited<ReturnType<typeof setup>>, kind: "invoice" | "order" | "repair", paid: number, total = 100) {
   return await env.raw.run(async ctx => {
     if (kind === "invoice") return await ctx.db.insert("invoices", { invoiceNumber: "INV-T", customerName: "عميل", items: [], subtotal: total, discount: 0, tax: 0, total, paid, remaining: total - paid, paymentMethod: "cash", status: paid ? "partial" : "pending", branchId: env.branchId, type: "sale" });
-    if (kind === "order") return await ctx.db.insert("orders", { orderNumber: "ORD-T", customerName: "عميل", items: [], total, deposit: paid, remaining: total - paid, status: "pending", branchId: env.branchId });
+    if (kind === "order") { if (paid > 0) await ctx.db.insert("customerBalances", { key: `${env.customerId}:${env.branchId}`, customerId: env.customerId, branchId: env.branchId, receivableBalance: 0, advanceBalance: paid, totalPurchases: 0, updatedAt: Date.now() }); return await ctx.db.insert("orders", { orderNumber: "ORD-T", customerId: env.customerId, customerName: "عميل", items: [], total, deposit: paid, remaining: total - paid, status: "pending", branchId: env.branchId }); }
     return await ctx.db.insert("repairs", { repairNumber: "REP-T", customerName: "عميل", customerPhone: "010", deviceType: "هاتف", deviceBrand: "X", deviceModel: "Y", problem: "عطل", parts: [], laborCost: total, totalCost: total, receivedDate: date, status: "received", deposit: paid, remaining: total - paid, branchId: env.branchId });
   });
 }
@@ -66,7 +67,7 @@ async function invoiceCreationArgs(env: Awaited<ReturnType<typeof setup>>, creat
   return { customerId, customerName: "عميل", items: [{ productId, productName: "منتج", quantity: 1, unitPrice: 100, discount: 0, total: 100 }], subtotal: 100, discount: 0, tax: 14, total: 114, creationRequestId, branchId: env.branchId };
 }
 
-const orderCreationArgs = (branchId: Awaited<ReturnType<typeof setup>>["branchId"], creationRequestId: string) => ({ customerName: "عميل", items: [{ productName: "قطعة", quantity: 1, unitPrice: 100 }], total: 100, creationRequestId, branchId });
+const orderCreationArgs = (branchId: Awaited<ReturnType<typeof setup>>["branchId"], creationRequestId: string, customerId?: Awaited<ReturnType<typeof setup>>["customerId"]) => ({ customerId, customerName: "عميل", items: [{ productName: "قطعة", quantity: 1, unitPrice: 100 }], total: 100, creationRequestId, branchId });
 const repairCreationArgs = (branchId: Awaited<ReturnType<typeof setup>>["branchId"], creationRequestId: string) => ({ customerName: "عميل", customerPhone: "010", deviceType: "هاتف", deviceBrand: "X", deviceModel: "Y", problem: "عطل", laborCost: 100, creationRequestId, branchId });
 
 test("FIN-01 blocks transfers before initialization", async () => { const e = await setup(); const a = await account(e, "A", 10), b = await account(e, "B"); await assert.rejects(e.t.mutation(api.finance.transferFunds, { sourceAccountId: a, destinationAccountId: b, amount: 1, date, requestId: "r" }), /غير مهيأ/); });
@@ -97,7 +98,7 @@ for (const [number, kind, paymentApi, refundApi] of [
   assert.equal((await e.raw.run(ctx => ctx.db.get(a)))?.currentBalance, 50);
 });
 
-test("FIN-18 order creation posts its initial deposit", async () => { const e = await setup({ initialized: true }), a = await account(e, "CASH"); const id = await e.t.mutation(api.orders.create, { customerName: "عميل", items: [{ productName: "قطعة", quantity: 1, unitPrice: 100 }], total: 100, creationRequestId: "create-order", branchId: e.branchId, initialDeposit: { amount: 25, accountId: a, paymentDate: date, requestId: "initial" } }); const s = await snapshot(e); assert.ok(s.transactions.some(x => x.referenceId === String(id) && x.type === "order_deposit")); });
+test("FIN-18 order creation posts its initial deposit", async () => { const e = await setup({ initialized: true }), a = await account(e, "CASH"); const id = await e.t.mutation(api.orders.create, { customerName: "عميل", items: [{ productName: "قطعة", quantity: 1, unitPrice: 100 }], total: 100, creationRequestId: "create-order", branchId: e.branchId, customerId: e.customerId, initialDeposit: { amount: 25, accountId: a, paymentDate: date, requestId: "initial" } }); const s = await snapshot(e); assert.ok(s.transactions.some(x => x.referenceId === String(id) && x.type === "order_deposit")); });
 test("FIN-19 requestId makes invoice collection idempotent", async () => { const e = await setup({ initialized: true }), a = await account(e, "CASH"), id = await seedDocument(e, "invoice", 0); const args = { invoiceId: id, amount: 20, accountId: a, paymentDate: date, requestId: "same" }; assert.equal(await e.t.mutation(api.invoices.recordPayment, args), await e.t.mutation(api.invoices.recordPayment, args)); assert.equal((await snapshot(e)).transactions.length, 1); });
 test("FIN-20 requestId makes order collection idempotent", async () => { const e = await setup({ initialized: true }), a = await account(e, "CASH"), id = await seedDocument(e, "order", 0); const args = { id, amount: 20, accountId: a, paymentDate: date, requestId: "same" }; assert.equal(await e.t.mutation(api.orders.addPayment, args), await e.t.mutation(api.orders.addPayment, args)); assert.equal((await snapshot(e)).transactions.length, 1); });
 test("FIN-21 requestId makes repair collection idempotent", async () => { const e = await setup({ initialized: true }), a = await account(e, "CASH"), id = await seedDocument(e, "repair", 0); const args = { repairId: id, amount: 20, accountId: a, paymentDate: date, requestId: "same" }; assert.equal(await e.t.mutation(api.repairs.recordPayment, args), await e.t.mutation(api.repairs.recordPayment, args)); assert.equal((await snapshot(e)).transactions.length, 1); });
@@ -127,7 +128,7 @@ test("FIN-37 invoice creation atomically posts one idempotent initial payment", 
 });
 
 test("FIN-38 order creation atomically posts one idempotent initial deposit", async () => {
-  const e = await setup({ initialized: true }), a = await account(e, "CASH"), args = { ...orderCreationArgs(e.branchId, "order-create-2"), initialDeposit: { amount: 25, accountId: a, paymentDate: date, requestId: "order-initial" } };
+  const e = await setup({ initialized: true }), a = await account(e, "CASH"), args = { ...orderCreationArgs(e.branchId, "order-create-2", e.customerId), initialDeposit: { amount: 25, accountId: a, paymentDate: date, requestId: "order-initial" } };
   const id = await e.t.mutation(api.orders.create, args); assert.equal(await e.t.mutation(api.orders.create, args), id); const s = await snapshot(e), row = await e.raw.run(ctx => ctx.db.get(id));
   assert.deepEqual({ deposit: row?.deposit, remaining: row?.remaining, status: row?.status }, { deposit: 25, remaining: 75, status: "pending" }); assert.equal(s.transactions.filter(x => x.referenceId === String(id)).length, 1); assert.equal(s.accounts.find(x => x._id === a)?.currentBalance, 25);
 });
@@ -146,7 +147,7 @@ test("FIN-40 document creation without an initial payment leaves finance untouch
 
 test("FIN-41 initial payments reject inactive, cross-branch, pre-cutover, non-positive, and excess inputs", async () => {
   const e = await setup({ initialized: true, secondBranch: true }), active = await account(e, "ACTIVE"), inactive = await account(e, "OFF"), foreign = await account(e, "FOREIGN", 0, "cash", e.branch2Id!); await e.raw.run(ctx => ctx.db.patch(inactive, { isActive: false }));
-  const attempt = async (suffix: string, payment: { amount: number; accountId: typeof active; paymentDate: string; requestId: string }) => e.t.mutation(api.orders.create, { ...orderCreationArgs(e.branchId, `reject-${suffix}`), initialDeposit: payment });
+  const attempt = async (suffix: string, payment: { amount: number; accountId: typeof active; paymentDate: string; requestId: string }) => e.t.mutation(api.orders.create, { ...orderCreationArgs(e.branchId, `reject-${suffix}`, e.customerId), initialDeposit: payment });
   await assert.rejects(attempt("inactive", { amount: 1, accountId: inactive, paymentDate: date, requestId: "i" }), /معطل/); await assert.rejects(attempt("foreign", { amount: 1, accountId: foreign, paymentDate: date, requestId: "f" }), /لا ينتمي/); await assert.rejects(attempt("date", { amount: 1, accountId: active, paymentDate: "2026-07-20", requestId: "d" }), /تاريخ القطع/); await assert.rejects(attempt("zero", { amount: 0, accountId: active, paymentDate: date, requestId: "z" }), /أكبر من صفر/); await assert.rejects(attempt("negative", { amount: -1, accountId: active, paymentDate: date, requestId: "n" }), /أكبر من صفر/); await assert.rejects(attempt("excess", { amount: 101, accountId: active, paymentDate: date, requestId: "e" }), /إجمالي/);
   assert.equal((await snapshot(e)).transactions.length, 0);
 });

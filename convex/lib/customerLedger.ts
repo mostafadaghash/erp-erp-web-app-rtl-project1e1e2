@@ -4,7 +4,7 @@ import type { Id } from "../_generated/dataModel";
 import type { AuthUser } from "./auth";
 import { logAction } from "./auth";
 import { nextDocumentNumber } from "./documentNumbers";
-import { roundMoney } from "../../shared/businessRules";
+import { isValidIsoDate, roundMoney } from "../../shared/businessRules";
 
 export const CUSTOMER_LEDGER_TYPES = ["opening_balance", "invoice_charge", "invoice_adjustment", "invoice_cancel", "invoice_payment", "invoice_refund", "sales_return", "sales_return_reversal", "order_deposit", "order_refund", "repair_charge", "repair_adjustment", "repair_cancel", "repair_payment", "repair_refund", "reversal"] as const;
 export type CustomerLedgerType = (typeof CUSTOMER_LEDGER_TYPES)[number];
@@ -20,6 +20,8 @@ export async function postCustomerLedgerEntry(ctx: MutationCtx, user: AuthUser, 
   const requestId = input.requestId.trim();
   if (!requestId || requestId.length > 200) throw new ConvexError("معرف طلب دفتر العميل غير صالح");
   for (const value of [input.receivableDelta, input.advanceDelta, input.purchasesDelta]) if (!precise(value)) throw new ConvexError("قيم دفتر العميل يجب أن تكون finite ومقربة إلى قرشين");
+  if (!isValidIsoDate(input.date)) throw new ConvexError("تاريخ دفتر العميل غير صالح");
+  const normalized = { ...input, description: input.description.trim(), referenceType: input.referenceType.trim(), referenceId: input.referenceId.trim(), referenceNumber: input.referenceNumber.trim() };
   const customer = await ctx.db.get(input.customerId);
   const branch = await ctx.db.get(input.branchId);
   if (!customer) throw new ConvexError("العميل غير موجود");
@@ -29,7 +31,7 @@ export async function postCustomerLedgerEntry(ctx: MutationCtx, user: AuthUser, 
   if (!settings?.isInitialized) throw new ConvexError("يجب تهيئة النظام المالي أولاً");
   if (input.date < settings.cutoverDate) throw new ConvexError("لا يمكن التسجيل قبل تاريخ القطع المالي");
   if (input.openingBalance && input.date !== settings.cutoverDate) throw new ConvexError("تاريخ الرصيد الافتتاحي يجب أن يساوي تاريخ القطع المالي");
-  const fingerprint = JSON.stringify({ ...input, requestId: undefined, originalEntryId: input.originalEntryId ? String(input.originalEntryId) : undefined });
+  const fingerprint = JSON.stringify({ ...normalized, requestId: undefined, originalEntryId: input.originalEntryId ? String(input.originalEntryId) : undefined });
   const idempotencyKey = `customer-ledger:${user.userId}:${requestId}`;
   const prior = await ctx.db.query("customerLedgerEntries").withIndex("by_idempotency_key", q => q.eq("idempotencyKey", idempotencyKey)).unique();
   if (prior) {
@@ -47,7 +49,7 @@ export async function postCustomerLedgerEntry(ctx: MutationCtx, user: AuthUser, 
   if (totalPurchasesAfter < 0) throw new ConvexError("لا يمكن أن يصبح إجمالي المشتريات سالبًا");
   const now = Date.now();
   const entryNumber = await nextDocumentNumber(ctx, "customerLedger", new Date(`${input.date}T00:00:00Z`));
-  const entryId = await ctx.db.insert("customerLedgerEntries", { entryNumber, idempotencyKey, requestId, requestFingerprint: fingerprint, type: input.type, status: "posted", customerId: input.customerId, customerName: customer.name, branchId: input.branchId, date: input.date, receivableDelta: roundMoney(input.receivableDelta), advanceDelta: roundMoney(input.advanceDelta), purchasesDelta: roundMoney(input.purchasesDelta), receivableBefore, receivableAfter, advanceBefore, advanceAfter, totalPurchasesBefore, totalPurchasesAfter, description: input.description, referenceType: input.referenceType, referenceId: input.referenceId, referenceNumber: input.referenceNumber, createdBy: user.userId, createdAt: now, originalEntryId: input.originalEntryId });
+  const entryId = await ctx.db.insert("customerLedgerEntries", { entryNumber, idempotencyKey, requestId, requestFingerprint: fingerprint, type: normalized.type, status: "posted", customerId: normalized.customerId, customerName: customer.name, branchId: normalized.branchId, date: normalized.date, receivableDelta: roundMoney(normalized.receivableDelta), advanceDelta: roundMoney(normalized.advanceDelta), purchasesDelta: roundMoney(normalized.purchasesDelta), receivableBefore, receivableAfter, advanceBefore, advanceAfter, totalPurchasesBefore, totalPurchasesAfter, description: normalized.description, referenceType: normalized.referenceType, referenceId: normalized.referenceId, referenceNumber: normalized.referenceNumber, createdBy: user.userId, createdAt: now, originalEntryId: normalized.originalEntryId });
   const values = { receivableBalance: receivableAfter, advanceBalance: advanceAfter, totalPurchases: totalPurchasesAfter, updatedAt: now, ...(input.openingBalance ? { openingBalancePostedAt: now } : {}) };
   if (snapshot) await ctx.db.patch(snapshot._id, values);
   else await ctx.db.insert("customerBalances", { key, customerId: input.customerId, branchId: input.branchId, ...values });

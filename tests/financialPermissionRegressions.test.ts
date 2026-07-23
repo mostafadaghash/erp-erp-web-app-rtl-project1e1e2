@@ -19,7 +19,7 @@ async function setup() {
     const branchId = await ctx.db.insert("branches", { name: "أ", address: "أ", isActive: true });
     const otherBranchId = await ctx.db.insert("branches", { name: "ب", address: "ب", isActive: true });
     await ctx.db.insert("financeSettings", { isInitialized: true, cutoverDate: date, defaultClearingDelayDays: 1, updatedAt: Date.now() });
-    return { branchId, otherBranchId };
+    const customerId = await ctx.db.insert("customers", { name: "عميل", phone: "010", balance: 0, totalPurchases: 0, branchId, isActive: true }); return { branchId, otherBranchId, customerId };
   });
   return { raw, ...ids };
 }
@@ -28,7 +28,7 @@ async function user(e: Awaited<ReturnType<typeof setup>>, id: string, role: stri
   return e.raw.withIdentity({ subject: id, tokenIdentifier: id });
 }
 async function account(e: Awaited<ReturnType<typeof setup>>, name: string, balance: number, branchId = e.branchId, active = true) { return e.raw.run(ctx => ctx.db.insert("financialAccounts", { name, code: name, uniqueKey: `${branchId}:${name}`, type: "cash", branchId, isActive: active, currentBalance: balance, allowNegative: false, settlementDelayDays: 0, openingBalancePostedAt: Date.now(), createdAt: Date.now(), createdBy: "seed", updatedAt: Date.now() })); }
-async function order(e: Awaited<ReturnType<typeof setup>>, deposit = 40) { return e.raw.run(ctx => ctx.db.insert("orders", { orderNumber: `O-${deposit}`, customerName: "عميل", items: [], total: 100, deposit, remaining: 100 - deposit, status: "pending", branchId: e.branchId })); }
+async function order(e: Awaited<ReturnType<typeof setup>>, deposit = 40) { return e.raw.run(async ctx => { if (deposit > 0) await ctx.db.insert("customerBalances", { key: `${e.customerId}:${e.branchId}`, customerId: e.customerId, branchId: e.branchId, receivableBalance: 0, advanceBalance: deposit, totalPurchases: 0, updatedAt: Date.now() }); return ctx.db.insert("orders", { orderNumber: `O-${deposit}`, customerId: e.customerId, customerName: "عميل", items: [], total: 100, deposit, remaining: 100 - deposit, status: "pending", branchId: e.branchId }); }); }
 async function state(e: Awaited<ReturnType<typeof setup>>) { return e.raw.run(async ctx => ({ accounts: await ctx.db.query("financialAccounts").collect(), transactions: await ctx.db.query("financialTransactions").collect(), movements: await ctx.db.query("financialMovements").collect(), orders: await ctx.db.query("orders").collect(), expenses: await ctx.db.query("expenses").collect() })); }
 
 test("shipping can view orders but cannot load collection accounts", async () => { const e = await setup(), t = await user(e, "shipping", "shipping", []); await order(e); assert.equal((await t.query(api.orders.list, {})).length, 1); await assert.rejects(t.query(api.finance.collectionAccountPicker, {}), /صلاحية/); });
