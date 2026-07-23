@@ -103,3 +103,25 @@ export async function postFinancialTransaction(ctx: MutationCtx, user: AuthUser,
     recordId: String(transactionId), recordLabel: transactionNumber, details: input.description, branchId: input.branchId, timestamp: Date.now() });
   return { transactionId, duplicate: false };
 }
+
+/** Reverses a posted transaction and maintains both sides of the relationship. */
+export async function reversePostedFinancialTransaction(ctx: MutationCtx, user: AuthUser, input: {
+  transactionId: Id<"financialTransactions">; reason: string; date: string; requestId: string;
+  referenceType?: string; referenceId?: string; referenceNumber?: string;
+}) {
+  const original = await ctx.db.get(input.transactionId);
+  if (!original) throw new ConvexError("المعاملة الأصلية غير موجودة");
+  const existing = await findFinancialTransactionByRequest(ctx, "reversal", user.userId, input.requestId);
+  if (existing) {
+    if (existing.originalTransactionId !== original._id) throw new ConvexError("معرف طلب العكس مستخدم لعملية أخرى");
+    return existing._id;
+  }
+  if (original.status === "reversed" || original.reversalTransactionId) throw new ConvexError("تم عكس المعاملة سابقاً بطلب مختلف");
+  const movements = await ctx.db.query("financialMovements").withIndex("by_transaction", q => q.eq("transactionId", original._id)).collect();
+  const posted = await postFinancialTransaction(ctx, user, { type: "reversal", requestId: input.requestId, date: input.date, amount: original.amount,
+    description: `عكس ${original.transactionNumber}: ${input.reason}`, branchId: original.branchId, originalTransactionId: original._id,
+    referenceType: input.referenceType ?? "financial_transaction", referenceId: input.referenceId ?? String(original._id), referenceNumber: input.referenceNumber ?? original.transactionNumber,
+    customerId: original.customerId, movements: movements.map(movement => ({ accountId: movement.accountId, signedAmount: -movement.signedAmount })) });
+  await ctx.db.patch(original._id, { status: "reversed", reversedAt: Date.now(), reversedBy: user.userId, reversalReason: input.reason, reversalTransactionId: posted.transactionId });
+  return posted.transactionId;
+}

@@ -1,7 +1,7 @@
 import { mutation, query } from "./_generated/server";
 import { ConvexError, v } from "convex/values";
 import { assertBranchAccess, filterByBranch, logAction, requirePermission } from "./lib/auth";
-import { assertFinancialAccountBranch, postFinancialTransaction, requireActiveFinancialAccount, requireFinanceInitialized } from "./lib/finance";
+import { assertFinancialAccountBranch, postFinancialTransaction, requireActiveFinancialAccount, requireFinanceInitialized, reversePostedFinancialTransaction } from "./lib/finance";
 import { changeProductStock } from "./lib/inventory";
 import { nextDocumentNumber } from "./lib/documentNumbers";
 import { INVENTORY_MOVEMENT_TYPES } from "../shared/inventoryRules";
@@ -23,6 +23,24 @@ export const list = query({ args: { invoiceId: v.optional(v.id("invoices")) }, h
 export const getForPrint = query({ args: { id: v.id("salesReturns") }, handler: async (ctx, args) => {
   const user = await requirePermission(ctx, "print_credit_notes"); const note = await ctx.db.get(args.id); if (!note) return null; assertBranchAccess(user, note);
   return redactCosts(note, user.permissions.includes("view_profits"));
+} });
+
+export const eligibleInvoices = query({ args: {}, handler: async ctx => {
+  const user = await requirePermission(ctx, "create_sales_returns");
+  const invoices = filterByBranch(await ctx.db.query("invoices").collect(), user);
+  const result = [];
+  for (const invoice of invoices) {
+    if (invoice.status === "cancelled" || invoice.status === "returned" || !invoice.costingVersion || invoice.items.some(item => item.lineNetTotal === undefined)) continue;
+    const notes = await ctx.db.query("salesReturns").withIndex("by_invoice", q => q.eq("invoiceId", invoice._id)).collect();
+    const returned = new Map<string, number>();
+    for (const note of notes) if (note.status === "posted") for (const item of note.items) returned.set(String(item.productId), (returned.get(String(item.productId)) ?? 0) + item.quantityReturned);
+    const items = invoice.items.map(item => ({ productId: item.productId, productName: item.productName, unitPrice: item.unitPrice,
+      originalQuantity: item.quantity, returnedQuantity: returned.get(String(item.productId)) ?? 0,
+      availableQuantity: item.quantity - (returned.get(String(item.productId)) ?? 0), lineNetTotal: item.lineNetTotal! })).filter(item => item.availableQuantity > 0);
+    if (items.length) result.push({ invoiceId: invoice._id, invoiceNumber: invoice.invoiceNumber, customerName: invoice.customerName,
+      originalTotal: invoice.total, creditedTotal: invoice.creditedTotal ?? 0, netTotal: invoice.netTotal ?? invoice.total, paid: invoice.paid, remaining: invoice.remaining, items });
+  }
+  return result;
 } });
 
 export const create = mutation({ args: {
@@ -61,14 +79,17 @@ export const create = mutation({ args: {
   return id;
 } });
 
-export const reverse = mutation({ args: { id: v.id("salesReturns"), reason: v.string(), requestId: v.string() }, handler: async (ctx, args) => {
-  const user = await requirePermission(ctx, "create_sales_returns"); const note = await ctx.db.get(args.id); if (!note) throw new ConvexError("الإشعار الدائن غير موجود"); assertBranchAccess(user, note);
-  if (note.status === "reversed") throw new ConvexError("تم عكس الإشعار الدائن بالفعل"); if (!args.reason.trim()) throw new ConvexError("سبب العكس مطلوب");
+export const reverse = mutation({ args: { id: v.id("salesReturns"), reason: v.string(), date: v.string(), requestId: v.string() }, handler: async (ctx, args) => {
+  const user = await requirePermission(ctx, "create_sales_returns"); await requirePermission(ctx, "reverse_financial_transactions");
+  const note = await ctx.db.get(args.id); if (!note) throw new ConvexError("الإشعار الدائن غير موجود"); assertBranchAccess(user, note);
+  const requestKey = `${user.userId}:${args.requestId.trim()}`; if (!args.requestId.trim()) throw new ConvexError("معرف طلب العكس مطلوب");
+  if (note.status === "reversed") { if (note.reversalRequestId === requestKey) return note._id; throw new ConvexError("تم عكس الإشعار الدائن بالفعل بطلب مختلف"); }
+  if (!args.reason.trim()) throw new ConvexError("سبب العكس مطلوب"); await requireFinanceInitialized(ctx, args.date);
   const invoice = await ctx.db.get(note.invoiceId); if (!invoice) throw new ConvexError("الفاتورة غير موجودة");
   for (const item of note.items) await changeProductStock(ctx, user, { productId: item.productId, quantityDelta: -item.quantityReturned, unitCost: item.historicalUnitCost, type: INVENTORY_MOVEMENT_TYPES.sale, reason: `عكس مرتجع ${note.creditNoteNumber}`, referenceId: String(note._id), referenceType: "sales_return_reversal" });
-  if (note.financialTransactionId) { await requirePermission(ctx, "refund_collections"); const movement = await ctx.db.query("financialMovements").withIndex("by_transaction", q => q.eq("transactionId", note.financialTransactionId!)).unique(); if (!movement) throw new ConvexError("حركة رد النقدية غير موجودة"); await postFinancialTransaction(ctx, user, { type: "reversal", requestId: args.requestId, date: note.date, amount: note.cashRefund, description: `عكس رد ${note.creditNoteNumber}: ${args.reason.trim()}`, branchId: note.branchId, referenceType: "sales_return_reversal", referenceId: String(note._id), referenceNumber: note.creditNoteNumber, customerId: note.customerId, movements: [{ accountId: movement.accountId, signedAmount: note.cashRefund }], originalTransactionId: note.financialTransactionId }); }
+  let reversalTransactionId; if (note.financialTransactionId) reversalTransactionId = await reversePostedFinancialTransaction(ctx, user, { transactionId: note.financialTransactionId, reason: args.reason.trim(), date: args.date, requestId: args.requestId, referenceType: "sales_return_reversal", referenceId: String(note._id), referenceNumber: note.creditNoteNumber });
   await ctx.db.patch(invoice._id, { creditedTotal: roundMoney((invoice.creditedTotal ?? 0) - note.totalCredit), netTotal: roundMoney((invoice.netTotal ?? invoice.total) + note.totalCredit), paid: roundMoney(invoice.paid + note.cashRefund), remaining: roundMoney(invoice.remaining + note.debtReduction), status: invoice.remaining + note.debtReduction === 0 ? "paid" : invoice.paid + note.cashRefund > 0 ? "partial" : "unpaid" });
   if (note.customerId) { const customer = await ctx.db.get(note.customerId); if (!customer) throw new ConvexError("العميل غير موجود"); await ctx.db.patch(customer._id, { balance: roundMoney(customer.balance + note.debtReduction), totalPurchases: roundMoney(customer.totalPurchases + note.totalCredit) }); }
-  await ctx.db.patch(note._id, { status: "reversed", reversedAt: Date.now(), reversedBy: user.userId, reversalReason: args.reason.trim() });
+  await ctx.db.patch(note._id, { status: "reversed", reversedAt: Date.now(), reversedBy: user.userId, reversalReason: args.reason.trim(), reversalDate: args.date, reversalRequestId: requestKey, reversalTransactionId });
   await logAction(ctx, user, { action: "reverse", module: "sales_returns", recordId: note._id, recordLabel: note.creditNoteNumber, details: `عكس الإشعار الدائن: ${args.reason.trim()}` }); return note._id;
 } });
