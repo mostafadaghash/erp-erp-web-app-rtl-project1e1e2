@@ -28,6 +28,7 @@ async function prepareInvoice(
   overallDiscount: number,
   paid: number,
   stockCredits = new Map<string, number>(),
+  branchId?: Id<"branches">,
 ) {
   if (items.length === 0) throw new ConvexError("أضف منتجاً واحداً على الأقل");
 
@@ -50,6 +51,7 @@ async function prepareInvoice(
     const product = await ctx.db.get(item.productId);
     if (!product || !product.isActive) throw new ConvexError(`المنتج غير موجود أو غير نشط: ${item.productName}`);
     assertBranchAccess(user, product);
+    if (branchId && product.branchId !== branchId) throw new ConvexError("المنتج لا ينتمي إلى فرع الفاتورة");
     const available = product.stock + (stockCredits.get(key) ?? 0);
     if (available < (requested.get(key) ?? 0)) {
       throw new ConvexError(`المخزون غير كافٍ للمنتج: ${product.name}`);
@@ -171,7 +173,7 @@ export const create = mutation({
       customerName = customer.name;
       customerPhone = customer.phone;
     }
-    const prepared = await prepareInvoice(ctx, user, args.items, args.discount, args.initialPayment?.amount ?? 0);
+    const prepared = await prepareInvoice(ctx, user, args.items, args.discount, args.initialPayment?.amount ?? 0, new Map(), branchId);
     if (args.initialPayment && args.initialPayment.amount <= 0) throw new ConvexError("مبلغ الدفعة الأولية يجب أن يكون أكبر من صفر");
     if (prepared.remaining > 0 && !args.customerId) throw new ConvexError("الفاتورة الآجلة تتطلب عميلاً مسجلاً");
     let paymentAccount;
@@ -274,6 +276,7 @@ export const update = mutation({
     if (inv.status === "cancelled") throw new ConvexError("لا يمكن تعديل فاتورة ملغاة");
     if (await ctx.db.query("salesReturns").withIndex("by_invoice", q => q.eq("invoiceId", inv._id)).first()) throw new ConvexError("لا يمكن تعديل فاتورة لها إشعار دائن؛ استخدم مسار المرتجع");
     if (inv.paid > 0) throw new ConvexError("لا يمكن تعديل فاتورة مدفوعة قبل تنفيذ التسوية المالية");
+    const branchId = resolveWriteBranch(user, data.branchId ?? inv.branchId);
     let customerName = data.customerName.trim();
     let customerPhone = data.customerPhone;
     if (!customerName) throw new ConvexError("اسم العميل مطلوب");
@@ -281,6 +284,7 @@ export const update = mutation({
       const customer = await ctx.db.get(data.customerId);
       if (!customer) throw new ConvexError("العميل غير موجود");
       assertBranchAccess(user, customer);
+      if (customer.branchId !== branchId) throw new ConvexError("العميل لا ينتمي إلى فرع الفاتورة");
       customerName = customer.name;
       customerPhone = customer.phone;
     }
@@ -289,8 +293,7 @@ export const update = mutation({
       const key = String(item.productId);
       oldQuantities.set(key, (oldQuantities.get(key) ?? 0) + item.quantity);
     }
-    const prepared = await prepareInvoice(ctx, user, data.items, data.discount, data.paid, oldQuantities);
-    const branchId = resolveWriteBranch(user, data.branchId ?? inv.branchId);
+    const prepared = await prepareInvoice(ctx, user, data.items, data.discount, data.paid, oldQuantities, branchId);
     await ctx.db.patch(id, {
       customerId: data.customerId,
       customerName,
