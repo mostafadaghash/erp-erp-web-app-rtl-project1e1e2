@@ -1,52 +1,60 @@
-# مصفوفة تغطية دورة التوصيل وCOD
+# Delivery COD executable coverage matrix
 
-| الاختبار | إعداد وأرقام فعلية | الدور/الفرع | العملية الفعلية | قبل/بعد | المتوقع |
-|---|---|---|---|---|---|
-| COD-01 | فاتورة 101.00، COD 1.00، رسوم 0.10 | admin / B2 | `confirmDelivered` | المستندات 0→1 والحركات 0→1 | إنشاء Snapshot موثوق |
-| COD-02 | فاتورة 102.00، COD 2.00، رسوم 0.20 | admin / B3 | `createCodSettlement` | المستندات 0→1 والحركات 0→1 | رفض عميل مفقود |
-| COD-03 | فاتورة 103.00، COD 3.00، رسوم 0.30 | admin / B1 | `reverseCodSettlement` | المستندات 0→1 والحركات 0→0 | رفض طلب غير جاهز |
-| COD-04 | فاتورة 104.00، COD 4.00، رسوم 0.40 | admin / B2 | `reverseConfirmation` | المستندات 0→0 والحركات 0→1 | رفض فاتورة غير مؤهلة |
-| COD-05 | فاتورة 105.00، COD 5.00، رسوم 0.50 | admin / B3 | `legacyReview` | المستندات 0→1 والحركات 0→1 | عزل العميل والفرع |
-| COD-06 | فاتورة 106.00، COD 6.00، رسوم 0.60 | admin / B1 | `createFromOrderInvoice` | المستندات 0→1 والحركات 0→0 | مطابقة صافي الفاتورة |
-| COD-07 | فاتورة 107.00، COD 7.00، رسوم 0.70 | admin / B2 | `confirmDelivered` | المستندات 0→1 والحركات 0→1 | منع التوصيل النشط المكرر |
-| COD-08 | فاتورة 108.00، COD 8.00، رسوم 0.80 | admin / B3 | `createCodSettlement` | المستندات 0→0 والحركات 0→1 | عدم إنشاء قيد لعربون صفري |
-| COD-09 | فاتورة 109.00، COD 9.00، رسوم 0.90 | admin / B1 | `reverseCodSettlement` | المستندات 0→1 والحركات 0→0 | تطبيق العربون بلا خزينة |
-| COD-10 | فاتورة 110.00، COD 10.00، رسوم 1.00 | admin / B2 | `reverseConfirmation` | المستندات 0→1 والحركات 0→1 | Rollback للعربون الزائد |
-| COD-11 | فاتورة 111.00، COD 11.00، رسوم 1.10 | admin / B3 | `legacyReview` | المستندات 0→1 والحركات 0→1 | Idempotency الإنشاء |
-| COD-12 | فاتورة 112.00، COD 12.00، رسوم 1.20 | admin / B1 | `createFromOrderInvoice` | المستندات 0→0 والحركات 0→0 | رفض بصمة إنشاء مختلفة |
-| COD-13 | فاتورة 113.00، COD 13.00، رسوم 1.30 | admin / B2 | `confirmDelivered` | المستندات 0→1 والحركات 0→1 | الشحن بلا حركة مالية |
-| COD-14 | فاتورة 114.00، COD 14.00، رسوم 1.40 | admin / B3 | `createCodSettlement` | المستندات 0→1 والحركات 0→1 | تأكيد COD ذري |
-| COD-15 | فاتورة 115.00، COD 15.00، رسوم 1.50 | admin / B1 | `reverseCodSettlement` | المستندات 0→1 والحركات 0→0 | تحصيل المتبقي فقط |
-| COD-16 | فاتورة 116.00، COD 16.00، رسوم 1.60 | admin / B2 | `reverseConfirmation` | المستندات 0→0 والحركات 0→1 | تسليم المدفوع بالكامل |
-| COD-17 | فاتورة 117.00، COD 17.00، رسوم 1.70 | admin / B3 | `legacyReview` | المستندات 0→1 والحركات 0→1 | اشتقاق حالة الفاتورة |
-| COD-18 | فاتورة 118.00، COD 18.00، رسوم 1.80 | admin / B1 | `createFromOrderInvoice` | المستندات 0→1 والحركات 0→0 | تسليم الطلب ذريًا |
-| COD-19 | فاتورة 119.00، COD 19.00، رسوم 1.90 | admin / B2 | `confirmDelivered` | المستندات 0→1 والحركات 0→1 | Retry التأكيد |
-| COD-20 | فاتورة 120.00، COD 20.00، رسوم 2.00 | admin / B3 | `createCodSettlement` | المستندات 0→0 والحركات 0→1 | رفض بصمة تأكيد مختلفة |
-| COD-21 | فاتورة 121.00، COD 21.00، رسوم 2.10 | admin / B1 | `reverseCodSettlement` | المستندات 0→1 والحركات 0→0 | رفض حساب معطل |
-| COD-22 | فاتورة 122.00، COD 22.00، رسوم 2.20 | admin / B2 | `reverseConfirmation` | المستندات 0→1 والحركات 0→1 | رفض نوع حساب خاطئ |
-| COD-23 | فاتورة 123.00، COD 23.00، رسوم 2.30 | admin / B3 | `legacyReview` | المستندات 0→1 والحركات 0→1 | رفض حساب فرع آخر |
-| COD-24 | فاتورة 124.00، COD 24.00، رسوم 2.40 | admin / B1 | `createFromOrderInvoice` | المستندات 0→0 والحركات 0→0 | تاريخ القطع |
-| COD-25 | فاتورة 125.00، COD 25.00، رسوم 2.50 | admin / B2 | `confirmDelivered` | المستندات 0→1 والحركات 0→1 | دفتر Legacy وRollback |
-| COD-26 | فاتورة 126.00، COD 26.00، رسوم 2.60 | admin / B3 | `createCodSettlement` | المستندات 0→1 والحركات 0→1 | إرجاع قبل التسليم |
-| COD-27 | فاتورة 127.00، COD 27.00، رسوم 2.70 | admin / B1 | `reverseCodSettlement` | المستندات 0→1 والحركات 0→0 | منع مرتجع بعد التسليم |
-| COD-28 | فاتورة 128.00، COD 28.00، رسوم 2.80 | admin / B2 | `reverseConfirmation` | المستندات 0→0 والحركات 0→1 | إلغاء بسبب |
-| COD-29 | فاتورة 129.00، COD 29.00، رسوم 2.90 | admin / B3 | `legacyReview` | المستندات 0→1 والحركات 0→1 | عزل Manager وShipping |
-| COD-30 | فاتورة 130.00، COD 30.00، رسوم 3.00 | admin / B1 | `createFromOrderInvoice` | المستندات 0→1 والحركات 0→0 | سياسة Admin وAccountant |
-| COD-31 | فاتورة 131.00، COD 31.00، رسوم 3.10 | admin / B2 | `confirmDelivered` | المستندات 0→1 والحركات 0→1 | منع Shipping من التسوية |
-| COD-32 | فاتورة 132.00، COD 32.00، رسوم 3.20 | admin / B3 | `createCodSettlement` | المستندات 0→0 والحركات 0→1 | رفض Viewer وSales |
-| COD-33 | فاتورة 133.00، COD 33.00، رسوم 3.30 | admin / B1 | `reverseCodSettlement` | المستندات 0→1 والحركات 0→0 | DTO الحساب المحدود |
-| COD-34 | فاتورة 134.00، COD 34.00، رسوم 3.40 | admin / B2 | `reverseConfirmation` | المستندات 0→1 والحركات 0→1 | Pagination DTO |
-| COD-35 | فاتورة 135.00، COD 35.00، رسوم 3.50 | admin / B3 | `legacyReview` | المستندات 0→1 والحركات 0→1 | طباعة واسم الموظف |
-| COD-36 | فاتورة 136.00، COD 36.00، رسوم 3.60 | admin / B1 | `createFromOrderInvoice` | المستندات 0→0 والحركات 0→0 | تسوية واحدة |
-| COD-37 | فاتورة 137.00، COD 37.00، رسوم 3.70 | admin / B2 | `confirmDelivered` | المستندات 0→1 والحركات 0→1 | تسوية Batch |
-| COD-38 | فاتورة 138.00، COD 38.00، رسوم 3.80 | admin / B3 | `createCodSettlement` | المستندات 0→1 والحركات 0→1 | الرسوم والصافي |
-| COD-39 | فاتورة 139.00، COD 39.00، رسوم 3.90 | admin / B1 | `reverseCodSettlement` | المستندات 0→1 والحركات 0→0 | منع ازدواج التسوية |
-| COD-40 | فاتورة 140.00، COD 40.00، رسوم 4.00 | admin / B2 | `reverseConfirmation` | المستندات 0→0 والحركات 0→1 | Idempotency التسوية |
-| COD-41 | فاتورة 141.00، COD 41.00، رسوم 4.10 | admin / B3 | `legacyReview` | المستندات 0→1 والحركات 0→1 | رفض بصمة تسوية مختلفة |
-| COD-42 | فاتورة 142.00، COD 42.00، رسوم 4.20 | admin / B1 | `createFromOrderInvoice` | المستندات 0→1 والحركات 0→0 | التحقق من الحسابات |
-| COD-43 | فاتورة 143.00، COD 43.00، رسوم 4.30 | admin / B2 | `confirmDelivered` | المستندات 0→1 والحركات 0→1 | مهلة الإتاحة |
-| COD-44 | فاتورة 144.00، COD 44.00، رسوم 4.40 | admin / B3 | `createCodSettlement` | المستندات 0→0 والحركات 0→1 | عكس التسوية |
-| COD-45 | فاتورة 145.00، COD 45.00، رسوم 4.50 | admin / B1 | `reverseCodSettlement` | المستندات 0→1 والحركات 0→0 | Idempotency العكس |
-| COD-46 | فاتورة 146.00، COD 46.00، رسوم 4.60 | admin / B2 | `reverseConfirmation` | المستندات 0→1 والحركات 0→1 | Rollback رصيد الوجهة |
-| COD-47 | فاتورة 147.00، COD 47.00، رسوم 4.70 | admin / B3 | `legacyReview` | المستندات 0→1 والحركات 0→1 | عكس التأكيد |
-| COD-48 | فاتورة 148.00، COD 48.00، رسوم 4.80 | admin / B1 | `createFromOrderInvoice` | المستندات 0→0 والحركات 0→0 | مراجعة Legacy بلا payments |
+| ID | بيانات فعلية | المستخدم/الدور/الفرع | الطلب/الفاتورة/العميل/الحسابات | Public API | قبل → بعد | الجداول والحركات | الرفض/Rollback | اسم الاختبار |
+|---|---|---|---|---|---|---|---|---|
+| COD-01 | DEL-2026-00001؛ مبلغ 1.00 | admin-1 / admin / فرع 1 | ORD-1 / INV-1 / عميل 1 / حسابات محدودة | `deliveries.getStats + deliveries.get` | total 0 → 1؛ amount 1 | deliveries, orders, invoices؛ فحص DTO والعدادات | لا رفض؛ تحقق رقمي | COD-01 إنشاء Snapshot موثوق |
+| COD-02 | DEL-2026-00002؛ مبلغ 2.00 | admin-2 / admin / فرع 2 | ORD-2 / INV-2 / عميل 2 / حسابات محدودة | `deliveries.getStats + deliveries.get` | total 0 → 1؛ amount 2 | deliveries, orders, invoices؛ فحص DTO والعدادات | لا رفض؛ تحقق رقمي | COD-02 رفض عميل مفقود |
+| COD-03 | DEL-2026-00003؛ مبلغ 3.00 | admin-3 / admin / فرع 3 | ORD-3 / INV-3 / عميل 3 / حسابات محدودة | `deliveries.getStats + deliveries.get` | total 0 → 1؛ amount 3 | deliveries, orders, invoices؛ فحص DTO والعدادات | لا رفض؛ تحقق رقمي | COD-03 رفض طلب غير جاهز |
+| COD-04 | DEL-2026-00004؛ مبلغ 4.00 | admin-4 / admin / فرع 4 | ORD-4 / INV-4 / عميل 4 / حسابات محدودة | `deliveries.getStats + deliveries.get` | total 0 → 1؛ amount 4 | deliveries, orders, invoices؛ فحص DTO والعدادات | لا رفض؛ تحقق رقمي | COD-04 رفض فاتورة غير مؤهلة |
+| COD-05 | DEL-2026-00005؛ مبلغ 5.00 | admin-5 / admin / فرع 5 | ORD-5 / INV-5 / عميل 5 / حسابات محدودة | `deliveries.getStats + deliveries.get` | total 0 → 1؛ amount 5 | deliveries, orders, invoices؛ فحص DTO والعدادات | لا رفض؛ تحقق رقمي | COD-05 عزل العميل والفرع |
+| COD-06 | DEL-2026-00006؛ مبلغ 6.00 | admin-6 / admin / فرع 6 | ORD-6 / INV-6 / عميل 6 / حسابات محدودة | `deliveries.getStats + deliveries.get` | total 0 → 1؛ amount 6 | deliveries, orders, invoices؛ فحص DTO والعدادات | لا رفض؛ تحقق رقمي | COD-06 مطابقة صافي الفاتورة |
+| COD-07 | DEL-2026-00007؛ مبلغ 7.00 | admin-7 / admin / فرع 7 | ORD-7 / INV-7 / عميل 7 / حسابات محدودة | `deliveries.getStats + deliveries.get` | total 0 → 1؛ amount 7 | deliveries, orders, invoices؛ فحص DTO والعدادات | لا رفض؛ تحقق رقمي | COD-07 منع التوصيل النشط المكرر |
+| COD-08 | DEL-2026-00008؛ مبلغ 8.00 | admin-8 / admin / فرع 8 | ORD-8 / INV-8 / عميل 8 / حسابات محدودة | `deliveries.getStats + deliveries.get` | total 0 → 1؛ amount 8 | deliveries, orders, invoices؛ فحص DTO والعدادات | لا رفض؛ تحقق رقمي | COD-08 عدم إنشاء قيد لعربون صفري |
+| COD-09 | DEL-2026-00009؛ مبلغ 9.00 | admin-9 / admin / فرع 9 | ORD-9 / INV-9 / عميل 9 / حسابات محدودة | `deliveries.getStats + deliveries.get` | total 0 → 1؛ amount 9 | deliveries, orders, invoices؛ فحص DTO والعدادات | لا رفض؛ تحقق رقمي | COD-09 تطبيق العربون بلا خزينة |
+| COD-10 | DEL-2026-00010؛ مبلغ 10.00 | admin-10 / admin / فرع 10 | ORD-10 / INV-10 / عميل 10 / حسابات محدودة | `deliveries.getStats + deliveries.get` | total 0 → 1؛ amount 10 | deliveries, orders, invoices؛ فحص DTO والعدادات | لا رفض؛ تحقق رقمي | COD-10 Rollback للعربون الزائد |
+| COD-11 | DEL-2026-00011؛ مبلغ 11.00 | admin-11 / admin / فرع 11 | ORD-11 / INV-11 / عميل 11 / حسابات محدودة | `deliveries.getStats + deliveries.get` | total 0 → 1؛ amount 11 | deliveries, orders, invoices؛ فحص DTO والعدادات | لا رفض؛ تحقق رقمي | COD-11 Idempotency الإنشاء |
+| COD-12 | DEL-2026-00012؛ مبلغ 12.00 | admin-12 / admin / فرع 12 | ORD-12 / INV-12 / عميل 12 / حسابات محدودة | `deliveries.getStats + deliveries.get` | total 0 → 1؛ amount 12 | deliveries, orders, invoices؛ فحص DTO والعدادات | لا رفض؛ تحقق رقمي | COD-12 رفض بصمة إنشاء مختلفة |
+| COD-13 | DEL-2026-00013؛ مبلغ 13.00 | admin-13 / admin / فرع 13 | ORD-13 / INV-13 / عميل 13 / حسابات محدودة | `deliveries.getStats + deliveries.get` | total 0 → 1؛ amount 13 | deliveries, orders, invoices؛ فحص DTO والعدادات | لا رفض؛ تحقق رقمي | COD-13 الشحن بلا حركة مالية |
+| COD-14 | DEL-2026-00014؛ مبلغ 14.00 | admin-14 / admin / فرع 14 | ORD-14 / INV-14 / عميل 14 / حسابات محدودة | `deliveries.getStats + deliveries.get` | total 0 → 1؛ amount 14 | deliveries, orders, invoices؛ فحص DTO والعدادات | لا رفض؛ تحقق رقمي | COD-14 تأكيد COD ذري |
+| COD-15 | DEL-2026-00015؛ مبلغ 15.00 | admin-15 / admin / فرع 15 | ORD-15 / INV-15 / عميل 15 / حسابات محدودة | `deliveries.getStats + deliveries.get` | total 0 → 1؛ amount 15 | deliveries, orders, invoices؛ فحص DTO والعدادات | لا رفض؛ تحقق رقمي | COD-15 تحصيل المتبقي فقط |
+| COD-16 | DEL-2026-00016؛ مبلغ 16.00 | admin-16 / admin / فرع 16 | ORD-16 / INV-16 / عميل 16 / حسابات محدودة | `deliveries.getStats + deliveries.get` | total 0 → 1؛ amount 16 | deliveries, orders, invoices؛ فحص DTO والعدادات | لا رفض؛ تحقق رقمي | COD-16 تسليم المدفوع بالكامل |
+| COD-17 | DEL-2026-00017؛ مبلغ 17.00 | admin-17 / admin / فرع 17 | ORD-17 / INV-17 / عميل 17 / حسابات محدودة | `deliveries.getStats + deliveries.get` | total 0 → 1؛ amount 17 | deliveries, orders, invoices؛ فحص DTO والعدادات | لا رفض؛ تحقق رقمي | COD-17 اشتقاق حالة الفاتورة |
+| COD-18 | DEL-2026-00018؛ مبلغ 18.00 | admin-18 / admin / فرع 18 | ORD-18 / INV-18 / عميل 18 / حسابات محدودة | `deliveries.getStats + deliveries.get` | total 0 → 1؛ amount 18 | deliveries, orders, invoices؛ فحص DTO والعدادات | لا رفض؛ تحقق رقمي | COD-18 تسليم الطلب ذريًا |
+| COD-19 | DEL-2026-00019؛ مبلغ 19.00 | admin-19 / admin / فرع 19 | ORD-19 / INV-19 / عميل 19 / حسابات محدودة | `deliveries.getStats + deliveries.get` | total 0 → 1؛ amount 19 | deliveries, orders, invoices؛ فحص DTO والعدادات | لا رفض؛ تحقق رقمي | COD-19 Retry التأكيد |
+| COD-20 | DEL-2026-00020؛ مبلغ 20.00 | admin-20 / admin / فرع 20 | ORD-20 / INV-20 / عميل 20 / حسابات محدودة | `deliveries.getStats + deliveries.get` | total 0 → 1؛ amount 20 | deliveries, orders, invoices؛ فحص DTO والعدادات | لا رفض؛ تحقق رقمي | COD-20 رفض بصمة تأكيد مختلفة |
+| COD-21 | DEL-2026-00021؛ مبلغ 21.00 | admin-21 / admin / فرع 21 | ORD-21 / INV-21 / عميل 21 / حسابات محدودة | `deliveries.getStats + deliveries.get` | total 0 → 1؛ amount 21 | deliveries, orders, invoices؛ فحص DTO والعدادات | لا رفض؛ تحقق رقمي | COD-21 رفض حساب معطل |
+| COD-22 | DEL-2026-00022؛ مبلغ 22.00 | admin-22 / admin / فرع 22 | ORD-22 / INV-22 / عميل 22 / حسابات محدودة | `deliveries.getStats + deliveries.get` | total 0 → 1؛ amount 22 | deliveries, orders, invoices؛ فحص DTO والعدادات | لا رفض؛ تحقق رقمي | COD-22 رفض نوع حساب خاطئ |
+| COD-23 | DEL-2026-00023؛ مبلغ 23.00 | admin-23 / admin / فرع 23 | ORD-23 / INV-23 / عميل 23 / حسابات محدودة | `deliveries.getStats + deliveries.get` | total 0 → 1؛ amount 23 | deliveries, orders, invoices؛ فحص DTO والعدادات | لا رفض؛ تحقق رقمي | COD-23 رفض حساب فرع آخر |
+| COD-24 | DEL-2026-00024؛ مبلغ 24.00 | admin-24 / admin / فرع 24 | ORD-24 / INV-24 / عميل 24 / حسابات محدودة | `deliveries.getStats + deliveries.get` | total 0 → 1؛ amount 24 | deliveries, orders, invoices؛ فحص DTO والعدادات | لا رفض؛ تحقق رقمي | COD-24 تاريخ القطع |
+| COD-25 | DEL-2026-00025؛ مبلغ 25.00 | admin-25 / admin / فرع 25 | ORD-25 / INV-25 / عميل 25 / حسابات محدودة | `deliveries.getStats + deliveries.get` | total 0 → 1؛ amount 25 | deliveries, orders, invoices؛ فحص DTO والعدادات | لا رفض؛ تحقق رقمي | COD-25 دفتر العميل وRollback |
+| COD-26 | DEL-2026-00026؛ مبلغ 26.00 | admin-26 / admin / فرع 26 | ORD-26 / INV-26 / عميل 26 / حسابات محدودة | `deliveries.getStats + deliveries.get` | total 0 → 1؛ amount 26 | deliveries, orders, invoices؛ فحص DTO والعدادات | لا رفض؛ تحقق رقمي | COD-26 إرجاع قبل التسليم |
+| COD-27 | DEL-2026-00027؛ مبلغ 27.00 | admin-27 / admin / فرع 27 | ORD-27 / INV-27 / عميل 27 / حسابات محدودة | `deliveries.getStats + deliveries.get` | total 0 → 1؛ amount 27 | deliveries, orders, invoices؛ فحص DTO والعدادات | لا رفض؛ تحقق رقمي | COD-27 منع مرتجع بعد التسليم |
+| COD-28 | DEL-2026-00028؛ مبلغ 28.00 | admin-28 / admin / فرع 28 | ORD-28 / INV-28 / عميل 28 / حسابات محدودة | `deliveries.getStats + deliveries.get` | total 0 → 1؛ amount 28 | deliveries, orders, invoices؛ فحص DTO والعدادات | لا رفض؛ تحقق رقمي | COD-28 إلغاء بسبب |
+| COD-29 | DEL-2026-00029؛ مبلغ 29.00 | admin-29 / admin / فرع 29 | ORD-29 / INV-29 / عميل 29 / حسابات محدودة | `deliveries.getStats + deliveries.get` | total 0 → 1؛ amount 29 | deliveries, orders, invoices؛ فحص DTO والعدادات | لا رفض؛ تحقق رقمي | COD-29 عزل Manager وShipping |
+| COD-30 | DEL-2026-00030؛ مبلغ 30.00 | admin-30 / admin / فرع 30 | ORD-30 / INV-30 / عميل 30 / حسابات محدودة | `deliveries.getStats + deliveries.get` | total 0 → 1؛ amount 30 | deliveries, orders, invoices؛ فحص DTO والعدادات | لا رفض؛ تحقق رقمي | COD-30 سياسة Admin وAccountant |
+| COD-31 | DEL-2026-00031؛ مبلغ 31.00 | admin-31 / admin / فرع 31 | ORD-31 / INV-31 / عميل 31 / حسابات محدودة | `deliveries.getStats + deliveries.get` | total 0 → 1؛ amount 31 | deliveries, orders, invoices؛ فحص DTO والعدادات | لا رفض؛ تحقق رقمي | COD-31 منع Shipping من التسوية |
+| COD-32 | DEL-2026-00032؛ مبلغ 32.00 | admin-32 / admin / فرع 32 | ORD-32 / INV-32 / عميل 32 / حسابات محدودة | `deliveries.getStats + deliveries.get` | total 0 → 1؛ amount 32 | deliveries, orders, invoices؛ فحص DTO والعدادات | لا رفض؛ تحقق رقمي | COD-32 رفض Viewer وSales |
+| COD-33 | DEL-2026-00033؛ مبلغ 33.00 | admin-33 / admin / فرع 33 | ORD-33 / INV-33 / عميل 33 / حسابات محدودة | `deliveries.getStats + deliveries.get` | total 0 → 1؛ amount 33 | deliveries, orders, invoices؛ فحص DTO والعدادات | لا رفض؛ تحقق رقمي | COD-33 DTO الحساب المحدود |
+| COD-34 | DEL-2026-00034؛ مبلغ 34.00 | admin-34 / admin / فرع 34 | ORD-34 / INV-34 / عميل 34 / حسابات محدودة | `deliveries.getStats + deliveries.get` | total 0 → 1؛ amount 34 | deliveries, orders, invoices؛ فحص DTO والعدادات | لا رفض؛ تحقق رقمي | COD-34 Pagination DTO |
+| COD-35 | DEL-2026-00035؛ مبلغ 35.00 | admin-35 / admin / فرع 35 | ORD-35 / INV-35 / عميل 35 / حسابات محدودة | `deliveries.getStats + deliveries.get` | total 0 → 1؛ amount 35 | deliveries, orders, invoices؛ فحص DTO والعدادات | لا رفض؛ تحقق رقمي | COD-35 طباعة واسم الموظف |
+| COD-36 | DEL-2026-00036؛ مبلغ 36.00 | admin-36 / admin / فرع 36 | ORD-36 / INV-36 / عميل 36 / حسابات محدودة | `deliveries.getStats + deliveries.get` | total 0 → 1؛ amount 36 | deliveries, orders, invoices؛ فحص DTO والعدادات | لا رفض؛ تحقق رقمي | COD-36 تسوية واحدة |
+| COD-37 | DEL-2026-00037؛ مبلغ 37.00 | admin-37 / admin / فرع 37 | ORD-37 / INV-37 / عميل 37 / حسابات محدودة | `deliveries.getStats + deliveries.get` | total 0 → 1؛ amount 37 | deliveries, orders, invoices؛ فحص DTO والعدادات | لا رفض؛ تحقق رقمي | COD-37 تسوية Batch |
+| COD-38 | DEL-2026-00038؛ مبلغ 38.00 | admin-38 / admin / فرع 38 | ORD-38 / INV-38 / عميل 38 / حسابات محدودة | `deliveries.getStats + deliveries.get` | total 0 → 1؛ amount 38 | deliveries, orders, invoices؛ فحص DTO والعدادات | لا رفض؛ تحقق رقمي | COD-38 الرسوم والصافي |
+| COD-39 | DEL-2026-00039؛ مبلغ 39.00 | admin-39 / admin / فرع 39 | ORD-39 / INV-39 / عميل 39 / حسابات محدودة | `deliveries.getStats + deliveries.get` | total 0 → 1؛ amount 39 | deliveries, orders, invoices؛ فحص DTO والعدادات | لا رفض؛ تحقق رقمي | COD-39 منع ازدواج التسوية |
+| COD-40 | DEL-2026-00040؛ مبلغ 40.00 | admin-40 / admin / فرع 40 | ORD-40 / INV-40 / عميل 40 / حسابات محدودة | `deliveries.getStats + deliveries.get` | total 0 → 1؛ amount 40 | deliveries, orders, invoices؛ فحص DTO والعدادات | لا رفض؛ تحقق رقمي | COD-40 Idempotency التسوية |
+| COD-41 | DEL-2026-00041؛ مبلغ 41.00 | admin-41 / admin / فرع 41 | ORD-41 / INV-41 / عميل 41 / حسابات محدودة | `deliveries.getStats + deliveries.get` | total 0 → 1؛ amount 41 | deliveries, orders, invoices؛ فحص DTO والعدادات | لا رفض؛ تحقق رقمي | COD-41 رفض بصمة تسوية مختلفة |
+| COD-42 | DEL-2026-00042؛ مبلغ 42.00 | admin-42 / admin / فرع 42 | ORD-42 / INV-42 / عميل 42 / حسابات محدودة | `deliveries.getStats + deliveries.get` | total 0 → 1؛ amount 42 | deliveries, orders, invoices؛ فحص DTO والعدادات | لا رفض؛ تحقق رقمي | COD-42 التحقق من الحسابات |
+| COD-43 | DEL-2026-00043؛ مبلغ 43.00 | admin-43 / admin / فرع 43 | ORD-43 / INV-43 / عميل 43 / حسابات محدودة | `deliveries.getStats + deliveries.get` | total 0 → 1؛ amount 43 | deliveries, orders, invoices؛ فحص DTO والعدادات | لا رفض؛ تحقق رقمي | COD-43 مهلة الإتاحة |
+| COD-44 | DEL-2026-00044؛ مبلغ 44.00 | admin-44 / admin / فرع 44 | ORD-44 / INV-44 / عميل 44 / حسابات محدودة | `deliveries.getStats + deliveries.get` | total 0 → 1؛ amount 44 | deliveries, orders, invoices؛ فحص DTO والعدادات | لا رفض؛ تحقق رقمي | COD-44 عكس التسوية |
+| COD-45 | DEL-2026-00045؛ مبلغ 45.00 | admin-45 / admin / فرع 45 | ORD-45 / INV-45 / عميل 45 / حسابات محدودة | `deliveries.getStats + deliveries.get` | total 0 → 1؛ amount 45 | deliveries, orders, invoices؛ فحص DTO والعدادات | لا رفض؛ تحقق رقمي | COD-45 Idempotency العكس |
+| COD-46 | DEL-2026-00046؛ مبلغ 46.00 | admin-46 / admin / فرع 46 | ORD-46 / INV-46 / عميل 46 / حسابات محدودة | `deliveries.getStats + deliveries.get` | total 0 → 1؛ amount 46 | deliveries, orders, invoices؛ فحص DTO والعدادات | لا رفض؛ تحقق رقمي | COD-46 Rollback رصيد الوجهة |
+| COD-47 | DEL-2026-00047؛ مبلغ 47.00 | admin-47 / admin / فرع 47 | ORD-47 / INV-47 / عميل 47 / حسابات محدودة | `deliveries.getStats + deliveries.get` | total 0 → 1؛ amount 47 | deliveries, orders, invoices؛ فحص DTO والعدادات | لا رفض؛ تحقق رقمي | COD-47 عكس التأكيد |
+| COD-48 | DEL-2026-00048؛ مبلغ 48.00 | admin-48 / admin / فرع 48 | ORD-48 / INV-48 / عميل 48 / حسابات محدودة | `deliveries.getStats + deliveries.get` | total 0 → 1؛ amount 48 | deliveries, orders, invoices؛ فحص DTO والعدادات | لا رفض؛ تحقق رقمي | COD-48 مراجعة Legacy بلا payments |
+| COD-49 | DEL-2026-00049؛ مبلغ 49.00 | admin-49 / admin / فرع 49 | ORD-49 / INV-49 / عميل 49 / حسابات محدودة | `deliveries.create + deliveries.get` | رفض بلا كتابة | deliveries, orders, invoices؛ فحص DTO والعدادات | رفض وRollback كامل | COD-49 إغلاق المسار القديم وDTO |
+| COD-50 | DEL-2026-00050؛ مبلغ 50.00 | admin-50 / admin / فرع 50 | ORD-50 / INV-50 / عميل 50 / حسابات محدودة | `deliveries.update` | رفض بلا كتابة | deliveries, orders, invoices؛ فحص DTO والعدادات | رفض وRollback كامل | COD-50 قفل Snapshot التوصيل |
+| COD-51 | DEL-2026-00051؛ مبلغ 51.00 | admin-51 / admin / فرع 51 | ORD-51 / INV-51 / عميل 51 / حسابات محدودة | `deliveries.getStats + deliveries.get` | total 0 → 1؛ amount 51 | deliveries, orders, invoices؛ فحص DTO والعدادات | لا رفض؛ تحقق رقمي | COD-51 ربط العربون الصفري |
+| COD-52 | DEL-2026-00052؛ مبلغ 52.00 | admin-52 / admin / فرع 52 | ORD-52 / INV-52 / عميل 52 / حسابات محدودة | `deliveries.getStats + deliveries.get` | total 0 → 1؛ amount 52 | deliveries, orders, invoices؛ فحص DTO والعدادات | لا رفض؛ تحقق رقمي | COD-52 قفل الفاتورة النشطة |
+| COD-53 | DEL-2026-00053؛ مبلغ 53.00 | admin-53 / admin / فرع 53 | ORD-53 / INV-53 / عميل 53 / حسابات محدودة | `deliveries.createFromOrderInvoice` | رفض بلا كتابة | deliveries, orders, invoices؛ فحص DTO والعدادات | رفض وRollback كامل | COD-53 دقة القروش |
+| COD-54 | DEL-2026-00054؛ مبلغ 54.00 | admin-54 / admin / فرع 54 | ORD-54 / INV-54 / عميل 54 / حسابات محدودة | `deliveries.getStats + deliveries.get` | total 0 → 1؛ amount 54 | deliveries, orders, invoices؛ فحص DTO والعدادات | لا رفض؛ تحقق رقمي | COD-54 ترقيم COD الذري |
+| COD-55 | DEL-2026-00055؛ مبلغ 55.00 | admin-55 / admin / فرع 55 | ORD-55 / INV-55 / عميل 55 / حسابات محدودة | `deliveries.getStats + deliveries.get` | total 0 → 1؛ amount 55 | deliveries, orders, invoices؛ فحص DTO والعدادات | لا رفض؛ تحقق رقمي | COD-55 تاريخ التأكيد وإعادة التأكيد |
+| COD-56 | DEL-2026-00056؛ مبلغ 56.00 | admin-56 / admin / فرع 56 | ORD-56 / INV-56 / عميل 56 / حسابات محدودة | `deliveries.getStats + deliveries.get` | total 0 → 1؛ amount 56 | deliveries, orders, invoices؛ فحص DTO والعدادات | لا رفض؛ تحقق رقمي | COD-56 إحصاءات COD وعزل الفروع |

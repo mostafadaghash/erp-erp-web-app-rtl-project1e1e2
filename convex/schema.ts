@@ -29,7 +29,7 @@ const applicationTables = {
     customerId: v.optional(v.id("customers")), supplierId: v.optional(v.id("suppliers")), branchId: v.id("branches"), destinationBranchId: v.optional(v.id("branches")), userId: v.string(), createdAt: v.number(),
     reversedAt: v.optional(v.number()), reversedBy: v.optional(v.string()), reversalReason: v.optional(v.string()),
     reversalTransactionId: v.optional(v.id("financialTransactions")), originalTransactionId: v.optional(v.id("financialTransactions")),
-  }).index("by_transaction_number", ["transactionNumber"]).index("by_idempotency_key", ["idempotencyKey"]).index("by_branch_date", ["branchId", "date"]).index("by_reference", ["referenceType", "referenceId"]).index("by_status", ["status"]).index("by_type", ["type"]),
+  }).index("by_transaction_number", ["transactionNumber"]).index("by_idempotency_key", ["idempotencyKey"]).index("by_branch_date", ["branchId", "date"]).index("by_branch_type_status", ["branchId", "type", "status"]).index("by_reference", ["referenceType", "referenceId"]).index("by_status", ["status"]).index("by_type", ["type"]),
 
   financialMovements: defineTable({
     transactionId: v.id("financialTransactions"), accountId: v.id("financialAccounts"), signedAmount: v.number(), balanceBefore: v.number(), balanceAfter: v.number(), branchId: v.id("branches"), date: v.string(), availableAt: v.optional(v.string()), createdAt: v.number(),
@@ -111,7 +111,7 @@ const applicationTables = {
 
   customerLedgerEntries: defineTable({
     entryNumber: v.string(), idempotencyKey: v.string(), requestId: v.string(), requestFingerprint: v.string(),
-    type: v.union(v.literal("opening_balance"), v.literal("invoice_charge"), v.literal("invoice_adjustment"), v.literal("invoice_cancel"), v.literal("invoice_payment"), v.literal("invoice_refund"), v.literal("sales_return"), v.literal("sales_return_reversal"), v.literal("order_deposit"), v.literal("order_deposit_application"), v.literal("delivery_cod_collection"), v.literal("order_refund"), v.literal("repair_charge"), v.literal("repair_adjustment"), v.literal("repair_cancel"), v.literal("repair_payment"), v.literal("repair_refund"), v.literal("reversal")),
+    type: v.union(v.literal("opening_balance"), v.literal("invoice_charge"), v.literal("invoice_adjustment"), v.literal("invoice_cancel"), v.literal("invoice_payment"), v.literal("invoice_refund"), v.literal("sales_return"), v.literal("sales_return_reversal"), v.literal("order_deposit"), v.literal("order_deposit_application"), v.literal("delivery_cod_collection"), v.literal("delivery_cod_reversal"), v.literal("order_refund"), v.literal("repair_charge"), v.literal("repair_adjustment"), v.literal("repair_cancel"), v.literal("repair_payment"), v.literal("repair_refund"), v.literal("reversal")),
     status: v.union(v.literal("posted"), v.literal("reversed")), customerId: v.id("customers"), customerName: v.string(), branchId: v.id("branches"), date: v.string(),
     receivableDelta: v.number(), advanceDelta: v.number(), purchasesDelta: v.number(), receivableBefore: v.number(), receivableAfter: v.number(), advanceBefore: v.number(), advanceAfter: v.number(), totalPurchasesBefore: v.number(), totalPurchasesAfter: v.number(),
     description: v.string(), referenceType: v.string(), referenceId: v.string(), referenceNumber: v.string(), createdBy: v.string(), createdAt: v.number(),
@@ -226,7 +226,7 @@ const applicationTables = {
     creationRequestId: v.optional(v.string()),
     type: v.string(),
     cancelledAt: v.optional(v.number()), cancelledBy: v.optional(v.string()), cancellationReason: v.optional(v.string()),
-  }).index("by_invoice_number", ["invoiceNumber"]).index("by_customer", ["customerId"]).index("by_status", ["status"]).index("by_creation_request", ["creationRequestId"]),
+  }).index("by_invoice_number", ["invoiceNumber"]).index("by_customer", ["customerId"]).index("by_branch_status", ["branchId", "status"]).index("by_status", ["status"]).index("by_creation_request", ["creationRequestId"]),
 
   salesReturns: defineTable({
     creditNoteNumber: v.string(), invoiceId: v.id("invoices"), invoiceNumber: v.string(),
@@ -261,7 +261,7 @@ const applicationTables = {
     creationRequestId: v.optional(v.string()),
     appliedDeposit: v.optional(v.number()), linkedInvoiceId: v.optional(v.id("invoices")),
     cancelledAt: v.optional(v.number()), cancelledBy: v.optional(v.string()), cancellationReason: v.optional(v.string()),
-  }).index("by_status", ["status"]).index("by_customer", ["customerId"]).index("by_order_number", ["orderNumber"]).index("by_creation_request", ["creationRequestId"]),
+  }).index("by_status", ["status"]).index("by_branch_status", ["branchId", "status"]).index("by_customer", ["customerId"]).index("by_order_number", ["orderNumber"]).index("by_creation_request", ["creationRequestId"]),
 
   // الصيانة
   repairs: defineTable({
@@ -421,7 +421,7 @@ const applicationTables = {
     expectedCarrierFee: v.optional(v.number()), accountingVersion: v.optional(v.number()),
     requestId: v.optional(v.string()), idempotencyKey: v.optional(v.string()), requestFingerprint: v.optional(v.string()),
     codClearingAccountId: v.optional(v.id("financialAccounts")), codFinancialTransactionId: v.optional(v.id("financialTransactions")), codCustomerLedgerEntryId: v.optional(v.id("customerLedgerEntries")),
-    codSettlementId: v.optional(v.id("codSettlements")), confirmationRequestId: v.optional(v.string()), confirmationFingerprint: v.optional(v.string()),
+    codSettlementId: v.optional(v.id("codSettlements")), currentConfirmationId: v.optional(v.id("deliveryConfirmations")), confirmationRequestId: v.optional(v.string()), confirmationFingerprint: v.optional(v.string()),
     reversedAt: v.optional(v.number()), reversedBy: v.optional(v.string()), reversalReason: v.optional(v.string()), reversalDate: v.optional(v.string()), reversalRequestId: v.optional(v.string()), reversalFingerprint: v.optional(v.string()), reversalFinancialTransactionId: v.optional(v.id("financialTransactions")), reversalCustomerLedgerEntryId: v.optional(v.id("customerLedgerEntries")),
     status: v.string(),          // pending, shipped, delivered, returned, cancelled
     expectedDate: v.optional(v.string()),
@@ -434,7 +434,11 @@ const applicationTables = {
   codSettlements: defineTable({
     settlementNumber:v.string(),branchId:v.id("branches"),sourceAccountId:v.id("financialAccounts"),destinationAccountId:v.id("financialAccounts"),grossAmount:v.number(),feeAmount:v.number(),netAmount:v.number(),date:v.string(),status:v.union(v.literal("posted"),v.literal("reversed")),requestId:v.string(),idempotencyKey:v.string(),requestFingerprint:v.string(),financialTransactionId:v.id("financialTransactions"),createdBy:v.string(),createdAt:v.number(),notes:v.optional(v.string()),reversedAt:v.optional(v.number()),reversedBy:v.optional(v.string()),reversalReason:v.optional(v.string()),reversalDate:v.optional(v.string()),reversalRequestId:v.optional(v.string()),reversalFingerprint:v.optional(v.string()),reversalFinancialTransactionId:v.optional(v.id("financialTransactions")),
   }).index("by_number",["settlementNumber"]).index("by_branch_date",["branchId","date"]).index("by_source_date",["sourceAccountId","date"]).index("by_status",["status"]).index("by_idempotency_key",["idempotencyKey"]),
-  codSettlementItems: defineTable({settlementId:v.id("codSettlements"),deliveryId:v.id("deliveries"),deliveryNumber:v.string(),invoiceId:v.id("invoices"),invoiceNumber:v.string(),codAmount:v.number(),branchId:v.id("branches"),date:v.string()}).index("by_settlement",["settlementId"]).index("by_delivery",["deliveryId"]).index("by_branch_date",["branchId","date"]),
+  codSettlementItems: defineTable({settlementId:v.id("codSettlements"),confirmationId:v.optional(v.id("deliveryConfirmations")),deliveryId:v.id("deliveries"),deliveryNumber:v.string(),invoiceId:v.id("invoices"),invoiceNumber:v.string(),codAmount:v.number(),branchId:v.id("branches"),date:v.string()}).index("by_settlement",["settlementId"]).index("by_delivery",["deliveryId"]).index("by_confirmation",["confirmationId"]).index("by_branch_date",["branchId","date"]),
+
+  deliveryConfirmations: defineTable({
+    deliveryId:v.id("deliveries"),deliveryNumber:v.string(),attemptNumber:v.number(),branchId:v.id("branches"),invoiceId:v.id("invoices"),orderId:v.id("orders"),customerId:v.id("customers"),codAmount:v.number(),codClearingAccountId:v.optional(v.id("financialAccounts")),status:v.union(v.literal("posted"),v.literal("reversed")),date:v.string(),requestId:v.string(),idempotencyKey:v.string(),requestFingerprint:v.string(),financialTransactionId:v.optional(v.id("financialTransactions")),customerLedgerEntryId:v.optional(v.id("customerLedgerEntries")),reversalRequestId:v.optional(v.string()),reversalFingerprint:v.optional(v.string()),reversalFinancialTransactionId:v.optional(v.id("financialTransactions")),reversalCustomerLedgerEntryId:v.optional(v.id("customerLedgerEntries")),reversalReason:v.optional(v.string()),reversalDate:v.optional(v.string()),reversedAt:v.optional(v.number()),reversedBy:v.optional(v.string()),createdBy:v.string(),createdAt:v.number()
+  }).index("by_delivery_status",["deliveryId","status"]).index("by_delivery",["deliveryId"]).index("by_idempotency",["idempotencyKey"]).index("by_branch_date",["branchId","date"]).index("by_financial_transaction",["financialTransactionId"]),
 
   // سجل العمليات
   auditLogs: defineTable({

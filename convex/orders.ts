@@ -7,6 +7,7 @@ import { nextDocumentNumber } from "./lib/documentNumbers";
 import { requireActiveBranch, requireActiveCustomer } from "./lib/references";
 import { postFinancialTransaction, requireActiveFinancialAccount, assertFinancialAccountBranch, findFinancialTransactionByRequest } from "./lib/finance";
 import { postCustomerLedgerEntry } from "./lib/customerLedger.ts";
+import { assertOrderNotLockedByDelivery } from "./lib/deliveryLocks.ts";
 
 export const list = query({
   args: { status: v.optional(v.string()) },
@@ -140,6 +141,8 @@ export const updateStatus = mutation({
     const order = await ctx.db.get(args.id);
     if (!order) throw new ConvexError("الطلب غير موجود");
     assertBranchAccess(user, order);
+    if ((args.status === "delivered" || args.status === "cancelled") && order.linkedInvoiceId) await assertOrderNotLockedByDelivery(ctx, order._id);
+    if (args.status === "delivered" && order.linkedInvoiceId) throw new ConvexError("يجب تأكيد التسليم من مسار التوصيل");
     if (args.status === "cancelled" && !args.reason?.trim()) throw new ConvexError("سبب الإلغاء مطلوب");
     if (args.status === "cancelled" && order.deposit > 0) throw new ConvexError("الطلب يحتوي عربوناً ويحتاج معالجة استرداد مالي قبل الإلغاء");
     if (!canTransition(ORDER_TRANSITIONS, order.status, args.status)) {
@@ -190,7 +193,7 @@ export const addPayment = mutation({
   },
 });
 
-export const refundDeposit = mutation({ args: { id: v.id("orders"), amount: v.number(), accountId: v.id("financialAccounts"), date: v.string(), reason: v.string(), requestId: v.string() }, handler: async (ctx, args) => { const user = await requirePermission(ctx, "refund_collections"); const order = await ctx.db.get(args.id); if (!order || !order.branchId) throw new ConvexError("الطلب غير موجود"); assertBranchAccess(user, order); if ((order.appliedDeposit ?? 0) > 0) throw new ConvexError("لا يمكن استرداد عربون طُبق على فاتورة"); const duplicate = await findFinancialTransactionByRequest(ctx, "order_refund", user.userId, args.requestId); if (duplicate) return duplicate._id; const reason = args.reason.trim(); if (!reason) throw new ConvexError("سبب الاسترداد مطلوب"); if (!Number.isFinite(args.amount) || args.amount <= 0 || args.amount > order.deposit) throw new ConvexError("مبلغ الاسترداد غير صالح"); const account = await requireActiveFinancialAccount(ctx, args.accountId); assertFinancialAccountBranch(account, order.branchId); const posted = await postFinancialTransaction(ctx, user, { type: "order_refund", requestId: args.requestId, date: args.date, amount: args.amount, description: reason, branchId: order.branchId, referenceType: "order", referenceId: String(order._id), referenceNumber: order.orderNumber, movements: [{ accountId: account._id, signedAmount: -args.amount }] }); if (!order.customerId) throw new ConvexError("الطلب غير مرتبط بعميل مسجل"); await postCustomerLedgerEntry(ctx, user, { type: "order_refund", requestId: `${args.requestId}:ledger`, customerId: order.customerId, branchId: order.branchId, date: args.date, receivableDelta: 0, advanceDelta: -args.amount, purchasesDelta: 0, description: reason, referenceType: "order", referenceId: String(order._id), referenceNumber: order.orderNumber }); await ctx.db.patch(order._id, { deposit: roundMoney(order.deposit - args.amount), remaining: roundMoney(order.remaining + args.amount) }); return posted.transactionId; } });
+export const refundDeposit = mutation({ args: { id: v.id("orders"), amount: v.number(), accountId: v.id("financialAccounts"), date: v.string(), reason: v.string(), requestId: v.string() }, handler: async (ctx, args) => { const user = await requirePermission(ctx, "refund_collections"); const order = await ctx.db.get(args.id); if (!order || !order.branchId) throw new ConvexError("الطلب غير موجود"); assertBranchAccess(user, order); if (order.linkedInvoiceId) throw new ConvexError("لا يمكن استرداد عربون بعد ربط الطلب بالفاتورة"); if ((order.appliedDeposit ?? 0) > 0) throw new ConvexError("لا يمكن استرداد عربون طُبق على فاتورة"); const duplicate = await findFinancialTransactionByRequest(ctx, "order_refund", user.userId, args.requestId); if (duplicate) return duplicate._id; const reason = args.reason.trim(); if (!reason) throw new ConvexError("سبب الاسترداد مطلوب"); if (!Number.isFinite(args.amount) || args.amount <= 0 || args.amount > order.deposit) throw new ConvexError("مبلغ الاسترداد غير صالح"); const account = await requireActiveFinancialAccount(ctx, args.accountId); assertFinancialAccountBranch(account, order.branchId); const posted = await postFinancialTransaction(ctx, user, { type: "order_refund", requestId: args.requestId, date: args.date, amount: args.amount, description: reason, branchId: order.branchId, referenceType: "order", referenceId: String(order._id), referenceNumber: order.orderNumber, movements: [{ accountId: account._id, signedAmount: -args.amount }] }); if (!order.customerId) throw new ConvexError("الطلب غير مرتبط بعميل مسجل"); await postCustomerLedgerEntry(ctx, user, { type: "order_refund", requestId: `${args.requestId}:ledger`, customerId: order.customerId, branchId: order.branchId, date: args.date, receivableDelta: 0, advanceDelta: -args.amount, purchasesDelta: 0, description: reason, referenceType: "order", referenceId: String(order._id), referenceNumber: order.orderNumber }); await ctx.db.patch(order._id, { deposit: roundMoney(order.deposit - args.amount), remaining: roundMoney(order.remaining + args.amount) }); return posted.transactionId; } });
 
 export const cancel = mutation({
   args: { id: v.id("orders"), reason: v.string() },
@@ -199,6 +202,7 @@ export const cancel = mutation({
     const order = await ctx.db.get(args.id);
     if (!order) throw new ConvexError("الطلب غير موجود");
     assertBranchAccess(user, order);
+    if (order.linkedInvoiceId) await assertOrderNotLockedByDelivery(ctx, order._id);
     const reason = args.reason.trim();
     if (!reason) throw new ConvexError("سبب الإلغاء مطلوب");
     if (order.status === "cancelled") throw new ConvexError("الطلب ملغي بالفعل");
