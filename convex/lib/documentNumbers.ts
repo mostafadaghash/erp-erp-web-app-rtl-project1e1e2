@@ -1,13 +1,14 @@
 import type { MutationCtx } from "../_generated/server";
 import { ConvexError } from "convex/values";
 
-export type DocumentType = "invoice" | "order" | "shipment" | "repair" | "delivery" | "finance" | "creditNote" | "purchaseReceipt" | "purchaseReturn" | "supplierLedger" | "supplierPayment" | "customerLedger";
+export type DocumentType = "invoice" | "order" | "shipment" | "repair" | "delivery" | "codSettlement" | "finance" | "creditNote" | "purchaseReceipt" | "purchaseReturn" | "supplierLedger" | "supplierPayment" | "customerLedger";
 const config = {
   invoice: { prefix: "INV", table: "invoices", field: "invoiceNumber" },
   order: { prefix: "ORD", table: "orders", field: "orderNumber" },
   shipment: { prefix: "SHP", table: "shipments", field: "shipmentNumber" },
   repair: { prefix: "REP", table: "repairs", field: "repairNumber" },
   delivery: { prefix: "DEL", table: "deliveries", field: "deliveryNumber" },
+  codSettlement: { prefix: "COD", table: "codSettlements", field: "settlementNumber" },
   finance: { prefix: "FIN", table: "financialTransactions", field: "transactionNumber" },
   creditNote: { prefix: "CRN", table: "salesReturns", field: "creditNoteNumber" },
   purchaseReceipt: { prefix: "PUR", table: "purchaseReceipts", field: "receiptNumber" },
@@ -38,6 +39,7 @@ async function legacyNumbersForYear(ctx: MutationCtx, type: DocumentType, year: 
     case "shipment": return (await ctx.db.query("shipments").withIndex("by_shipment_number", q => q.gte("shipmentNumber", lower).lt("shipmentNumber", upper)).collect()).map(x => x.shipmentNumber);
     case "repair": return (await ctx.db.query("repairs").withIndex("by_repair_number", q => q.gte("repairNumber", lower).lt("repairNumber", upper)).collect()).map(x => x.repairNumber);
     case "delivery": return (await ctx.db.query("deliveries").withIndex("by_delivery_number", q => q.gte("deliveryNumber", lower).lt("deliveryNumber", upper)).collect()).map(x => x.deliveryNumber);
+    case "codSettlement": return (await ctx.db.query("codSettlements").withIndex("by_number", q => q.gte("settlementNumber", lower).lt("settlementNumber", upper)).collect()).map(x => x.settlementNumber);
     case "finance": return (await ctx.db.query("financialTransactions").withIndex("by_transaction_number", q => q.gte("transactionNumber", lower).lt("transactionNumber", upper)).collect()).map(x => x.transactionNumber);
     case "creditNote": return (await ctx.db.query("salesReturns").withIndex("by_credit_note_number", q => q.gte("creditNoteNumber", lower).lt("creditNoteNumber", upper)).collect()).map(x => x.creditNoteNumber);
     case "purchaseReceipt": return (await ctx.db.query("purchaseReceipts").withIndex("by_receipt_number", q => q.gte("receiptNumber", lower).lt("receiptNumber", upper)).collect()).map(x => x.receiptNumber);
@@ -55,6 +57,7 @@ export async function documentNumberExists(ctx: MutationCtx, type: DocumentType,
     case "shipment": return (await ctx.db.query("shipments").withIndex("by_shipment_number", q => q.eq("shipmentNumber", number)).first()) !== null;
     case "repair": return (await ctx.db.query("repairs").withIndex("by_repair_number", q => q.eq("repairNumber", number)).first()) !== null;
     case "delivery": return (await ctx.db.query("deliveries").withIndex("by_delivery_number", q => q.eq("deliveryNumber", number)).first()) !== null;
+    case "codSettlement": return (await ctx.db.query("codSettlements").withIndex("by_number", q => q.eq("settlementNumber", number)).first()) !== null;
     case "finance": return (await ctx.db.query("financialTransactions").withIndex("by_transaction_number", q => q.eq("transactionNumber", number)).first()) !== null;
     case "creditNote": return (await ctx.db.query("salesReturns").withIndex("by_credit_note_number", q => q.eq("creditNoteNumber", number)).first()) !== null;
     case "purchaseReceipt": return (await ctx.db.query("purchaseReceipts").withIndex("by_receipt_number", q => q.eq("receiptNumber", number)).first()) !== null;

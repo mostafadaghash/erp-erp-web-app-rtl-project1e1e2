@@ -7,6 +7,7 @@ import { nextDocumentNumber } from "./lib/documentNumbers";
 import { INVENTORY_MOVEMENT_TYPES } from "../shared/inventoryRules";
 import { deriveInvoiceStatus, roundMoney } from "../shared/businessRules";
 import { postCustomerLedgerEntry } from "./lib/customerLedger.ts";
+import { assertInvoiceNotLockedByActiveDelivery } from "./lib/deliveryLocks.ts";
 
 function redactCosts<T extends { items: Array<Record<string, unknown>>; totalCogsReversed: number }>(note: T, allowed: boolean) {
   if (allowed) return note;
@@ -52,6 +53,7 @@ export const create = mutation({ args: {
   const requestKey = `${user.userId}:${args.requestId.trim()}`; if (!args.requestId.trim()) throw new ConvexError("معرف الطلب مطلوب");
   const duplicate = await ctx.db.query("salesReturns").withIndex("by_creation_request", q => q.eq("creationRequestId", requestKey)).unique(); if (duplicate) return duplicate._id;
   const invoice = await ctx.db.get(args.invoiceId); if (!invoice || !invoice.branchId) throw new ConvexError("الفاتورة غير موجودة أو بلا فرع"); assertBranchAccess(user, invoice);
+  await assertInvoiceNotLockedByActiveDelivery(ctx, invoice._id);
   if (invoice.status === "cancelled") throw new ConvexError("لا يمكن إنشاء مرتجع لفاتورة ملغاة");
   if (!args.reason.trim()) throw new ConvexError("سبب المرتجع مطلوب"); await requireFinanceInitialized(ctx, args.date);
   if (!invoice.costingVersion || invoice.items.some(item => item.unitCost === undefined || item.lineNetTotal === undefined)) throw new ConvexError("هذه فاتورة قديمة بلا تكلفة تاريخية؛ يلزم إجراء معالجة يدوية موثقة ولا يجوز تخمين التكلفة");
