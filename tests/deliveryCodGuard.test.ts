@@ -18,6 +18,7 @@ function testBody(source: string, id: string) {
 test("delivery COD acceptance guard", async () => {
   const source = await readFile("tests/deliveryCodIntegration.test.ts", "utf8");
   const matrix = await readFile("tests/DELIVERY_COD_COVERAGE_MATRIX.md", "utf8");
+  const deliveriesSource = await readFile("convex/deliveries.ts", "utf8");
   const matches = [...source.matchAll(/^test\("COD-(\d{2})[^\n]+/gm)];
   assert.equal(matches.length, 56);
   assert.deepEqual(matches.map(match => match[1]), Array.from({ length: 56 }, (_, index) => String(index + 1).padStart(2, "0")));
@@ -47,10 +48,10 @@ test("delivery COD acceptance guard", async () => {
   const required: Record<string, RegExp> = {
     "COD-25": /(?=[\s\S]*createFromOrderInvoice)(?=[\s\S]*updateStatus)(?=[\s\S]*confirmDelivered)(?=[\s\S]*assert\.rejects)/,
     "COD-26": /createFromOrderInvoice[\s\S]*updateStatus[\s\S]*returned/, "COD-27": /(?=[\s\S]*confirmDelivered)(?=[\s\S]*updateStatus)(?=[\s\S]*returned)(?=[\s\S]*assert\.rejects)/,
-    "COD-28": /updateStatus[\s\S]*cancelled[\s\S]*reason/, "COD-29": /Manager[\s\S]*Shipping[\s\S]*otherBranchId/, "COD-30": /Admin[\s\S]*Accountant/,
+    "COD-28": /updateStatus[\s\S]*cancelled[\s\S]*reason/, "COD-29": /(?=[\s\S]*manager)(?=[\s\S]*shipping)(?=[\s\S]*otherBranchId)(?=[\s\S]*تأكيد Manager)(?=[\s\S]*تأكيد Shipping)(?=[\s\S]*confirmDelivered)(?=[\s\S]*listPaginated)(?=[\s\S]*accountPicker)(?=[\s\S]*assert\.rejects)/, "COD-30": /(?=[\s\S]*admin)(?=[\s\S]*accountant)(?=[\s\S]*otherBranchId)(?=[\s\S]*Cash branch one)(?=[\s\S]*Bank branch two)(?=[\s\S]*accountPicker)(?=[\s\S]*confirmDelivered)(?=[\s\S]*assert\.rejects)(?=[\s\S]*length>0)/,
     "COD-31": /(?=[\s\S]*Shipping)(?=[\s\S]*createCodSettlement)(?=[\s\S]*assert\.rejects)/, "COD-32": /(?=[\s\S]*Viewer)(?=[\s\S]*Sales)(?=[\s\S]*assert\.rejects)/,
-    "COD-33": /accountPicker[\s\S]*allowlist/, "COD-34": /listPaginated[\s\S]*continueCursor[\s\S]*isDone/,
-    "COD-35": /(?=[\s\S]*printDelivery)(?=[\s\S]*by_token)(?=[\s\S]*by_user)(?=[\s\S]*مستخدم غير معروف)/, "COD-36": /(?=[\s\S]*createCodSettlement)(?=[\s\S]*codSettlements)(?=[\s\S]*codSettlementItems)/,
+    "COD-33": /(?=[\s\S]*active COD)(?=[\s\S]*disabled COD)(?=[\s\S]*active cash)(?=[\s\S]*active bank)(?=[\s\S]*clearing غير مسموح)(?=[\s\S]*otherBranchId)(?=[\s\S]*allowlist)/, "COD-34": /(?=[\s\S]*34-a)(?=[\s\S]*34-b)(?=[\s\S]*34-c)(?=[\s\S]*34-x)(?=[\s\S]*34-z)(?=[\s\S]*Manager)(?=[\s\S]*Admin)(?=[\s\S]*numItems:1)(?=[\s\S]*continueCursor)(?=[\s\S]*isDone)(?=[\s\S]*seen\.includes)/,
+    "COD-35": /(?=[\s\S]*printDelivery)(?=[\s\S]*by_token)(?=[\s\S]*by_user)(?=[\s\S]*مستخدم غير معروف)(?=[\s\S]*مستخدم بلا صلاحية)(?=[\s\S]*otherBranchId)(?=[\s\S]*allowlist)(?=[\s\S]*createdBy[^\n]*false)/, "COD-36": /(?=[\s\S]*createCodSettlement)(?=[\s\S]*codSettlements)(?=[\s\S]*codSettlementItems)/,
   };
   for (const [id, pattern] of Object.entries(required)) assert.match(testBody(source, id), pattern, `${id} executable evidence missing`);
   const executableRows = rows.slice(0, 36).join("\n");
@@ -59,4 +60,10 @@ test("delivery COD acceptance guard", async () => {
   assert.match(executableRows, /COD-09[^\n]*paid 0→25[^\n]*remaining 100→75[^\n]*order_deposit_application[^\n]*0 financialTransactions/);
   for (const id of ["02", "03", "04", "05", "06", "07", "10", "12"]) assert.match(executableRows, new RegExp(`COD-${id}[^\\n]*(رفض|Rollback)[^\\n]*(Rollback|ثابت|لم تتغير)`));
   assert.doesNotMatch(source, /Placeholder|exercise\s*\(|case-\d+|forEach\([^\n]*test|map\([^\n]*test/);
+  const printBody = deliveriesSource.slice(deliveriesSource.indexOf("export const printDelivery"));
+  assert.match(printBody, /const creator=d\.createdBy/);
+  assert.match(printBody, /withIndex\("by_user"/);
+  assert.match(printBody, /withIndex\("by_token"/);
+  assert.doesNotMatch(printBody, /query\("userProfiles"\)\.collect\(\)/);
+  assert.doesNotMatch(printBody, /employeeName\s*:\s*creator/);
 });
