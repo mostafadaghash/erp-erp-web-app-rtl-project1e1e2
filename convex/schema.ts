@@ -428,6 +428,7 @@ const applicationTables = {
     deliveredDate: v.optional(v.string()),
     notes: v.optional(v.string()),
     branchId: v.optional(v.id("branches")),
+    createdBy: v.optional(v.string()),
     cancelledAt: v.optional(v.number()), cancelledBy: v.optional(v.string()), cancellationReason: v.optional(v.string()),
   }).index("by_delivery_number", ["deliveryNumber"]).index("by_status", ["status"]).index("by_city", ["city"]).index("by_order_status", ["orderId", "status"]).index("by_invoice_status", ["invoiceId", "status"]).index("by_idempotency_key", ["idempotencyKey"]).index("by_branch_status", ["branchId", "status"]).index("by_cod_account_status", ["codClearingAccountId", "status"]),
 
