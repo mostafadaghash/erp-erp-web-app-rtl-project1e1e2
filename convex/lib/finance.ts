@@ -48,7 +48,7 @@ export async function requireFinanceInitialized(ctx: QueryCtx | MutationCtx, dat
 }
 
 function availableAt(date: string, account: Doc<"financialAccounts">, signedAmount: number): string | undefined {
-  if (signedAmount <= 0 || !["paymob_clearing", "fawry_clearing", "card_clearing"].includes(account.type)) return undefined;
+  if (signedAmount <= 0 || !["paymob_clearing", "fawry_clearing", "card_clearing", "cod_clearing"].includes(account.type)) return undefined;
   const value = new Date(`${date}T00:00:00.000Z`);
   value.setUTCDate(value.getUTCDate() + account.settlementDelayDays);
   return value.toISOString().slice(0, 10);
