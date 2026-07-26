@@ -39,3 +39,19 @@ test("UI-18 renders safe errors without TypeScript escapes", () => {
   assert.doesNotMatch(source, new RegExp(["as", "any"].join(" ")));
   assert.doesNotMatch(source, new RegExp(["@ts", "ignore"].join("-")));
 });
+test("UI-19 separates confirmation and settlement account pickers", () => {
+  assert.match(source, /purpose:"confirmation_cod"/);
+  assert.match(source, /purpose:"settlement_source"/);
+  assert.match(source, /purpose:"settlement_destination"/);
+});
+test("UI-20 accountant settlement source is gated by settlement permission", () => assert.match(source, /settlementSources=useQuery\(api\.deliveries\.accountPicker,canSettle/));
+test("UI-21 shipping settlement pickers are not gated by confirmation permission", () => assert.doesNotMatch(source, /settlementSources=useQuery\([^\n]*canConfirm/));
+test("UI-22 settlement id and reason use independent state", () => { assert.match(source, /selectedSettlementId/); assert.match(source, /reversalReason/); assert.match(source, /setSelectedSettlementId\(settlementId\)[\s\S]*setReversalReason\(""\)/); });
+test("UI-23 settlement reversal sends trimmed user reason", () => { const args=callArgumentObject("reverseSettlement"); assert.match(args, /settlementId:selectedSettlementId/); assert.match(args, /reason:reversalReason\.trim\(\)/); assert.doesNotMatch(args, /عكس التسوية من الواجهة/); });
+test("UI-24 settlement reversal keeps request stable while retrying", () => assert.match(callArgumentObject("reverseSettlement"), /requestId:operationRequestId\.current/));
+test("UI-25 real Convex delivery print query is awaited", () => assert.match(source, /const dto=await convex\.query\(api\.deliveries\.printDelivery/));
+test("UI-26 real Convex settlement print query is awaited", () => assert.match(source, /const dto=await convex\.query\(api\.deliveries\.printCodSettlement/));
+test("UI-27 delivery and settlement print structured Arabic vouchers", () => { assert.match(source, /سند توصيل/); assert.match(source, /سند تسوية/); assert.match(source, /توقيع الناقل/); assert.match(source, /الإجمالي/); });
+test("UI-28 stats cards use branch-scoped getStats", () => { assert.match(source, /api\.deliveries\.getStats,activeBranch\?\{branchId:activeBranch\}/); for(const label of ["COD لدى شركات الشحن","COD تمت تسويته","COD معكوس","رسوم شركات الشحن"])assert.ok(source.includes(label)); });
+test("UI-29 avoids prompt global print hooks and unsafe escapes", () => { assert.doesNotMatch(source, new RegExp(["window\\.prompt","__deliveryPrint",["as","any"].join(" "),["@ts","ignore"].join("-")].join("|"))); });
+test("UI-30 reversal creation confirmation and settlement share busy protection", () => { assert.match(source, /if\(busy\)return/); assert.match(source, /disabled=\{busy\}/); });
