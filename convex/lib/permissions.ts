@@ -42,6 +42,7 @@ export const PERMISSIONS = [
   "view_financial_reports",
   "view_sales_returns", "create_sales_returns", "print_credit_notes",
   "view_purchase_returns", "create_purchase_returns", "reverse_purchase_returns", "print_purchase_returns", "record_supplier_refunds",
+  "confirm_cod_deliveries", "view_cod_settlements", "settle_cod_collections", "reverse_cod_collections", "print_cod_settlements",
   // ── Create ──
   "create_products",
   "create_customers",
@@ -112,6 +113,7 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
     "view_supplier_ledger", "post_purchase_receipts", "record_supplier_payments", "print_supplier_payments",
     "view_customer_ledger", "print_customer_statements",
     "view_purchase_returns", "create_purchase_returns", "print_purchase_returns", "record_supplier_refunds",
+    "confirm_cod_deliveries", "view_cod_settlements", "settle_cod_collections", "print_cod_settlements",
   ],
   sales: [
     "view_products", "view_customers", "view_orders", "view_invoices",
@@ -145,6 +147,7 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
     "view_supplier_ledger", "post_purchase_receipts", "record_supplier_payments", "reverse_supplier_payments", "print_supplier_payments",
     "view_customer_ledger", "initialize_customer_ledger", "print_customer_statements",
     "view_purchase_returns", "create_purchase_returns", "reverse_purchase_returns", "print_purchase_returns", "record_supplier_refunds",
+    "view_cod_settlements", "settle_cod_collections", "reverse_cod_collections", "print_cod_settlements",
   ],
   shipping: [
     "view_orders", "view_shipments", "view_deliveries",
@@ -152,6 +155,7 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
     "create_deliveries", "edit_deliveries",
     "print_shipping", "print_orders",
     "post_purchase_receipts",
+    "confirm_cod_deliveries", "print_cod_settlements",
   ],
   viewer: [
     "view_products", "view_customers", "view_orders",

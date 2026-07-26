@@ -196,7 +196,10 @@ export function DeliveriesPage() {
             { label: "تم الشحن",    value: stats.shipped,   color: "bg-blue-100 text-blue-700" },
             { label: "تم التسليم",  value: stats.delivered, color: "bg-emerald-100 text-emerald-700" },
             { label: "مرتجع",       value: stats.returned,  color: "bg-red-100 text-red-700" },
-            { label: "COD محصل",    value: `${stats.totalCOD.toLocaleString("ar-EG")} ج.م`, color: "bg-purple-100 text-purple-700" },
+            { label: "COD لدى شركات الشحن", value: `${stats.codWithCarriers.toLocaleString("ar-EG")} ج.م`, color: "bg-purple-100 text-purple-700" },
+            { label: "COD تمت تسويته", value: `${stats.codSettled.toLocaleString("ar-EG")} ج.م`, color: "bg-emerald-100 text-emerald-700" },
+            { label: "COD معكوس", value: `${stats.codReversed.toLocaleString("ar-EG")} ج.م`, color: "bg-red-100 text-red-700" },
+            { label: "رسوم شركات الشحن", value: `${stats.carrierFees.toLocaleString("ar-EG")} ج.م`, color: "bg-amber-100 text-amber-700" },
           ].map(s => (
             <div key={s.label} className={`rounded-xl p-3 text-center ${s.color}`}>
               <p className="text-xl font-black">{s.value}</p>
