@@ -24,12 +24,12 @@ test("delivery COD acceptance guard", async () => {
   assert.deepEqual(matches.map(match => match[1]), Array.from({ length: 56 }, (_, index) => String(index + 1).padStart(2, "0")));
   const rows = matrix.split("\n").filter(line => /^\| COD-\d{2} /.test(line));
   assert.equal(rows.length, 56);
-  assert.equal(rows.filter(line => line.includes("| EXECUTABLE |")).length, 48);
-  assert.equal(rows.filter(line => line.includes("| PENDING |")).length, 8);
+  assert.equal(rows.filter(line => line.includes("| EXECUTABLE |")).length, 56);
+  assert.equal(rows.filter(line => line.includes("| PENDING |")).length, 0);
   for (let number = 1; number <= 56; number += 1) {
     const row = rows.find(line => line.startsWith(`| COD-${String(number).padStart(2, "0")} `));
     assert.ok(row);
-    assert.match(row, number <= 48 ? /\| EXECUTABLE \|/ : /\| PENDING \|/);
+    assert.match(row, /\| EXECUTABLE \|/);
   }
   for (let number = 1; number <= 36; number += 1) {
     const id = `COD-${String(number).padStart(2, "0")}`;
@@ -69,7 +69,18 @@ test("delivery COD acceptance guard", async () => {
     "COD-48": /(?=[\s\S]*legacyReview)(?=[\s\S]*accountingVersion:2)(?=[\s\S]*payments)(?=[\s\S]*deepEqual)/,
   };
   for (const [id, pattern] of Object.entries(settlementApis)) assert.match(testBody(source, id), pattern, `${id} executable API evidence missing`);
-  const executableRows = rows.slice(0, 48).join("\n");
+  const finalEvidence: Record<string, RegExp> = {
+    "COD-49": /(?=[\s\S]*deliveries\.create)(?=[\s\S]*createFromOrderInvoice)(?=[\s\S]*deliveries\.remove)(?=[\s\S]*listPaginated)(?=[\s\S]*before)(?=[\s\S]*deepEqual)/,
+    "COD-50": /createFromOrderInvoice[\s\S]*deliveries\.update[\s\S]*updateStatus[\s\S]*confirmDelivered[\s\S]*Snapshot/,
+    "COD-51": /(?=[\s\S]*createFromOrderInvoice)(?=[\s\S]*retry)(?=[\s\S]*appliedDeposit)(?=[\s\S]*financialTransactions)/,
+    "COD-52": /invoices\.recordPayment[\s\S]*updateStatus[\s\S]*returned[\s\S]*orders\.addPayment/,
+    "COD-53": /1\.001[\s\S]*1\.01[\s\S]*createCodSettlement[\s\S]*99\.99/,
+    "COD-54": /(?=[\s\S]*createCodSettlement)(?=[\s\S]*documentCounters)(?=[\s\S]*by_number)(?=[\s\S]*nextValue)/,
+    "COD-55": /confirmDelivered[\s\S]*reverseConfirmation[\s\S]*confirmDelivered[\s\S]*confirmationHistory[\s\S]*attemptNumber/,
+    "COD-56": /confirmDelivered[\s\S]*getStats[\s\S]*other\.branchId[\s\S]*manager/,
+  };
+  for (const [id, pattern] of Object.entries(finalEvidence)) assert.match(testBody(source, id), pattern, `${id} final executable evidence missing`);
+  const executableRows = rows.join("\n");
   assert.doesNotMatch(executableRows, /deliveries\.getStats\s*\+\s*deliveries\.get/);
   assert.match(executableRows, /COD-08[^\n]*appliedDeposit=0[^\n]*0 customerLedgerEntries[^\n]*0 financialTransactions/);
   assert.match(executableRows, /COD-09[^\n]*paid 0→25[^\n]*remaining 100→75[^\n]*order_deposit_application[^\n]*0 financialTransactions/);
