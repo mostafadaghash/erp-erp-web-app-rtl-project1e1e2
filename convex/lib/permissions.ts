@@ -25,6 +25,9 @@ export const PERMISSIONS = [
   "view_finance",
   "view_supplier_ledger",
   "view_customer_ledger",
+  "view_general_ledger", "initialize_general_ledger", "manage_chart_of_accounts",
+  "post_manual_journals", "reverse_journal_entries", "close_accounting_periods",
+  "reopen_accounting_periods", "print_general_ledger",
   "initialize_customer_ledger",
   "print_customer_statements",
   "post_purchase_receipts",
@@ -97,6 +100,7 @@ export function isPermission(value: string): value is Permission {
 export const ROLE_PERMISSIONS: Record<string, string[]> = {
   admin: [...PERMISSIONS],
   manager: [
+    "view_general_ledger", "print_general_ledger",
     "view_products", "view_customers", "view_orders", "view_invoices",
     "view_repairs", "view_shipments", "view_deliveries", "view_suppliers",
     "view_expenses", "view_leads", "view_branches", "view_reports",
@@ -136,6 +140,7 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
     "print_repairs",
   ],
   accountant: [
+    "view_general_ledger", "initialize_general_ledger", "manage_chart_of_accounts", "post_manual_journals", "reverse_journal_entries", "close_accounting_periods", "reopen_accounting_periods", "print_general_ledger",
     "view_products", "view_customers", "view_invoices", "view_expenses",
     "view_reports", "view_prices", "view_profits",
     "create_expenses", "edit_expenses",

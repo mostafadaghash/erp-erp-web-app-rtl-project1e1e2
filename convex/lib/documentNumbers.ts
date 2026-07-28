@@ -1,7 +1,7 @@
 import type { MutationCtx } from "../_generated/server";
 import { ConvexError } from "convex/values";
 
-export type DocumentType = "invoice" | "order" | "shipment" | "repair" | "delivery" | "codSettlement" | "finance" | "creditNote" | "purchaseReceipt" | "purchaseReturn" | "supplierLedger" | "supplierPayment" | "customerLedger";
+export type DocumentType = "invoice" | "order" | "shipment" | "repair" | "delivery" | "codSettlement" | "finance" | "creditNote" | "purchaseReceipt" | "purchaseReturn" | "supplierLedger" | "supplierPayment" | "customerLedger" | "journal";
 const config = {
   invoice: { prefix: "INV", table: "invoices", field: "invoiceNumber" },
   order: { prefix: "ORD", table: "orders", field: "orderNumber" },
@@ -16,6 +16,7 @@ const config = {
   supplierLedger: { prefix: "SUP", table: "supplierLedgerEntries", field: "entryNumber" },
   supplierPayment: { prefix: "SPY", table: "supplierPayments", field: "paymentNumber" },
   customerLedger: { prefix: "CUS", table: "customerLedgerEntries", field: "entryNumber" },
+  journal: { prefix: "JRN", table: "journalEntries", field: "entryNumber" },
 } as const;
 
 export function formatDocumentNumber(type: DocumentType, year: number, value: number): string {
@@ -47,6 +48,7 @@ async function legacyNumbersForYear(ctx: MutationCtx, type: DocumentType, year: 
     case "supplierLedger": return (await ctx.db.query("supplierLedgerEntries").withIndex("by_entry_number", q => q.gte("entryNumber", lower).lt("entryNumber", upper)).collect()).map(x => x.entryNumber);
     case "supplierPayment": return (await ctx.db.query("supplierPayments").withIndex("by_payment_number", q => q.gte("paymentNumber", lower).lt("paymentNumber", upper)).collect()).map(x => x.paymentNumber);
     case "customerLedger": return (await ctx.db.query("customerLedgerEntries").withIndex("by_entry_number", q => q.gte("entryNumber", lower).lt("entryNumber", upper)).collect()).map(x => x.entryNumber);
+    case "journal": return (await ctx.db.query("journalEntries").withIndex("by_number", q => q.gte("entryNumber", lower).lt("entryNumber", upper)).collect()).map(x => x.entryNumber);
   }
 }
 
@@ -65,6 +67,7 @@ export async function documentNumberExists(ctx: MutationCtx, type: DocumentType,
     case "supplierLedger": return (await ctx.db.query("supplierLedgerEntries").withIndex("by_entry_number", q => q.eq("entryNumber", number)).first()) !== null;
     case "supplierPayment": return (await ctx.db.query("supplierPayments").withIndex("by_payment_number", q => q.eq("paymentNumber", number)).first()) !== null;
     case "customerLedger": return (await ctx.db.query("customerLedgerEntries").withIndex("by_entry_number", q => q.eq("entryNumber", number)).first()) !== null;
+    case "journal": return (await ctx.db.query("journalEntries").withIndex("by_number", q => q.eq("entryNumber", number)).first()) !== null;
   }
 }
 
