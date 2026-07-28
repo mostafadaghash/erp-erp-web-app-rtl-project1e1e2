@@ -72,6 +72,7 @@ const ALL_NAV_GROUPS: NavGroup[] = [
       { id: "expenses", label: "المصروفات", icon: DollarSign, moduleKey: "expenses", permission: "view_expenses" },
       { id: "treasury", label: "الخزائن والحسابات", icon: DollarSign, permission: "view_finance" },
       { id: "customer-ledger", label: "دفتر العملاء", icon: BookOpen, permission: "view_customer_ledger" },
+      { id: "general-ledger", label: "الأستاذ العام", icon: BookOpen, permission: "view_general_ledger" },
       { id: "supplier-payments", label: "مدفوعات الموردين", icon: DollarSign, permission: "view_supplier_ledger" },
       { id: "reports",  label: "التقارير",  icon: BarChart3,  moduleKey: "reports", permission: "view_reports" },
     ],

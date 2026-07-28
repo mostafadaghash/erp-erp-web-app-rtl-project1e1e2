@@ -23,6 +23,7 @@ import { TreasuryPage } from "./TreasuryPage";
 import { SupplierPaymentsPage } from "./SupplierPaymentsPage";
 import { PurchaseReturnsPage } from "./PurchaseReturnsPage";
 import { CustomerLedgerPage } from "./CustomerLedgerPage";
+import { GeneralLedgerPage } from "./GeneralLedgerPage";
 import { Menu } from "lucide-react";
 import { ShieldX } from "lucide-react";
 import type { Permission } from "../../convex/lib/permissions";
@@ -51,7 +52,8 @@ export type Page =
   | "treasury"
   | "supplier-payments"
   | "purchase-returns"
-  | "customer-ledger";
+  | "customer-ledger"
+  | "general-ledger";
 
 const PAGE_PERMISSIONS: Partial<Record<Page, Permission>> = {
   products: "view_products",
@@ -74,6 +76,7 @@ const PAGE_PERMISSIONS: Partial<Record<Page, Permission>> = {
   "supplier-payments": "view_supplier_ledger",
   "purchase-returns": "view_purchase_returns",
   "customer-ledger": "view_customer_ledger",
+  "general-ledger": "view_general_ledger",
 };
 
 const PAGE_MODULES: Partial<Record<Page, string>> = {
@@ -251,6 +254,7 @@ export function ERPApp() {
             {authorized && currentPage === "supplier-payments" && <SupplierPaymentsPage />}
             {authorized && currentPage === "purchase-returns" && <PurchaseReturnsPage />}
             {authorized && currentPage === "customer-ledger" && <CustomerLedgerPage />}
+            {authorized && currentPage === "general-ledger" && <GeneralLedgerPage />}
           </div>
         </main>
       </div>
