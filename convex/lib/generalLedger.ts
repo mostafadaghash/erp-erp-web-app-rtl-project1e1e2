@@ -26,7 +26,9 @@ export async function postJournal(ctx:MutationCtx,user:AuthUser,input:PostingReq
   const requestFingerprint=fingerprint(canonical), idempotencyKey=`gl:${input.sourceType}:${requestId}`;
   const existing=await ctx.db.query("journalEntries").withIndex("by_idempotency",q=>q.eq("idempotencyKey",idempotencyKey)).unique();
   if(existing) { if(existing.requestFingerprint!==requestFingerprint) throw new ConvexError("معرف الطلب مستخدم بحمولة مختلفة"); return existing; }
-  if(date < "2020-01-01") throw new ConvexError("التاريخ يسبق تاريخ القطع المالي");
+  const settings=await ctx.db.query("generalLedgerSettings").first();
+  if(!settings) throw new ConvexError("لم تتم تهيئة الأستاذ العام");
+  if(date < settings.cutoverDate) throw new ConvexError("التاريخ يسبق تاريخ القطع المالي");
   const branch=await ctx.db.get(input.branchId); if(!branch?.isActive) throw new ConvexError("الفرع غير صالح أو غير نشط");
   const period=await ctx.db.query("accountingPeriods").withIndex("by_key",q=>q.eq("periodKey",periodKey)).unique();
   if(!period || period.status!=="open") throw new ConvexError("الفترة المالية غير مفتوحة");
