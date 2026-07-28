@@ -9,7 +9,7 @@ import { logAction } from "./auth";
 export interface PostingLine { accountId:Id<"chartOfAccounts">; debit:number; credit:number; description?:string }
 export interface PostingRequest { branchId:Id<"branches">; date:string; memo:string; lines:PostingLine[]; requestId:string; sourceType:"opening"|"manual"|"reversal"; originalEntryId?:Id<"journalEntries">; reversalReason?:string }
 
-async function updateBalances(ctx:MutationCtx, entryId:Id<"journalEntries">, branchId:Id<"branches">, periodKey:string, accountId:Id<"chartOfAccounts">, debit:number, credit:number) {
+async function updateBalances(ctx:MutationCtx, entryId:Id<"journalEntries">, branchId:Id<"branches">, entryDate:string, periodKey:string, accountId:Id<"chartOfAccounts">, debit:number, credit:number) {
   const now=Date.now(), accountKey=`${branchId}:${accountId}`;
   const account=await ctx.db.query("generalLedgerAccountBalances").withIndex("by_key",q=>q.eq("key",accountKey)).unique();
   if(account) await ctx.db.patch(account._id,{debitTotal:account.debitTotal+debit,creditTotal:account.creditTotal+credit,netDebitBalance:account.netDebitBalance+debit-credit,updatedAt:now,lastEntryId:entryId});
@@ -18,6 +18,10 @@ async function updateBalances(ctx:MutationCtx, entryId:Id<"journalEntries">, bra
   const period=await ctx.db.query("generalLedgerPeriodBalances").withIndex("by_key",q=>q.eq("key",periodBalanceKey)).unique();
   if(period) await ctx.db.patch(period._id,{debitTotal:period.debitTotal+debit,creditTotal:period.creditTotal+credit,netDebitMovement:period.netDebitMovement+debit-credit,updatedAt:now,lastEntryId:entryId});
   else await ctx.db.insert("generalLedgerPeriodBalances",{key:periodBalanceKey,branchId,accountId,periodKey,debitTotal:debit,creditTotal:credit,netDebitMovement:debit-credit,updatedAt:now,lastEntryId:entryId});
+  const dailyKey=`${branchId}:${accountId}:${entryDate}`;
+  const daily=await ctx.db.query("generalLedgerDailyBalances").withIndex("by_key",q=>q.eq("key",dailyKey)).unique();
+  if(daily) await ctx.db.patch(daily._id,{debitTotal:daily.debitTotal+debit,creditTotal:daily.creditTotal+credit,updatedAt:now,lastEntryId:entryId});
+  else await ctx.db.insert("generalLedgerDailyBalances",{key:dailyKey,branchId,accountId,entryDate,debitTotal:debit,creditTotal:credit,updatedAt:now,lastEntryId:entryId});
 }
 
 export async function postJournal(ctx:MutationCtx,user:AuthUser,input:PostingRequest) {
@@ -44,7 +48,7 @@ export async function postJournal(ctx:MutationCtx,user:AuthUser,input:PostingReq
   if(!debitCents || !creditCents || debitCents!==creditCents) throw new ConvexError("القيد غير متوازن");
   const entryNumber=await nextDocumentNumber(ctx,"journal",new Date(`${date}T00:00:00Z`)), now=Date.now();
   const entryId=await ctx.db.insert("journalEntries",{entryNumber,branchId:input.branchId,entryDate:date,periodKey,sourceType:input.sourceType,status:"posted",memo,totalDebit:fromCents(debitCents),totalCredit:fromCents(creditCents),lineCount:prepared.length,requestId,idempotencyKey,requestFingerprint,originalEntryId:input.originalEntryId,reversalReason:input.reversalReason,postedAt:now,postedBy:user.userId});
-  for(const line of prepared) { await ctx.db.insert("journalLines",{entryId,entryNumber,lineNumber:line.lineNumber,branchId:input.branchId,entryDate:date,periodKey,accountId:line.account._id,accountCodeSnapshot:line.account.code,accountNameSnapshot:line.account.nameAr,normalSideSnapshot:line.account.normalSide,debit:line.debit,credit:line.credit,description:line.description}); await updateBalances(ctx,entryId,input.branchId,periodKey,line.account._id,line.debit,line.credit); }
+  for(const line of prepared) { await ctx.db.insert("journalLines",{entryId,entryNumber,lineNumber:line.lineNumber,branchId:input.branchId,entryDate:date,periodKey,accountId:line.account._id,accountCodeSnapshot:line.account.code,accountNameSnapshot:line.account.nameAr,normalSideSnapshot:line.account.normalSide,debit:line.debit,credit:line.credit,description:line.description}); await updateBalances(ctx,entryId,input.branchId,date,periodKey,line.account._id,line.debit,line.credit); }
   await logAction(ctx,user,{action:"post",module:"general_ledger",recordId:String(entryId),recordLabel:entryNumber,details:`${input.sourceType}; debit=${fromCents(debitCents)}; credit=${fromCents(creditCents)}`});
   const entry=await ctx.db.get(entryId); if(!entry) throw new ConvexError("تعذر حفظ القيد"); return entry;
 }
