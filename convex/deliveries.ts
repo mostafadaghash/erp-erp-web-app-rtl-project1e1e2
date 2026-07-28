@@ -143,14 +143,15 @@ export const getStats = query({
     const user = await requireModulePermission(ctx, "view_deliveries", "deliveries");
     const branchId = user.role === "admin" || user.role === "accountant" ? args.branchId : user.branchId;
     const all = await ctx.db.query("deliveries").collect();
-    const d = filterByBranch(all, user).filter(row => !branchId || row.branchId === branchId);
+    const visible = <T extends { branchId?: Id<"branches"> }>(rows: T[]) => user.role === "admin" || user.role === "accountant" ? rows : filterByBranch(rows, user);
+    const d = visible(all).filter(row => !branchId || row.branchId === branchId);
     const pending   = d.filter(x => x.status === "pending").length;
     const shipped   = d.filter(x => x.status === "shipped").length;
     const delivered = d.filter(x => x.status === "delivered").length;
     const returned  = d.filter(x => x.status === "returned").length;
     const cancelled = d.filter(x => x.status === "cancelled").length;
-    const collections = filterByBranch(await ctx.db.query("financialTransactions").withIndex("by_type", q => q.eq("type", "delivery_cod_collection")).collect(), user).filter(row => !branchId || row.branchId === branchId);
-    const settlements = filterByBranch(await ctx.db.query("codSettlements").withIndex("by_status").collect(), user).filter(row => !branchId || row.branchId === branchId);
+    const collections = visible(await ctx.db.query("financialTransactions").withIndex("by_type", q => q.eq("type", "delivery_cod_collection")).collect()).filter(row => !branchId || row.branchId === branchId);
+    const settlements = visible(await ctx.db.query("codSettlements").withIndex("by_status").collect()).filter(row => !branchId || row.branchId === branchId);
     const codWithCarriers = roundMoney(collections.filter(x => x.status === "posted").reduce((sum, x) => sum + x.amount, 0) - settlements.filter(x => x.status === "posted").reduce((sum, x) => sum + x.grossAmount, 0));
     const codSettled = roundMoney(settlements.filter(x => x.status === "posted").reduce((sum, x) => sum + x.grossAmount, 0));
     const codReversed = roundMoney(settlements.filter(x => x.status === "reversed").reduce((sum, x) => sum + x.grossAmount, 0));
