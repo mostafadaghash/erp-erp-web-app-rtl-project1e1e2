@@ -19,6 +19,7 @@ test("delivery COD acceptance guard", async () => {
   const source = await readFile("tests/deliveryCodIntegration.test.ts", "utf8");
   const matrix = await readFile("tests/DELIVERY_COD_COVERAGE_MATRIX.md", "utf8");
   const deliveriesSource = await readFile("convex/deliveries.ts", "utf8");
+  const documentNumbersSource = await readFile("convex/lib/documentNumbers.ts", "utf8");
   const matches = [...source.matchAll(/^test\("COD-(\d{2})[^\n]+/gm)];
   assert.equal(matches.length, 56);
   assert.deepEqual(matches.map(match => match[1]), Array.from({ length: 56 }, (_, index) => String(index + 1).padStart(2, "0")));
@@ -73,13 +74,18 @@ test("delivery COD acceptance guard", async () => {
     "COD-49": /(?=[\s\S]*deliveries\.create)(?=[\s\S]*createFromOrderInvoice)(?=[\s\S]*deliveries\.remove)(?=[\s\S]*listPaginated)(?=[\s\S]*before)(?=[\s\S]*deepEqual)/,
     "COD-50": /createFromOrderInvoice[\s\S]*deliveries\.update[\s\S]*updateStatus[\s\S]*confirmDelivered[\s\S]*Snapshot/,
     "COD-51": /(?=[\s\S]*createFromOrderInvoice)(?=[\s\S]*retry)(?=[\s\S]*appliedDeposit)(?=[\s\S]*financialTransactions)/,
-    "COD-52": /invoices\.recordPayment[\s\S]*updateStatus[\s\S]*returned[\s\S]*orders\.addPayment/,
+    "COD-52": /(?=[\s\S]*invoices\.recordPayment)(?=[\s\S]*invoices\.refundPayment)(?=[\s\S]*invoices\.update)(?=[\s\S]*invoices\.cancel)(?=[\s\S]*salesReturns\.create)(?=[\s\S]*orders\.addPayment)(?=[\s\S]*orders\.refundDeposit)(?=[\s\S]*orders\.cancel)(?=[\s\S]*orders\.updateStatus)(?=[\s\S]*deliveries\.updateStatus)(?=[\s\S]*pending)(?=[\s\S]*shipped)(?=[\s\S]*returned)(?=[\s\S]*Snapshot)(?=[\s\S]*assert\.rejects)(?=[\s\S]*unlocked-52)(?=[\s\S]*transactions)(?=[\s\S]*ledger)(?=[\s\S]*inventory)(?=[\s\S]*payments)/,
     "COD-53": /1\.001[\s\S]*1\.01[\s\S]*createCodSettlement[\s\S]*99\.99/,
-    "COD-54": /(?=[\s\S]*createCodSettlement)(?=[\s\S]*documentCounters)(?=[\s\S]*by_number)(?=[\s\S]*nextValue)/,
+    "COD-54": /(?=[\s\S]*COD-2026-00007)(?=[\s\S]*COD-2026-00009)(?=[\s\S]*COD-2026-00010)(?=[\s\S]*Promise\.all)(?=[\s\S]*COD-2027-00001)(?=[\s\S]*documentCounters)(?=[\s\S]*by_key)(?=[\s\S]*by_number)(?=[\s\S]*nextValue)(?=[\s\S]*new Set\(numbers\))/,
     "COD-55": /confirmDelivered[\s\S]*reverseConfirmation[\s\S]*confirmDelivered[\s\S]*confirmationHistory[\s\S]*attemptNumber/,
-    "COD-56": /confirmDelivered[\s\S]*getStats[\s\S]*other\.branchId[\s\S]*manager/,
+    "COD-56": /(?=[\s\S]*createCodSettlement)(?=[\s\S]*reverseCodSettlement)(?=[\s\S]*reverseConfirmation)(?=[\s\S]*other\.branchId)(?=[\s\S]*Manager)(?=[\s\S]*Admin|[\s\S]*adminTotal)(?=[\s\S]*Accountant)(?=[\s\S]*\b50\b)(?=[\s\S]*\b100\b)(?=[\s\S]*\b30\b)(?=[\s\S]*\b5\b)(?=[\s\S]*\b80\b)(?=[\s\S]*\b130\b)(?=[\s\S]*codWithCarriers)(?=[\s\S]*codSettled)(?=[\s\S]*codReversed)(?=[\s\S]*carrierFees)(?=[\s\S]*readOnlySnapshot)(?=[\s\S]*payments)/,
   };
   for (const [id, pattern] of Object.entries(finalEvidence)) assert.match(testBody(source, id), pattern, `${id} final executable evidence missing`);
+  assert.match(documentNumbersSource, /documentCounters[\s\S]*withIndex\("by_key"/);
+  assert.match(documentNumbersSource, /codSettlements[\s\S]*withIndex\("by_number"[\s\S]*gte[\s\S]*lt/);
+  assert.match(documentNumbersSource, /documentNumberExists[\s\S]*withIndex\("by_number"[\s\S]*eq/);
+  assert.match(documentNumbersSource, /now\.getUTCFullYear\(\)/);
+  assert.doesNotMatch(documentNumbersSource.slice(documentNumbersSource.indexOf("case \"codSettlement\""), documentNumbersSource.indexOf("case \"finance\"")), /query\("codSettlements"\)\.collect/);
   const executableRows = rows.join("\n");
   assert.doesNotMatch(executableRows, /deliveries\.getStats\s*\+\s*deliveries\.get/);
   assert.match(executableRows, /COD-08[^\n]*appliedDeposit=0[^\n]*0 customerLedgerEntries[^\n]*0 financialTransactions/);
