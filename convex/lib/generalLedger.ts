@@ -9,7 +9,7 @@ import { logAction } from "./auth.ts";
 export interface PostingLine { accountId:Id<"chartOfAccounts">; debit:number; credit:number; description?:string }
 export interface PostingRequest {
   branchId:Id<"branches">; date:string; memo:string; lines:PostingLine[]; requestId:string;
-  sourceType:"opening"|"manual"|"reversal"|"financial"|"financial_reversal";
+  sourceType:"opening"|"manual"|"reversal"|"financial"|"financial_reversal"|"operational"|"operational_reversal";
   originalEntryId?:Id<"journalEntries">; reversalReason?:string;
   operationType?:string; referenceType?:string; referenceId?:string; referenceNumber?:string;
   financialTransactionId?:Id<"financialTransactions">;
