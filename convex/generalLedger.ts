@@ -5,7 +5,10 @@ import { requirePermission, logAction, type AuthUser } from "./lib/auth";
 import { DEFAULT_CHART, GENERAL_LEDGER_CHART_VERSION } from "./lib/generalLedgerTemplate";
 import { assertIsoDate, fingerprint, normalizeRequestId, normalizeText, periodKeyOf } from "./lib/generalLedgerRules";
 import { postJournal } from "./lib/generalLedger";
-import { activateFinancialPosting, financialPostingReadiness } from "./lib/generalLedgerOperations";
+import {
+  activateFinancialPosting,
+  financialPostingReadiness,
+} from "./lib/generalLedgerOperations.ts";
 import type { Id } from "./_generated/dataModel";
 
 const lineValidator=v.object({accountId:v.id("chartOfAccounts"),debit:v.number(),credit:v.number(),description:v.optional(v.string())});
