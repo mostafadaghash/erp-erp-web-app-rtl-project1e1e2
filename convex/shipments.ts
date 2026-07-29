@@ -1,15 +1,16 @@
-import { query, mutation } from "./_generated/server";
+import { query, mutation } from "./_generated/server.js";
 import { v } from "convex/values";
 import { ConvexError } from "convex/values";
-import { assertBranchAccess, requireModulePermission, requirePermission, filterByBranch, resolveWriteBranch, logAction } from "./lib/auth";
-import { canTransition, roundMoney, SHIPMENT_TRANSITIONS } from "../shared/businessRules";
-import { changeProductStock } from "./lib/inventory";
-import { allocateProportionally, INVENTORY_MOVEMENT_TYPES, roundAverageCost } from "../shared/inventoryRules";
-import { nextDocumentNumber } from "./lib/documentNumbers";
-import { requireActiveBranch, requireActiveSupplier } from "./lib/references";
-import { postSupplierLedgerEntry } from "./lib/supplierLedger";
-import { requireFinanceInitialized } from "./lib/finance";
-import { isValidIsoDate } from "../shared/businessRules";
+import { assertBranchAccess, requireModulePermission, requirePermission, filterByBranch, resolveWriteBranch, logAction } from "./lib/auth.ts";
+import { canTransition, roundMoney, SHIPMENT_TRANSITIONS } from "../shared/businessRules.ts";
+import { changeProductStock } from "./lib/inventory.ts";
+import { allocateProportionally, INVENTORY_MOVEMENT_TYPES, roundAverageCost } from "../shared/inventoryRules.ts";
+import { nextDocumentNumber } from "./lib/documentNumbers.ts";
+import { requireActiveBranch, requireActiveSupplier } from "./lib/references.ts";
+import { postSupplierLedgerEntry } from "./lib/supplierLedger.ts";
+import { requireFinanceInitialized } from "./lib/finance.ts";
+import { isValidIsoDate } from "../shared/businessRules.ts";
+import { postPurchaseReceiptJournal } from "./lib/generalLedgerPurchases.ts";
 
 export const list = query({
   args: { status: v.optional(v.string()) },
@@ -223,6 +224,8 @@ export const receive = mutation({
       const ledger = await postSupplierLedgerEntry(ctx, user, { requestId, supplierId: shipment.supplierId, branchId: shipment.branchId, date: args.receiptDate, amount: payableAmount, referenceId: String(purchaseReceiptId), referenceNumber: receiptNumber, externalInvoiceNumber, dueDate: args.dueDate });
       await ctx.db.patch(purchaseReceiptId, { supplierLedgerEntryId: ledger._id });
     }
+    const journal = await postPurchaseReceiptJournal(ctx, user, { branchId: shipment.branchId, date: args.receiptDate, requestId: `purchase-receipt:${purchaseReceiptId}:create`, referenceId: String(purchaseReceiptId), referenceNumber: receiptNumber, totalLandedCost, payableAmount, externalFreightAmount: roundMoney(totalFreight - supplierFreightAmount) });
+    if (journal) await ctx.db.patch(purchaseReceiptId, { journalEntryId: journal._id });
     await ctx.db.patch(args.shipmentId, { status: "arrived", arrivedDate: args.receiptDate, purchaseReceiptId, arrivalRequestId: requestId });
     await logAction(ctx, user, { action: "receive", module: "shipments", recordId: args.shipmentId, recordLabel: shipment.shipmentNumber, details: JSON.stringify({ purchaseReceiptId, receiptNumber, payableAmount, totalLandedCost }) });
     return { purchaseReceiptId, receiptNumber };
