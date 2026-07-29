@@ -1,10 +1,10 @@
 import type { MutationCtx, QueryCtx } from "../_generated/server";
 import type { Doc, Id } from "../_generated/dataModel";
 import { ConvexError } from "convex/values";
-import { roundMoney } from "../../shared/businessRules";
-import { nextDocumentNumber } from "./documentNumbers";
+import { roundMoney } from "../../shared/businessRules.ts";
+import { nextDocumentNumber } from "./documentNumbers.ts";
 import type { AuthUser } from "./auth";
-import { isValidIsoDate } from "../../shared/businessRules";
+import { isValidIsoDate } from "../../shared/businessRules.ts";
 import { postFinancialTransactionJournal } from "./generalLedgerOperations.ts";
 
 export type FinancialTransactionType = Doc<"financialTransactions">["type"];
