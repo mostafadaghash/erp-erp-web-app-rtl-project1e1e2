@@ -4,12 +4,17 @@ import { convexTest } from "convex-test";
 import schema from "../convex/schema.ts";
 import { api } from "../convex/_generated/api.js";
 import type { Id } from "../convex/_generated/dataModel";
+import type { AuthUser } from "../convex/lib/auth.ts";
+import { postJournal } from "../convex/lib/generalLedger.ts";
+import {
+  DEFAULT_CHART,
+  GENERAL_LEDGER_CHART_VERSION,
+} from "../convex/lib/generalLedgerTemplate.ts";
 
 const modules = {
   "../convex/_generated/api.js": () => import("../convex/_generated/api.js"),
   "../convex/_generated/server.js": () =>
     import("../convex/_generated/server.js"),
-  "../convex/generalLedger.ts": () => import("../convex/generalLedger.ts"),
   "../convex/repairs.ts": () => import("../convex/repairs.ts"),
 };
 
@@ -18,12 +23,13 @@ type Fixture = Awaited<ReturnType<typeof fixture>>;
 async function fixture(options?: { operational?: boolean }) {
   const raw = convexTest(schema, modules);
   const seeded = await raw.run(async (ctx) => {
+    const now = Date.now();
     const branchId = await ctx.db.insert("branches", {
       name: "الفرع الرئيسي",
       address: "القاهرة",
       isActive: true,
     });
-    await ctx.db.insert("userProfiles", {
+    const employeeId = await ctx.db.insert("userProfiles", {
       userId: "admin",
       tokenIdentifier: "admin",
       name: "مدير النظام",
@@ -32,6 +38,15 @@ async function fixture(options?: { operational?: boolean }) {
       permissions: [],
       isActive: true,
     });
+    const user: AuthUser = {
+      userId: "admin",
+      employeeId,
+      name: "مدير النظام",
+      role: "admin",
+      branchId,
+      isActive: true,
+      permissions: [],
+    };
     await ctx.db.insert("settings", {
       storeName: "اختبار",
       storeType: "repair",
@@ -44,7 +59,84 @@ async function fixture(options?: { operational?: boolean }) {
       isInitialized: true,
       cutoverDate: "2026-01-01",
       defaultClearingDelayDays: 0,
-      updatedAt: Date.now(),
+      updatedAt: now,
+    });
+    const accountIds = {} as Record<string, Id<"chartOfAccounts">>;
+    const accountIdsByCode = new Map<string, Id<"chartOfAccounts">>();
+    for (const account of DEFAULT_CHART) {
+      const accountId = await ctx.db.insert("chartOfAccounts", {
+        code: account.code,
+        normalizedCode: account.code,
+        nameAr: account.nameAr,
+        parentId: account.parentCode
+          ? accountIdsByCode.get(account.parentCode)
+          : undefined,
+        accountClass: account.accountClass,
+        normalSide: account.normalSide,
+        isContra: account.isContra ?? false,
+        isPosting: account.isPosting,
+        isSystem: true,
+        systemKey: account.systemKey,
+        isActive: true,
+        createdAt: now,
+        createdBy: user.userId,
+      });
+      accountIds[account.systemKey] = accountId;
+      accountIdsByCode.set(account.code, accountId);
+    }
+    await ctx.db.insert("generalLedgerSettings", {
+      baseCurrency: "EGP",
+      chartVersion: GENERAL_LEDGER_CHART_VERSION,
+      status: "foundation_ready",
+      operationalPostingEnabled: options?.operational !== false,
+      financialPostingEnabled: true,
+      financialPostingCutoverDate: "2026-01-01",
+      cutoverDate: "2026-01-01",
+      initializedAt: now,
+      initializedBy: user.userId,
+      initializationRequestId: "repair-gl-init",
+      initializationFingerprint: "repair-bridge-fixture",
+    });
+    await ctx.db.insert("accountingPeriods", {
+      periodKey: "2026-01",
+      startDate: "2026-01-01",
+      endDate: "2026-01-31",
+      status: "open",
+    });
+    const opening = await postJournal(ctx, user, {
+      branchId,
+      date: "2026-01-01",
+      memo: "أرصدة افتتاحية مرجعية لاختبار جسر الصيانة",
+      requestId: "repair-gl-opening",
+      sourceType: "opening",
+      operationType: "opening_balance",
+      referenceType: "general_ledger_opening",
+      referenceId: String(branchId),
+      lines: [
+        {
+          accountId: accountIds.cash,
+          debit: 1000,
+          credit: 0,
+          description: "خزينة الصيانة",
+        },
+        {
+          accountId: accountIds.opening_equity,
+          debit: 0,
+          credit: 1000,
+          description: "حقوق الافتتاح",
+        },
+      ],
+    });
+    await ctx.db.insert("generalLedgerOpenings", {
+      branchId,
+      openingDate: "2026-01-01",
+      status: "confirmed",
+      isZeroOpening: false,
+      openingEntryId: opening._id,
+      requestId: "repair-gl-opening",
+      fingerprint: "repair-bridge-fixture",
+      confirmedAt: now,
+      confirmedBy: user.userId,
     });
     const cashAccountId = await ctx.db.insert("financialAccounts", {
       name: "خزينة الصيانة",
@@ -56,9 +148,9 @@ async function fixture(options?: { operational?: boolean }) {
       currentBalance: 1000,
       allowNegative: false,
       settlementDelayDays: 0,
-      createdAt: Date.now(),
+      createdAt: now,
       createdBy: "admin",
-      updatedAt: Date.now(),
+      updatedAt: now,
     });
     const customerId = await ctx.db.insert("customers", {
       name: "عميل الصيانة",
@@ -68,56 +160,17 @@ async function fixture(options?: { operational?: boolean }) {
       branchId,
       isActive: true,
     });
-    return { branchId, cashAccountId, customerId };
+    return { branchId, cashAccountId, customerId, accountIds };
   });
   const t = raw.withIdentity({
     subject: "admin",
     tokenIdentifier: "admin",
   });
-  await t.mutation(api.generalLedger.initialize, {
-    cutoverDate: "2026-01-01",
-    requestId: "repair-gl-init",
-  });
-  await t.mutation(api.generalLedger.createOrOpenPeriod, {
-    periodKey: "2026-01",
-  });
-  const chart = await t.query(api.generalLedger.chart, { activeOnly: false });
   const account = (key: string) => {
-    const found = chart.find((row) => row.systemKey === key);
+    const found = seeded.accountIds[key];
     assert.ok(found, `missing chart account ${key}`);
-    return found._id;
+    return found;
   };
-  await t.mutation(api.generalLedger.confirmOpening, {
-    branchId: seeded.branchId,
-    openingDate: "2026-01-01",
-    isZeroOpening: false,
-    requestId: "repair-gl-opening",
-    lines: [
-      {
-        accountId: account("cash"),
-        debit: 1000,
-        credit: 0,
-        description: "خزينة الصيانة",
-      },
-      {
-        accountId: account("opening_equity"),
-        debit: 0,
-        credit: 1000,
-        description: "حقوق الافتتاح",
-      },
-    ],
-  });
-  await t.mutation(api.generalLedger.enableFinancialPosting, {
-    cutoverDate: "2026-01-01",
-    requestId: "repair-finance-bridge",
-  });
-  if (options?.operational !== false) {
-    await raw.run(async (ctx) => {
-      const settings = await ctx.db.query("generalLedgerSettings").first();
-      assert.ok(settings);
-      await ctx.db.patch(settings._id, { operationalPostingEnabled: true });
-    });
-  }
   return { raw, t, account, ...seeded };
 }
 
@@ -328,9 +381,13 @@ test("RIB-07 identical create retry duplicates no repair or journal", async () =
 
 test("RIB-08 closed period rolls back the entire repair mutation", async () => {
   const e = await fixture();
-  await e.t.mutation(api.generalLedger.closePeriod, {
-    periodKey: "2026-01",
-    reason: "إقفال يناير",
+  await e.raw.run(async (ctx) => {
+    const period = await ctx.db
+      .query("accountingPeriods")
+      .withIndex("by_key", (q) => q.eq("periodKey", "2026-01"))
+      .unique();
+    assert.ok(period);
+    await ctx.db.patch(period._id, { status: "closed" });
   });
   const before = await snapshot(e);
   await assert.rejects(createRepair(e), /غير مفتوحة/);
