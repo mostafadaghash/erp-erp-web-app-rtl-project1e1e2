@@ -1,13 +1,13 @@
-import { mutation, query } from "./_generated/server";
+import { mutation, query } from "./_generated/server.js";
 import { paginationOptsValidator } from "convex/server";
 import { ConvexError, v } from "convex/values";
-import { assertBranchAccess, logAction, requirePermission, resolveWriteBranch } from "./lib/auth";
-import { assertFinancialAccountBranch, postFinancialTransaction, requireActiveFinancialAccount, reversePostedFinancialTransaction } from "./lib/finance";
-import { nextDocumentNumber } from "./lib/documentNumbers";
-import { postSupplierBalanceMovement } from "./lib/supplierLedger";
-import { canonicalAllocations, allocationTotal, derivePurchaseReceiptState, hasAtMostTwoDecimals, reverseAllocatedPayment } from "../shared/supplierPaymentRules";
+import { assertBranchAccess, logAction, requirePermission, resolveWriteBranch } from "./lib/auth.ts";
+import { assertFinancialAccountBranch, postFinancialTransaction, requireActiveFinancialAccount, reversePostedFinancialTransaction } from "./lib/finance.ts";
+import { nextDocumentNumber } from "./lib/documentNumbers.ts";
+import { postSupplierBalanceMovement } from "./lib/supplierLedger.ts";
+import { canonicalAllocations, allocationTotal, derivePurchaseReceiptState, hasAtMostTwoDecimals, reverseAllocatedPayment } from "../shared/supplierPaymentRules.ts";
 import type { Id } from "./_generated/dataModel";
-import { roundMoney } from "../shared/businessRules";
+import { roundMoney } from "../shared/businessRules.ts";
 
 const allocationValidator = v.object({ purchaseReceiptId: v.id("purchaseReceipts"), amount: v.number() });
 const allowedAccounts = ["cash", "bank", "instapay", "vodafone_cash", "other"] as const;
