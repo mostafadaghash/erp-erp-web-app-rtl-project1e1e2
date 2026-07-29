@@ -6,8 +6,8 @@ import type { QueryCtx, MutationCtx } from "../_generated/server";
 import type { Id } from "../_generated/dataModel";
 import { ConvexError } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
-import { PERMISSIONS, ROLE_PERMISSIONS } from "./permissions";
-import type { Permission } from "./permissions";
+import { PERMISSIONS, ROLE_PERMISSIONS } from "./permissions.ts";
+import type { Permission } from "./permissions.ts";
 
 // ──────────────────────────────────────────────
 // Types
