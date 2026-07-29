@@ -343,3 +343,17 @@ test("FGBUI-06 financial journal sources have explicit Arabic labels", () => {
   assert.match(ui, /financial: "تشغيلي مالي"/);
   assert.match(ui, /financial_reversal: "عكس تشغيلي مالي"/);
 });
+
+test("SIBUI-01 sales and inventory journals have explicit Arabic labels", () => {
+  assert.match(ui, /operational: "قيد مستند تشغيلي"/);
+  assert.match(ui, /operational_reversal: "عكس مستند تشغيلي"/);
+});
+
+test("SIBUI-02 full operational posting remains visibly disabled", () => {
+  assert.match(ui, /status\.operationalPostingEnabled/);
+  assert.match(ui, /غير مفعّل/);
+  assert.match(
+    ui,
+    /ربط المبيعات والمخزون والمشتريات غير النقدية ما زال معطلًا/,
+  );
+});
