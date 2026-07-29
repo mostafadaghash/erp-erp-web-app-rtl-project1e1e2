@@ -310,6 +310,11 @@ const applicationTables = {
     branchId: v.optional(v.id("branches")),
     trackingToken: v.optional(v.string()),
     creationRequestId: v.optional(v.string()),
+    journalEntryId: v.optional(v.id("journalEntries")),
+    cancellationJournalEntryId: v.optional(v.id("journalEntries")),
+    cancellationRequestId: v.optional(v.string()),
+    cancellationFingerprint: v.optional(v.string()),
+    cancellationDate: v.optional(v.string()),
     cancelledAt: v.optional(v.number()), cancelledBy: v.optional(v.string()), cancellationReason: v.optional(v.string()),
   }).index("by_repair_number", ["repairNumber"]).index("by_customer", ["customerId"]).index("by_status", ["status"]).index("by_tracking", ["trackingToken"]).index("by_creation_request", ["creationRequestId"]),
 
@@ -479,4 +484,3 @@ export default defineSchema({
   ...authTables,
   ...applicationTables,
 });
-
