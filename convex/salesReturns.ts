@@ -1,17 +1,19 @@
-import { mutation, query } from "./_generated/server";
+import { mutation, query } from "./_generated/server.js";
 import { ConvexError, v } from "convex/values";
-import { assertBranchAccess, filterByBranch, logAction, requirePermission } from "./lib/auth";
-import { assertFinancialAccountBranch, postFinancialTransaction, requireActiveFinancialAccount, requireFinanceInitialized, reversePostedFinancialTransaction } from "./lib/finance";
-import { changeProductStock } from "./lib/inventory";
-import { nextDocumentNumber } from "./lib/documentNumbers";
-import { INVENTORY_MOVEMENT_TYPES } from "../shared/inventoryRules";
-import { deriveInvoiceStatus, roundMoney } from "../shared/businessRules";
+import { assertBranchAccess, filterByBranch, logAction, requirePermission } from "./lib/auth.ts";
+import { assertFinancialAccountBranch, postFinancialTransaction, requireActiveFinancialAccount, requireFinanceInitialized, reversePostedFinancialTransaction } from "./lib/finance.ts";
+import { changeProductStock } from "./lib/inventory.ts";
+import { nextDocumentNumber } from "./lib/documentNumbers.ts";
+import { INVENTORY_MOVEMENT_TYPES } from "../shared/inventoryRules.ts";
+import { deriveInvoiceStatus, roundMoney } from "../shared/businessRules.ts";
 import { postCustomerLedgerEntry } from "./lib/customerLedger.ts";
 import { assertInvoiceNotLockedByActiveDelivery } from "./lib/deliveryLocks.ts";
+import { postSalesInventoryJournal } from "./lib/generalLedgerSales.ts";
 
-function redactCosts<T extends { items: Array<Record<string, unknown>>; totalCogsReversed: number }>(note: T, allowed: boolean) {
-  if (allowed) return note;
-  const { totalCogsReversed: _total, ...rest } = note;
+function redactCosts<T extends { items: Array<Record<string, unknown>>; totalCogsReversed: number; journalEntryId?: unknown; reversalJournalEntryId?: unknown }>(note: T, allowed: boolean) {
+  const { journalEntryId: _journal, reversalJournalEntryId: _reversalJournal, ...sanitized } = note;
+  if (allowed) return sanitized;
+  const { totalCogsReversed: _total, ...rest } = sanitized;
   return { ...rest, items: note.items.map(({ historicalUnitCost: _unit, returnedCostTotal: _cost, ...item }) => item) };
 }
 
@@ -78,6 +80,19 @@ export const create = mutation({ args: {
   const creditedTotal = roundMoney((invoice.creditedTotal ?? 0) + totalCredit), netTotal = roundMoney(invoice.total - creditedTotal), paid = roundMoney(invoice.paid - cashRefund), remaining = roundMoney(invoice.remaining - debtReduction);
   await ctx.db.patch(invoice._id, { creditedTotal, netTotal, paid, remaining, status: deriveInvoiceStatus({ netTotal, creditedTotal, paid, remaining }) });
   if (invoice.customerId) await postCustomerLedgerEntry(ctx, user, { type: "sales_return", requestId: `${args.requestId}:ledger`, customerId: invoice.customerId, branchId: invoice.branchId, date: args.date, receivableDelta: -debtReduction, advanceDelta: 0, purchasesDelta: -totalCredit, description: `إشعار دائن ${creditNoteNumber}`, referenceType: "sales_return", referenceId: String(id), referenceNumber: creditNoteNumber });
+  const journal = await postSalesInventoryJournal(ctx, user, {
+    operation: "sales_return",
+    branchId: invoice.branchId,
+    date: args.date,
+    requestId: `sales-return:${id}:create`,
+    referenceId: String(id),
+    referenceNumber: creditNoteNumber,
+    debtReduction,
+    cogsAmount: roundMoney(
+      normalized.reduce((sum, item) => sum + item.returnedCostTotal, 0),
+    ),
+  });
+  if (journal) await ctx.db.patch(id, { journalEntryId: journal._id });
   await logAction(ctx, user, { action: "create", module: "sales_returns", recordId: id, recordLabel: creditNoteNumber, details: `إنشاء إشعار دائن ${creditNoteNumber} بقيمة ${totalCredit} وإعادة المخزون` });
   return id;
 } });
@@ -94,6 +109,17 @@ export const reverse = mutation({ args: { id: v.id("salesReturns"), reason: v.st
   const creditedTotal = roundMoney((invoice.creditedTotal ?? 0) - note.totalCredit), netTotal = roundMoney((invoice.netTotal ?? invoice.total) + note.totalCredit), paid = roundMoney(invoice.paid + note.cashRefund), remaining = roundMoney(invoice.remaining + note.debtReduction);
   await ctx.db.patch(invoice._id, { creditedTotal, netTotal, paid, remaining, status: deriveInvoiceStatus({ netTotal, creditedTotal, paid, remaining }) });
   if (note.customerId) await postCustomerLedgerEntry(ctx, user, { type: "sales_return_reversal", requestId: `${args.requestId}:ledger`, customerId: note.customerId, branchId: note.branchId, date: args.date, receivableDelta: note.debtReduction, advanceDelta: 0, purchasesDelta: note.totalCredit, description: `عكس الإشعار ${note.creditNoteNumber}`, referenceType: "sales_return", referenceId: String(note._id), referenceNumber: note.creditNoteNumber });
-  await ctx.db.patch(note._id, { status: "reversed", reversedAt: Date.now(), reversedBy: user.userId, reversalReason: args.reason.trim(), reversalDate: args.date, reversalRequestId: requestKey, reversalTransactionId });
+  const reversalJournal = await postSalesInventoryJournal(ctx, user, {
+    operation: "sales_return_reversal",
+    branchId: note.branchId,
+    date: args.date,
+    requestId: `sales-return:${note._id}:reverse:${args.requestId}`,
+    referenceId: String(note._id),
+    referenceNumber: note.creditNoteNumber,
+    debtReduction: -note.debtReduction,
+    cogsAmount: -note.totalCogsReversed,
+    originalEntryId: note.journalEntryId,
+  });
+  await ctx.db.patch(note._id, { status: "reversed", reversedAt: Date.now(), reversedBy: user.userId, reversalReason: args.reason.trim(), reversalDate: args.date, reversalRequestId: requestKey, reversalTransactionId, reversalJournalEntryId: reversalJournal?._id });
   await logAction(ctx, user, { action: "reverse", module: "sales_returns", recordId: note._id, recordLabel: note.creditNoteNumber, details: `عكس الإشعار الدائن: ${args.reason.trim()}` }); return note._id;
 } });
