@@ -2,9 +2,9 @@ import type { MutationCtx } from "../_generated/server";
 import type { Id } from "../_generated/dataModel";
 import type { AuthUser } from "./auth";
 import { ConvexError } from "convex/values";
-import { nextDocumentNumber } from "./documentNumbers";
-import { assertIsoDate, fingerprint, fromCents, normalizeRequestId, normalizeText, periodKeyOf, toCents } from "./generalLedgerRules";
-import { logAction } from "./auth";
+import { nextDocumentNumber } from "./documentNumbers.ts";
+import { assertIsoDate, fingerprint, fromCents, normalizeRequestId, normalizeText, periodKeyOf, toCents } from "./generalLedgerRules.ts";
+import { logAction } from "./auth.ts";
 
 export interface PostingLine { accountId:Id<"chartOfAccounts">; debit:number; credit:number; description?:string }
 export interface PostingRequest {
