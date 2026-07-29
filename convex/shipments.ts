@@ -10,6 +10,7 @@ import { requireActiveBranch, requireActiveSupplier } from "./lib/references";
 import { postSupplierLedgerEntry } from "./lib/supplierLedger";
 import { requireFinanceInitialized } from "./lib/finance";
 import { isValidIsoDate } from "../shared/businessRules";
+import { postPurchaseReceiptJournal } from "./lib/generalLedgerPurchases.ts";
 
 export const list = query({
   args: { status: v.optional(v.string()) },
@@ -223,6 +224,8 @@ export const receive = mutation({
       const ledger = await postSupplierLedgerEntry(ctx, user, { requestId, supplierId: shipment.supplierId, branchId: shipment.branchId, date: args.receiptDate, amount: payableAmount, referenceId: String(purchaseReceiptId), referenceNumber: receiptNumber, externalInvoiceNumber, dueDate: args.dueDate });
       await ctx.db.patch(purchaseReceiptId, { supplierLedgerEntryId: ledger._id });
     }
+    const journal = await postPurchaseReceiptJournal(ctx, user, { branchId: shipment.branchId, date: args.receiptDate, requestId: `purchase-receipt:${purchaseReceiptId}:create`, referenceId: String(purchaseReceiptId), referenceNumber: receiptNumber, totalLandedCost, payableAmount, externalFreightAmount: roundMoney(totalFreight - supplierFreightAmount) });
+    if (journal) await ctx.db.patch(purchaseReceiptId, { journalEntryId: journal._id });
     await ctx.db.patch(args.shipmentId, { status: "arrived", arrivedDate: args.receiptDate, purchaseReceiptId, arrivalRequestId: requestId });
     await logAction(ctx, user, { action: "receive", module: "shipments", recordId: args.shipmentId, recordLabel: shipment.shipmentNumber, details: JSON.stringify({ purchaseReceiptId, receiptNumber, payableAmount, totalLandedCost }) });
     return { purchaseReceiptId, receiptNumber };
@@ -230,3 +233,4 @@ export const receive = mutation({
 });
 
 export const remove = mutation({ args: { id: v.id("shipments") }, handler: async () => { throw new ConvexError("استخدم انتقال حالة الشحنة إلى ملغاة مع إدخال السبب"); } });
+
