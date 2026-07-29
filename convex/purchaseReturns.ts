@@ -1,14 +1,14 @@
-import { mutation, query } from "./_generated/server";
+import { mutation, query } from "./_generated/server.js";
 import { paginationOptsValidator } from "convex/server";
 import { ConvexError, v } from "convex/values";
-import { assertBranchAccess, logAction, requirePermission, resolveWriteBranch } from "./lib/auth";
-import { assertFinancialAccountBranch, postFinancialTransaction, requireActiveFinancialAccount, requireFinanceInitialized, reversePostedFinancialTransaction } from "./lib/finance";
-import { changeProductStock } from "./lib/inventory";
-import { nextDocumentNumber } from "./lib/documentNumbers";
-import { postSupplierBalanceMovement } from "./lib/supplierLedger";
-import { INVENTORY_MOVEMENT_TYPES } from "../shared/inventoryRules";
-import { availableSupplierFreight, canonicalPurchaseReturnItems, hasMoneyPrecision, incrementalGoodsCredit, inventoryValueForPurchaseReturn, purchaseReceiptAfterCredit, purchaseReceiptAfterReversal, totalPurchaseCredit, normalizeExternalCreditNote } from "../shared/purchaseReturnRules";
-import { roundMoney } from "../shared/businessRules";
+import { assertBranchAccess, logAction, requirePermission, resolveWriteBranch } from "./lib/auth.ts";
+import { assertFinancialAccountBranch, postFinancialTransaction, requireActiveFinancialAccount, requireFinanceInitialized, reversePostedFinancialTransaction } from "./lib/finance.ts";
+import { changeProductStock } from "./lib/inventory.ts";
+import { nextDocumentNumber } from "./lib/documentNumbers.ts";
+import { postSupplierBalanceMovement } from "./lib/supplierLedger.ts";
+import { INVENTORY_MOVEMENT_TYPES } from "../shared/inventoryRules.ts";
+import { availableSupplierFreight, canonicalPurchaseReturnItems, hasMoneyPrecision, incrementalGoodsCredit, inventoryValueForPurchaseReturn, purchaseReceiptAfterCredit, purchaseReceiptAfterReversal, totalPurchaseCredit, normalizeExternalCreditNote } from "../shared/purchaseReturnRules.ts";
+import { roundMoney } from "../shared/businessRules.ts";
 import { postPurchaseReturnJournal, reversePurchaseReturnJournal } from "./lib/generalLedgerPurchases.ts";
 
 const itemValidator=v.object({receiptItemIndex:v.number(),quantity:v.number()});
@@ -49,4 +49,3 @@ const dto=(row:{_id:unknown;returnNumber:string;receiptNumber:string;supplierNam
 export const list=query({args:{branchId:v.optional(v.id("branches")),supplierId:v.optional(v.id("suppliers")),paginationOpts:paginationOptsValidator},handler:async(ctx,args)=>{const user=await requirePermission(ctx,"view_purchase_returns"),branchId=resolveWriteBranch(user,args.branchId);if(!branchId)throw new ConvexError("اختر الفرع");const result=args.supplierId?await ctx.db.query("purchaseReturns").withIndex("by_supplier_branch_date",q=>q.eq("supplierId",args.supplierId!).eq("branchId",branchId)).order("desc").paginate(args.paginationOpts):await ctx.db.query("purchaseReturns").withIndex("by_branch_date",q=>q.eq("branchId",branchId)).order("desc").paginate(args.paginationOpts);return{page:result.page.map(dto),isDone:result.isDone,continueCursor:result.continueCursor};}});
 export const getForPrint=query({args:{purchaseReturnId:v.id("purchaseReturns")},handler:async(ctx,args)=>{const user=await requirePermission(ctx,"print_purchase_returns"),row=await ctx.db.get(args.purchaseReturnId);if(!row)throw new ConvexError("مستند المرتجع غير موجود");assertBranchAccess(user,row);const branch=await ctx.db.get(row.branchId),byUser=await ctx.db.query("userProfiles").withIndex("by_user",q=>q.eq("userId",row.createdBy)).first(),profile=byUser??await ctx.db.query("userProfiles").withIndex("by_token",q=>q.eq("tokenIdentifier",row.createdBy)).first();return{returnNumber:row.returnNumber,date:row.date,supplierName:row.supplierName,branchName:branch?.name??"—",receiptNumber:row.receiptNumber,externalInvoiceNumber:row.externalInvoiceNumber,externalCreditNoteNumber:row.externalCreditNoteNumber,items:row.items.map(x=>({productName:x.productName,quantityReturned:x.quantityReturned,historicalUnitCost:x.historicalUnitCost,goodsCreditAmount:x.goodsCreditAmount})),goodsCredit:row.goodsCredit,freightCredit:row.freightCredit,totalCredit:row.totalCredit,debtReduction:row.debtReduction,cashRefund:row.cashRefund,status:row.status,createdBy:profile?.name??"مستخدم غير معروف",refundAccountName:row.refundAccountName,reversalReason:row.reversalReason,reversalDate:row.reversalDate};}});
 export const supplierRefundAccountPicker=query({args:{branchId:v.optional(v.id("branches"))},handler:async(ctx,args)=>{const user=await requirePermission(ctx,"record_supplier_refunds"),branchId=resolveWriteBranch(user,args.branchId);if(!branchId)throw new ConvexError("اختر الفرع");return(await ctx.db.query("financialAccounts").withIndex("by_branch",q=>q.eq("branchId",branchId)).collect()).filter(x=>x.isActive&&allowedRefundAccounts.includes(x.type)).map(x=>({_id:x._id,name:x.name,type:x.type,branchId:x.branchId}));}});
-
