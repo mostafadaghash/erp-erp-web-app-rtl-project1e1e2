@@ -1,12 +1,12 @@
 import { ConvexError } from "convex/values";
 import type { MutationCtx } from "../_generated/server";
 import type { Id } from "../_generated/dataModel";
-import type { AuthUser } from "./auth";
-import { logAction } from "./auth";
-import { requireActiveBranch, requireActiveSupplier } from "./references";
-import { requireFinanceInitialized } from "./finance";
-import { nextDocumentNumber } from "./documentNumbers";
-import { roundMoney } from "../../shared/businessRules";
+import type { AuthUser } from "./auth.ts";
+import { logAction } from "./auth.ts";
+import { requireActiveBranch, requireActiveSupplier } from "./references.ts";
+import { requireFinanceInitialized } from "./finance.ts";
+import { nextDocumentNumber } from "./documentNumbers.ts";
+import { roundMoney } from "../../shared/businessRules.ts";
 
 function hasAtMostTwoDecimals(value: number): boolean { return Number.isFinite(value) && Math.abs(value * 100 - Math.round(value * 100)) < 1e-7; }
 
