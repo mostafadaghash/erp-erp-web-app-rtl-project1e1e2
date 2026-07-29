@@ -1,15 +1,15 @@
-import { query, mutation } from "./_generated/server";
+import { query, mutation } from "./_generated/server.js";
 import { v } from "convex/values";
 import { ConvexError } from "convex/values";
-import { assertBranchAccess, requireModulePermission, requirePermission, filterByBranch, resolveWriteBranch, logAction } from "./lib/auth";
-import { canTransition, roundMoney, SHIPMENT_TRANSITIONS } from "../shared/businessRules";
-import { changeProductStock } from "./lib/inventory";
-import { allocateProportionally, INVENTORY_MOVEMENT_TYPES, roundAverageCost } from "../shared/inventoryRules";
-import { nextDocumentNumber } from "./lib/documentNumbers";
-import { requireActiveBranch, requireActiveSupplier } from "./lib/references";
-import { postSupplierLedgerEntry } from "./lib/supplierLedger";
-import { requireFinanceInitialized } from "./lib/finance";
-import { isValidIsoDate } from "../shared/businessRules";
+import { assertBranchAccess, requireModulePermission, requirePermission, filterByBranch, resolveWriteBranch, logAction } from "./lib/auth.ts";
+import { canTransition, roundMoney, SHIPMENT_TRANSITIONS } from "../shared/businessRules.ts";
+import { changeProductStock } from "./lib/inventory.ts";
+import { allocateProportionally, INVENTORY_MOVEMENT_TYPES, roundAverageCost } from "../shared/inventoryRules.ts";
+import { nextDocumentNumber } from "./lib/documentNumbers.ts";
+import { requireActiveBranch, requireActiveSupplier } from "./lib/references.ts";
+import { postSupplierLedgerEntry } from "./lib/supplierLedger.ts";
+import { requireFinanceInitialized } from "./lib/finance.ts";
+import { isValidIsoDate } from "../shared/businessRules.ts";
 import { postPurchaseReceiptJournal } from "./lib/generalLedgerPurchases.ts";
 
 export const list = query({
@@ -233,4 +233,3 @@ export const receive = mutation({
 });
 
 export const remove = mutation({ args: { id: v.id("shipments") }, handler: async () => { throw new ConvexError("استخدم انتقال حالة الشحنة إلى ملغاة مع إدخال السبب"); } });
-
