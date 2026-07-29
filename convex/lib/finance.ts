@@ -5,6 +5,7 @@ import { roundMoney } from "../../shared/businessRules";
 import { nextDocumentNumber } from "./documentNumbers";
 import type { AuthUser } from "./auth";
 import { isValidIsoDate } from "../../shared/businessRules";
+import { postFinancialTransactionJournal } from "./generalLedgerOperations.ts";
 
 export type FinancialTransactionType = Doc<"financialTransactions">["type"];
 export type MovementInput = { accountId: Id<"financialAccounts">; signedAmount: number };
@@ -68,8 +69,32 @@ export async function postFinancialTransaction(ctx: MutationCtx, user: AuthUser,
   if (!isValidIsoDate(input.date)) throw new ConvexError("تاريخ المعاملة غير صالح");
   if (!input.allowBeforeInitialization) await requireFinanceInitialized(ctx, input.date);
   const idempotencyKey = financialIdempotencyKey(input.type, user.userId, input.requestId);
+  const description = input.description.trim().replace(/\s+/g, " ");
+  const requestFingerprint = JSON.stringify({
+    type: input.type,
+    date: input.date,
+    amount: roundMoney(input.amount),
+    feeAmount: roundMoney(input.feeAmount ?? 0),
+    description,
+    branchId: String(input.branchId),
+    destinationBranchId: input.destinationBranchId ? String(input.destinationBranchId) : undefined,
+    referenceType: input.referenceType,
+    referenceId: input.referenceId,
+    referenceNumber: input.referenceNumber,
+    customerId: input.customerId ? String(input.customerId) : undefined,
+    supplierId: input.supplierId ? String(input.supplierId) : undefined,
+    originalTransactionId: input.originalTransactionId ? String(input.originalTransactionId) : undefined,
+    movements: input.movements
+      .map(movement => ({ accountId: String(movement.accountId), signedAmount: roundMoney(movement.signedAmount) }))
+      .sort((left, right) => `${left.accountId}:${left.signedAmount}`.localeCompare(`${right.accountId}:${right.signedAmount}`)),
+  });
   const duplicate = await ctx.db.query("financialTransactions").withIndex("by_idempotency_key", q => q.eq("idempotencyKey", idempotencyKey)).unique();
-  if (duplicate) return { transactionId: duplicate._id, duplicate: true };
+  if (duplicate) {
+    if (duplicate.requestFingerprint && duplicate.requestFingerprint !== requestFingerprint) {
+      throw new ConvexError("معرف الطلب مستخدم بحركة مالية مختلفة");
+    }
+    return { transactionId: duplicate._id, duplicate: true };
+  }
   if (!Number.isFinite(input.amount) || input.amount <= 0) throw new ConvexError("المبلغ يجب أن يكون أكبر من صفر");
   const amount = roundMoney(input.amount), feeAmount = roundMoney(input.feeAmount ?? 0);
   if (!Number.isFinite(feeAmount) || feeAmount < 0 || feeAmount > amount) throw new ConvexError("قيمة الرسوم غير صالحة");
@@ -87,8 +112,8 @@ export async function postFinancialTransaction(ctx: MutationCtx, user: AuthUser,
   }
   const transactionNumber = await nextDocumentNumber(ctx, "finance");
   const transactionId = await ctx.db.insert("financialTransactions", {
-    transactionNumber, idempotencyKey, type: input.type, status: "posted", date: input.date,
-    amount, feeAmount, netAmount: roundMoney(amount - feeAmount), description: input.description,
+    transactionNumber, idempotencyKey, requestFingerprint, type: input.type, status: "posted", date: input.date,
+    amount, feeAmount, netAmount: roundMoney(amount - feeAmount), description,
     referenceType: input.referenceType, referenceId: input.referenceId, referenceNumber: input.referenceNumber,
     customerId: input.customerId, supplierId: input.supplierId, branchId: input.branchId, destinationBranchId: input.destinationBranchId,
     userId: user.userId, createdAt: Date.now(), originalTransactionId: input.originalTransactionId,
@@ -99,6 +124,7 @@ export async function postFinancialTransaction(ctx: MutationCtx, user: AuthUser,
       balanceBefore: movement.before, balanceAfter: movement.after, branchId: movement.account.branchId, date: input.date,
       availableAt: availableAt(input.date, movement.account, movement.signedAmount), createdAt: Date.now() });
   }
+  await postFinancialTransactionJournal(ctx, user, transactionId);
   await ctx.db.insert("auditLogs", { userId: user.userId, userName: user.name, action: "post", module: "finance",
     recordId: String(transactionId), recordLabel: transactionNumber, details: input.description, branchId: input.branchId, timestamp: Date.now() });
   return { transactionId, duplicate: false };

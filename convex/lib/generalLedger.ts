@@ -2,12 +2,18 @@ import type { MutationCtx } from "../_generated/server";
 import type { Id } from "../_generated/dataModel";
 import type { AuthUser } from "./auth";
 import { ConvexError } from "convex/values";
-import { nextDocumentNumber } from "./documentNumbers";
-import { assertIsoDate, fingerprint, fromCents, normalizeRequestId, normalizeText, periodKeyOf, toCents } from "./generalLedgerRules";
-import { logAction } from "./auth";
+import { nextDocumentNumber } from "./documentNumbers.ts";
+import { assertIsoDate, fingerprint, fromCents, normalizeRequestId, normalizeText, periodKeyOf, toCents } from "./generalLedgerRules.ts";
+import { logAction } from "./auth.ts";
 
 export interface PostingLine { accountId:Id<"chartOfAccounts">; debit:number; credit:number; description?:string }
-export interface PostingRequest { branchId:Id<"branches">; date:string; memo:string; lines:PostingLine[]; requestId:string; sourceType:"opening"|"manual"|"reversal"; originalEntryId?:Id<"journalEntries">; reversalReason?:string }
+export interface PostingRequest {
+  branchId:Id<"branches">; date:string; memo:string; lines:PostingLine[]; requestId:string;
+  sourceType:"opening"|"manual"|"reversal"|"financial"|"financial_reversal";
+  originalEntryId?:Id<"journalEntries">; reversalReason?:string;
+  operationType?:string; referenceType?:string; referenceId?:string; referenceNumber?:string;
+  financialTransactionId?:Id<"financialTransactions">;
+}
 
 async function updateBalances(ctx:MutationCtx, entryId:Id<"journalEntries">, branchId:Id<"branches">, entryDate:string, periodKey:string, accountId:Id<"chartOfAccounts">, debit:number, credit:number) {
   const now=Date.now(), accountKey=`${branchId}:${accountId}`;
@@ -26,7 +32,7 @@ async function updateBalances(ctx:MutationCtx, entryId:Id<"journalEntries">, bra
 
 export async function postJournal(ctx:MutationCtx,user:AuthUser,input:PostingRequest) {
   const requestId=normalizeRequestId(input.requestId), date=assertIsoDate(input.date), periodKey=periodKeyOf(date), memo=normalizeText(input.memo);
-  const canonical={branchId:String(input.branchId),date,memo,lines:input.lines.map(l=>({accountId:String(l.accountId),debit:l.debit,credit:l.credit,description:normalizeText(l.description??"")})),sourceType:input.sourceType,originalEntryId:input.originalEntryId?String(input.originalEntryId):undefined,reversalReason:input.reversalReason?normalizeText(input.reversalReason):undefined};
+  const canonical={branchId:String(input.branchId),date,memo,lines:input.lines.map(l=>({accountId:String(l.accountId),debit:l.debit,credit:l.credit,description:normalizeText(l.description??"")})),sourceType:input.sourceType,originalEntryId:input.originalEntryId?String(input.originalEntryId):undefined,reversalReason:input.reversalReason?normalizeText(input.reversalReason):undefined,operationType:input.operationType,referenceType:input.referenceType,referenceId:input.referenceId,referenceNumber:input.referenceNumber,financialTransactionId:input.financialTransactionId?String(input.financialTransactionId):undefined};
   const requestFingerprint=fingerprint(canonical), idempotencyKey=`gl:${input.sourceType}:${requestId}`;
   const existing=await ctx.db.query("journalEntries").withIndex("by_idempotency",q=>q.eq("idempotencyKey",idempotencyKey)).unique();
   if(existing) { if(existing.requestFingerprint!==requestFingerprint) throw new ConvexError("معرف الطلب مستخدم بحمولة مختلفة"); return existing; }
@@ -47,7 +53,7 @@ export async function postJournal(ctx:MutationCtx,user:AuthUser,input:PostingReq
   }
   if(!debitCents || !creditCents || debitCents!==creditCents) throw new ConvexError("القيد غير متوازن");
   const entryNumber=await nextDocumentNumber(ctx,"journal",new Date(`${date}T00:00:00Z`)), now=Date.now();
-  const entryId=await ctx.db.insert("journalEntries",{entryNumber,branchId:input.branchId,entryDate:date,periodKey,sourceType:input.sourceType,status:"posted",memo,totalDebit:fromCents(debitCents),totalCredit:fromCents(creditCents),lineCount:prepared.length,requestId,idempotencyKey,requestFingerprint,originalEntryId:input.originalEntryId,reversalReason:input.reversalReason,postedAt:now,postedBy:user.userId});
+  const entryId=await ctx.db.insert("journalEntries",{entryNumber,branchId:input.branchId,entryDate:date,periodKey,sourceType:input.sourceType,status:"posted",memo,totalDebit:fromCents(debitCents),totalCredit:fromCents(creditCents),lineCount:prepared.length,requestId,idempotencyKey,requestFingerprint,originalEntryId:input.originalEntryId,reversalReason:input.reversalReason,operationType:input.operationType,referenceType:input.referenceType,referenceId:input.referenceId,referenceNumber:input.referenceNumber,financialTransactionId:input.financialTransactionId,postedAt:now,postedBy:user.userId});
   for(const line of prepared) { await ctx.db.insert("journalLines",{entryId,entryNumber,lineNumber:line.lineNumber,branchId:input.branchId,entryDate:date,periodKey,accountId:line.account._id,accountCodeSnapshot:line.account.code,accountNameSnapshot:line.account.nameAr,normalSideSnapshot:line.account.normalSide,debit:line.debit,credit:line.credit,description:line.description}); await updateBalances(ctx,entryId,input.branchId,date,periodKey,line.account._id,line.debit,line.credit); }
   await logAction(ctx,user,{action:"post",module:"general_ledger",recordId:String(entryId),recordLabel:entryNumber,details:`${input.sourceType}; debit=${fromCents(debitCents)}; credit=${fromCents(creditCents)}`});
   const entry=await ctx.db.get(entryId); if(!entry) throw new ConvexError("تعذر حفظ القيد"); return entry;

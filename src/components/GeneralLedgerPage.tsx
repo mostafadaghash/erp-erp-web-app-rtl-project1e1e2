@@ -79,7 +79,12 @@ type EntrySummary = {
   totalCredit: number;
   lineCount: number;
   status: "posted" | "reversed";
-  sourceType: "opening" | "manual" | "reversal";
+  sourceType:
+    | "opening"
+    | "manual"
+    | "reversal"
+    | "financial"
+    | "financial_reversal";
 };
 type EntryLine = {
   lineNumber: number;
@@ -100,7 +105,12 @@ type EntryDetails = {
   totalCredit: number;
   lineCount: number;
   status: "posted" | "reversed";
-  sourceType: "opening" | "manual" | "reversal";
+  sourceType:
+    | "opening"
+    | "manual"
+    | "reversal"
+    | "financial"
+    | "financial_reversal";
   originalEntryNumber?: string;
   reversalEntryNumber?: string;
   reversalReason?: string;
@@ -156,6 +166,8 @@ const sourceLabel: Record<EntrySummary["sourceType"], string> = {
   opening: "افتتاحي",
   manual: "يدوي",
   reversal: "عكس",
+  financial: "تشغيلي مالي",
+  financial_reversal: "عكس تشغيلي مالي",
 };
 
 function lineNumbers(lines: LineDraft[]) {
@@ -397,6 +409,7 @@ export function GeneralLedgerPage() {
   const [busy, setBusy] = useState(false);
   const [modal, setModal] = useState<Modal>(null);
   const [cutoverDate, setCutoverDate] = useState(today());
+  const [financialCutoverDate, setFinancialCutoverDate] = useState(today());
   const [openingDate, setOpeningDate] = useState(today());
   const [zeroOpening, setZeroOpening] = useState(true);
   const [openingLines, setOpeningLines] = useState<LineDraft[]>(initialLines);
@@ -432,6 +445,7 @@ export function GeneralLedgerPage() {
   );
 
   const initializeRequestId = useRef(newRequestId());
+  const financialPostingRequestId = useRef(newRequestId());
   const openingRequestId = useRef(newRequestId());
   const journalRequestId = useRef(newRequestId());
   const reversalRequestId = useRef(newRequestId());
@@ -439,6 +453,15 @@ export function GeneralLedgerPage() {
   const openingStatus = useQuery(
     api.generalLedger.openingStatus,
     canView && effectiveBranch ? { branchId: effectiveBranch } : "skip",
+  );
+  const financialReadiness = useQuery(
+    api.generalLedger.financialPostingReadinessStatus,
+    canInitialize &&
+      status?.initialized &&
+      !status.financialPostingEnabled &&
+      financialCutoverDate
+      ? { cutoverDate: financialCutoverDate }
+      : "skip",
   );
   const entries = usePaginatedQuery(
     api.generalLedger.entriesPaginated,
@@ -484,6 +507,9 @@ export function GeneralLedgerPage() {
   const trialRows = (trialQuery ?? []) as TrialRow[];
 
   const initialize = useMutation(api.generalLedger.initialize);
+  const enableFinancialPosting = useMutation(
+    api.generalLedger.enableFinancialPosting,
+  );
   const createAccount = useMutation(api.generalLedger.createAccount);
   const deactivateAccount = useMutation(api.generalLedger.deactivateAccount);
   const confirmOpening = useMutation(api.generalLedger.confirmOpening);
@@ -552,12 +578,16 @@ export function GeneralLedgerPage() {
     if (!status?.initialized || !status.cutoverDate) return;
     setCutoverDate(status.cutoverDate);
     setOpeningDate(status.cutoverDate);
+    setFinancialCutoverDate(
+      status.financialPostingCutoverDate ?? status.cutoverDate,
+    );
   }, [status]);
 
   useEffect(() => {
     openingRequestId.current = newRequestId();
     journalRequestId.current = newRequestId();
     reversalRequestId.current = newRequestId();
+    financialPostingRequestId.current = newRequestId();
     setSelectedEntryId(null);
     setLedgerAccountId(null);
   }, [effectiveBranch]);
@@ -740,8 +770,9 @@ export function GeneralLedgerPage() {
           <LockKeyhole className="h-4 w-4" /> وضع التأسيس Foundation
         </strong>
         <p className="mt-1 text-sm">
-          الربط التلقائي للمبيعات والمخزون والمشتريات وCOD غير مفعّل بعد. القيود
-          هنا افتتاحية أو يدوية فقط.
+          {status?.financialPostingEnabled
+            ? "ربط الخزائن والبنوك والمحافظ وCOD بالأستاذ العام مفعّل. ربط المبيعات والمخزون والمشتريات غير النقدية ما زال معطلًا."
+            : "الربط التلقائي للمبيعات والمخزون والمشتريات وCOD غير مفعّل بعد. القيود هنا افتتاحية أو يدوية فقط."}
         </p>
       </div>
 
@@ -812,6 +843,21 @@ export function GeneralLedgerPage() {
                     {status.operationalPostingEnabled ? "مفعّل" : "غير مفعّل"}
                   </strong>
                 </p>
+                <p>
+                  ربط الخزائن بالأستاذ العام:{" "}
+                  <strong
+                    className={
+                      status.financialPostingEnabled
+                        ? "text-emerald-700"
+                        : "text-amber-700"
+                    }
+                  >
+                    {status.financialPostingEnabled ? "مفعّل" : "غير مفعّل"}
+                  </strong>
+                </p>
+                {status.financialPostingCutoverDate && (
+                  <p>تاريخ ربط الخزائن: {status.financialPostingCutoverDate}</p>
+                )}
               </div>
             ) : canInitialize ? (
               <div className="space-y-3">
@@ -872,6 +918,83 @@ export function GeneralLedgerPage() {
               </button>
             )}
           </section>
+          {status?.initialized && (
+            <section className="card p-5 lg:col-span-3">
+              <h2 className="mb-2 font-bold">
+                الربط الذري للخزائن والبنوك والمحافظ وCOD
+              </h2>
+              {status.financialPostingEnabled ? (
+                <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">
+                  كل حركة مالية جديدة من تاريخ{" "}
+                  <strong>{status.financialPostingCutoverDate}</strong> تُنشئ
+                  قيدًا مزدوجًا داخل Mutation نفسها. عكس الحركة المالية يعكس
+                  القيد المرتبط بها.
+                </div>
+              ) : canInitialize ? (
+                <div className="space-y-3">
+                  <p className="text-sm text-slate-600">
+                    التفعيل نهائي لهذه الشريحة. يلزم افتتاح كل فرع في التاريخ
+                    نفسه، ومطابقة أرصدة الحسابات المالية مع حسابات GL، وفتح
+                    الفترة المالية.
+                  </p>
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+                    <label className="block">
+                      <span className="mb-1 block text-xs font-bold text-slate-600">
+                        تاريخ بدء الربط
+                      </span>
+                      <input
+                        className="form-input"
+                        type="date"
+                        value={financialCutoverDate}
+                        onChange={(event) => {
+                          setFinancialCutoverDate(event.target.value);
+                          financialPostingRequestId.current = newRequestId();
+                        }}
+                      />
+                    </label>
+                    <button
+                      type="button"
+                      className="btn-primary disabled:opacity-50"
+                      disabled={
+                        busy ||
+                        !financialCutoverDate ||
+                        !financialReadiness?.ready
+                      }
+                      onClick={() =>
+                        void run(
+                          () =>
+                            enableFinancialPosting({
+                              cutoverDate: financialCutoverDate,
+                              requestId: financialPostingRequestId.current,
+                            }),
+                          "تم تفعيل ربط الحركات المالية بالأستاذ العام",
+                          financialPostingRequestId,
+                        )
+                      }
+                    >
+                      تفعيل ربط الخزائن
+                    </button>
+                  </div>
+                  {financialReadiness &&
+                    (financialReadiness.ready ? (
+                      <p className="text-sm font-bold text-emerald-700">
+                        المطابقة ناجحة وجاهزة للتفعيل.
+                      </p>
+                    ) : (
+                      <ul className="list-disc space-y-1 pr-5 text-sm text-red-700">
+                        {financialReadiness.issues.map((issue) => (
+                          <li key={issue}>{issue}</li>
+                        ))}
+                      </ul>
+                    ))}
+                </div>
+              ) : (
+                <p className="text-sm text-slate-500">
+                  لا تملك صلاحية تفعيل الربط المالي.
+                </p>
+              )}
+            </section>
+          )}
         </div>
       )}
 

@@ -290,8 +290,56 @@ test("GLUI-39 surfaces real Convex errors and blocks double submission", () => {
 });
 
 test("GLUI-40 forbids unsafe escapes prompts and fake print hooks", () => {
-  assert.doesNotMatch(ui, /\bas any\b|@ts-ignore/);
+  assert.doesNotMatch(ui, /\bas\s+any\b|@ts-ign[o]re/);
   assert.doesNotMatch(ui, /window\.prompt|prompt\(/);
   assert.doesNotMatch(ui, /__generalLedgerPrint|setTimeout\([^)]*print/);
   assert.match(ui, /window\.open\("", "_blank"\)/);
+});
+
+test("FGBUI-01 financial readiness query is permission and state gated", () => {
+  assert.match(ui, /api\.generalLedger\.financialPostingReadinessStatus/);
+  assert.match(
+    ui,
+    /canInitialize[\s\S]*status\?\.initialized[\s\S]*!status\.financialPostingEnabled/,
+  );
+  assert.match(ui, /: "skip"/);
+});
+
+test("FGBUI-02 activation uses the dedicated backend mutation", () => {
+  assert.match(
+    ui,
+    /useMutation\(\s*api\.generalLedger\.enableFinancialPosting/,
+  );
+  assert.match(ui, /enableFinancialPosting\(\{/);
+  assert.match(ui, /cutoverDate: financialCutoverDate/);
+});
+
+test("FGBUI-03 activation request id remains stable across failure", () => {
+  assert.match(
+    ui,
+    /const financialPostingRequestId = useRef\(newRequestId\(\)\)/,
+  );
+  assert.match(ui, /requestId: financialPostingRequestId\.current/);
+  assert.match(ui, /financialPostingRequestId,\s*\)/);
+});
+
+test("FGBUI-04 activation button requires successful reconciliation", () => {
+  assert.match(ui, /!financialReadiness\?\.ready/);
+  assert.match(ui, /financialReadiness\.issues\.map/);
+  assert.match(ui, /المطابقة ناجحة وجاهزة للتفعيل/);
+});
+
+test("FGBUI-05 UI distinguishes financial bridge from full operational posting", () => {
+  assert.match(ui, /ربط الخزائن بالأستاذ العام/);
+  assert.match(ui, /status\.financialPostingEnabled/);
+  assert.match(ui, /status\.operationalPostingEnabled/);
+  assert.match(
+    ui,
+    /ربط المبيعات والمخزون والمشتريات غير النقدية ما زال معطلًا/,
+  );
+});
+
+test("FGBUI-06 financial journal sources have explicit Arabic labels", () => {
+  assert.match(ui, /financial: "تشغيلي مالي"/);
+  assert.match(ui, /financial_reversal: "عكس تشغيلي مالي"/);
 });
