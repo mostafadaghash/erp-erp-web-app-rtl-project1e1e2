@@ -2,7 +2,7 @@ import { mutation, query } from "./_generated/server";
 import { paginationOptsValidator } from "convex/server";
 import { v, ConvexError } from "convex/values";
 import { assertBranchAccess, requireAdmin, requirePermission, resolveWriteBranch } from "./lib/auth";
-import { assertFinancialAccountBranch, calculateAvailableBalance, postFinancialTransaction, requireActiveFinancialAccount } from "./lib/finance";
+import { assertFinancialAccountBranch, calculateAvailableBalance, findFinancialTransactionByRequest, postFinancialTransaction, requireActiveFinancialAccount } from "./lib/finance";
 import { isValidIsoDate, roundMoney } from "../shared/businessRules";
 
 const accountType = v.union(v.literal("cash"), v.literal("instapay"), v.literal("vodafone_cash"), v.literal("fawry_clearing"), v.literal("paymob_clearing"), v.literal("card_clearing"), v.literal("bank"), v.literal("other"));
@@ -72,11 +72,17 @@ export const settleClearingAccount = mutation({ args: { sourceAccountId: v.id("f
 
 export const reverseTransaction = mutation({ args: { transactionId: v.id("financialTransactions"), reason: v.string(), date: v.string(), requestId: v.string() }, handler: async (ctx, args) => {
   const user = await requirePermission(ctx, "reverse_financial_transactions"), original = await ctx.db.get(args.transactionId); if (!original) throw new ConvexError("المعاملة غير موجودة"); assertBranchAccess(user, original);
+  const reason = args.reason.trim(); if (!reason) throw new ConvexError("سبب العكس مطلوب");
+  const reversalDescription = `عكس ${original.transactionNumber}: ${reason}`;
+  const retry = await findFinancialTransactionByRequest(ctx, "reversal", user.userId, args.requestId);
+  if (retry) {
+    if (retry.originalTransactionId !== original._id || retry.date !== args.date || retry.description !== reversalDescription) throw new ConvexError("معرف طلب العكس مستخدم ببيانات مختلفة");
+    return retry._id;
+  }
   if (original.status === "reversed" || original.reversalTransactionId) throw new ConvexError("تم عكس المعاملة سابقاً");
   if (!["opening_balance", "account_transfer", "paymob_settlement", "clearing_settlement"].includes(original.type)) throw new ConvexError("استخدم مسار الاسترداد الخاص بالمستند للحفاظ على اتساقه");
-  const reason = args.reason.trim(); if (!reason) throw new ConvexError("سبب العكس مطلوب");
   const movements = await ctx.db.query("financialMovements").withIndex("by_transaction", q => q.eq("transactionId", original._id)).collect();
-  const posted = await postFinancialTransaction(ctx, user, { type: "reversal", requestId: args.requestId, date: args.date, amount: original.amount, feeAmount: 0, description: `عكس ${original.transactionNumber}: ${reason}`, branchId: original.branchId, destinationBranchId: original.destinationBranchId, referenceType: "financial_transaction", referenceId: String(original._id), referenceNumber: original.transactionNumber, originalTransactionId: original._id, movements: movements.map(movement => ({ accountId: movement.accountId, signedAmount: -movement.signedAmount })) });
+  const posted = await postFinancialTransaction(ctx, user, { type: "reversal", requestId: args.requestId, date: args.date, amount: original.amount, feeAmount: 0, description: reversalDescription, branchId: original.branchId, destinationBranchId: original.destinationBranchId, referenceType: "financial_transaction", referenceId: String(original._id), referenceNumber: original.transactionNumber, originalTransactionId: original._id, movements: movements.map(movement => ({ accountId: movement.accountId, signedAmount: -movement.signedAmount })) });
   if (!posted.duplicate) await ctx.db.patch(original._id, { status: "reversed", reversedAt: Date.now(), reversedBy: user.userId, reversalReason: reason, reversalTransactionId: posted.transactionId });
   return posted.transactionId;
 } });
