@@ -5,7 +5,7 @@ import { roundMoney } from "../../shared/businessRules";
 import { nextDocumentNumber } from "./documentNumbers";
 import type { AuthUser } from "./auth";
 import { isValidIsoDate } from "../../shared/businessRules";
-import { postFinancialTransactionJournal } from "./generalLedgerOperations";
+import { postFinancialTransactionJournal } from "./generalLedgerOperations.ts";
 
 export type FinancialTransactionType = Doc<"financialTransactions">["type"];
 export type MovementInput = { accountId: Id<"financialAccounts">; signedAmount: number };
