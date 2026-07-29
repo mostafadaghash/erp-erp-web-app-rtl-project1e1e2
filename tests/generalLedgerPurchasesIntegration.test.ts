@@ -1,41 +1,20 @@
-import test, { before } from "node:test";
+import test from "node:test";
 import assert from "node:assert/strict";
-import { existsSync } from "node:fs";
-import { symlink } from "node:fs/promises";
-import { resolve } from "node:path";
 import { convexTest } from "convex-test";
 import schema from "../convex/schema.ts";
 import { api } from "../convex/_generated/api.js";
 import type { Id } from "../convex/_generated/dataModel";
-
-const links = [
-  ["convex/_generated/server", "server.js"],
-  ["convex/lib/auth", "auth.ts"],
-  ["convex/lib/finance", "finance.ts"],
-  ["convex/lib/documentNumbers", "documentNumbers.ts"],
-  ["convex/lib/references", "references.ts"],
-  ["convex/lib/inventory", "inventory.ts"],
-  ["convex/lib/supplierLedger", "supplierLedger.ts"],
-  ["shared/businessRules", "businessRules.ts"],
-  ["shared/inventoryRules", "inventoryRules.ts"],
-  ["shared/purchaseReturnRules", "purchaseReturnRules.ts"],
-  ["shared/supplierPaymentRules", "supplierPaymentRules.ts"],
-] as const;
-
-before(async () => {
-  for (const [path, target] of links) {
-    const absolute = resolve(path);
-    if (!existsSync(absolute)) {
-      await symlink(target, absolute);
-    }
-  }
-});
+import type { AuthUser } from "../convex/lib/auth.ts";
+import { postJournal } from "../convex/lib/generalLedger.ts";
+import {
+  DEFAULT_CHART,
+  GENERAL_LEDGER_CHART_VERSION,
+} from "../convex/lib/generalLedgerTemplate.ts";
 
 const modules = {
   "../convex/_generated/api.js": () => import("../convex/_generated/api.js"),
   "../convex/_generated/server.js": () =>
     import("../convex/_generated/server.js"),
-  "../convex/generalLedger.ts": () => import("../convex/generalLedger.ts"),
   "../convex/shipments.ts": () => import("../convex/shipments.ts"),
   "../convex/purchaseReturns.ts": () => import("../convex/purchaseReturns.ts"),
   "../convex/supplierPayments.ts": () =>
@@ -52,12 +31,13 @@ async function fixture(options?: {
 }) {
   const raw = convexTest(schema, modules);
   const seeded = await raw.run(async (ctx) => {
+    const now = Date.now();
     const branchId = await ctx.db.insert("branches", {
       name: "الفرع الرئيسي",
       address: "القاهرة",
       isActive: true,
     });
-    await ctx.db.insert("userProfiles", {
+    const employeeId = await ctx.db.insert("userProfiles", {
       userId: "admin",
       tokenIdentifier: "admin",
       name: "مدير النظام",
@@ -66,6 +46,15 @@ async function fixture(options?: {
       permissions: [],
       isActive: true,
     });
+    const user: AuthUser = {
+      userId: "admin",
+      employeeId,
+      name: "مدير النظام",
+      role: "admin",
+      branchId,
+      isActive: true,
+      permissions: [],
+    };
     await ctx.db.insert("settings", {
       storeName: "اختبار",
       storeType: "retail",
@@ -78,7 +67,90 @@ async function fixture(options?: {
       isInitialized: true,
       cutoverDate: "2026-01-01",
       defaultClearingDelayDays: 0,
-      updatedAt: Date.now(),
+      updatedAt: now,
+    });
+    const accountIds = {} as Record<string, Id<"chartOfAccounts">>;
+    const accountIdsByCode = new Map<string, Id<"chartOfAccounts">>();
+    for (const account of DEFAULT_CHART) {
+      const accountId = await ctx.db.insert("chartOfAccounts", {
+        code: account.code,
+        normalizedCode: account.code,
+        nameAr: account.nameAr,
+        parentId: account.parentCode
+          ? accountIdsByCode.get(account.parentCode)
+          : undefined,
+        accountClass: account.accountClass,
+        normalSide: account.normalSide,
+        isContra: account.isContra ?? false,
+        isPosting: account.isPosting,
+        isSystem: true,
+        systemKey: account.systemKey,
+        isActive: true,
+        createdAt: now,
+        createdBy: user.userId,
+      });
+      accountIds[account.systemKey] = accountId;
+      accountIdsByCode.set(account.code, accountId);
+    }
+    await ctx.db.insert("generalLedgerSettings", {
+      baseCurrency: "EGP",
+      chartVersion: GENERAL_LEDGER_CHART_VERSION,
+      status: "foundation_ready",
+      operationalPostingEnabled: options?.operational !== false,
+      financialPostingEnabled: true,
+      financialPostingCutoverDate: "2026-01-01",
+      cutoverDate: "2026-01-01",
+      initializedAt: now,
+      initializedBy: user.userId,
+      initializationRequestId: "gl-init",
+      initializationFingerprint: "purchase-bridge-fixture",
+    });
+    await ctx.db.insert("accountingPeriods", {
+      periodKey: "2026-01",
+      startDate: "2026-01-01",
+      endDate: "2026-01-31",
+      status: "open",
+    });
+    const opening = await postJournal(ctx, user, {
+      branchId,
+      date: "2026-01-01",
+      memo: "أرصدة افتتاحية مرجعية لاختبار جسر المشتريات",
+      requestId: "gl-opening",
+      sourceType: "opening",
+      operationType: "opening_balance",
+      referenceType: "general_ledger_opening",
+      referenceId: String(branchId),
+      lines: [
+        {
+          accountId: accountIds.cash,
+          debit: 1000,
+          credit: 0,
+          description: "الخزينة الافتتاحية",
+        },
+        {
+          accountId: accountIds.inventory,
+          debit: 100,
+          credit: 0,
+          description: "المخزون الافتتاحي",
+        },
+        {
+          accountId: accountIds.opening_equity,
+          debit: 0,
+          credit: 1100,
+          description: "حقوق الافتتاح",
+        },
+      ],
+    });
+    await ctx.db.insert("generalLedgerOpenings", {
+      branchId,
+      openingDate: "2026-01-01",
+      status: "confirmed",
+      isZeroOpening: false,
+      openingEntryId: opening._id,
+      requestId: "gl-opening",
+      fingerprint: "purchase-bridge-fixture",
+      confirmedAt: now,
+      confirmedBy: user.userId,
     });
     const cashAccountId = await ctx.db.insert("financialAccounts", {
       name: "الخزينة",
@@ -90,9 +162,9 @@ async function fixture(options?: {
       currentBalance: 1000,
       allowNegative: false,
       settlementDelayDays: 0,
-      createdAt: Date.now(),
+      createdAt: now,
       createdBy: "admin",
-      updatedAt: Date.now(),
+      updatedAt: now,
     });
     const supplierId = await ctx.db.insert("suppliers", {
       name: "مورد الاختبار",
@@ -135,64 +207,24 @@ async function fixture(options?: {
       status: "in_transit",
       branchId,
     });
-    return { branchId, cashAccountId, supplierId, productId, shipmentId };
+    return {
+      accountIds,
+      branchId,
+      cashAccountId,
+      supplierId,
+      productId,
+      shipmentId,
+    };
   });
   const t = raw.withIdentity({
     subject: "admin",
     tokenIdentifier: "admin",
   });
-  await t.mutation(api.generalLedger.initialize, {
-    cutoverDate: "2026-01-01",
-    requestId: "gl-init",
-  });
-  await t.mutation(api.generalLedger.createOrOpenPeriod, {
-    periodKey: "2026-01",
-  });
-  const chart = await t.query(api.generalLedger.chart, {
-    activeOnly: false,
-  });
   const account = (key: string) => {
-    const found = chart.find((row) => row.systemKey === key);
+    const found = seeded.accountIds[key];
     assert.ok(found, `missing ${key}`);
-    return found._id;
+    return found;
   };
-  await t.mutation(api.generalLedger.confirmOpening, {
-    branchId: seeded.branchId,
-    openingDate: "2026-01-01",
-    isZeroOpening: false,
-    requestId: "gl-opening",
-    lines: [
-      {
-        accountId: account("cash"),
-        debit: 1000,
-        credit: 0,
-        description: "الخزينة الافتتاحية",
-      },
-      {
-        accountId: account("inventory"),
-        debit: 100,
-        credit: 0,
-        description: "المخزون الافتتاحي",
-      },
-      {
-        accountId: account("opening_equity"),
-        debit: 0,
-        credit: 1100,
-        description: "حقوق الافتتاح",
-      },
-    ],
-  });
-  await t.mutation(api.generalLedger.enableFinancialPosting, {
-    cutoverDate: "2026-01-01",
-    requestId: "finance-bridge",
-  });
-  if (options?.operational !== false) {
-    await raw.run(async (ctx) => {
-      const settings = await ctx.db.query("generalLedgerSettings").first();
-      assert.ok(settings);
-      await ctx.db.patch(settings._id, { operationalPostingEnabled: true });
-    });
-  }
   return { raw, t, account, ...seeded };
 }
 
@@ -253,6 +285,22 @@ async function payReceipt(
     date: "2026-01-10",
     requestId,
     allocations: [{ purchaseReceiptId: receiptId, amount }],
+  });
+}
+
+async function closeJanuaryPeriod(e: Fixture) {
+  await e.raw.run(async (ctx) => {
+    const period = await ctx.db
+      .query("accountingPeriods")
+      .withIndex("by_key", (q) => q.eq("periodKey", "2026-01"))
+      .unique();
+    assert.ok(period);
+    await ctx.db.patch(period._id, {
+      status: "closed",
+      closedAt: Date.now(),
+      closedBy: "admin",
+      closeReason: "إغلاق اختبار",
+    });
   });
 }
 
@@ -439,10 +487,7 @@ test("PIB-07 receipt retry returns one operational journal without duplicate bal
 
 test("PIB-08 closed period rolls back receipt stock supplier and journal effects", async () => {
   const e = await fixture();
-  await e.t.mutation(api.generalLedger.closePeriod, {
-    periodKey: "2026-01",
-    reason: "إغلاق اختبار",
-  });
+  await closeJanuaryPeriod(e);
   const beforeState = await operationalSnapshot(e);
   await assert.rejects(receive(e), /الفترة المالية غير مفتوحة/);
   assert.deepEqual(await operationalSnapshot(e), beforeState);
@@ -669,10 +714,7 @@ test("PIB-20 return request fingerprint conflict preserves all ledgers and inven
 test("PIB-21 closed period rolls back purchase return inventory supplier and finance writes", async () => {
   const e = await fixture({ shippingCost: 0 });
   const receipt = await receive(e);
-  await e.t.mutation(api.generalLedger.closePeriod, {
-    periodKey: "2026-01",
-    reason: "إغلاق اختبار",
-  });
+  await closeJanuaryPeriod(e);
   const beforeState = await operationalSnapshot(e);
   await assert.rejects(
     purchaseReturn(e, receipt.purchaseReceiptId),
@@ -772,10 +814,7 @@ test("PIB-26 closed reversal period rolls back stock finance supplier and journa
   const e = await fixture({ shippingCost: 0 });
   const receipt = await receive(e);
   const returnId = await purchaseReturn(e, receipt.purchaseReceiptId);
-  await e.t.mutation(api.generalLedger.closePeriod, {
-    periodKey: "2026-01",
-    reason: "إغلاق قبل العكس",
-  });
+  await closeJanuaryPeriod(e);
   const beforeState = await operationalSnapshot(e);
   await assert.rejects(
     e.t.mutation(api.purchaseReturns.reverse, {
