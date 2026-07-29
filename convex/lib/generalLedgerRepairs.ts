@@ -9,7 +9,11 @@ import {
   toCents,
 } from "./generalLedgerRules.ts";
 
-type RepairSystemKey = "accounts_receivable" | "sales";
+type RepairSystemKey =
+  | "accounts_receivable"
+  | "sales"
+  | "inventory"
+  | "cogs";
 
 export async function repairPostingState(ctx: MutationCtx) {
   const settings = await ctx.db.query("generalLedgerSettings").first();
@@ -53,7 +57,8 @@ async function postingLine(
   debitCents: number,
   creditCents: number,
   description: string,
-): Promise<PostingLine> {
+): Promise<PostingLine | null> {
+  if (!debitCents && !creditCents) return null;
   const account = await systemAccount(ctx, key);
   return {
     accountId: account._id,
@@ -64,9 +69,9 @@ async function postingLine(
 }
 
 /**
- * Posts labor/service revenue only. Cash collections remain owned by the
- * financial bridge and repair parts remain out of scope until inventory-backed
- * parts are implemented.
+ * Posts the repair charge and the exact historical inventory/COGS effect of
+ * inventory-backed spare parts. Cash collections remain owned by the financial
+ * bridge.
  */
 export async function postRepairRevenueJournal(
   ctx: MutationCtx,
@@ -78,29 +83,49 @@ export async function postRepairRevenueJournal(
     repairId: Id<"repairs">;
     repairNumber: string;
     laborCost: number;
+    partsRevenue?: number;
+    partsCogs?: number;
   },
 ): Promise<Doc<"journalEntries"> | null> {
   const state = await operationalSettings(ctx, input.date);
   if (!state) return null;
-  const amountCents = toCents(input.laborCost);
-  if (!amountCents) return null;
+  const amountCents =
+    toCents(input.laborCost) + toCents(input.partsRevenue ?? 0);
+  const cogsCents = toCents(input.partsCogs ?? 0);
+  if (!amountCents && !cogsCents) return null;
 
-  const lines = [
-    await postingLine(
-      ctx,
-      "accounts_receivable",
-      amountCents,
-      0,
-      `${input.repairNumber} — مديونية خدمة الصيانة`,
-    ),
-    await postingLine(
-      ctx,
-      "sales",
-      0,
-      amountCents,
-      `${input.repairNumber} — إيراد خدمة الصيانة`,
-    ),
-  ];
+  const lines = (
+    await Promise.all([
+      postingLine(
+        ctx,
+        "accounts_receivable",
+        amountCents,
+        0,
+        `${input.repairNumber} — مديونية خدمة الصيانة`,
+      ),
+      postingLine(
+        ctx,
+        "sales",
+        0,
+        amountCents,
+        `${input.repairNumber} — إيراد خدمة الصيانة`,
+      ),
+      postingLine(
+        ctx,
+        "cogs",
+        cogsCents,
+        0,
+        `${input.repairNumber} — تكلفة قطع غيار الصيانة`,
+      ),
+      postingLine(
+        ctx,
+        "inventory",
+        0,
+        cogsCents,
+        `${input.repairNumber} — مخزون قطع غيار الصيانة`,
+      ),
+    ])
+  ).filter((line): line is PostingLine => line !== null);
   return postJournal(ctx, user, {
     branchId: input.branchId,
     date: state.date,

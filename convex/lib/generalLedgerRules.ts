@@ -12,8 +12,15 @@ export function assertIsoDate(value: string): string {
 }
 export const periodKeyOf = (date: string) => assertIsoDate(date).slice(0,7);
 export function toCents(value: number): number {
-  if (!Number.isFinite(value) || value < 0 || Math.round(value * 100) !== value * 100) throw new ConvexError("المبلغ يجب أن يكون غير سالب وبدقة قرشين");
-  return Math.round(value * 100);
+  const cents = Math.round(value * 100);
+  if (
+    !Number.isFinite(value) ||
+    value < 0 ||
+    Math.abs(value - cents / 100) > 1e-9
+  ) {
+    throw new ConvexError("المبلغ يجب أن يكون غير سالب وبدقة قرشين");
+  }
+  return cents;
 }
 export const fromCents = (value: number) => value / 100;
 export const fingerprint = (value: unknown) => JSON.stringify(value);
