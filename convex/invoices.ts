@@ -1,17 +1,19 @@
-import { query, mutation } from "./_generated/server";
+import { query, mutation } from "./_generated/server.js";
 import type { MutationCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import { v } from "convex/values";
 import { ConvexError } from "convex/values";
-import { assertBranchAccess, filterByBranch, requireModulePermission, requirePermission, resolveWriteBranch, logAction, type AuthUser } from "./lib/auth";
-import { postFinancialTransaction, requireActiveFinancialAccount, assertFinancialAccountBranch, findFinancialTransactionByRequest } from "./lib/finance";
-import { calculateInvoiceTotals, deriveInvoiceStatus, roundMoney } from "../shared/businessRules";
-import { changeProductStock } from "./lib/inventory";
-import { allocateProportionally, INVENTORY_MOVEMENT_TYPES } from "../shared/inventoryRules";
-import { nextDocumentNumber } from "./lib/documentNumbers";
-import { requireActiveBranch, requireActiveCustomer } from "./lib/references";
+import { assertBranchAccess, filterByBranch, requireModulePermission, requirePermission, resolveWriteBranch, logAction, type AuthUser } from "./lib/auth.ts";
+import { postFinancialTransaction, requireActiveFinancialAccount, assertFinancialAccountBranch, findFinancialTransactionByRequest } from "./lib/finance.ts";
+import { calculateInvoiceTotals, deriveInvoiceStatus, roundMoney } from "../shared/businessRules.ts";
+import { changeProductStock } from "./lib/inventory.ts";
+import { allocateProportionally, INVENTORY_MOVEMENT_TYPES } from "../shared/inventoryRules.ts";
+import { nextDocumentNumber } from "./lib/documentNumbers.ts";
+import { requireActiveBranch, requireActiveCustomer } from "./lib/references.ts";
 import { postCustomerLedgerEntry } from "./lib/customerLedger.ts";
 import { assertInvoiceNotLockedByActiveDelivery } from "./lib/deliveryLocks.ts";
+import { postSalesInventoryJournal } from "./lib/generalLedgerSales.ts";
+import { assertIsoDate } from "./lib/generalLedgerRules.ts";
 
 type InvoiceItemInput = {
   productId: Id<"products">;
@@ -21,6 +23,22 @@ type InvoiceItemInput = {
   discount: number;
   total: number;
 };
+
+function withoutJournalLinks<
+  T extends {
+    journalEntryId?: unknown;
+    lastAdjustmentJournalEntryId?: unknown;
+    cancellationJournalEntryId?: unknown;
+  },
+>(invoice: T) {
+  const {
+    journalEntryId: _journal,
+    lastAdjustmentJournalEntryId: _adjustment,
+    cancellationJournalEntryId: _cancellation,
+    ...visible
+  } = invoice;
+  return visible;
+}
 
 async function prepareInvoice(
   ctx: MutationCtx,
@@ -118,8 +136,9 @@ export const list = query({
       invoices = invoices.filter(i => i.customerId === args.customerId);
     }
     const sorted = invoices.sort((a, b) => b._creationTime - a._creationTime);
-    if (user.permissions.includes("view_profits")) return sorted;
-    return sorted.map(({ cogsTotal: _cogs, ...invoice }) => ({ ...invoice, items: invoice.items.map(({ unitCost: _unit, costTotal: _cost, ...item }) => item) }));
+    const visible = sorted.map(withoutJournalLinks);
+    if (user.permissions.includes("view_profits")) return visible;
+    return visible.map(({ cogsTotal: _cogs, ...invoice }) => ({ ...invoice, items: invoice.items.map(({ unitCost: _unit, costTotal: _cost, ...item }) => item) }));
   },
 });
 
@@ -129,8 +148,10 @@ export const get = query({
     const user = await requireModulePermission(ctx, "view_invoices", "invoices");
     const invoice = await ctx.db.get(args.id);
     if (invoice) assertBranchAccess(user, invoice);
-    if (!invoice || user.permissions.includes("view_profits")) return invoice;
-    const { cogsTotal: _cogs, ...visible } = invoice;
+    if (!invoice) return null;
+    const sanitized = withoutJournalLinks(invoice);
+    if (user.permissions.includes("view_profits")) return sanitized;
+    const { cogsTotal: _cogs, ...visible } = sanitized;
     return { ...visible, items: invoice.items.map(({ unitCost: _unit, costTotal: _cost, ...item }) => item) };
   },
 });
@@ -152,6 +173,7 @@ export const create = mutation({
     discount: v.number(),
     tax: v.number(),
     total: v.number(),
+    date: v.optional(v.string()),
     creationRequestId: v.string(),
     initialPayment: v.optional(v.object({ amount: v.number(), accountId: v.id("financialAccounts"), paymentDate: v.string(), requestId: v.string(), notes: v.optional(v.string()) })),
     notes: v.optional(v.string()),
@@ -175,6 +197,11 @@ export const create = mutation({
       customerPhone = customer.phone;
     }
     const prepared = await prepareInvoice(ctx, user, args.items, args.discount, args.initialPayment?.amount ?? 0, new Map(), branchId);
+    const operationDate = assertIsoDate(
+      args.date ??
+        args.initialPayment?.paymentDate ??
+        new Date().toISOString().slice(0, 10),
+    );
     if (args.initialPayment && args.initialPayment.amount <= 0) throw new ConvexError("مبلغ الدفعة الأولية يجب أن يكون أكبر من صفر");
     if (prepared.remaining > 0 && !args.customerId) throw new ConvexError("الفاتورة الآجلة تتطلب عميلاً مسجلاً");
     let paymentAccount;
@@ -198,6 +225,7 @@ export const create = mutation({
       paymentMethod: paymentAccount?.type ?? "unpaid",
       status: deriveInvoiceStatus({ netTotal: prepared.total, creditedTotal: 0, paid: prepared.paid, remaining: prepared.remaining }),
       notes: args.notes,
+      date: operationDate,
       branchId,
       userId: user.userId,
       type: "sale",
@@ -218,14 +246,25 @@ export const create = mutation({
     }
 
     if (args.customerId) {
-      const ledgerDate = args.initialPayment?.paymentDate ?? new Date().toISOString().slice(0, 10);
-      await postCustomerLedgerEntry(ctx, user, { type: "invoice_charge", requestId: `${args.creationRequestId}:charge`, customerId: args.customerId, branchId: branchId!, date: ledgerDate, receivableDelta: prepared.total, advanceDelta: 0, purchasesDelta: prepared.total, description: `استحقاق الفاتورة ${invoiceNumber}`, referenceType: "invoice", referenceId: String(id), referenceNumber: invoiceNumber });
+      await postCustomerLedgerEntry(ctx, user, { type: "invoice_charge", requestId: `${args.creationRequestId}:charge`, customerId: args.customerId, branchId: branchId!, date: operationDate, receivableDelta: prepared.total, advanceDelta: 0, purchasesDelta: prepared.total, description: `استحقاق الفاتورة ${invoiceNumber}`, referenceType: "invoice", referenceId: String(id), referenceNumber: invoiceNumber });
       if (args.initialPayment) await postCustomerLedgerEntry(ctx, user, { type: "invoice_payment", requestId: `${args.initialPayment.requestId}:ledger`, customerId: args.customerId, branchId: branchId!, date: args.initialPayment.paymentDate, receivableDelta: -args.initialPayment.amount, advanceDelta: 0, purchasesDelta: 0, description: `دفعة الفاتورة ${invoiceNumber}`, referenceType: "invoice", referenceId: String(id), referenceNumber: invoiceNumber });
     }
 
     if (args.initialPayment && paymentAccount) {
       await postFinancialTransaction(ctx, user, { type: "invoice_payment", requestId: args.initialPayment.requestId, date: args.initialPayment.paymentDate, amount: args.initialPayment.amount, description: args.initialPayment.notes?.trim() || `تحصيل أولي للفاتورة ${invoiceNumber}`, branchId: branchId!, referenceType: "invoice", referenceId: String(id), referenceNumber: invoiceNumber, customerId: args.customerId, movements: [{ accountId: paymentAccount._id, signedAmount: args.initialPayment.amount }] });
     }
+
+    const journal = await postSalesInventoryJournal(ctx, user, {
+      operation: "invoice_create",
+      branchId: branchId!,
+      date: operationDate,
+      requestId: `invoice:${id}:create`,
+      referenceId: String(id),
+      referenceNumber: invoiceNumber,
+      salesAmount: prepared.total,
+      cogsAmount: prepared.cogsTotal,
+    });
+    if (journal) await ctx.db.patch(id, { journalEntryId: journal._id });
 
     await logAction(ctx, user, {
       action: "create",
@@ -296,6 +335,16 @@ export const update = mutation({
       oldQuantities.set(key, (oldQuantities.get(key) ?? 0) + item.quantity);
     }
     const prepared = await prepareInvoice(ctx, user, data.items, data.discount, data.paid, oldQuantities, branchId);
+    const glSettings = await ctx.db.query("generalLedgerSettings").first();
+    if (
+      glSettings?.operationalPostingEnabled &&
+      inv.branchId &&
+      inv.branchId !== branchId
+    ) {
+      throw new ConvexError(
+        "لا يمكن نقل فاتورة مرحلة محاسبيًا بين الفروع؛ استخدم الإلغاء وإعادة الإصدار",
+      );
+    }
     await ctx.db.patch(id, {
       customerId: data.customerId,
       customerName,
@@ -325,6 +374,23 @@ export const update = mutation({
     } else {
       if (inv.customerId) await postCustomerLedgerEntry(ctx, user, { type: "invoice_adjustment", requestId: `${requestId}:old`, customerId: inv.customerId, branchId: inv.branchId!, date, receivableDelta: -inv.remaining, advanceDelta: 0, purchasesDelta: -(inv.netTotal ?? inv.total), description: `نقل الفاتورة ${inv.invoiceNumber} من العميل`, referenceType: "invoice", referenceId: String(id), referenceNumber: inv.invoiceNumber });
       if (data.customerId) await postCustomerLedgerEntry(ctx, user, { type: "invoice_adjustment", requestId: `${requestId}:new`, customerId: data.customerId, branchId: branchId!, date, receivableDelta: prepared.remaining, advanceDelta: 0, purchasesDelta: prepared.total, description: `نقل الفاتورة ${inv.invoiceNumber} إلى العميل`, referenceType: "invoice", referenceId: String(id), referenceNumber: inv.invoiceNumber });
+    }
+    const adjustmentJournal = await postSalesInventoryJournal(ctx, user, {
+      operation: "invoice_adjustment",
+      branchId: branchId!,
+      date,
+      requestId: `invoice:${id}:adjust:${requestId}`,
+      referenceId: String(id),
+      referenceNumber: inv.invoiceNumber,
+      salesAmount: roundMoney(prepared.total - (inv.netTotal ?? inv.total)),
+      cogsAmount: roundMoney(
+        prepared.cogsTotal - (inv.cogsTotal ?? Number.NaN),
+      ),
+    });
+    if (adjustmentJournal) {
+      await ctx.db.patch(id, {
+        lastAdjustmentJournalEntryId: adjustmentJournal._id,
+      });
     }
     await logAction(ctx, user, {
       action: "update",
@@ -388,7 +454,17 @@ export const cancel = mutation({
     if (inv.customerId) {
       await postCustomerLedgerEntry(ctx, user, { type: "invoice_cancel", requestId: args.requestId, customerId: inv.customerId, branchId: inv.branchId!, date: args.date, receivableDelta: -inv.remaining, advanceDelta: 0, purchasesDelta: -(inv.netTotal ?? inv.total), description: `إلغاء الفاتورة ${inv.invoiceNumber}`, referenceType: "invoice", referenceId: String(inv._id), referenceNumber: inv.invoiceNumber });
     }
-    await ctx.db.patch(args.id, { status: "cancelled", cancelledAt: Date.now(), cancelledBy: user.userId, cancellationReason: reason });
+    const cancellationJournal = await postSalesInventoryJournal(ctx, user, {
+      operation: "invoice_cancel",
+      branchId: inv.branchId!,
+      date: args.date,
+      requestId: `invoice:${args.id}:cancel:${args.requestId}`,
+      referenceId: String(args.id),
+      referenceNumber: inv.invoiceNumber,
+      salesAmount: -(inv.netTotal ?? inv.total),
+      cogsAmount: -(inv.cogsTotal ?? Number.NaN),
+    });
+    await ctx.db.patch(args.id, { status: "cancelled", cancelledAt: Date.now(), cancelledBy: user.userId, cancellationReason: reason, cancellationJournalEntryId: cancellationJournal?._id });
     await logAction(ctx, user, {
       action: "cancel",
       module: "invoices",
