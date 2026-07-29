@@ -1,10 +1,10 @@
-import { mutation, query, type QueryCtx } from "./_generated/server";
+import { mutation, query, type QueryCtx } from "./_generated/server.js";
 import { paginationOptsValidator } from "convex/server";
 import { ConvexError, v } from "convex/values";
-import { requirePermission, logAction, type AuthUser } from "./lib/auth";
-import { DEFAULT_CHART, GENERAL_LEDGER_CHART_VERSION } from "./lib/generalLedgerTemplate";
-import { assertIsoDate, fingerprint, normalizeRequestId, normalizeText, periodKeyOf } from "./lib/generalLedgerRules";
-import { postJournal } from "./lib/generalLedger";
+import { requirePermission, logAction, type AuthUser } from "./lib/auth.ts";
+import { DEFAULT_CHART, GENERAL_LEDGER_CHART_VERSION } from "./lib/generalLedgerTemplate.ts";
+import { assertIsoDate, fingerprint, normalizeRequestId, normalizeText, periodKeyOf } from "./lib/generalLedgerRules.ts";
+import { postJournal } from "./lib/generalLedger.ts";
 import {
   activateFinancialPosting,
   financialPostingReadiness,

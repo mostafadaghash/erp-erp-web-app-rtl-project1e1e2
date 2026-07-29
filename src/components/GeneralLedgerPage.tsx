@@ -84,7 +84,9 @@ type EntrySummary = {
     | "manual"
     | "reversal"
     | "financial"
-    | "financial_reversal";
+    | "financial_reversal"
+    | "operational"
+    | "operational_reversal";
 };
 type EntryLine = {
   lineNumber: number;
@@ -110,7 +112,9 @@ type EntryDetails = {
     | "manual"
     | "reversal"
     | "financial"
-    | "financial_reversal";
+    | "financial_reversal"
+    | "operational"
+    | "operational_reversal";
   originalEntryNumber?: string;
   reversalEntryNumber?: string;
   reversalReason?: string;
@@ -168,6 +172,8 @@ const sourceLabel: Record<EntrySummary["sourceType"], string> = {
   reversal: "عكس",
   financial: "تشغيلي مالي",
   financial_reversal: "عكس تشغيلي مالي",
+  operational: "قيد مستند تشغيلي",
+  operational_reversal: "عكس مستند تشغيلي",
 };
 
 function lineNumbers(lines: LineDraft[]) {

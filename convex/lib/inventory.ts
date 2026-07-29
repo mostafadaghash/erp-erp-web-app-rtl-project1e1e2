@@ -1,9 +1,9 @@
 import { ConvexError } from "convex/values";
 import type { Id } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
-import { assertBranchAccess, type AuthUser } from "./auth";
+import { assertBranchAccess, type AuthUser } from "./auth.ts";
 
-import { calculateInventoryChange, INVENTORY_MOVEMENT_TYPES, type InventoryMovementType } from "../../shared/inventoryRules";
+import { calculateInventoryChange, INVENTORY_MOVEMENT_TYPES, type InventoryMovementType } from "../../shared/inventoryRules.ts";
 
 type ChangeStockInput = {
   productId: Id<"products">;
