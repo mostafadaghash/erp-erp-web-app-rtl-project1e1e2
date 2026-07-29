@@ -2,14 +2,14 @@ import { ConvexError } from "convex/values";
 import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
 import type { AuthUser } from "./auth";
-import { postJournal, type PostingLine } from "./generalLedger";
+import { postJournal, type PostingLine } from "./generalLedger.ts";
 import {
   assertIsoDate,
   fingerprint,
   fromCents,
   normalizeRequestId,
   periodKeyOf,
-} from "./generalLedgerRules";
+} from "./generalLedgerRules.ts";
 
 type ReadCtx = QueryCtx | MutationCtx;
 type SystemKey =
