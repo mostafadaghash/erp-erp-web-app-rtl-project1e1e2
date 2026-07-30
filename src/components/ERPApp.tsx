@@ -97,6 +97,10 @@ const PAGE_MODULES: Partial<Record<Page, string>> = {
 export function ERPApp() {
   const [currentPage, setCurrentPage] = useState<Page>("dashboard");
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [customerLedgerTarget, setCustomerLedgerTarget] = useState<{
+    customerId: Id<"customers">;
+    branchId: Id<"branches">;
+  } | null>(null);
   const settings = useQuery(api.settings.getPublic);
   const me = useQuery(api.employees.me);
 
@@ -134,6 +138,14 @@ export function ERPApp() {
     if (!canAccessPage(page)) return;
     setCurrentPage(page);
     setSidebarOpen(false);
+  };
+  const openCustomerLedger = (
+    customerId: Id<"customers">,
+    branchId: Id<"branches">,
+  ) => {
+    if (!canAccessPage("customer-ledger")) return;
+    setCustomerLedgerTarget({ customerId, branchId });
+    navigate("customer-ledger");
   };
 
   if (me === undefined) {
@@ -235,7 +247,7 @@ export function ERPApp() {
             )}
             {authorized && currentPage === "dashboard"   && <Dashboard onNavigate={navigate} permissions={permissions} modules={modules} />}
             {authorized && currentPage === "products"    && <ProductsPage />}
-            {authorized && currentPage === "customers"   && <CustomersPage />}
+            {authorized && currentPage === "customers"   && <CustomersPage onOpenLedger={openCustomerLedger} />}
             {authorized && currentPage === "invoices"    && <InvoicesPage onNavigate={navigate} />}
             {authorized && currentPage === "new-invoice" && <NewInvoicePage onNavigate={navigate} />}
             {authorized && currentPage === "repairs"     && <RepairsPage />}
@@ -253,7 +265,7 @@ export function ERPApp() {
             {authorized && currentPage === "treasury"    && <TreasuryPage />}
             {authorized && currentPage === "supplier-payments" && <SupplierPaymentsPage />}
             {authorized && currentPage === "purchase-returns" && <PurchaseReturnsPage />}
-            {authorized && currentPage === "customer-ledger" && <CustomerLedgerPage />}
+            {authorized && currentPage === "customer-ledger" && <CustomerLedgerPage initialCustomerId={customerLedgerTarget?.customerId} initialBranchId={customerLedgerTarget?.branchId} />}
             {authorized && currentPage === "general-ledger" && <GeneralLedgerPage />}
           </div>
         </main>
