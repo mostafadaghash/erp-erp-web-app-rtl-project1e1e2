@@ -52,9 +52,12 @@ interface RepairData {
   deviceType: string;
   deviceBrand: string;
   deviceModel: string;
+  serialNumber?: string;
+  accessories?: string;
+  intakeCondition?: string;
   problem: string;
   diagnosis?: string;
-  parts: Array<{ name: string; cost: number; quantity: number }>;
+  parts: Array<{ name: string; cost: number; quantity: number; lineTotal?: number }>;
   laborCost: number;
   totalCost: number;
   deposit: number;
@@ -63,6 +66,11 @@ interface RepairData {
   technicianName?: string;
   receivedDate: string;
   expectedDate?: string;
+  deliveredDate?: string;
+  warrantyDays?: number;
+  warrantyUntil?: string;
+  qualityCheckNotes?: string;
+  employeeName?: string;
   notes?: string;
   _creationTime: number;
 }
@@ -428,6 +436,18 @@ function RepairTemplate({ data, settings }: { data: RepairData; settings: any })
               <span className="print-field-label">الموديل: </span>
               <span className="print-field-value">{data.deviceModel}</span>
             </div>
+            {data.serialNumber && (
+              <div>
+                <span className="print-field-label">السيريال: </span>
+                <span className="print-field-value">{data.serialNumber}</span>
+              </div>
+            )}
+            {data.accessories && (
+              <div>
+                <span className="print-field-label">الملحقات: </span>
+                <span className="print-field-value">{data.accessories}</span>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -438,6 +458,12 @@ function RepairTemplate({ data, settings }: { data: RepairData; settings: any })
           <span className="print-field-label">المشكلة المُبلَّغ عنها: </span>
           <span>{data.problem}</span>
         </div>
+        {data.intakeCondition && (
+          <div style={{ marginBottom: "8px" }}>
+            <span className="print-field-label">حالة الجهاز عند الاستلام: </span>
+            <span>{data.intakeCondition}</span>
+          </div>
+        )}
         {data.diagnosis && (
           <div>
             <span className="print-field-label">التشخيص: </span>
@@ -454,6 +480,24 @@ function RepairTemplate({ data, settings }: { data: RepairData; settings: any })
           <div style={{ marginTop: "4px" }}>
             <span className="print-field-label">التاريخ المتوقع للتسليم: </span>
             <span>{data.expectedDate}</span>
+          </div>
+        )}
+        {data.qualityCheckNotes && (
+          <div style={{ marginTop: "8px" }}>
+            <span className="print-field-label">اختبار الجودة: </span>
+            <span>{data.qualityCheckNotes}</span>
+          </div>
+        )}
+        {data.deliveredDate && (
+          <div style={{ marginTop: "8px" }}>
+            <span className="print-field-label">تاريخ التسليم: </span>
+            <span>{data.deliveredDate}</span>
+          </div>
+        )}
+        {data.warrantyDays !== undefined && (
+          <div style={{ marginTop: "4px" }}>
+            <span className="print-field-label">الضمان: </span>
+            <span>{data.warrantyDays} يوم — حتى {data.warrantyUntil ?? "—"}</span>
           </div>
         )}
       </div>
@@ -478,7 +522,7 @@ function RepairTemplate({ data, settings }: { data: RepairData; settings: any })
                   <td className="print-td" style={{ textAlign: "center" }}>{part.quantity}</td>
                   <td className="print-td" style={{ textAlign: "center" }}>{part.cost.toLocaleString("ar-EG")} ج.م</td>
                   <td className="print-td" style={{ textAlign: "center", fontWeight: "bold" }}>
-                    {(part.cost * part.quantity).toLocaleString("ar-EG")} ج.م
+                    {(part.lineTotal ?? part.cost * part.quantity).toLocaleString("ar-EG")} ج.م
                   </td>
                 </tr>
               ))}
@@ -493,7 +537,7 @@ function RepairTemplate({ data, settings }: { data: RepairData; settings: any })
           {data.parts.length > 0 && (
             <div className="print-total-row">
               <span>تكلفة القطع</span>
-              <span>{data.parts.reduce((s, p) => s + p.cost * p.quantity, 0).toLocaleString("ar-EG")} ج.م</span>
+              <span>{data.parts.reduce((s, p) => s + (p.lineTotal ?? p.cost * p.quantity), 0).toLocaleString("ar-EG")} ج.م</span>
             </div>
           )}
           <div className="print-total-row">
@@ -538,6 +582,12 @@ function RepairTemplate({ data, settings }: { data: RepairData; settings: any })
           <p>توقيع الفني</p>
         </div>
       </div>
+
+      {data.employeeName && (
+        <p className="mt-4 text-center text-xs text-slate-500">
+          محرر أمر الصيانة: {data.employeeName}
+        </p>
+      )}
 
       {/* التذييل */}
       <div className="print-footer">
