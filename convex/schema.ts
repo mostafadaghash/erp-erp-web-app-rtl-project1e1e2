@@ -116,7 +116,7 @@ const applicationTables = {
     financialTransactionId: v.optional(v.id("financialTransactions")), supplierLedgerEntryId: v.optional(v.id("supplierLedgerEntries")), createdBy: v.string(), createdAt: v.number(),
     reversedAt: v.optional(v.number()), reversedBy: v.optional(v.string()), reversalReason: v.optional(v.string()), reversalDate: v.optional(v.string()), reversalFingerprint: v.optional(v.string()), reversalRequestId: v.optional(v.string()),
     reversalFinancialTransactionId: v.optional(v.id("financialTransactions")), reversalSupplierLedgerEntryId: v.optional(v.id("supplierLedgerEntries")),
-  }).index("by_payment_number", ["paymentNumber"]).index("by_idempotency_key", ["idempotencyKey"]).index("by_supplier_branch_date", ["supplierId", "branchId", "date"]).index("by_branch_date", ["branchId", "date"]).index("by_account_date", ["accountId", "date"]).index("by_status", ["status"]),
+  }).index("by_payment_number", ["paymentNumber"]).index("by_idempotency_key", ["idempotencyKey"]).index("by_supplier_branch_date", ["supplierId", "branchId", "date"]).index("by_branch_date", ["branchId", "date"]).index("by_branch_reversal_date", ["branchId", "reversalDate"]).index("by_account_date", ["accountId", "date"]).index("by_status", ["status"]),
 
   customerBalances: defineTable({
     key: v.string(), customerId: v.id("customers"), branchId: v.id("branches"),
@@ -148,7 +148,7 @@ const applicationTables = {
     items:v.array(v.object({receiptItemIndex:v.number(),productId:v.id("products"),productName:v.string(),quantityReturned:v.number(),historicalUnitCost:v.number(),historicalLineTotal:v.number(),goodsCreditAmount:v.number(),historicalLandedUnitCost:v.number(),inventoryValueRemoved:v.number()})),
     goodsCredit:v.number(),freightCredit:v.number(),totalCredit:v.number(),inventoryValueRemoved:v.number(),debtReduction:v.number(),cashRefund:v.number(),refundAccountId:v.optional(v.id("financialAccounts")),refundAccountName:v.optional(v.string()),status:v.union(v.literal("posted"),v.literal("reversed")),idempotencyKey:v.string(),requestId:v.string(),requestFingerprint:v.string(),supplierLedgerEntryId:v.optional(v.id("supplierLedgerEntries")),supplierRefundLedgerEntryId:v.optional(v.id("supplierLedgerEntries")),financialTransactionId:v.optional(v.id("financialTransactions")),journalEntryId:v.optional(v.id("journalEntries")),createdBy:v.string(),createdAt:v.number(),
     reversedAt:v.optional(v.number()),reversedBy:v.optional(v.string()),reversalReason:v.optional(v.string()),reversalDate:v.optional(v.string()),reversalRequestId:v.optional(v.string()),reversalFingerprint:v.optional(v.string()),reversalFinancialTransactionId:v.optional(v.id("financialTransactions")),reversalSupplierLedgerEntryId:v.optional(v.id("supplierLedgerEntries")),reversalSupplierRefundLedgerEntryId:v.optional(v.id("supplierLedgerEntries")),reversalJournalEntryId:v.optional(v.id("journalEntries")),
-  }).index("by_return_number",["returnNumber"]).index("by_purchase_receipt",["purchaseReceiptId"]).index("by_supplier_branch_date",["supplierId","branchId","date"]).index("by_branch_date",["branchId","date"]).index("by_idempotency_key",["idempotencyKey"]).index("by_external_credit_note_key",["externalCreditNoteKey"]).index("by_supplier_branch_external_credit_note",["supplierId","branchId","externalCreditNoteKey"]).index("by_status",["status"]),
+  }).index("by_return_number",["returnNumber"]).index("by_purchase_receipt",["purchaseReceiptId"]).index("by_supplier_branch_date",["supplierId","branchId","date"]).index("by_branch_date",["branchId","date"]).index("by_branch_reversal_date",["branchId","reversalDate"]).index("by_idempotency_key",["idempotencyKey"]).index("by_external_credit_note_key",["externalCreditNoteKey"]).index("by_supplier_branch_external_credit_note",["supplierId","branchId","externalCreditNoteKey"]).index("by_status",["status"]),
 
   // الفئات
   categories: defineTable({
@@ -254,7 +254,7 @@ const applicationTables = {
     creationRequestId: v.string(), createdBy: v.string(), createdAt: v.number(), financialTransactionId: v.optional(v.id("financialTransactions")), journalEntryId: v.optional(v.id("journalEntries")),
     reversedAt: v.optional(v.number()), reversedBy: v.optional(v.string()), reversalReason: v.optional(v.string()), reversalDate: v.optional(v.string()),
     reversalRequestId: v.optional(v.string()), reversalTransactionId: v.optional(v.id("financialTransactions")), reversalJournalEntryId: v.optional(v.id("journalEntries")),
-  }).index("by_credit_note_number", ["creditNoteNumber"]).index("by_invoice", ["invoiceId"]).index("by_customer", ["customerId"]).index("by_branch_date", ["branchId", "date"]).index("by_creation_request", ["creationRequestId"]),
+  }).index("by_credit_note_number", ["creditNoteNumber"]).index("by_invoice", ["invoiceId"]).index("by_customer", ["customerId"]).index("by_branch_date", ["branchId", "date"]).index("by_branch_reversal_date", ["branchId", "reversalDate"]).index("by_creation_request", ["creationRequestId"]),
 
   // الطلبات / الأوردرات
   orders: defineTable({
@@ -402,7 +402,7 @@ const applicationTables = {
     status: v.optional(v.union(v.literal("active"), v.literal("voided"))),
     financialTransactionId: v.optional(v.id("financialTransactions")),
     voidedAt: v.optional(v.number()), voidedBy: v.optional(v.string()), voidReason: v.optional(v.string()),
-  }).index("by_category", ["category"]),
+  }).index("by_category", ["category"]).index("by_branch_date", ["branchId", "date"]),
 
   // المدفوعات / التحصيل
   payments: defineTable({
@@ -503,12 +503,12 @@ const applicationTables = {
 
   codSettlements: defineTable({
     settlementNumber:v.string(),branchId:v.id("branches"),sourceAccountId:v.id("financialAccounts"),destinationAccountId:v.id("financialAccounts"),grossAmount:v.number(),feeAmount:v.number(),netAmount:v.number(),date:v.string(),status:v.union(v.literal("posted"),v.literal("reversed")),requestId:v.string(),idempotencyKey:v.string(),requestFingerprint:v.string(),financialTransactionId:v.id("financialTransactions"),createdBy:v.string(),createdAt:v.number(),notes:v.optional(v.string()),reversedAt:v.optional(v.number()),reversedBy:v.optional(v.string()),reversalReason:v.optional(v.string()),reversalDate:v.optional(v.string()),reversalRequestId:v.optional(v.string()),reversalFingerprint:v.optional(v.string()),reversalFinancialTransactionId:v.optional(v.id("financialTransactions")),
-  }).index("by_number",["settlementNumber"]).index("by_branch_date",["branchId","date"]).index("by_source_date",["sourceAccountId","date"]).index("by_status",["status"]).index("by_idempotency_key",["idempotencyKey"]),
+  }).index("by_number",["settlementNumber"]).index("by_branch_date",["branchId","date"]).index("by_branch_reversal_date",["branchId","reversalDate"]).index("by_source_date",["sourceAccountId","date"]).index("by_status",["status"]).index("by_idempotency_key",["idempotencyKey"]),
   codSettlementItems: defineTable({settlementId:v.id("codSettlements"),confirmationId:v.optional(v.id("deliveryConfirmations")),deliveryId:v.id("deliveries"),deliveryNumber:v.string(),invoiceId:v.id("invoices"),invoiceNumber:v.string(),codAmount:v.number(),branchId:v.id("branches"),date:v.string()}).index("by_settlement",["settlementId"]).index("by_delivery",["deliveryId"]).index("by_confirmation",["confirmationId"]).index("by_branch_date",["branchId","date"]),
 
   deliveryConfirmations: defineTable({
     deliveryId:v.id("deliveries"),deliveryNumber:v.string(),attemptNumber:v.number(),branchId:v.id("branches"),invoiceId:v.id("invoices"),orderId:v.id("orders"),customerId:v.id("customers"),codAmount:v.number(),codClearingAccountId:v.optional(v.id("financialAccounts")),status:v.union(v.literal("posted"),v.literal("reversed")),date:v.string(),requestId:v.string(),idempotencyKey:v.string(),requestFingerprint:v.string(),financialTransactionId:v.optional(v.id("financialTransactions")),customerLedgerEntryId:v.optional(v.id("customerLedgerEntries")),reversalRequestId:v.optional(v.string()),reversalFingerprint:v.optional(v.string()),reversalFinancialTransactionId:v.optional(v.id("financialTransactions")),reversalCustomerLedgerEntryId:v.optional(v.id("customerLedgerEntries")),reversalReason:v.optional(v.string()),reversalDate:v.optional(v.string()),reversedAt:v.optional(v.number()),reversedBy:v.optional(v.string()),createdBy:v.string(),createdAt:v.number()
-  }).index("by_delivery_status",["deliveryId","status"]).index("by_delivery",["deliveryId"]).index("by_idempotency",["idempotencyKey"]).index("by_branch_date",["branchId","date"]).index("by_financial_transaction",["financialTransactionId"]),
+  }).index("by_delivery_status",["deliveryId","status"]).index("by_delivery",["deliveryId"]).index("by_idempotency",["idempotencyKey"]).index("by_branch_date",["branchId","date"]).index("by_branch_reversal_date",["branchId","reversalDate"]).index("by_financial_transaction",["financialTransactionId"]),
 
   // سجل العمليات
   auditLogs: defineTable({
