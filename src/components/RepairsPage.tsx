@@ -1,12 +1,13 @@
 import { FinancialHistory } from "./FinancialHistory";
-import { useState } from "react";
-import { useQuery, useMutation } from "convex/react";
+import { useEffect, useState } from "react";
+import { usePaginatedQuery, useQuery, useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { usePermission } from "../lib/access";
 import { toast } from "sonner";
 import { Wrench, Plus, Search, Clock, CheckCircle, AlertCircle, Copy, MessageCircle, Printer, RefreshCw } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { PrintModal } from "./PrintTemplate";
+import type { PrintData } from "./PrintTemplate";
 import { buildEgyptWhatsAppUrl } from "../lib/utils";
 import type { Doc, Id } from "../../convex/_generated/dataModel";
 import { isRepairStatus, REPAIR_TRANSITIONS, type RepairStatus } from "../../shared/businessRules";
@@ -25,15 +26,41 @@ export function RepairsPage() {
   const canEdit = usePermission("edit_repairs");
   const canPrint = usePermission("print_repairs");
   const canRefund = usePermission("refund_collections");
+  const canViewBranches = usePermission("view_branches");
   const [showForm, setShowForm] = useState(false);
+  const [selectedBranchId, setSelectedBranchId] = useState("");
+  const branches = useQuery(
+    api.branches.list,
+    canViewBranches ? {} : "skip",
+  ) ?? [];
   const repairs = useQuery(api.repairs.list) ?? [];
   const customers = useQuery(api.customers.repairPicker, canCreate ? {} : "skip") ?? [];
+  const partPickerGate = canCreate && showForm ? {} : "skip";
   const partOptions = useQuery(
     api.repairs.partPicker,
-    canCreate && showForm ? {} : "skip",
+    partPickerGate !== "skip"
+      ? {
+          branchId: selectedBranchId
+            ? selectedBranchId as Id<"branches">
+            : undefined,
+        }
+      : "skip",
+  ) ?? [];
+  const [editTarget, setEditTarget] = useState<Doc<"repairs"> | null>(null);
+  const technicianOptions = useQuery(
+    api.repairs.technicianPicker,
+    canEdit && (showForm || editTarget)
+      ? {
+          branchId: editTarget?.branchId ??
+            (selectedBranchId
+              ? selectedBranchId as Id<"branches">
+              : undefined),
+        }
+      : "skip",
   ) ?? [];
   const createRepair = useMutation(api.repairs.create);
-  const updateStatus = useMutation(api.repairs.updateStatus);
+  const updateDetails = useMutation(api.repairs.updateDetails);
+  const transitionStatus = useMutation(api.repairs.transitionStatus);
   const rotateTrackingToken = useMutation(api.repairs.rotateTrackingToken);
   const recordPayment = useMutation(api.repairs.recordPayment);
   const refundPayment = useMutation(api.repairs.refundPayment);
@@ -46,15 +73,47 @@ export function RepairsPage() {
 
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState("");
-  const [printRepair, setPrintRepair] = useState<Doc<"repairs"> | null>(null);
-  const [cancelTarget, setCancelTarget] = useState<Doc<"repairs"> | null>(null);
-  const [cancelReason, setCancelReason] = useState("");
+  const [printRepair, setPrintRepair] = useState<PrintData | null>(null);
+  const [printTargetId, setPrintTargetId] = useState<Id<"repairs"> | null>(null);
+  const printableRepair = useQuery(
+    api.repairs.repairForPrint,
+    canPrint && printTargetId ? { id: printTargetId } : "skip",
+  );
+  const [historyTarget, setHistoryTarget] = useState<Doc<"repairs"> | null>(null);
+  const history = usePaginatedQuery(
+    api.repairs.historyPaginated,
+    historyTarget ? { repairId: historyTarget._id } : "skip",
+    { initialNumItems: 10 },
+  );
+  const [transitionTarget, setTransitionTarget] = useState<Doc<"repairs"> | null>(null);
+  const [transitionNext, setTransitionNext] = useState<RepairStatus | null>(null);
+  const [transitionForm, setTransitionForm] = useState({
+    date: new Date().toISOString().slice(0, 10),
+    reason: "",
+    diagnosis: "",
+    qualityCheckNotes: "",
+    warrantyDays: "0",
+  });
+  const [transitionRequestId, setTransitionRequestId] = useState(
+    () => crypto.randomUUID(),
+  );
+  const [editForm, setEditForm] = useState({
+    technicianProfileId: "",
+    diagnosis: "",
+    serialNumber: "",
+    accessories: "",
+    intakeCondition: "",
+    qualityCheckNotes: "",
+    expectedDate: "",
+    notes: "",
+  });
   const [updatingId, setUpdatingId] = useState<Id<"repairs"> | null>(null);
   const [form, setForm] = useState({
     customerName: "", customerPhone: "", customerId: "",
     deviceType: "موبايل", deviceBrand: "", deviceModel: "",
     problem: "", laborCost: "", deposit: "",
-    expectedDate: "", notes: "", technicianName: "",
+    expectedDate: "", notes: "", technicianProfileId: "",
+    serialNumber: "", accessories: "", intakeCondition: "",
   });
   const [parts, setParts] = useState<Array<{
     productId: string;
@@ -65,6 +124,18 @@ export function RepairsPage() {
     const product = partOptions.find((part) => part._id === row.productId);
     return sum + (product?.sellPrice ?? 0) * Number(row.quantity || 0);
   }, 0);
+
+  useEffect(() => {
+    if (!printableRepair) return;
+    setPrintRepair(printableRepair);
+    setPrintTargetId(null);
+  }, [printableRepair]);
+
+  useEffect(() => {
+    if (!selectedBranchId && branches.length === 1) {
+      setSelectedBranchId(branches[0]._id);
+    }
+  }, [branches, selectedBranchId]);
 
   const filtered = repairs.filter(r =>
     r.customerName.toLowerCase().includes(search.toLowerCase()) ||
@@ -116,13 +187,21 @@ export function RepairsPage() {
         initialDeposit: Number(form.deposit) > 0 ? { amount: Number(form.deposit), accountId: accountId as Id<"financialAccounts">, paymentDate: new Date().toISOString().slice(0, 10), requestId } : undefined,
         expectedDate: form.expectedDate || undefined,
         notes: form.notes || undefined,
-        technicianName: form.technicianName || undefined,
+        serialNumber: form.serialNumber || undefined,
+        accessories: form.accessories || undefined,
+        intakeCondition: form.intakeCondition || undefined,
+        technicianProfileId: form.technicianProfileId
+          ? form.technicianProfileId as Id<"userProfiles">
+          : undefined,
+        branchId: selectedBranchId
+          ? selectedBranchId as Id<"branches">
+          : undefined,
       });
       toast.success("تم إضافة طلب الصيانة بنجاح");
       setRequestId(crypto.randomUUID());
       setShowForm(false);
       setParts([]);
-      setForm({ customerName: "", customerPhone: "", customerId: "", deviceType: "موبايل", deviceBrand: "", deviceModel: "", problem: "", laborCost: "", deposit: "", expectedDate: "", notes: "", technicianName: "" });
+      setForm({ customerName: "", customerPhone: "", customerId: "", deviceType: "موبايل", deviceBrand: "", deviceModel: "", problem: "", laborCost: "", deposit: "", expectedDate: "", notes: "", technicianProfileId: "", serialNumber: "", accessories: "", intakeCondition: "" });
     } catch (error) {
       toast.error(getErrorMessage(error, "تعذر إضافة طلب الصيانة"));
     } finally {
@@ -130,15 +209,101 @@ export function RepairsPage() {
     }
   };
 
-  const applyStatus = async (id: Id<"repairs">, status: RepairStatus, reason?: string) => {
-    if (updatingId) return;
-    setUpdatingId(id);
+  const openStatusTransition = (repair: Doc<"repairs">, next: RepairStatus) => {
+    setTransitionTarget(repair);
+    setTransitionNext(next);
+    setTransitionRequestId(crypto.randomUUID());
+    setTransitionForm({
+      date: new Date().toISOString().slice(0, 10),
+      reason: "",
+      diagnosis: repair.diagnosis ?? "",
+      qualityCheckNotes: repair.qualityCheckNotes ?? "",
+      warrantyDays: String(repair.warrantyDays ?? 0),
+    });
+  };
+
+  const submitTransition = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!transitionTarget || !transitionNext || updatingId) return;
+    setUpdatingId(transitionTarget._id);
+    const transitionRequest = {
+      requestId: transitionRequestId,
+    };
+    const applyStatus = async (
+      id: Id<"repairs">,
+      next: RepairStatus,
+      reason?: string,
+    ) => {
+      await transitionStatus({
+        id,
+        status: next,
+        date: transitionForm.date,
+        requestId: transitionRequest.requestId,
+        reason: reason || undefined,
+        diagnosis: transitionForm.diagnosis.trim() || undefined,
+        qualityCheckNotes:
+          transitionForm.qualityCheckNotes.trim() || undefined,
+        warrantyDays:
+          next === "delivered"
+            ? Number(transitionForm.warrantyDays || 0)
+            : undefined,
+      });
+    };
     try {
-      await updateStatus({ id, status, reason, ...(status === "cancelled" ? { date: new Date().toISOString().slice(0, 10), requestId: crypto.randomUUID() } : {}) });
-      toast.success("تم تحديث الحالة");
-      if (status === "cancelled") { setCancelTarget(null); setCancelReason(""); }
+      if (transitionNext === "cancelled") {
+        const cancelTarget = transitionTarget;
+        const cancelReason = transitionForm.reason;
+        await applyStatus(cancelTarget._id, "cancelled", cancelReason.trim());
+      } else {
+        await applyStatus(transitionTarget._id, transitionNext);
+      }
+      toast.success("تم تحديث حالة الصيانة");
+      setTransitionTarget(null);
+      setTransitionNext(null);
+      setTransitionRequestId(crypto.randomUUID());
     } catch (error) {
       toast.error(getErrorMessage(error, "تعذر تحديث حالة الصيانة"));
+    } finally {
+      setUpdatingId(null);
+    }
+  };
+
+  const openEdit = (repair: Doc<"repairs">) => {
+    setEditTarget(repair);
+    setEditForm({
+      technicianProfileId: repair.assignedTechnicianProfileId ?? "",
+      diagnosis: repair.diagnosis ?? "",
+      serialNumber: repair.serialNumber ?? "",
+      accessories: repair.accessories ?? "",
+      intakeCondition: repair.intakeCondition ?? "",
+      qualityCheckNotes: repair.qualityCheckNotes ?? "",
+      expectedDate: repair.expectedDate ?? "",
+      notes: repair.notes ?? "",
+    });
+  };
+
+  const saveDetails = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!editTarget || updatingId) return;
+    setUpdatingId(editTarget._id);
+    try {
+      await updateDetails({
+        id: editTarget._id,
+        technicianProfileId: editForm.technicianProfileId
+          ? editForm.technicianProfileId as Id<"userProfiles">
+          : undefined,
+        diagnosis: editForm.diagnosis,
+        serialNumber: editForm.serialNumber,
+        accessories: editForm.accessories,
+        intakeCondition: editForm.intakeCondition,
+        qualityCheckNotes: editForm.qualityCheckNotes,
+        expectedDate: editForm.expectedDate,
+        notes: editForm.notes,
+      });
+      toast.success("تم تحديث بيانات الصيانة");
+      setEditTarget(null);
+    } catch (error) {
+      toast.error(getErrorMessage(error, "تعذر تحديث بيانات الصيانة"));
     } finally {
       setUpdatingId(null);
     }
@@ -156,14 +321,7 @@ export function RepairsPage() {
   const handleStatusSelection = (repair: Doc<"repairs">, value: string) => {
     if (!isRepairStatus(value) || !isRepairStatus(repair.status)) return;
     if (!REPAIR_TRANSITIONS[repair.status].includes(value)) return;
-    if (value === "cancelled") { setCancelTarget(repair); setCancelReason(""); return; }
-    void applyStatus(repair._id, value);
-  };
-
-  const handleCancellation = (event: React.FormEvent) => {
-    event.preventDefault();
-    if (!cancelTarget || !cancelReason.trim()) return;
-    void applyStatus(cancelTarget._id, "cancelled", cancelReason.trim());
+    openStatusTransition(repair, value);
   };
 
   const handleSelectCustomer = (id: string) => {
@@ -185,6 +343,14 @@ export function RepairsPage() {
     }
   };
 
+  const openNewRepair = () => {
+    if (canViewBranches && branches.length > 0 && !selectedBranchId) {
+      toast.error("اختر فرع أمر الصيانة أولًا");
+      return;
+    }
+    setRequestId(crypto.randomUUID()); setParts([]); setAccountId(""); setShowForm(true);
+  };
+
   return (
     <div className="p-4 lg:p-6 space-y-5">
       <div className="flex items-center justify-between">
@@ -195,10 +361,28 @@ export function RepairsPage() {
           </h1>
           <p className="text-slate-500 text-sm mt-0.5">{repairs.length} طلب صيانة</p>
         </div>
-        {canCreate && <button onClick={() => { setRequestId(crypto.randomUUID()); setParts([]); setAccountId(""); setShowForm(true); }} className="btn-primary flex items-center gap-2">
-          <Plus className="w-4 h-4" />
-          طلب صيانة جديد
-        </button>}
+        <div className="flex items-center gap-2">
+          {canViewBranches && branches.length > 0 && (
+            <select
+              className="form-input min-w-40"
+              value={selectedBranchId}
+              onChange={(event) => {
+                setSelectedBranchId(event.target.value);
+                setParts([]);
+              }}
+              aria-label="فرع أمر الصيانة"
+            >
+              <option value="">اختر الفرع</option>
+              {branches.map((branch: { _id: Id<"branches">; name: string }) => (
+                <option key={branch._id} value={branch._id}>{branch.name}</option>
+              ))}
+            </select>
+          )}
+          {canCreate && <button onClick={openNewRepair} className="btn-primary flex items-center gap-2">
+            <Plus className="w-4 h-4" />
+            طلب صيانة جديد
+          </button>}
+        </div>
       </div>
 
       {/* Status filter tabs */}
@@ -254,7 +438,10 @@ export function RepairsPage() {
               <div className="bg-slate-50 rounded-xl p-3 mb-3">
                 <p className="text-sm font-semibold text-slate-700">{r.deviceBrand} {r.deviceModel}</p>
                 <p className="text-xs text-slate-500 mt-0.5">{r.deviceType}</p>
+                {r.serialNumber && <p className="text-xs text-slate-500 mt-0.5">السيريال: {r.serialNumber}</p>}
+                {r.accessories && <p className="text-xs text-slate-500 mt-0.5">الملحقات: {r.accessories}</p>}
                 <p className="text-xs text-slate-600 mt-1.5 font-medium">المشكلة: {r.problem}</p>
+                {r.diagnosis && <p className="text-xs text-indigo-700 mt-1.5 font-medium">التشخيص: {r.diagnosis}</p>}
               </div>
 
               {r.parts.length > 0 && (
@@ -290,6 +477,15 @@ export function RepairsPage() {
                   </div>
                 )}
               </div>
+
+              {r.status === "delivered" && (
+                <div className="mb-3 rounded-xl bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
+                  تم تسليم الجهاز
+                  {r.warrantyDays !== undefined && (
+                    <span> — ضمان {r.warrantyDays} يوم حتى {r.warrantyUntil ?? "—"}</span>
+                  )}
+                </div>
+              )}
 
               {r.trackingToken && (
                 <div className="bg-indigo-50 border border-indigo-100 rounded-xl px-3 py-2 mb-3">
@@ -336,6 +532,14 @@ export function RepairsPage() {
               <div className="flex gap-2">
                 {canCollect && r.remaining > 0 && <button className="btn-secondary text-xs" onClick={() => void collectRepair(r)}>تحصيل دفعة</button>}
                 {canRefund && r.deposit > 0 && <button className="btn-secondary text-xs" onClick={() => void refundRepair(r)}>استرداد مبلغ</button>}
+                {canEdit && ["received", "in_progress"].includes(r.status) && (
+                  <button className="btn-secondary text-xs" onClick={() => openEdit(r)}>
+                    التفاصيل
+                  </button>
+                )}
+                <button className="btn-secondary text-xs" onClick={() => setHistoryTarget(r)}>
+                  السجل
+                </button>
                 {canEdit && r.status !== "delivered" && r.status !== "cancelled" && (
                   <select
                     className="flex-1 text-xs border border-slate-200 rounded-lg px-2 py-1.5 bg-white text-slate-700"
@@ -348,7 +552,7 @@ export function RepairsPage() {
                   </select>
                 )}
                 {canPrint && <button
-                  onClick={() => { if (canPrint) setPrintRepair(r); }}
+                  onClick={() => { if (canPrint) setPrintTargetId(r._id); }}
                   className="p-1.5 bg-slate-100 hover:bg-indigo-100 text-slate-500 hover:text-indigo-600 rounded-lg transition-colors"
                   title="طباعة"
                 >
@@ -375,8 +579,193 @@ export function RepairsPage() {
         />
       )}
 
-      {cancelTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" dir="rtl"><div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl"><h2 className="text-lg font-black">إلغاء أمر الصيانة {cancelTarget.repairNumber}</h2><p className="my-3 text-sm text-slate-600">لن تتغير الحالة قبل نجاح العملية. اكتب سبب الإلغاء للمتابعة.</p><form className="space-y-4" onSubmit={handleCancellation}><div><label className="form-label">سبب الإلغاء *</label><textarea required className="form-input" rows={3} value={cancelReason} onChange={e => setCancelReason(e.target.value)} /></div><div className="flex gap-3"><button className="btn-primary flex-1" disabled={updatingId !== null || !cancelReason.trim()}>{updatingId ? "جارٍ الإلغاء..." : "تأكيد الإلغاء"}</button><button type="button" className="btn-secondary" disabled={updatingId !== null} onClick={() => setCancelTarget(null)}>تراجع</button></div></form></div></div>
+      {transitionTarget && transitionNext && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" dir="rtl">
+          <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl">
+            <h2 className="text-lg font-black">
+              {statusConfig[transitionNext].label} — {transitionTarget.repairNumber}
+            </h2>
+            <p className="my-2 text-sm text-slate-600">
+              تُحفظ العملية في سجل الحالات، ويبقى معرف الطلب ثابتًا عند إعادة المحاولة.
+            </p>
+            <form className="space-y-4" onSubmit={submitTransition}>
+              <div>
+                <label className="form-label">تاريخ العملية *</label>
+                <input
+                  required
+                  type="date"
+                  className="form-input"
+                  value={transitionForm.date}
+                  onChange={(event) => setTransitionForm({
+                    ...transitionForm,
+                    date: event.target.value,
+                  })}
+                />
+              </div>
+              {transitionNext === "ready" && (
+                <>
+                  <div>
+                    <label className="form-label">التشخيص النهائي *</label>
+                    <textarea
+                      required
+                      className="form-input"
+                      rows={3}
+                      value={transitionForm.diagnosis}
+                      onChange={(event) => setTransitionForm({
+                        ...transitionForm,
+                        diagnosis: event.target.value,
+                      })}
+                    />
+                  </div>
+                  <div>
+                    <label className="form-label">ملاحظات اختبار الجودة</label>
+                    <textarea
+                      className="form-input"
+                      rows={2}
+                      value={transitionForm.qualityCheckNotes}
+                      onChange={(event) => setTransitionForm({
+                        ...transitionForm,
+                        qualityCheckNotes: event.target.value,
+                      })}
+                    />
+                  </div>
+                </>
+              )}
+              {transitionNext === "delivered" && (
+                <div>
+                  <label className="form-label">مدة الضمان بالأيام</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="365"
+                    step="1"
+                    className="form-input"
+                    value={transitionForm.warrantyDays}
+                    onChange={(event) => setTransitionForm({
+                      ...transitionForm,
+                      warrantyDays: event.target.value,
+                    })}
+                  />
+                </div>
+              )}
+              {transitionNext === "cancelled" && (
+                <div>
+                  <label className="form-label">سبب الإلغاء *</label>
+                  <textarea
+                    required
+                    className="form-input"
+                    rows={3}
+                    value={transitionForm.reason}
+                    onChange={(event) => setTransitionForm({
+                      ...transitionForm,
+                      reason: event.target.value,
+                    })}
+                  />
+                </div>
+              )}
+              <div className="flex gap-3">
+                <button
+                  className="btn-primary flex-1"
+                  disabled={updatingId !== null}
+                >
+                  {updatingId ? "جارٍ الحفظ..." : "تأكيد الانتقال"}
+                </button>
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  disabled={updatingId !== null}
+                  onClick={() => {
+                    setTransitionTarget(null);
+                    setTransitionNext(null);
+                  }}
+                >
+                  تراجع
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {editTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" dir="rtl">
+          <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl">
+            <h2 className="text-lg font-black">بيانات الصيانة {editTarget.repairNumber}</h2>
+            <form className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2" onSubmit={saveDetails}>
+              <div>
+                <label className="form-label">الفني المسؤول</label>
+                <select className="form-input" value={editForm.technicianProfileId} onChange={(event) => setEditForm({...editForm, technicianProfileId: event.target.value})}>
+                  <option value="">اختر الفني</option>
+                  {technicianOptions.map((technician) => <option key={technician._id} value={technician._id}>{technician.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="form-label">تاريخ التسليم المتوقع</label>
+                <input type="date" className="form-input" value={editForm.expectedDate} onChange={(event) => setEditForm({...editForm, expectedDate: event.target.value})} />
+              </div>
+              <div>
+                <label className="form-label">الرقم المسلسل</label>
+                <input className="form-input" value={editForm.serialNumber} onChange={(event) => setEditForm({...editForm, serialNumber: event.target.value})} />
+              </div>
+              <div>
+                <label className="form-label">الملحقات المستلمة</label>
+                <input className="form-input" value={editForm.accessories} onChange={(event) => setEditForm({...editForm, accessories: event.target.value})} />
+              </div>
+              <div className="sm:col-span-2">
+                <label className="form-label">حالة الجهاز عند الاستلام</label>
+                <textarea className="form-input" rows={2} value={editForm.intakeCondition} onChange={(event) => setEditForm({...editForm, intakeCondition: event.target.value})} />
+              </div>
+              <div className="sm:col-span-2">
+                <label className="form-label">التشخيص</label>
+                <textarea className="form-input" rows={3} value={editForm.diagnosis} onChange={(event) => setEditForm({...editForm, diagnosis: event.target.value})} />
+              </div>
+              <div className="sm:col-span-2">
+                <label className="form-label">اختبار الجودة</label>
+                <textarea className="form-input" rows={2} value={editForm.qualityCheckNotes} onChange={(event) => setEditForm({...editForm, qualityCheckNotes: event.target.value})} />
+              </div>
+              <div className="sm:col-span-2">
+                <label className="form-label">ملاحظات</label>
+                <textarea className="form-input" rows={2} value={editForm.notes} onChange={(event) => setEditForm({...editForm, notes: event.target.value})} />
+              </div>
+              <div className="flex gap-3 sm:col-span-2">
+                <button className="btn-primary flex-1" disabled={updatingId !== null}>{updatingId ? "جارٍ الحفظ..." : "حفظ التفاصيل"}</button>
+                <button type="button" className="btn-secondary" disabled={updatingId !== null} onClick={() => setEditTarget(null)}>إغلاق</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {historyTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" dir="rtl">
+          <div className="max-h-[85vh] w-full max-w-xl overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-black">سجل {historyTarget.repairNumber}</h2>
+              <button className="btn-secondary" onClick={() => setHistoryTarget(null)}>إغلاق</button>
+            </div>
+            <div className="mt-4 space-y-3">
+              {history.results.map((entry) => (
+                <div key={entry._id} className="rounded-xl border border-slate-200 p-3">
+                  <div className="flex justify-between gap-3">
+                    <span className="font-bold text-slate-800">
+                      {entry.fromStatus ? `${statusConfig[entry.fromStatus].label} ← ` : ""}
+                      {statusConfig[entry.toStatus].label}
+                    </span>
+                    <span className="text-xs text-slate-500">{entry.date}</span>
+                  </div>
+                  <p className="mt-1 text-xs text-slate-500">بواسطة {entry.employeeName}</p>
+                  {entry.technicianName && <p className="mt-1 text-xs">الفني: {entry.technicianName}</p>}
+                  {entry.diagnosis && <p className="mt-1 text-xs">التشخيص: {entry.diagnosis}</p>}
+                  {entry.reason && <p className="mt-1 text-xs text-red-700">السبب: {entry.reason}</p>}
+                </div>
+              ))}
+              {history.results.length === 0 && <p className="py-8 text-center text-sm text-slate-400">لا توجد حركات.</p>}
+              {history.status === "CanLoadMore" && (
+                <button className="btn-secondary w-full" onClick={() => history.loadMore(10)}>تحميل المزيد</button>
+              )}
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Add Repair Modal */}
@@ -425,6 +814,18 @@ export function RepairsPage() {
                 <div>
                   <label className="form-label">الموديل *</label>
                   <input className="form-input" required value={form.deviceModel} onChange={e => setForm({...form, deviceModel: e.target.value})} placeholder="مثال: Galaxy S23" />
+                </div>
+                <div>
+                  <label className="form-label">الرقم المسلسل</label>
+                  <input className="form-input" value={form.serialNumber} onChange={e => setForm({...form, serialNumber: e.target.value})} />
+                </div>
+                <div>
+                  <label className="form-label">الملحقات المستلمة</label>
+                  <input className="form-input" value={form.accessories} onChange={e => setForm({...form, accessories: e.target.value})} placeholder="دراع، كابل، شنطة..." />
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="form-label">حالة الجهاز عند الاستلام</label>
+                  <textarea className="form-input" rows={2} value={form.intakeCondition} onChange={e => setForm({...form, intakeCondition: e.target.value})} />
                 </div>
                 <div className="sm:col-span-2">
                   <label className="form-label">وصف المشكلة *</label>
@@ -534,7 +935,10 @@ export function RepairsPage() {
                 </div>
                 <div>
                   <label className="form-label">الفني المسؤول</label>
-                  <input className="form-input" value={form.technicianName} onChange={e => setForm({...form, technicianName: e.target.value})} placeholder="اسم الفني" />
+                  <select className="form-input" value={form.technicianProfileId} onChange={e => setForm({...form, technicianProfileId: e.target.value})}>
+                    <option value="">يُعيّن لاحقًا</option>
+                    {technicianOptions.map((technician) => <option key={technician._id} value={technician._id}>{technician.name}</option>)}
+                  </select>
                 </div>
                 <div>
                   <label className="form-label">تاريخ التسليم المتوقع</label>

@@ -1,11 +1,17 @@
 import { query, mutation } from "./_generated/server.js";
-import type { MutationCtx } from "./_generated/server";
+import type { MutationCtx, QueryCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import { v, ConvexError } from "convex/values";
-import { canTransition, REPAIR_TRANSITIONS, roundMoney } from "../shared/businessRules.ts";
+import { paginationOptsValidator } from "convex/server";
+import {
+  canTransition,
+  REPAIR_TRANSITIONS,
+  roundMoney,
+  type RepairStatus,
+} from "../shared/businessRules.ts";
 import { nextDocumentNumber } from "./lib/documentNumbers.ts";
 import { requireActiveBranch, requireActiveCustomer } from "./lib/references.ts";
-import { assertBranchAccess, requireModuleEnabled, requireModulePermission, requirePermission, filterByBranch, resolveWriteBranch, logAction } from "./lib/auth.ts";
+import { assertBranchAccess, requireModuleEnabled, requireModulePermission, requirePermission, filterByBranch, resolveWriteBranch, logAction, type AuthUser } from "./lib/auth.ts";
 import { postFinancialTransaction, requireActiveFinancialAccount, assertFinancialAccountBranch, findFinancialTransactionByRequest } from "./lib/finance.ts";
 import { postCustomerLedgerEntry } from "./lib/customerLedger.ts";
 import { changeProductStock } from "./lib/inventory.ts";
@@ -32,6 +38,17 @@ type PreparedRepairPart = {
   quantity: number;
   unitPrice: number;
   lineTotal: number;
+};
+
+type RepairTransitionArgs = {
+  id: Id<"repairs">;
+  status: RepairStatus;
+  date: string;
+  requestId: string;
+  diagnosis?: string;
+  reason?: string;
+  qualityCheckNotes?: string;
+  warrantyDays?: number;
 };
 
 function assertMoney(value: number, label: string) {
@@ -100,6 +117,51 @@ function createTrackingToken(): string {
     .toUpperCase();
 }
 
+function addDays(date: string, days: number): string {
+  const value = new Date(`${date}T00:00:00.000Z`);
+  value.setUTCDate(value.getUTCDate() + days);
+  return value.toISOString().slice(0, 10);
+}
+
+function normalizeOptionalText(value?: string): string | undefined {
+  const normalized = value ? normalizeText(value) : "";
+  return normalized || undefined;
+}
+
+async function requireRepairTechnician(
+  ctx: MutationCtx,
+  branchId: Id<"branches">,
+  profileId: Id<"userProfiles">,
+) {
+  const profile = await ctx.db.get(profileId);
+  if (
+    !profile ||
+    !profile.isActive ||
+    profile.role !== "technician" ||
+    profile.branchId !== branchId
+  ) {
+    throw new ConvexError("الفني غير موجود أو غير نشط أو لا ينتمي إلى فرع الصيانة");
+  }
+  return profile;
+}
+
+async function resolveEmployeeName(
+  ctx: Pick<QueryCtx, "db">,
+  userId?: string,
+): Promise<string> {
+  if (!userId) return "مستخدم غير معروف";
+  const byUser = await ctx.db
+    .query("userProfiles")
+    .withIndex("by_user", (q) => q.eq("userId", userId))
+    .first();
+  if (byUser) return byUser.name;
+  const byToken = await ctx.db
+    .query("userProfiles")
+    .withIndex("by_token", (q) => q.eq("tokenIdentifier", userId))
+    .first();
+  return byToken?.name ?? "مستخدم غير معروف";
+}
+
 async function createUniqueTrackingToken(ctx: MutationCtx): Promise<string> {
   for (let attempt = 0; attempt < 3; attempt++) {
     const token = createTrackingToken();
@@ -129,6 +191,9 @@ function publicRepair<T extends Doc<"repairs">>(
     cancellationRequestId: _cancellationRequestId,
     cancellationFingerprint: _cancellationFingerprint,
     creationFingerprint: _creationFingerprint,
+    createdBy: _createdBy,
+    deliveredBy: _deliveredBy,
+    technicianId: _technicianId,
     ...dto
   } = repair;
   if (canViewProfits) return dto;
@@ -195,6 +260,114 @@ export const partPicker = query({
   },
 });
 
+export const technicianPicker = query({
+  args: { branchId: v.optional(v.id("branches")) },
+  handler: async (ctx, args) => {
+    const user = await requireModulePermission(ctx, "edit_repairs", "repairs");
+    const branchId = resolveWriteBranch(user, args.branchId);
+    const profiles = await ctx.db
+      .query("userProfiles")
+      .withIndex("by_branch", (q) => q.eq("branchId", branchId))
+      .collect();
+    return profiles
+      .filter((profile) => profile.isActive && profile.role === "technician")
+      .sort((a, b) => a.name.localeCompare(b.name, "ar"))
+      .map(({ _id, name }) => ({ _id, name }));
+  },
+});
+
+export const historyPaginated = query({
+  args: {
+    repairId: v.id("repairs"),
+    paginationOpts: paginationOptsValidator,
+  },
+  handler: async (ctx, args) => {
+    const user = await requireModulePermission(ctx, "view_repairs", "repairs");
+    const repair = await ctx.db.get(args.repairId);
+    if (!repair) throw new ConvexError("أمر الصيانة غير موجود");
+    assertBranchAccess(user, repair);
+    const result = await ctx.db
+      .query("repairStatusHistory")
+      .withIndex("by_repair_date", (q) => q.eq("repairId", args.repairId))
+      .order("desc")
+      .paginate(args.paginationOpts);
+    return {
+      ...result,
+      page: await Promise.all(
+        result.page.map(async (entry) => ({
+          _id: entry._id,
+          fromStatus: entry.fromStatus,
+          toStatus: entry.toStatus,
+          date: entry.date,
+          diagnosis: entry.diagnosisSnapshot,
+          technicianName: entry.technicianNameSnapshot,
+          qualityCheckNotes: entry.qualityCheckNotesSnapshot,
+          reason: entry.reason,
+          employeeName: await resolveEmployeeName(ctx, entry.changedBy),
+        })),
+      ),
+    };
+  },
+});
+
+export const repairForPrint = query({
+  args: { id: v.id("repairs") },
+  handler: async (ctx, args) => {
+    const user = await requireModulePermission(ctx, "print_repairs", "repairs");
+    const repair = await ctx.db.get(args.id);
+    if (!repair) throw new ConvexError("أمر الصيانة غير موجود");
+    assertBranchAccess(user, repair);
+    const history = await ctx.db
+      .query("repairStatusHistory")
+      .withIndex("by_repair_date", (q) => q.eq("repairId", repair._id))
+      .order("asc")
+      .collect();
+    return {
+      repairNumber: repair.repairNumber,
+      customerName: repair.customerName,
+      customerPhone: repair.customerPhone,
+      deviceType: repair.deviceType,
+      deviceBrand: repair.deviceBrand,
+      deviceModel: repair.deviceModel,
+      serialNumber: repair.serialNumber,
+      accessories: repair.accessories,
+      intakeCondition: repair.intakeCondition,
+      problem: repair.problem,
+      diagnosis: repair.diagnosis,
+      parts: repair.parts.map((part) => ({
+        name: part.name,
+        cost: part.unitPrice ?? part.cost,
+        quantity: part.quantity,
+        lineTotal: part.lineTotal ?? roundMoney(part.cost * part.quantity),
+      })),
+      laborCost: repair.laborCost,
+      totalCost: repair.totalCost,
+      deposit: repair.deposit,
+      remaining: repair.remaining,
+      status: repair.status,
+      technicianName: repair.technicianName,
+      receivedDate: repair.receivedDate,
+      expectedDate: repair.expectedDate,
+      deliveredDate: repair.deliveredDate,
+      warrantyDays: repair.warrantyDays,
+      warrantyUntil: repair.warrantyUntil,
+      qualityCheckNotes: repair.qualityCheckNotes,
+      notes: repair.notes,
+      _creationTime: repair._creationTime,
+      employeeName: await resolveEmployeeName(ctx, repair.createdBy),
+      history: await Promise.all(
+        history.map(async (entry) => ({
+          fromStatus: entry.fromStatus,
+          toStatus: entry.toStatus,
+          date: entry.date,
+          reason: entry.reason,
+          employeeName: await resolveEmployeeName(ctx, entry.changedBy),
+        })),
+      ),
+    };
+  },
+});
+
 export const getByTracking = query({
   args: { token: v.string() },
   handler: async (ctx, args) => {
@@ -223,6 +396,8 @@ export const getByTracking = query({
       receivedDate: repair.receivedDate,
       expectedDate: repair.expectedDate,
       deliveredDate: repair.deliveredDate,
+      warrantyDays: repair.warrantyDays,
+      warrantyUntil: repair.warrantyUntil,
     };
   },
 });
@@ -247,6 +422,10 @@ export const create = mutation({
     expectedDate: v.optional(v.string()),
     notes: v.optional(v.string()),
     branchId: v.optional(v.id("branches")),
+    serialNumber: v.optional(v.string()),
+    accessories: v.optional(v.string()),
+    intakeCondition: v.optional(v.string()),
+    technicianProfileId: v.optional(v.id("userProfiles")),
     technicianName: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
@@ -269,9 +448,10 @@ export const create = mutation({
         ? assertIsoDate(args.expectedDate)
         : undefined,
       notes: args.notes ? normalizeText(args.notes) || undefined : undefined,
-      technicianName: args.technicianName
-        ? normalizeText(args.technicianName) || undefined
-        : undefined,
+      serialNumber: normalizeOptionalText(args.serialNumber),
+      accessories: normalizeOptionalText(args.accessories),
+      intakeCondition: normalizeOptionalText(args.intakeCondition),
+      technicianName: normalizeOptionalText(args.technicianName),
     };
     for (const value of [
       normalizedText.customerName,
@@ -314,6 +494,9 @@ export const create = mutation({
         productId: String(part.productId),
         quantity: part.quantity,
       })),
+      technicianProfileId: args.technicianProfileId
+        ? String(args.technicianProfileId)
+        : null,
       initialDeposit: initialDeposit ?? null,
     });
     const existing = await ctx.db
@@ -330,6 +513,11 @@ export const create = mutation({
         "استُخدم معرف طلب إنشاء الصيانة ببيانات مختلفة",
       );
     }
+    const assignedTechnician = args.technicianProfileId
+      ? await requireRepairTechnician(ctx, branchId!, args.technicianProfileId)
+      : null;
+    const technicianName =
+      assignedTechnician?.name ?? normalizedText.technicianName;
     await requireActiveBranch(ctx, branchId);
     const preparedParts = await prepareRepairParts(
       ctx,
@@ -368,9 +556,16 @@ export const create = mutation({
       deviceBrand: normalizedText.deviceBrand,
       deviceModel: normalizedText.deviceModel,
       problem: normalizedText.problem,
+      serialNumber: normalizedText.serialNumber,
+      accessories: normalizedText.accessories,
+      intakeCondition: normalizedText.intakeCondition,
       expectedDate: normalizedText.expectedDate,
       notes: normalizedText.notes,
-      technicianName: normalizedText.technicianName,
+      technicianName,
+      technicianId: args.technicianProfileId
+        ? String(args.technicianProfileId)
+        : undefined,
+      assignedTechnicianProfileId: args.technicianProfileId,
       branchId,
       repairNumber,
       trackingToken,
@@ -384,8 +579,21 @@ export const create = mutation({
       remaining: roundMoney(totalCost - initialAmount),
       creationRequestId,
       creationFingerprint,
+      createdBy: user.userId,
       status: "received",
       receivedDate: date,
+    });
+    await ctx.db.insert("repairStatusHistory", {
+      repairId: id,
+      repairNumber,
+      branchId: branchId!,
+      toStatus: "received",
+      date,
+      technicianNameSnapshot: technicianName,
+      idempotencyKey: `${creationRequestId}:received`,
+      requestFingerprint: creationFingerprint,
+      changedAt: Date.now(),
+      changedBy: user.userId,
     });
     const storedParts = [];
     let partsCogsTotal = 0;
@@ -460,10 +668,304 @@ export const rotateTrackingToken = mutation({
   },
 });
 
+export const updateDetails = mutation({
+  args: {
+    id: v.id("repairs"),
+    technicianProfileId: v.optional(v.id("userProfiles")),
+    diagnosis: v.optional(v.string()),
+    serialNumber: v.optional(v.string()),
+    accessories: v.optional(v.string()),
+    intakeCondition: v.optional(v.string()),
+    qualityCheckNotes: v.optional(v.string()),
+    expectedDate: v.optional(v.string()),
+    notes: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const user = await requireModulePermission(ctx, "edit_repairs", "repairs");
+    const repair = await ctx.db.get(args.id);
+    if (!repair) throw new ConvexError("أمر الصيانة غير موجود");
+    assertBranchAccess(user, repair);
+    if (!["received", "in_progress"].includes(repair.status)) {
+      throw new ConvexError("لا يمكن تعديل تفاصيل الصيانة بعد الجاهزية أو الإغلاق");
+    }
+    const technician = args.technicianProfileId
+      ? await requireRepairTechnician(
+          ctx,
+          repair.branchId!,
+          args.technicianProfileId,
+        )
+      : null;
+    const expectedDate = args.expectedDate
+      ? assertIsoDate(args.expectedDate)
+      : undefined;
+    await ctx.db.patch(args.id, {
+      assignedTechnicianProfileId:
+        args.technicianProfileId ?? repair.assignedTechnicianProfileId,
+      technicianId: args.technicianProfileId
+        ? String(args.technicianProfileId)
+        : repair.technicianId,
+      technicianName: technician?.name ?? repair.technicianName,
+      diagnosis:
+        args.diagnosis === undefined
+          ? repair.diagnosis
+          : normalizeOptionalText(args.diagnosis),
+      serialNumber:
+        args.serialNumber === undefined
+          ? repair.serialNumber
+          : normalizeOptionalText(args.serialNumber),
+      accessories:
+        args.accessories === undefined
+          ? repair.accessories
+          : normalizeOptionalText(args.accessories),
+      intakeCondition:
+        args.intakeCondition === undefined
+          ? repair.intakeCondition
+          : normalizeOptionalText(args.intakeCondition),
+      qualityCheckNotes:
+        args.qualityCheckNotes === undefined
+          ? repair.qualityCheckNotes
+          : normalizeOptionalText(args.qualityCheckNotes),
+      expectedDate:
+        args.expectedDate === undefined ? repair.expectedDate : expectedDate,
+      notes:
+        args.notes === undefined
+          ? repair.notes
+          : normalizeOptionalText(args.notes),
+    });
+    await logAction(ctx, user, {
+      action: "update_details",
+      module: "repairs",
+      recordId: args.id,
+      recordLabel: repair.repairNumber,
+      details: `تحديث بيانات الجهاز والتشخيص للصيانة ${repair.repairNumber}`,
+    });
+    return args.id;
+  },
+});
+
+async function transitionRepair(
+  ctx: MutationCtx,
+  user: AuthUser,
+  args: RepairTransitionArgs,
+) {
+  const date = assertIsoDate(args.date);
+  const reason = normalizeOptionalText(args.reason);
+  const diagnosis = normalizeOptionalText(args.diagnosis);
+  const qualityCheckNotes = normalizeOptionalText(args.qualityCheckNotes);
+  const requestId = normalizeRequestId(args.requestId);
+  const idempotencyKey = `${user.userId}:repair_status:${requestId}`;
+  const requestFingerprint = fingerprint({
+    repairId: String(args.id),
+    status: args.status,
+    date,
+    reason: reason ?? null,
+    diagnosis: diagnosis ?? null,
+    qualityCheckNotes: qualityCheckNotes ?? null,
+    warrantyDays: args.warrantyDays ?? null,
+  });
+  const previousAttempt = await ctx.db
+    .query("repairStatusHistory")
+    .withIndex("by_idempotency_key", (q) =>
+      q.eq("idempotencyKey", idempotencyKey),
+    )
+    .unique();
+  if (previousAttempt) {
+    if (previousAttempt.requestFingerprint === requestFingerprint) {
+      return previousAttempt.repairId;
+    }
+    throw new ConvexError(
+      "استُخدم معرف طلب تغيير الحالة ببيانات مختلفة — طلب مختلف",
+    );
+  }
+
+  const repair = await ctx.db.get(args.id);
+  if (!repair || !repair.branchId) {
+    throw new ConvexError("أمر الصيانة غير موجود");
+  }
+  assertBranchAccess(user, repair);
+  if (repair.status === "cancelled" && args.status === "cancelled") {
+    throw new ConvexError("تم إلغاء الصيانة سابقًا بطلب مختلف");
+  }
+  if (!canTransition(REPAIR_TRANSITIONS, repair.status, args.status)) {
+    throw new ConvexError(
+      `لا يمكن تغيير حالة الصيانة من ${repair.status} إلى ${args.status}`,
+    );
+  }
+  const nextDiagnosis = diagnosis ?? repair.diagnosis;
+  const nextQualityCheckNotes =
+    qualityCheckNotes ?? repair.qualityCheckNotes;
+  if (args.status === "in_progress" && !repair.technicianName) {
+    throw new ConvexError("يجب تعيين فني قبل بدء الإصلاح");
+  }
+  if (args.status === "ready" && !nextDiagnosis) {
+    throw new ConvexError("التشخيص مطلوب قبل اعتماد الصيانة جاهزة");
+  }
+  if (args.status === "cancelled" && !reason) {
+    throw new ConvexError("سبب الإلغاء مطلوب");
+  }
+  if (args.status === "cancelled" && repair.deposit > 0) {
+    throw new ConvexError("يجب استرداد عربون الصيانة بالكامل قبل الإلغاء");
+  }
+  if (args.status === "delivered" && repair.remaining > 0) {
+    throw new ConvexError("لا يمكن تسليم صيانة عليها مبلغ متبقٍ");
+  }
+  if (
+    args.warrantyDays !== undefined &&
+    (args.status !== "delivered" ||
+      !Number.isInteger(args.warrantyDays) ||
+      args.warrantyDays < 0 ||
+      args.warrantyDays > 365)
+  ) {
+    throw new ConvexError("مدة الضمان يجب أن تكون عدد أيام صحيحًا من صفر إلى 365 عند التسليم");
+  }
+
+  if (args.status === "cancelled") {
+    for (const part of repair.parts) {
+      if (
+        !part.productId ||
+        part.inventoryValueRemoved === undefined ||
+        !Number.isFinite(part.inventoryValueRemoved)
+      ) {
+        throw new ConvexError(
+          "أمر الصيانة القديم يحتوي قطعًا بلا تكلفة مخزون تاريخية؛ راجعه يدويًا قبل الإلغاء",
+        );
+      }
+      const product = await ctx.db.get(part.productId);
+      if (!product || product.branchId !== repair.branchId) {
+        throw new ConvexError(
+          "تعذر استعادة قطعة غيار إلى مخزون فرع أمر الصيانة",
+        );
+      }
+      await changeProductStock(ctx, user, {
+        productId: part.productId,
+        quantityDelta: part.quantity,
+        unitCost:
+          part.historicalUnitCost ??
+          part.inventoryValueRemoved / part.quantity,
+        valueDelta: part.inventoryValueRemoved,
+        type: INVENTORY_MOVEMENT_TYPES.repairPartReversal,
+        reason: `عكس قطع غيار الصيانة ${repair.repairNumber}`,
+        referenceId: String(repair._id),
+        referenceType: "repair_cancellation",
+      });
+    }
+  }
+  if (args.status === "cancelled" && repair.customerId) {
+    await postCustomerLedgerEntry(ctx, user, {
+      type: "repair_cancel",
+      requestId: `${idempotencyKey}:ledger`,
+      customerId: repair.customerId,
+      branchId: repair.branchId,
+      date,
+      receivableDelta: -repair.remaining,
+      advanceDelta: 0,
+      purchasesDelta: -repair.totalCost,
+      description: `إلغاء الصيانة ${repair.repairNumber}`,
+      referenceType: "repair",
+      referenceId: String(repair._id),
+      referenceNumber: repair.repairNumber,
+    });
+  }
+  const cancellationJournal =
+    args.status === "cancelled" && reason
+      ? await reverseRepairRevenueJournal(ctx, user, {
+          branchId: repair.branchId,
+          date,
+          requestId: `${idempotencyKey}:revenue`,
+          repairId: repair._id,
+          repairNumber: repair.repairNumber,
+          originalEntryId: repair.journalEntryId,
+          reason,
+          hasAccountingImpact:
+            repair.totalCost > 0 || (repair.partsCogsTotal ?? 0) > 0,
+        })
+      : null;
+  const warrantyDays =
+    args.status === "delivered" ? args.warrantyDays ?? 0 : undefined;
+  await ctx.db.patch(args.id, {
+    status: args.status,
+    diagnosis: nextDiagnosis,
+    qualityCheckNotes: nextQualityCheckNotes,
+    ...(args.status === "delivered"
+      ? {
+          deliveredDate: date,
+          deliveredBy: user.userId,
+          warrantyDays,
+          warrantyUntil: warrantyDays ? addDays(date, warrantyDays) : date,
+        }
+      : {}),
+    ...(args.status === "cancelled"
+      ? {
+          cancelledAt: Date.now(),
+          cancelledBy: user.userId,
+          cancellationReason: reason,
+          cancellationDate: date,
+          cancellationRequestId: idempotencyKey,
+          cancellationFingerprint: requestFingerprint,
+          cancellationJournalEntryId: cancellationJournal?._id,
+        }
+      : {}),
+  });
+  await ctx.db.insert("repairStatusHistory", {
+    repairId: repair._id,
+    repairNumber: repair.repairNumber,
+    branchId: repair.branchId,
+    fromStatus: repair.status as RepairStatus,
+    toStatus: args.status,
+    date,
+    diagnosisSnapshot: nextDiagnosis,
+    technicianNameSnapshot: repair.technicianName,
+    qualityCheckNotesSnapshot: nextQualityCheckNotes,
+    reason,
+    idempotencyKey,
+    requestFingerprint,
+    changedAt: Date.now(),
+    changedBy: user.userId,
+  });
+  await logAction(ctx, user, {
+    action: "update_status",
+    module: "repairs",
+    recordId: args.id,
+    recordLabel: repair.repairNumber,
+    details: `تحديث حالة الصيانة ${repair.repairNumber} من ${repair.status} إلى ${args.status}`,
+  });
+  return args.id;
+}
+
+export const transitionStatus = mutation({
+  args: {
+    id: v.id("repairs"),
+    status: v.union(
+      v.literal("received"),
+      v.literal("in_progress"),
+      v.literal("ready"),
+      v.literal("delivered"),
+      v.literal("cancelled"),
+    ),
+    date: v.string(),
+    requestId: v.string(),
+    diagnosis: v.optional(v.string()),
+    reason: v.optional(v.string()),
+    qualityCheckNotes: v.optional(v.string()),
+    warrantyDays: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const user = await requireModulePermission(ctx, "edit_repairs", "repairs");
+    return transitionRepair(ctx, user, args);
+  },
+});
+
+/** Compatibility path for older callers; the UI uses transitionStatus. */
 export const updateStatus = mutation({
   args: {
     id: v.id("repairs"),
-    status: v.union(v.literal("received"), v.literal("in_progress"), v.literal("ready"), v.literal("delivered"), v.literal("cancelled")),
+    status: v.union(
+      v.literal("received"),
+      v.literal("in_progress"),
+      v.literal("ready"),
+      v.literal("delivered"),
+      v.literal("cancelled"),
+    ),
     diagnosis: v.optional(v.string()),
     reason: v.optional(v.string()),
     date: v.optional(v.string()),
@@ -473,104 +975,14 @@ export const updateStatus = mutation({
     const user = await requireModulePermission(ctx, "edit_repairs", "repairs");
     const repair = await ctx.db.get(args.id);
     if (!repair) throw new ConvexError("أمر الصيانة غير موجود");
-    assertBranchAccess(user, repair);
-    let cancellationRequestId: string | undefined;
-    let cancellationFingerprint: string | undefined;
-    let cancellationDate: string | undefined;
-    let cancellationReason: string | undefined;
-    if (args.status === "cancelled") {
-      if (!args.date || !args.requestId) throw new ConvexError("تاريخ ومعرف طلب الإلغاء مطلوبان");
-      cancellationDate = assertIsoDate(args.date);
-      cancellationReason = normalizeText(args.reason ?? "");
-      if (!cancellationReason) throw new ConvexError("سبب الإلغاء مطلوب");
-      cancellationRequestId = `${user.userId}:${normalizeRequestId(args.requestId)}`;
-      cancellationFingerprint = fingerprint({
-        date: cancellationDate,
-        reason: cancellationReason,
-      });
-      if (repair.status === "cancelled") {
-        if (
-          repair.cancellationRequestId === cancellationRequestId &&
-          repair.cancellationFingerprint === cancellationFingerprint
-        ) {
-          return repair._id;
-        }
-        throw new ConvexError("تم إلغاء الصيانة سابقًا بطلب مختلف");
-      }
-    }
-    if (!canTransition(REPAIR_TRANSITIONS, repair.status, args.status)) throw new ConvexError(`لا يمكن تغيير حالة الصيانة من ${repair.status} إلى ${args.status}`);
-    if (args.status === "cancelled" && repair.deposit > 0) throw new ConvexError("يجب استرداد عربون الصيانة بالكامل قبل الإلغاء");
-    if (args.status === "delivered" && repair.remaining > 0) throw new ConvexError("لا يمكن تسليم صيانة عليها مبلغ متبقٍ");
-    if (args.status === "cancelled") {
-      for (const part of repair.parts) {
-        if (
-          !part.productId ||
-          part.inventoryValueRemoved === undefined ||
-          !Number.isFinite(part.inventoryValueRemoved)
-        ) {
-          throw new ConvexError(
-            "أمر الصيانة القديم يحتوي قطعًا بلا تكلفة مخزون تاريخية؛ راجعه يدويًا قبل الإلغاء",
-          );
-        }
-        const product = await ctx.db.get(part.productId);
-        if (!product || product.branchId !== repair.branchId) {
-          throw new ConvexError(
-            "تعذر استعادة قطعة غيار إلى مخزون فرع أمر الصيانة",
-          );
-        }
-        await changeProductStock(ctx, user, {
-          productId: part.productId,
-          quantityDelta: part.quantity,
-          unitCost:
-            part.historicalUnitCost ??
-            part.inventoryValueRemoved / part.quantity,
-          valueDelta: part.inventoryValueRemoved,
-          type: INVENTORY_MOVEMENT_TYPES.repairPartReversal,
-          reason: `عكس قطع غيار الصيانة ${repair.repairNumber}`,
-          referenceId: String(repair._id),
-          referenceType: "repair_cancellation",
-        });
-      }
-    }
-    if (args.status === "cancelled" && repair.customerId && cancellationDate && cancellationRequestId) await postCustomerLedgerEntry(ctx, user, { type: "repair_cancel", requestId: `${cancellationRequestId}:ledger`, customerId: repair.customerId, branchId: repair.branchId!, date: cancellationDate, receivableDelta: -repair.remaining, advanceDelta: 0, purchasesDelta: -repair.totalCost, description: `إلغاء الصيانة ${repair.repairNumber}`, referenceType: "repair", referenceId: String(repair._id), referenceNumber: repair.repairNumber });
-    const cancellationJournal =
-      args.status === "cancelled" &&
-      cancellationDate &&
-      cancellationRequestId &&
-      cancellationReason
-        ? await reverseRepairRevenueJournal(ctx, user, {
-            branchId: repair.branchId!,
-            date: cancellationDate,
-            requestId: `${cancellationRequestId}:revenue`,
-            repairId: repair._id,
-            repairNumber: repair.repairNumber,
-            originalEntryId: repair.journalEntryId,
-            reason: cancellationReason,
-            hasAccountingImpact:
-              repair.totalCost > 0 || (repair.partsCogsTotal ?? 0) > 0,
-          })
-        : null;
-    await ctx.db.patch(args.id, {
-      status: args.status, diagnosis: args.diagnosis?.trim(),
-      ...(args.status === "delivered" ? { deliveredDate: new Date().toISOString().slice(0, 10) } : {}),
-      ...(args.status === "cancelled" ? {
-        cancelledAt: Date.now(),
-        cancelledBy: user.userId,
-        cancellationReason,
-        cancellationDate,
-        cancellationRequestId,
-        cancellationFingerprint,
-        cancellationJournalEntryId: cancellationJournal?._id,
-      } : {}),
+    const date = args.date ?? new Date().toISOString().slice(0, 10);
+    return transitionRepair(ctx, user, {
+      ...args,
+      date,
+      requestId:
+        args.requestId ??
+        `legacy:${args.id}:${repair.status}:${args.status}:${date}`,
     });
-    await logAction(ctx, user, {
-      action: "update",
-      module: "repairs",
-      recordId: args.id,
-      recordLabel: repair.repairNumber,
-      details: `تحديث حالة الصيانة ${repair.repairNumber} إلى: ${args.status}`,
-    });
-    return args.id;
   },
 });
 
