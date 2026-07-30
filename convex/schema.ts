@@ -95,7 +95,7 @@ const applicationTables = {
     balance: v.number(),
     notes: v.optional(v.string()),
     isActive: v.optional(v.boolean()),
-  }),
+  }).index("by_phone", ["phone"]),
 
   supplierBalances: defineTable({
     key: v.string(), supplierId: v.id("suppliers"), branchId: v.id("branches"), balance: v.number(), updatedAt: v.number(),
@@ -209,7 +209,10 @@ const applicationTables = {
     notes: v.optional(v.string()),
     branchId: v.optional(v.id("branches")),
     isActive: v.optional(v.boolean()),
-  }).index("by_phone", ["phone"]).index("by_branch", ["branchId"]),
+  })
+    .index("by_phone", ["phone"])
+    .index("by_branch", ["branchId"])
+    .index("by_branch_phone", ["branchId", "phone"]),
 
   // الفواتير / المبيعات
   invoices: defineTable({

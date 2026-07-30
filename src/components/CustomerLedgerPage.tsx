@@ -10,11 +10,17 @@ import { BookOpen, Printer } from "lucide-react";
 
 const requestId = () => crypto.randomUUID();
 
-export function CustomerLedgerPage() {
+export function CustomerLedgerPage({
+  initialCustomerId,
+  initialBranchId,
+}: {
+  initialCustomerId?: Id<"customers">;
+  initialBranchId?: Id<"branches">;
+}) {
   const canView = usePermission("view_customer_ledger"), canInitialize = usePermission("initialize_customer_ledger"), canPrint = usePermission("print_customer_statements");
   const me = useQuery(api.employees.me), branches = useQuery(api.customerLedger.availableBranches, canView ? {} : "skip");
-  const [branchId, setBranchId] = useState<Id<"branches"> | null>(null), [customerId, setCustomerId] = useState<Id<"customers"> | null>(null), [busy, setBusy] = useState(false), [printTarget, setPrintTarget] = useState(false);
-  const effectiveBranch = branchId ?? (me?.role === "manager" ? me.branchId : branches?.[0]?._id) ?? null;
+  const [branchId, setBranchId] = useState<Id<"branches"> | null>(initialBranchId ?? null), [customerId, setCustomerId] = useState<Id<"customers"> | null>(initialCustomerId ?? null), [busy, setBusy] = useState(false), [printTarget, setPrintTarget] = useState(false);
+  const effectiveBranch = branchId ?? initialBranchId ?? me?.branchId ?? branches?.[0]?._id ?? null;
   const options = useQuery(api.customerLedger.customerOptions, canView && effectiveBranch ? { branchId: effectiveBranch } : "skip");
   const ledgerArgs = canView && effectiveBranch && customerId ? { customerId, branchId: effectiveBranch } : "skip";
   const { results, status, loadMore } = usePaginatedQuery(api.customerLedger.ledger, ledgerArgs, { initialNumItems: 20 });
@@ -24,6 +30,12 @@ export function CustomerLedgerPage() {
   const [opening, setOpening] = useState({ receivableBalance: "0", advanceBalance: "0", totalPurchases: "0", notes: "" });
   const selected = useMemo(() => options?.customers.find(x => x.customerId === customerId), [options, customerId]);
 
+  useEffect(() => {
+    if (!initialCustomerId || !initialBranchId) return;
+    setBranchId(initialBranchId);
+    setCustomerId(initialCustomerId);
+    retryRequestId.current = requestId();
+  }, [initialBranchId, initialCustomerId]);
   useEffect(() => { if (!printTarget || !printStatement) return; const timer = window.setTimeout(() => { window.print(); setPrintTarget(false); setBusy(false); }, 0); return () => window.clearTimeout(timer); }, [printTarget, printStatement]);
 
   const handleInitialize = async (event: React.FormEvent) => { event.preventDefault(); if (busy || !canInitialize || !effectiveBranch || !customerId || selected?.openingState !== "not_started" || !options?.cutoverDate) return; setBusy(true); try { await initialize({ customerId, branchId: effectiveBranch, receivableBalance: Number(opening.receivableBalance), advanceBalance: Number(opening.advanceBalance), totalPurchases: Number(opening.totalPurchases), date: options.cutoverDate, notes: opening.notes || undefined, requestId: retryRequestId.current }); toast.success("تم تسجيل الرصيد الافتتاحي"); retryRequestId.current = requestId(); } catch (error) { toast.error(getErrorMessage(error, "تعذر تسجيل الرصيد الافتتاحي")); } finally { setBusy(false); } };
