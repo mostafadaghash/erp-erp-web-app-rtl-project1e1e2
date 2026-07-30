@@ -59,6 +59,26 @@ function normalizedRange(from: string, to: string): ReportingRange {
   }
 }
 
+export const availableBranches = query({
+  args: {},
+  handler: async (ctx) => {
+    const user = await requirePermission(ctx, "view_reports");
+    const central = user.role === "admin" || user.role === "accountant";
+    if (central) {
+      return (await ctx.db.query("branches").collect())
+        .filter((branch) => branch.isActive)
+        .map((branch) => ({ _id: branch._id, name: branch.name }));
+    }
+    if (!user.branchId) {
+      throw new ConvexError("يجب ربط حسابك بفرع لعرض التقارير");
+    }
+    const branch = await ctx.db.get(user.branchId);
+    return branch?.isActive
+      ? [{ _id: branch._id, name: branch.name }]
+      : [];
+  },
+});
+
 async function resolveReportBranches(
   ctx: QueryCtx,
   user: AuthUser,

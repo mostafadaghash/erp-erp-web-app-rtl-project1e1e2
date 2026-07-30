@@ -1,378 +1,538 @@
 import { useState } from "react";
 import { useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
+import type { Id } from "../../convex/_generated/dataModel";
 import { usePermission } from "../lib/access";
-import { BarChart3, TrendingUp, TrendingDown, DollarSign, Package, Users, Wrench, Target, Calendar, Filter } from "lucide-react";
+import { useCurrency } from "../lib/utils";
+import {
+  AlertTriangle,
+  ArrowDownToLine,
+  ArrowUpFromLine,
+  BarChart3,
+  Building2,
+  CalendarDays,
+  CircleDollarSign,
+  Package,
+  ReceiptText,
+  ShoppingCart,
+  TrendingDown,
+  TrendingUp,
+  Truck,
+  Users,
+  WalletCards,
+} from "lucide-react";
+import type { LucideIcon } from "lucide-react";
+import type { ReportingOverview } from "../../shared/reportingView";
 
-type Period = "all" | "today" | "week" | "month" | "year";
+type Period = "today" | "week" | "month" | "year" | "custom";
+type BranchOption = { _id: Id<"branches">; name: string };
+type Tone = "indigo" | "emerald" | "amber" | "red" | "sky" | "violet";
 
-function filterByPeriod<T extends { _creationTime: number }>(items: T[], period: Period): T[] {
-  if (period === "all") return items;
-  const now = new Date();
-  const start = new Date();
-  if (period === "today") { start.setHours(0, 0, 0, 0); }
-  else if (period === "week") { start.setDate(now.getDate() - 7); }
-  else if (period === "month") { start.setMonth(now.getMonth() - 1); }
-  else if (period === "year") { start.setFullYear(now.getFullYear() - 1); }
-  return items.filter(i => i._creationTime >= start.getTime());
+const toneClasses: Record<Tone, { icon: string; background: string }> = {
+  indigo: { icon: "text-indigo-600", background: "bg-indigo-50" },
+  emerald: { icon: "text-emerald-600", background: "bg-emerald-50" },
+  amber: { icon: "text-amber-600", background: "bg-amber-50" },
+  red: { icon: "text-red-600", background: "bg-red-50" },
+  sky: { icon: "text-sky-600", background: "bg-sky-50" },
+  violet: { icon: "text-violet-600", background: "bg-violet-50" },
+};
+
+function isoDate(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function startOfPeriod(period: Exclude<Period, "custom">, now: Date) {
+  const start = new Date(now);
+  if (period === "today") return isoDate(start);
+  if (period === "week") {
+    start.setDate(start.getDate() - 6);
+    return isoDate(start);
+  }
+  if (period === "month") {
+    start.setDate(1);
+    return isoDate(start);
+  }
+  return `${start.getFullYear()}-01-01`;
+}
+
+function validIsoDate(value: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const date = new Date(`${value}T00:00:00.000Z`);
+  return !Number.isNaN(date.valueOf()) && date.toISOString().slice(0, 10) === value;
+}
+
+function rangeError(from: string, to: string) {
+  if (!validIsoDate(from) || !validIsoDate(to)) {
+    return "أدخل تاريخ بداية ونهاية صحيحين.";
+  }
+  if (from > to) return "تاريخ البداية يجب ألا يتجاوز تاريخ النهاية.";
+  const days =
+    Math.floor(
+      (new Date(`${to}T00:00:00.000Z`).valueOf() -
+        new Date(`${from}T00:00:00.000Z`).valueOf()) /
+        86_400_000,
+    ) + 1;
+  return days > 366 ? "الفترة الواحدة لا يمكن أن تتجاوز 366 يومًا." : null;
+}
+
+function monthLabel(month: string) {
+  const [year, monthNumber] = month.split("-").map(Number);
+  return new Date(year, monthNumber - 1, 1).toLocaleDateString("ar-EG", {
+    month: "short",
+    year: "2-digit",
+  });
+}
+
+function percentage(value: number | null) {
+  return value === null ? "—" : `${value.toLocaleString("ar-EG")}٪`;
+}
+
+function MetricCard({
+  label,
+  value,
+  detail,
+  icon: Icon,
+  tone,
+}: {
+  label: string;
+  value: string;
+  detail?: string;
+  icon: LucideIcon;
+  tone: Tone;
+}) {
+  const classes = toneClasses[tone];
+  return (
+    <div className="stat-card">
+      <div className={`mb-3 flex h-10 w-10 items-center justify-center rounded-xl ${classes.background}`}>
+        <Icon className={`h-5 w-5 ${classes.icon}`} />
+      </div>
+      <p className="text-xl font-black text-slate-800">{value}</p>
+      <p className="mt-1 text-xs font-semibold text-slate-600">{label}</p>
+      {detail && <p className="mt-1 text-xs text-slate-400">{detail}</p>}
+    </div>
+  );
+}
+
+function Section({
+  title,
+  icon: Icon,
+  children,
+}: {
+  title: string;
+  icon: LucideIcon;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
+      <h2 className="mb-4 flex items-center gap-2 font-bold text-slate-800">
+        <Icon className="h-5 w-5 text-indigo-600" />
+        {title}
+      </h2>
+      {children}
+    </section>
+  );
 }
 
 export function ReportsPage() {
-  const [period, setPeriod] = useState<Period>("month");
-  const settings = useQuery(api.settings.getPublic);
-  const modules = (settings?.modules ?? {}) as Record<string, boolean | undefined>;
-  const enabled = (moduleName: string) => modules[moduleName] !== false;
-  const canViewInvoices = usePermission("view_invoices") && enabled("invoices");
-  const canViewExpenses = usePermission("view_expenses") && enabled("expenses");
-  const canViewProducts = usePermission("view_products");
-  const canViewCustomers = usePermission("view_customers");
-  const canViewRepairs = usePermission("view_repairs") && enabled("repairs");
-  const canViewLeads = usePermission("view_leads") && enabled("crm");
-
-  const allInvoices = useQuery(api.invoices.list, canViewInvoices ? {} : "skip") ?? [];
-  const allExpenses = useQuery(api.expenses.list, canViewExpenses ? {} : "skip") ?? [];
-  const products = useQuery(api.products.list, canViewProducts ? {} : "skip") ?? [];
-  const customers = useQuery(api.customers.list, canViewCustomers ? {} : "skip") ?? [];
-  const allRepairs = useQuery(api.repairs.list, canViewRepairs ? {} : "skip") ?? [];
-  const crmStats = useQuery(api.leads.stats, canViewLeads ? {} : "skip");
-
-  const invoices = filterByPeriod(allInvoices, period);
-  const expenses = filterByPeriod(allExpenses, period);
-  const repairs = filterByPeriod(allRepairs, period);
-
-  const totalRevenue = invoices.reduce((s, i) => s + i.total, 0);
-  const totalExpenses = expenses.reduce((s, e) => s + e.amount, 0);
-  const netProfit = totalRevenue - totalExpenses;
-  const totalPending = invoices.reduce((s, i) => s + i.remaining, 0);
-
-  // Monthly breakdown (last 6 months)
-  const months: Record<string, { revenue: number; expenses: number }> = {};
+  const canViewReports = usePermission("view_reports");
+  const canViewProfits = usePermission("view_profits");
+  const { formatCurrency } = useCurrency();
   const now = new Date();
-  for (let i = 5; i >= 0; i--) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    const key = d.toLocaleDateString("ar-EG", { month: "short", year: "2-digit" });
-    months[key] = { revenue: 0, expenses: 0 };
+  const today = isoDate(now);
+  const [period, setPeriod] = useState<Period>("month");
+  const [customFrom, setCustomFrom] = useState(startOfPeriod("month", now));
+  const [customTo, setCustomTo] = useState(today);
+  const [branchId, setBranchId] = useState<Id<"branches"> | "">("");
+
+  const me = useQuery(api.employees.me);
+  const branchesQuery = useQuery(
+    api.reporting.availableBranches,
+    canViewReports ? {} : "skip",
+  );
+  const branches = (branchesQuery ?? []) as BranchOption[];
+  const canSelectBranch = me?.role === "admin" || me?.role === "accountant";
+  const from = period === "custom" ? customFrom : startOfPeriod(period, now);
+  const to = period === "custom" ? customTo : today;
+  const validationMessage = rangeError(from, to);
+  const report = useQuery(
+    api.reporting.overview,
+    canViewReports && !validationMessage
+      ? {
+          from,
+          to,
+          branchId: canSelectBranch && branchId ? branchId : undefined,
+        }
+      : "skip",
+  ) as ReportingOverview | undefined;
+
+  if (!canViewReports) {
+    return (
+      <div className="p-6">
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-6 text-center text-amber-800">
+          لا تملك صلاحية عرض التقارير.
+        </div>
+      </div>
+    );
   }
 
-  invoices.forEach(inv => {
-    const d = new Date(inv._creationTime);
-    const key = d.toLocaleDateString("ar-EG", { month: "short", year: "2-digit" });
-    if (months[key]) months[key].revenue += inv.total;
-  });
-
-  expenses.forEach(exp => {
-    const d = new Date(exp._creationTime);
-    const key = d.toLocaleDateString("ar-EG", { month: "short", year: "2-digit" });
-    if (months[key]) months[key].expenses += exp.amount;
-  });
-
-  const maxVal = Math.max(...Object.values(months).map(m => Math.max(m.revenue, m.expenses)), 1);
-
-  // Top products by sales
-  const productSales: Record<string, { name: string; qty: number; revenue: number }> = {};
-  invoices.forEach(inv => {
-    inv.items.forEach((item: any) => {
-      if (!productSales[item.productId]) {
-        productSales[item.productId] = { name: item.productName, qty: 0, revenue: 0 };
-      }
-      productSales[item.productId].qty += item.quantity;
-      productSales[item.productId].revenue += item.total;
-    });
-  });
-  const topProducts = Object.values(productSales).sort((a, b) => b.revenue - a.revenue).slice(0, 5);
-
-  // Expense by category
-  const expByCategory: Record<string, number> = {};
-  expenses.forEach(e => {
-    expByCategory[e.category] = (expByCategory[e.category] ?? 0) + e.amount;
-  });
-
   const periodLabels: Record<Period, string> = {
-    all: "كل الوقت",
     today: "اليوم",
     week: "آخر 7 أيام",
-    month: "آخر 30 يوم",
-    year: "آخر سنة",
+    month: "هذا الشهر",
+    year: "هذه السنة",
+    custom: "فترة مخصصة",
   };
-
-  const conversionRate = crmStats
-    ? crmStats.total > 0 ? Math.round((crmStats.won / crmStats.total) * 100) : 0
-    : 0;
+  const trendMax = Math.max(
+    ...(report?.trend.map((row) =>
+      Math.max(
+        Math.abs(row.netSales),
+        Math.abs(row.operatingExpenses + row.carrierFees),
+        Math.abs(row.grossProfit ?? 0),
+      ),
+    ) ?? [1]),
+    1,
+  );
 
   return (
-    <div className="p-4 lg:p-6 space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+    <div className="space-y-6 p-4 lg:p-6">
+      <header className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
         <div>
-          <h1 className="text-2xl font-black text-slate-800 flex items-center gap-2">
-            <BarChart3 className="w-6 h-6 text-indigo-600" />
-            التقارير والإحصائيات
+          <h1 className="flex items-center gap-2 text-2xl font-black text-slate-800">
+            <BarChart3 className="h-6 w-6 text-indigo-600" />
+            التقارير المالية والتشغيلية
           </h1>
-          <p className="text-slate-500 text-sm mt-0.5">نظرة شاملة على أداء المحل</p>
+          <p className="mt-1 text-sm text-slate-500">
+            مبنية على تاريخ العملية وصافي الحركات المثبتة في الدفاتر.
+          </p>
         </div>
-        {/* Period Filter */}
-        <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-xl p-1 shadow-sm">
-          <Filter className="w-4 h-4 text-slate-400 mr-1" />
-          {(["today", "week", "month", "year", "all"] as Period[]).map(p => (
-            <button
-              key={p}
-              onClick={() => setPeriod(p)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                period === p
-                  ? "bg-indigo-600 text-white shadow-sm"
-                  : "text-slate-500 hover:bg-slate-100"
-              }`}
-            >
-              {periodLabels[p]}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* KPI Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {[
-          { label: "إجمالي الإيرادات", value: totalRevenue, icon: TrendingUp, color: "text-emerald-600", bg: "bg-emerald-50", suffix: " ج.م" },
-          { label: "إجمالي المصروفات", value: totalExpenses, icon: TrendingDown, color: "text-red-600", bg: "bg-red-50", suffix: " ج.م" },
-          { label: "صافي الربح", value: netProfit, icon: DollarSign, color: netProfit >= 0 ? "text-indigo-600" : "text-red-600", bg: netProfit >= 0 ? "bg-indigo-50" : "bg-red-50", suffix: " ج.م" },
-          { label: "مستحقات العملاء", value: totalPending, icon: Users, color: "text-amber-600", bg: "bg-amber-50", suffix: " ج.م" },
-        ].map((kpi, i) => {
-          const Icon = kpi.icon;
-          return (
-            <div key={i} className="stat-card">
-              <div className={`w-10 h-10 ${kpi.bg} rounded-xl flex items-center justify-center mb-3`}>
-                <Icon className={`w-5 h-5 ${kpi.color}`} />
-              </div>
-              <p className={`text-xl font-black ${kpi.color}`}>
-                {kpi.value.toLocaleString("ar-EG")}{kpi.suffix}
-              </p>
-              <p className="text-xs text-slate-500 mt-1">{kpi.label}</p>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Quick stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        {[
-          { label: "إجمالي الفواتير", value: invoices.length, icon: "📄" },
-          { label: "إجمالي العملاء", value: customers.length, icon: "👥" },
-          { label: "إجمالي المنتجات", value: products.length, icon: "📦" },
-          { label: "طلبات الصيانة", value: repairs.length, icon: "🔧" },
-        ].map((s, i) => (
-          <div key={i} className="bg-white rounded-xl border border-slate-100 p-4 text-center shadow-sm">
-            <p className="text-2xl font-black text-slate-800">{s.value}</p>
-            <p className="text-xs text-slate-500 mt-1">{s.label}</p>
-          </div>
-        ))}
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Monthly Chart */}
-        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
-          <h2 className="font-bold text-slate-800 mb-5">الإيرادات والمصروفات الشهرية</h2>
-          <div className="flex items-end gap-3 h-40">
-            {Object.entries(months).map(([month, data]) => (
-              <div key={month} className="flex-1 flex flex-col items-center gap-1">
-                <div className="w-full flex gap-0.5 items-end" style={{ height: "120px" }}>
-                  <div
-                    className="flex-1 bg-indigo-500 rounded-t-sm transition-all"
-                    style={{ height: `${(data.revenue / maxVal) * 100}%`, minHeight: data.revenue > 0 ? "4px" : "0" }}
-                    title={`إيرادات: ${data.revenue.toLocaleString("ar-EG")} ج.م`}
-                  />
-                  <div
-                    className="flex-1 bg-red-400 rounded-t-sm transition-all"
-                    style={{ height: `${(data.expenses / maxVal) * 100}%`, minHeight: data.expenses > 0 ? "4px" : "0" }}
-                    title={`مصروفات: ${data.expenses.toLocaleString("ar-EG")} ج.م`}
-                  />
-                </div>
-                <p className="text-xs text-slate-500 text-center">{month}</p>
-              </div>
-            ))}
-          </div>
-          <div className="flex items-center gap-4 mt-3">
-            <div className="flex items-center gap-1.5">
-              <div className="w-3 h-3 bg-indigo-500 rounded-sm" />
-              <span className="text-xs text-slate-500">إيرادات</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <div className="w-3 h-3 bg-red-400 rounded-sm" />
-              <span className="text-xs text-slate-500">مصروفات</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Top Products */}
-        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
-          <h2 className="font-bold text-slate-800 mb-4">أكثر المنتجات مبيعاً</h2>
-          {topProducts.length > 0 ? (
-            <div className="space-y-3">
-              {topProducts.map((p, i) => (
-                <div key={i} className="flex items-center gap-3">
-                  <span className="w-6 h-6 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">
-                    {i + 1}
-                  </span>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-slate-800 truncate">{p.name}</p>
-                    <div className="w-full bg-slate-100 rounded-full h-1.5 mt-1">
-                      <div
-                        className="bg-indigo-500 h-1.5 rounded-full"
-                        style={{ width: `${(p.revenue / (topProducts[0]?.revenue || 1)) * 100}%` }}
-                      />
-                    </div>
-                  </div>
-                  <div className="text-left flex-shrink-0">
-                    <p className="text-sm font-bold text-slate-800">{p.revenue.toLocaleString("ar-EG")} ج.م</p>
-                    <p className="text-xs text-slate-400">{p.qty} قطعة</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-center text-slate-400 py-8">لا توجد بيانات مبيعات بعد</p>
-          )}
-        </div>
-
-        {/* Expense breakdown */}
-        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
-          <h2 className="font-bold text-slate-800 mb-4">توزيع المصروفات</h2>
-          {Object.keys(expByCategory).length > 0 ? (
-            <div className="space-y-3">
-              {Object.entries(expByCategory).sort((a, b) => b[1] - a[1]).map(([cat, amount]) => (
-                <div key={cat} className="flex items-center gap-3">
-                  <span className="text-sm text-slate-600 w-20 flex-shrink-0">{cat}</span>
-                  <div className="flex-1">
-                    <div className="w-full bg-slate-100 rounded-full h-2">
-                      <div
-                        className="bg-red-400 h-2 rounded-full"
-                        style={{ width: `${(amount / totalExpenses) * 100}%` }}
-                      />
-                    </div>
-                  </div>
-                  <span className="text-sm font-bold text-slate-700 w-28 text-left flex-shrink-0">
-                    {amount.toLocaleString("ar-EG")} ج.م
-                  </span>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-center text-slate-400 py-8">لا توجد مصروفات بعد</p>
-          )}
-        </div>
-
-        {/* Repair stats */}
-        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
-          <h2 className="font-bold text-slate-800 mb-4">إحصائيات الصيانة</h2>
-          <div className="grid grid-cols-2 gap-3">
-            {[
-              { label: "إجمالي الطلبات", value: repairs.length, color: "text-slate-700", bg: "bg-slate-50" },
-              { label: "قيد الإصلاح", value: repairs.filter(r => r.status === "in_progress").length, color: "text-amber-600", bg: "bg-amber-50" },
-              { label: "جاهزة للاستلام", value: repairs.filter(r => r.status === "ready").length, color: "text-emerald-600", bg: "bg-emerald-50" },
-              { label: "تم التسليم", value: repairs.filter(r => r.status === "delivered").length, color: "text-indigo-600", bg: "bg-indigo-50" },
-            ].map((s, i) => (
-              <div key={i} className={`${s.bg} rounded-xl p-4 text-center`}>
-                <p className={`text-2xl font-black ${s.color}`}>{s.value}</p>
-                <p className="text-xs text-slate-600 mt-0.5">{s.label}</p>
-              </div>
-            ))}
-          </div>
-          <div className="mt-4 pt-4 border-t border-slate-100">
-            <div className="flex justify-between text-sm">
-              <span className="text-slate-500">إجمالي إيرادات الصيانة</span>
-              <span className="font-bold text-slate-800">
-                {repairs.reduce((s, r) => s + r.totalCost, 0).toLocaleString("ar-EG")} ج.م
-              </span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* CRM Report Section */}
-      {crmStats && (
-        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
-          <h2 className="font-bold text-slate-800 mb-5 flex items-center gap-2">
-            <Target className="w-5 h-5 text-purple-600" />
-            تقرير إدارة العملاء المحتملين (CRM)
-          </h2>
-          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3 mb-6">
-            {[
-              { label: "إجمالي العملاء", value: crmStats.total, color: "text-slate-700", bg: "bg-slate-50", border: "border-slate-200" },
-              { label: "جديد", value: crmStats.new, color: "text-blue-600", bg: "bg-blue-50", border: "border-blue-100" },
-              { label: "تم التواصل", value: crmStats.contacted, color: "text-indigo-600", bg: "bg-indigo-50", border: "border-indigo-100" },
-              { label: "مهتم", value: crmStats.interested, color: "text-amber-600", bg: "bg-amber-50", border: "border-amber-100" },
-              { label: "تفاوض", value: crmStats.negotiating, color: "text-orange-600", bg: "bg-orange-50", border: "border-orange-100" },
-              { label: "تم البيع ✓", value: crmStats.won, color: "text-emerald-600", bg: "bg-emerald-50", border: "border-emerald-100" },
-              { label: "خسارة ✗", value: crmStats.lost, color: "text-red-600", bg: "bg-red-50", border: "border-red-100" },
-            ].map((s, i) => (
-              <div key={i} className={`${s.bg} border ${s.border} rounded-xl p-3 text-center`}>
-                <p className={`text-2xl font-black ${s.color}`}>{s.value}</p>
-                <p className="text-xs text-slate-500 mt-0.5">{s.label}</p>
-              </div>
-            ))}
-          </div>
-
-          {/* Conversion funnel */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-            <div>
-              <div className="flex justify-between items-center mb-2">
-                <span className="text-sm font-semibold text-slate-700">معدل التحويل إلى مبيعات</span>
-                <span className="text-lg font-black text-emerald-600">{conversionRate}%</span>
-              </div>
-              <div className="w-full bg-slate-100 rounded-full h-3">
-                <div
-                  className="bg-gradient-to-r from-emerald-400 to-emerald-600 h-3 rounded-full transition-all duration-500"
-                  style={{ width: `${conversionRate}%` }}
-                />
-              </div>
-              <p className="text-xs text-slate-400 mt-1">
-                {crmStats.won} من أصل {crmStats.total} عميل محتمل تحوّل إلى مبيعات
-              </p>
-            </div>
-            <div>
-              <div className="flex justify-between items-center mb-2">
-                <span className="text-sm font-semibold text-slate-700">نسبة الخسارة</span>
-                <span className="text-lg font-black text-red-500">
-                  {crmStats.total > 0 ? Math.round((crmStats.lost / crmStats.total) * 100) : 0}%
-                </span>
-              </div>
-              <div className="w-full bg-slate-100 rounded-full h-3">
-                <div
-                  className="bg-gradient-to-r from-red-400 to-red-600 h-3 rounded-full transition-all duration-500"
-                  style={{ width: `${crmStats.total > 0 ? (crmStats.lost / crmStats.total) * 100 : 0}%` }}
-                />
-              </div>
-              <p className="text-xs text-slate-400 mt-1">
-                {crmStats.lost} عميل محتمل لم يتحوّل إلى مبيعات
-              </p>
-            </div>
-          </div>
-
-          {/* Pipeline stages visual */}
-          {crmStats.total > 0 && (
-            <div className="mt-5 pt-5 border-t border-slate-100">
-              <p className="text-sm font-semibold text-slate-700 mb-3">مسار المبيعات</p>
-              <div className="flex items-center gap-1 overflow-x-auto pb-1">
-                {[
-                  { label: "جديد", value: crmStats.new, color: "bg-blue-500" },
-                  { label: "تواصل", value: crmStats.contacted, color: "bg-indigo-500" },
-                  { label: "مهتم", value: crmStats.interested, color: "bg-amber-500" },
-                  { label: "تفاوض", value: crmStats.negotiating, color: "bg-orange-500" },
-                  { label: "مبيعات", value: crmStats.won, color: "bg-emerald-500" },
-                ].map((stage, i, arr) => (
-                  <div key={i} className="flex items-center gap-1 flex-shrink-0">
-                    <div className={`${stage.color} text-white rounded-lg px-3 py-2 text-center min-w-[70px]`}>
-                      <p className="text-lg font-black">{stage.value}</p>
-                      <p className="text-xs opacity-90">{stage.label}</p>
-                    </div>
-                    {i < arr.length - 1 && (
-                      <span className="text-slate-300 text-lg">›</span>
-                    )}
-                  </div>
+        <div className="grid gap-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:grid-cols-2">
+          <label className="text-xs font-bold text-slate-600">
+            <span className="mb-1 flex items-center gap-1">
+              <Building2 className="h-3.5 w-3.5" />
+              نطاق الفرع
+            </span>
+            {canSelectBranch ? (
+              <select
+                className="form-input min-w-52"
+                value={branchId}
+                onChange={(event) =>
+                  setBranchId(
+                    event.target.value
+                      ? (event.target.value as Id<"branches">)
+                      : "",
+                  )
+                }
+              >
+                <option value="">كل الفروع — مجمع</option>
+                {branches.map((branch) => (
+                  <option key={branch._id} value={branch._id}>
+                    {branch.name}
+                  </option>
                 ))}
-              </div>
+              </select>
+            ) : (
+              <span className="block rounded-lg border bg-slate-50 px-3 py-2 text-sm font-normal">
+                {branches[0]?.name ?? "فرع المستخدم"}
+              </span>
+            )}
+          </label>
+          <div className="text-xs font-bold text-slate-600">
+            <span className="mb-1 flex items-center gap-1">
+              <CalendarDays className="h-3.5 w-3.5" />
+              الفترة
+            </span>
+            <select
+              className="form-input min-w-44"
+              value={period}
+              onChange={(event) => setPeriod(event.target.value as Period)}
+            >
+              {(Object.keys(periodLabels) as Period[]).map((option) => (
+                <option key={option} value={option}>
+                  {periodLabels[option]}
+                </option>
+              ))}
+            </select>
+          </div>
+          {period === "custom" && (
+            <div className="grid gap-2 sm:col-span-2 sm:grid-cols-2">
+              <label className="text-xs font-bold text-slate-600">
+                من
+                <input
+                  className="form-input mt-1"
+                  type="date"
+                  value={customFrom}
+                  onChange={(event) => setCustomFrom(event.target.value)}
+                />
+              </label>
+              <label className="text-xs font-bold text-slate-600">
+                إلى
+                <input
+                  className="form-input mt-1"
+                  type="date"
+                  value={customTo}
+                  onChange={(event) => setCustomTo(event.target.value)}
+                />
+              </label>
             </div>
           )}
+        </div>
+      </header>
+
+      {validationMessage && (
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {validationMessage}
         </div>
       )}
+
+      {!validationMessage && report === undefined && (
+        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+          {Array.from({ length: 8 }, (_, index) => (
+            <div key={index} className="h-32 animate-pulse rounded-2xl bg-slate-100" />
+          ))}
+        </div>
+      )}
+
+      {report && (
+        <>
+          <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
+            <span className="rounded-full bg-slate-100 px-3 py-1">
+              {report.scope.from} ← {report.scope.to}
+            </span>
+            <span className="rounded-full bg-slate-100 px-3 py-1">
+              {report.scope.consolidated
+                ? `تقرير مجمع — ${report.scope.branchCount} فروع`
+                : "تقرير فرع واحد"}
+            </span>
+            <span className="rounded-full bg-emerald-50 px-3 py-1 text-emerald-700">
+              أساس التاريخ: تاريخ العملية
+            </span>
+          </div>
+
+          {canViewProfits && !report.completeness.profitabilityAvailable && (
+            <div className="flex gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-amber-800">
+              <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
+              <div>
+                <p className="font-bold">الربحية غير مكتملة لهذه الفترة</p>
+                <p className="mt-1 text-sm">
+                  توجد {report.completeness.incompleteCogsInvoices.toLocaleString("ar-EG")} فاتورة
+                  دون COGS تاريخي مكتمل. لن يعرض النظام ربحًا تقديريًا من التكلفة الحالية.
+                </p>
+              </div>
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
+            <MetricCard
+              label="صافي المبيعات"
+              value={formatCurrency(report.sales.netSales)}
+              detail={`${report.sales.invoiceCount.toLocaleString("ar-EG")} فاتورة بعد المرتجعات`}
+              icon={TrendingUp}
+              tone="emerald"
+            />
+            <MetricCard
+              label="صافي التحصيلات"
+              value={formatCurrency(report.collections.netCollections)}
+              detail={`تحصيل ${formatCurrency(report.collections.collections)} · رد ${formatCurrency(report.collections.refunds)}`}
+              icon={ArrowDownToLine}
+              tone="indigo"
+            />
+            <MetricCard
+              label="إجمالي المصروفات"
+              value={formatCurrency(report.expenses.totalExpenses)}
+              detail={`تشغيل ${formatCurrency(report.expenses.operatingExpenses)} · شحن ${formatCurrency(report.expenses.carrierFees)}`}
+              icon={TrendingDown}
+              tone="red"
+            />
+            <MetricCard
+              label="مستحقات العملاء الحالية"
+              value={formatCurrency(report.currentBalances.customerReceivables)}
+              detail={`مقدمات العملاء ${formatCurrency(report.currentBalances.customerAdvances)}`}
+              icon={Users}
+              tone="amber"
+            />
+            {report.profitability && (
+              <>
+                <MetricCard
+                  label="مجمل الربح"
+                  value={
+                    report.profitability.grossProfit === null
+                      ? "غير مكتمل"
+                      : formatCurrency(report.profitability.grossProfit)
+                  }
+                  detail={`الهامش ${percentage(report.profitability.grossMargin)}`}
+                  icon={CircleDollarSign}
+                  tone="violet"
+                />
+                <MetricCard
+                  label="صافي الربح"
+                  value={
+                    report.profitability.netProfit === null
+                      ? "غير مكتمل"
+                      : formatCurrency(report.profitability.netProfit)
+                  }
+                  detail={`الهامش ${percentage(report.profitability.netMargin)}`}
+                  icon={BarChart3}
+                  tone="indigo"
+                />
+              </>
+            )}
+            <MetricCard
+              label="مديونية الموردين الحالية"
+              value={formatCurrency(report.currentBalances.supplierPayables)}
+              detail={`مدفوعات الفترة ${formatCurrency(report.purchases.supplierPayments)}`}
+              icon={ReceiptText}
+              tone="sky"
+            />
+            <MetricCard
+              label="COD لدى شركات الشحن"
+              value={formatCurrency(report.cod.currentOutstanding)}
+              detail={`حُصل ${formatCurrency(report.cod.collected)} · سُوي ${formatCurrency(report.cod.settled)}`}
+              icon={Truck}
+              tone="amber"
+            />
+          </div>
+
+          <div className="grid gap-6 xl:grid-cols-2">
+            <Section title="اتجاه الأداء الشهري" icon={BarChart3}>
+              {report.trend.length === 0 ? (
+                <p className="py-10 text-center text-sm text-slate-400">لا توجد حركة في الفترة.</p>
+              ) : (
+                <div className="space-y-4">
+                  <div className="flex h-48 items-end gap-3 overflow-x-auto border-b border-slate-100 pb-2">
+                    {report.trend.map((row) => (
+                      <div key={row.month} className="flex min-w-16 flex-1 flex-col items-center gap-1">
+                        <div className="flex h-36 w-full items-end justify-center gap-1">
+                          <div
+                            className="w-3 rounded-t bg-indigo-500"
+                            title={`صافي المبيعات: ${formatCurrency(row.netSales)}`}
+                            style={{
+                              height: `${Math.max(2, (Math.abs(row.netSales) / trendMax) * 100)}%`,
+                            }}
+                          />
+                          <div
+                            className="w-3 rounded-t bg-red-400"
+                            title={`المصروفات: ${formatCurrency(row.operatingExpenses + row.carrierFees)}`}
+                            style={{
+                              height: `${Math.max(
+                                2,
+                                (Math.abs(row.operatingExpenses + row.carrierFees) /
+                                  trendMax) *
+                                  100,
+                              )}%`,
+                            }}
+                          />
+                          {canViewProfits && row.grossProfit !== null && (
+                            <div
+                              className="w-3 rounded-t bg-emerald-500"
+                              title={`مجمل الربح: ${formatCurrency(row.grossProfit)}`}
+                              style={{
+                                height: `${Math.max(
+                                  2,
+                                  (Math.abs(row.grossProfit) / trendMax) * 100,
+                                )}%`,
+                              }}
+                            />
+                          )}
+                        </div>
+                        <span className="text-xs text-slate-500">{monthLabel(row.month)}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="flex flex-wrap gap-4 text-xs text-slate-500">
+                    <span className="flex items-center gap-1">
+                      <i className="h-3 w-3 rounded-sm bg-indigo-500" /> صافي المبيعات
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <i className="h-3 w-3 rounded-sm bg-red-400" /> المصروفات والرسوم
+                    </span>
+                    {canViewProfits && (
+                      <span className="flex items-center gap-1">
+                        <i className="h-3 w-3 rounded-sm bg-emerald-500" /> مجمل الربح
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
+            </Section>
+
+            <Section title="المنتجات الأعلى مبيعًا" icon={Package}>
+              {report.topProducts.length === 0 ? (
+                <p className="py-10 text-center text-sm text-slate-400">لا توجد بنود مبيعات في الفترة.</p>
+              ) : (
+                <div className="space-y-3">
+                  {report.topProducts.map((product, index) => (
+                    <div key={`${product.productName}-${index}`} className="flex items-center gap-3">
+                      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-indigo-50 text-xs font-bold text-indigo-600">
+                        {index + 1}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-semibold text-slate-800">{product.productName}</p>
+                        <p className="text-xs text-slate-400">
+                          {product.quantity.toLocaleString("ar-EG")} قطعة
+                          {product.grossProfit !== undefined &&
+                            product.grossProfit !== null &&
+                            ` · ربح ${formatCurrency(product.grossProfit)}`}
+                        </p>
+                      </div>
+                      <span className="text-sm font-bold text-slate-700">
+                        {formatCurrency(product.netSales)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </Section>
+          </div>
+
+          <div className="grid gap-6 xl:grid-cols-3">
+            <Section title="المبيعات والتحصيل" icon={ShoppingCart}>
+              <dl className="space-y-3 text-sm">
+                <ReportRow label="إجمالي المبيعات" value={formatCurrency(report.sales.grossSales)} />
+                <ReportRow label="مرتجعات المبيعات" value={formatCurrency(report.sales.salesReturns)} />
+                <ReportRow label="تحصيلات معكوسة" value={formatCurrency(report.collections.reversedCollections)} />
+                <ReportRow label="استردادات معكوسة" value={formatCurrency(report.collections.reversedRefunds)} />
+              </dl>
+            </Section>
+            <Section title="المشتريات والموردون" icon={ArrowUpFromLine}>
+              <dl className="space-y-3 text-sm">
+                <ReportRow label="تكلفة المشتريات الواصلة" value={formatCurrency(report.purchases.landedPurchases)} />
+                <ReportRow label="مديونية مورد منشأة" value={formatCurrency(report.purchases.supplierLiabilityCreated)} />
+                <ReportRow label="إشعارات خصم المورد" value={formatCurrency(report.purchases.supplierCredits)} />
+                <ReportRow label="صافي المديونية المنشأة" value={formatCurrency(report.purchases.netSupplierLiabilityCreated)} />
+              </dl>
+            </Section>
+            <Section title="الأرصدة الحالية" icon={WalletCards}>
+              <dl className="space-y-3 text-sm">
+                <ReportRow label="الخزائن والبنوك" value={formatCurrency(report.currentBalances.liquidAccounts)} />
+                <ReportRow label="حسابات التسوية الأخرى" value={formatCurrency(report.currentBalances.otherClearingAccounts)} />
+                {report.currentBalances.inventoryValue !== undefined && (
+                  <ReportRow label="قيمة المخزون" value={formatCurrency(report.currentBalances.inventoryValue)} />
+                )}
+                <ReportRow label="حركة COD الصافية للفترة" value={formatCurrency(report.cod.netPeriodMovement)} />
+              </dl>
+            </Section>
+          </div>
+
+          {report.completeness.legacyInventoryValueProducts > 0 && canViewProfits && (
+            <div className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-800">
+              توجد {report.completeness.legacyInventoryValueProducts.toLocaleString("ar-EG")} منتجات قديمة
+              دون قيمة مخزون تاريخية مكتملة؛ قيمة المخزون الحالية لا تتضمن تقديرًا تلقائيًا لها.
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+function ReportRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between gap-3 border-b border-slate-100 pb-2 last:border-0">
+      <dt className="text-slate-500">{label}</dt>
+      <dd className="font-bold text-slate-800">{value}</dd>
     </div>
   );
 }
