@@ -4,6 +4,8 @@ export const INVENTORY_MOVEMENT_TYPES = {
   sale: "sale",
   saleReversal: "sale_reversal",
   salesReturn: "sales_return",
+  repairPartIssue: "repair_part_issue",
+  repairPartReversal: "repair_part_reversal",
   shipmentReceipt: "shipment_receipt",
   purchaseReturn: "purchase_return",
 } as const;

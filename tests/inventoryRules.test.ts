@@ -16,7 +16,17 @@ test("inventory changes reject zero, fractions, non-finite values, blank reasons
 });
 
 test("inventory movement types are centralized and stable", () => {
-  assert.deepEqual(Object.values(INVENTORY_MOVEMENT_TYPES), ["opening_balance", "manual_adjustment", "sale", "sale_reversal", "sales_return", "shipment_receipt", "purchase_return"]);
+  assert.deepEqual(Object.values(INVENTORY_MOVEMENT_TYPES), [
+    "opening_balance",
+    "manual_adjustment",
+    "sale",
+    "sale_reversal",
+    "sales_return",
+    "repair_part_issue",
+    "repair_part_reversal",
+    "shipment_receipt",
+    "purchase_return",
+  ]);
 });
 
 test("exact inventory value direction accepts zero and rejects reversed or imprecise values", () => {

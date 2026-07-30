@@ -25,8 +25,13 @@ export function RepairsPage() {
   const canEdit = usePermission("edit_repairs");
   const canPrint = usePermission("print_repairs");
   const canRefund = usePermission("refund_collections");
+  const [showForm, setShowForm] = useState(false);
   const repairs = useQuery(api.repairs.list) ?? [];
   const customers = useQuery(api.customers.repairPicker, canCreate ? {} : "skip") ?? [];
+  const partOptions = useQuery(
+    api.repairs.partPicker,
+    canCreate && showForm ? {} : "skip",
+  ) ?? [];
   const createRepair = useMutation(api.repairs.create);
   const updateStatus = useMutation(api.repairs.updateStatus);
   const rotateTrackingToken = useMutation(api.repairs.rotateTrackingToken);
@@ -41,7 +46,6 @@ export function RepairsPage() {
 
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState("");
-  const [showForm, setShowForm] = useState(false);
   const [printRepair, setPrintRepair] = useState<Doc<"repairs"> | null>(null);
   const [cancelTarget, setCancelTarget] = useState<Doc<"repairs"> | null>(null);
   const [cancelReason, setCancelReason] = useState("");
@@ -52,6 +56,15 @@ export function RepairsPage() {
     problem: "", laborCost: "", deposit: "",
     expectedDate: "", notes: "", technicianName: "",
   });
+  const [parts, setParts] = useState<Array<{
+    productId: string;
+    quantity: string;
+  }>>([]);
+
+  const partsTotal = parts.reduce((sum, row) => {
+    const product = partOptions.find((part) => part._id === row.productId);
+    return sum + (product?.sellPrice ?? 0) * Number(row.quantity || 0);
+  }, 0);
 
   const filtered = repairs.filter(r =>
     r.customerName.toLowerCase().includes(search.toLowerCase()) ||
@@ -63,6 +76,30 @@ export function RepairsPage() {
     e.preventDefault();
     if (saving) return;
     if (Number(form.deposit) > 0 && !accountId) { toast.error("اختر حساب تحصيل العربون"); return; }
+    const completedParts = parts.filter((part) => part.productId);
+    if (
+      completedParts.some(
+        (part) =>
+          !Number.isInteger(Number(part.quantity)) ||
+          Number(part.quantity) <= 0,
+      )
+    ) {
+      toast.error("كمية قطعة الغيار يجب أن تكون عددًا صحيحًا أكبر من صفر");
+      return;
+    }
+    const selectedParts = completedParts
+      .map((part) => ({
+        productId: part.productId as Id<"products">,
+        quantity: Number(part.quantity),
+      }));
+    if (new Set(selectedParts.map((part) => part.productId)).size !== selectedParts.length) {
+      toast.error("لا يمكن تكرار قطعة الغيار");
+      return;
+    }
+    if (Number(form.deposit) > Number(form.laborCost || 0) + partsTotal) {
+      toast.error("العربون لا يمكن أن يتجاوز إجمالي أمر الصيانة");
+      return;
+    }
     setSaving(true);
     try {
       await createRepair({
@@ -74,6 +111,7 @@ export function RepairsPage() {
         deviceModel: form.deviceModel,
         problem: form.problem,
         laborCost: Number(form.laborCost),
+        parts: selectedParts,
         creationRequestId: requestId,
         initialDeposit: Number(form.deposit) > 0 ? { amount: Number(form.deposit), accountId: accountId as Id<"financialAccounts">, paymentDate: new Date().toISOString().slice(0, 10), requestId } : undefined,
         expectedDate: form.expectedDate || undefined,
@@ -83,6 +121,7 @@ export function RepairsPage() {
       toast.success("تم إضافة طلب الصيانة بنجاح");
       setRequestId(crypto.randomUUID());
       setShowForm(false);
+      setParts([]);
       setForm({ customerName: "", customerPhone: "", customerId: "", deviceType: "موبايل", deviceBrand: "", deviceModel: "", problem: "", laborCost: "", deposit: "", expectedDate: "", notes: "", technicianName: "" });
     } catch (error) {
       toast.error(getErrorMessage(error, "تعذر إضافة طلب الصيانة"));
@@ -156,7 +195,7 @@ export function RepairsPage() {
           </h1>
           <p className="text-slate-500 text-sm mt-0.5">{repairs.length} طلب صيانة</p>
         </div>
-        {canCreate && <button onClick={() => { setRequestId(crypto.randomUUID()); setShowForm(true); }} className="btn-primary flex items-center gap-2">
+        {canCreate && <button onClick={() => { setRequestId(crypto.randomUUID()); setParts([]); setAccountId(""); setShowForm(true); }} className="btn-primary flex items-center gap-2">
           <Plus className="w-4 h-4" />
           طلب صيانة جديد
         </button>}
@@ -217,6 +256,21 @@ export function RepairsPage() {
                 <p className="text-xs text-slate-500 mt-0.5">{r.deviceType}</p>
                 <p className="text-xs text-slate-600 mt-1.5 font-medium">المشكلة: {r.problem}</p>
               </div>
+
+              {r.parts.length > 0 && (
+                <div className="mb-3 rounded-xl border border-slate-100 px-3 py-2">
+                  <p className="mb-1 text-xs font-bold text-slate-600">قطع الغيار</p>
+                  {r.parts.map((part, index) => (
+                    <div
+                      key={`${part.productId ?? part.name}-${index}`}
+                      className="flex justify-between gap-2 text-xs text-slate-500"
+                    >
+                      <span>{part.name} × {part.quantity}</span>
+                      <span>{(part.lineTotal ?? part.cost * part.quantity).toLocaleString("ar-EG")} ج.م</span>
+                    </div>
+                  ))}
+                </div>
+              )}
 
               <div className="flex items-center justify-between mb-3 text-sm">
                 <div>
@@ -376,14 +430,107 @@ export function RepairsPage() {
                   <label className="form-label">وصف المشكلة *</label>
                   <textarea className="form-input" required rows={2} value={form.problem} onChange={e => setForm({...form, problem: e.target.value})} placeholder="اشرح المشكلة بالتفصيل..." />
                 </div>
+                <div className="sm:col-span-2 rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="font-bold text-slate-800">قطع الغيار</p>
+                      <p className="text-xs text-slate-500">يُحتسب السعر والمخزون من بيانات الفرع على الخادم</p>
+                    </div>
+                    <button
+                      type="button"
+                      className="btn-secondary text-xs"
+                      onClick={() => setParts((current) => [
+                        ...current,
+                        { productId: "", quantity: "1" },
+                      ])}
+                    >
+                      إضافة قطعة
+                    </button>
+                  </div>
+                  {parts.map((row, index) => {
+                    const selected = partOptions.find(
+                      (part) => part._id === row.productId,
+                    );
+                    return (
+                      <div
+                        key={`${index}-${row.productId}`}
+                        className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_110px_auto]"
+                      >
+                        <select
+                          className="form-input"
+                          value={row.productId}
+                          onChange={(event) =>
+                            setParts((current) =>
+                              current.map((part, partIndex) =>
+                                partIndex === index
+                                  ? { ...part, productId: event.target.value }
+                                  : part,
+                              ),
+                            )
+                          }
+                        >
+                          <option value="">اختر قطعة الغيار</option>
+                          {partOptions.map((part) => (
+                            <option key={part._id} value={part._id}>
+                              {part.name} — متاح {part.stock} {part.unit} — {part.sellPrice.toLocaleString("ar-EG")} ج.م
+                            </option>
+                          ))}
+                        </select>
+                        <input
+                          className="form-input"
+                          type="number"
+                          min="1"
+                          step="1"
+                          value={row.quantity}
+                          onChange={(event) =>
+                            setParts((current) =>
+                              current.map((part, partIndex) =>
+                                partIndex === index
+                                  ? { ...part, quantity: event.target.value }
+                                  : part,
+                              ),
+                            )
+                          }
+                          aria-label="كمية قطعة الغيار"
+                        />
+                        <button
+                          type="button"
+                          className="rounded-lg px-3 py-2 text-xs font-bold text-red-600 hover:bg-red-50"
+                          onClick={() =>
+                            setParts((current) =>
+                              current.filter((_, partIndex) => partIndex !== index),
+                            )
+                          }
+                        >
+                          حذف
+                        </button>
+                        {selected && (
+                          <p className="text-xs text-slate-500 sm:col-span-3">
+                            إجمالي السطر: {(selected.sellPrice * Number(row.quantity || 0)).toLocaleString("ar-EG")} ج.م
+                          </p>
+                        )}
+                      </div>
+                    );
+                  })}
+                  {parts.length === 0 && (
+                    <p className="text-xs text-slate-400">لا توجد قطع غيار مضافة.</p>
+                  )}
+                  <div className="flex justify-between border-t border-slate-200 pt-3 text-sm font-bold">
+                    <span>إجمالي قطع الغيار</span>
+                    <span>{partsTotal.toLocaleString("ar-EG")} ج.م</span>
+                  </div>
+                </div>
                 <div>
                   <label className="form-label">تكلفة العمالة (ج.م)</label>
-                  <input className="form-input" type="number" value={form.laborCost} onChange={e => setForm({...form, laborCost: e.target.value})} placeholder="0" />
+                  <input className="form-input" type="number" min="0" step="0.01" value={form.laborCost} onChange={e => setForm({...form, laborCost: e.target.value})} placeholder="0" />
                 </div>
                 <div>
                   <label className="form-label">العربون (ج.م)</label>
-                  <input className="form-input" type="number" disabled={!canCollect} value={form.deposit} onChange={e => setForm({...form, deposit: e.target.value})} placeholder="0" />
+                  <input className="form-input" type="number" min="0" step="0.01" max={Number(form.laborCost || 0) + partsTotal} disabled={!canCollect} value={form.deposit} onChange={e => setForm({...form, deposit: e.target.value})} placeholder="0" />
                   {canCollect && Number(form.deposit) > 0 && <select className="form-input mt-2" value={accountId} onChange={e => setAccountId(e.target.value)}><option value="">اختر حساب التحصيل</option>{collectionAccounts.map(a => <option key={a._id} value={a._id}>{a.name}</option>)}</select>}
+                </div>
+                <div className="sm:col-span-2 rounded-xl bg-indigo-50 px-4 py-3 text-sm font-bold text-indigo-800">
+                  إجمالي أمر الصيانة: {(Number(form.laborCost || 0) + partsTotal).toLocaleString("ar-EG")} ج.م
                 </div>
                 <div>
                   <label className="form-label">الفني المسؤول</label>

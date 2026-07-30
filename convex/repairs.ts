@@ -1,12 +1,15 @@
 import { query, mutation } from "./_generated/server.js";
 import type { MutationCtx } from "./_generated/server";
+import type { Doc, Id } from "./_generated/dataModel";
 import { v, ConvexError } from "convex/values";
-import { canTransition, REPAIR_TRANSITIONS, isValidIsoDate, roundMoney } from "../shared/businessRules.ts";
+import { canTransition, REPAIR_TRANSITIONS, roundMoney } from "../shared/businessRules.ts";
 import { nextDocumentNumber } from "./lib/documentNumbers.ts";
 import { requireActiveBranch, requireActiveCustomer } from "./lib/references.ts";
 import { assertBranchAccess, requireModuleEnabled, requireModulePermission, requirePermission, filterByBranch, resolveWriteBranch, logAction } from "./lib/auth.ts";
 import { postFinancialTransaction, requireActiveFinancialAccount, assertFinancialAccountBranch, findFinancialTransactionByRequest } from "./lib/finance.ts";
 import { postCustomerLedgerEntry } from "./lib/customerLedger.ts";
+import { changeProductStock } from "./lib/inventory.ts";
+import { INVENTORY_MOVEMENT_TYPES } from "../shared/inventoryRules.ts";
 import {
   postRepairRevenueJournal,
   repairPostingState,
@@ -18,6 +21,76 @@ import {
   normalizeRequestId,
   normalizeText,
 } from "./lib/generalLedgerRules.ts";
+
+type RepairPartRequest = {
+  productId: Id<"products">;
+  quantity: number;
+};
+
+type PreparedRepairPart = {
+  product: Doc<"products">;
+  quantity: number;
+  unitPrice: number;
+  lineTotal: number;
+};
+
+function assertMoney(value: number, label: string) {
+  if (!Number.isFinite(value) || value < 0 || roundMoney(value) !== value) {
+    throw new ConvexError(`${label} يجب أن يكون رقمًا غير سالب بدقة قرشين`);
+  }
+  return value;
+}
+
+function canonicalPartRequests(
+  parts: RepairPartRequest[] | undefined,
+): RepairPartRequest[] {
+  const rows = [...(parts ?? [])].sort((a, b) =>
+    String(a.productId).localeCompare(String(b.productId)),
+  );
+  if (rows.length > 100) {
+    throw new ConvexError("لا يمكن إضافة أكثر من 100 قطعة لأمر الصيانة");
+  }
+  const seen = new Set<string>();
+  for (const row of rows) {
+    if (!Number.isInteger(row.quantity) || row.quantity <= 0) {
+      throw new ConvexError("كمية قطعة الغيار يجب أن تكون عددًا صحيحًا أكبر من صفر");
+    }
+    const key = String(row.productId);
+    if (seen.has(key)) {
+      throw new ConvexError("لا يمكن تكرار قطعة الغيار في أمر الصيانة");
+    }
+    seen.add(key);
+  }
+  return rows;
+}
+
+async function prepareRepairParts(
+  ctx: MutationCtx,
+  branchId: Id<"branches">,
+  parts: RepairPartRequest[],
+): Promise<PreparedRepairPart[]> {
+  const prepared: PreparedRepairPart[] = [];
+  for (const row of parts) {
+    const product = await ctx.db.get(row.productId);
+    if (!product || !product.isActive) {
+      throw new ConvexError("قطعة الغيار غير موجودة أو غير نشطة");
+    }
+    if (product.branchId !== branchId) {
+      throw new ConvexError("قطعة الغيار لا تنتمي إلى فرع أمر الصيانة");
+    }
+    if (product.stock < row.quantity) {
+      throw new ConvexError(`المخزون غير كافٍ لقطعة الغيار: ${product.name}`);
+    }
+    const unitPrice = assertMoney(product.sellPrice, "سعر بيع قطعة الغيار");
+    prepared.push({
+      product,
+      quantity: row.quantity,
+      unitPrice,
+      lineTotal: roundMoney(unitPrice * row.quantity),
+    });
+  }
+  return prepared;
+}
 
 function createTrackingToken(): string {
   const bytes = new Uint8Array(16);
@@ -45,16 +118,34 @@ function maskCustomerName(name: string): string {
   return `${parts[0]} ${parts.slice(1).map((part) => `${part[0]}ـ`).join(" ")}`;
 }
 
-function publicRepair<T extends Record<string, unknown>>(repair: T) {
+function publicRepair<T extends Doc<"repairs">>(
+  repair: T,
+  canViewProfits: boolean,
+) {
   const {
     journalEntryId: _journalEntryId,
     cancellationJournalEntryId: _cancellationJournalEntryId,
     creationRequestId: _creationRequestId,
     cancellationRequestId: _cancellationRequestId,
     cancellationFingerprint: _cancellationFingerprint,
+    creationFingerprint: _creationFingerprint,
     ...dto
   } = repair;
-  return dto;
+  if (canViewProfits) return dto;
+  const {
+    partsCogsTotal: _partsCogsTotal,
+    ...visible
+  } = dto;
+  return {
+    ...visible,
+    parts: visible.parts.map(
+      ({
+        historicalUnitCost: _historicalUnitCost,
+        inventoryValueRemoved: _inventoryValueRemoved,
+        ...part
+      }) => part,
+    ),
+  };
 }
 
 export const list = query({
@@ -62,7 +153,9 @@ export const list = query({
   handler: async (ctx) => {
     const user = await requireModulePermission(ctx, "view_repairs", "repairs");
     const repairs = await ctx.db.query("repairs").order("desc").collect();
-    return filterByBranch(repairs, user).map(publicRepair);
+    return filterByBranch(repairs, user).map((repair) =>
+      publicRepair(repair, user.permissions.includes("view_profits")),
+    );
   },
 });
 
@@ -72,7 +165,33 @@ export const get = query({
     const user = await requireModulePermission(ctx, "view_repairs", "repairs");
     const repair = await ctx.db.get(args.id);
     if (repair) assertBranchAccess(user, repair);
-    return repair ? publicRepair(repair) : null;
+    return repair
+      ? publicRepair(repair, user.permissions.includes("view_profits"))
+      : null;
+  },
+});
+
+export const partPicker = query({
+  args: { branchId: v.optional(v.id("branches")) },
+  handler: async (ctx, args) => {
+    const user = await requireModulePermission(ctx, "create_repairs", "repairs");
+    const branchId = resolveWriteBranch(user, args.branchId);
+    const products = await ctx.db
+      .query("products")
+      .withIndex("by_branch", (q) => q.eq("branchId", branchId))
+      .collect();
+    return products
+      .filter((product) => product.isActive)
+      .sort((a, b) => a.name.localeCompare(b.name, "ar"))
+      .map(({ _id, name, sku, stock, unit, sellPrice }) => ({
+        _id,
+        name,
+        sku,
+        stock,
+        unit,
+        sellPrice,
+        branchId,
+      }));
   },
 });
 
@@ -118,6 +237,10 @@ export const create = mutation({
     deviceModel: v.string(),
     problem: v.string(),
     laborCost: v.number(),
+    parts: v.optional(v.array(v.object({
+      productId: v.id("products"),
+      quantity: v.number(),
+    }))),
     date: v.optional(v.string()),
     creationRequestId: v.string(),
     initialDeposit: v.optional(v.object({ amount: v.number(), accountId: v.id("financialAccounts"), paymentDate: v.string(), requestId: v.string(), notes: v.optional(v.string()) })),
@@ -128,23 +251,102 @@ export const create = mutation({
   },
   handler: async (ctx, args) => {
     const user = await requireModulePermission(ctx, "create_repairs", "repairs");
-    const creationRequestId = `${user.userId}:${args.creationRequestId.trim()}`; if (!args.creationRequestId.trim()) throw new ConvexError("معرف طلب إنشاء الصيانة مطلوب");
-    const existing = await ctx.db.query("repairs").withIndex("by_creation_request", q => q.eq("creationRequestId", creationRequestId)).unique(); if (existing) return existing._id;
+    const normalizedRequestId = normalizeRequestId(args.creationRequestId);
+    const creationRequestId = `${user.userId}:${normalizedRequestId}`;
     const branchId = resolveWriteBranch(user, args.branchId);
-    await requireActiveBranch(ctx, branchId);
     const date = assertIsoDate(
       args.date ?? new Date().toISOString().slice(0, 10),
     );
-    for (const value of [args.customerName, args.customerPhone, args.deviceType, args.deviceBrand, args.deviceModel, args.problem]) if (!value.trim()) throw new ConvexError("جميع الحقول النصية المطلوبة يجب ألا تكون فارغة");
+    const canonicalParts = canonicalPartRequests(args.parts);
+    const normalizedText = {
+      customerName: normalizeText(args.customerName),
+      customerPhone: normalizeText(args.customerPhone),
+      deviceType: normalizeText(args.deviceType),
+      deviceBrand: normalizeText(args.deviceBrand),
+      deviceModel: normalizeText(args.deviceModel),
+      problem: normalizeText(args.problem),
+      expectedDate: args.expectedDate
+        ? assertIsoDate(args.expectedDate)
+        : undefined,
+      notes: args.notes ? normalizeText(args.notes) || undefined : undefined,
+      technicianName: args.technicianName
+        ? normalizeText(args.technicianName) || undefined
+        : undefined,
+    };
+    for (const value of [
+      normalizedText.customerName,
+      normalizedText.customerPhone,
+      normalizedText.deviceType,
+      normalizedText.deviceBrand,
+      normalizedText.deviceModel,
+      normalizedText.problem,
+    ]) {
+      if (!value) {
+        throw new ConvexError(
+          "جميع الحقول النصية المطلوبة يجب ألا تكون فارغة",
+        );
+      }
+    }
+    const laborCost = assertMoney(args.laborCost, "تكلفة العمالة");
     const initialAmount = args.initialDeposit?.amount ?? 0;
-    if (args.initialDeposit && initialAmount <= 0) throw new ConvexError("العربون الأولي يجب أن يكون أكبر من صفر");
-    if (!Number.isFinite(args.laborCost) || args.laborCost < 0 || !Number.isFinite(initialAmount) || initialAmount < 0) throw new ConvexError("قيم الصيانة المالية غير صالحة");
-    if (initialAmount > args.laborCost) throw new ConvexError("العربون لا يمكن أن يتجاوز التكلفة الإجمالية");
-    if (args.expectedDate && !isValidIsoDate(args.expectedDate)) throw new ConvexError("التاريخ المتوقع غير صالح");
+    assertMoney(initialAmount, "العربون الأولي");
+    if (args.initialDeposit && initialAmount <= 0) {
+      throw new ConvexError("العربون الأولي يجب أن يكون أكبر من صفر");
+    }
+    const initialDeposit = args.initialDeposit
+      ? {
+          amount: initialAmount,
+          accountId: String(args.initialDeposit.accountId),
+          paymentDate: assertIsoDate(args.initialDeposit.paymentDate),
+          requestId: normalizeRequestId(args.initialDeposit.requestId),
+          notes: args.initialDeposit.notes
+            ? normalizeText(args.initialDeposit.notes) || undefined
+            : undefined,
+        }
+      : undefined;
+    const creationFingerprint = fingerprint({
+      branchId: String(branchId),
+      customerId: args.customerId ? String(args.customerId) : null,
+      ...normalizedText,
+      laborCost,
+      date,
+      parts: canonicalParts.map((part) => ({
+        productId: String(part.productId),
+        quantity: part.quantity,
+      })),
+      initialDeposit: initialDeposit ?? null,
+    });
+    const existing = await ctx.db
+      .query("repairs")
+      .withIndex("by_creation_request", (q) =>
+        q.eq("creationRequestId", creationRequestId),
+      )
+      .unique();
+    if (existing) {
+      if (existing.creationFingerprint === creationFingerprint) {
+        return existing._id;
+      }
+      throw new ConvexError(
+        "استُخدم معرف طلب إنشاء الصيانة ببيانات مختلفة",
+      );
+    }
+    await requireActiveBranch(ctx, branchId);
+    const preparedParts = await prepareRepairParts(
+      ctx,
+      branchId!,
+      canonicalParts,
+    );
+    const partsTotal = roundMoney(
+      preparedParts.reduce((sum, part) => sum + part.lineTotal, 0),
+    );
+    const totalCost = roundMoney(laborCost + partsTotal);
+    if (initialAmount > totalCost) {
+      throw new ConvexError("العربون لا يمكن أن يتجاوز التكلفة الإجمالية");
+    }
     const postingState = await repairPostingState(ctx);
     if (
       !args.customerId &&
-      ((postingState.operational && args.laborCost > 0) ||
+      ((postingState.operational && totalCost > 0) ||
         (postingState.financial && initialAmount > 0))
     ) {
       throw new ConvexError(
@@ -157,21 +359,62 @@ export const create = mutation({
     }
     const repairNumber = await nextDocumentNumber(ctx, "repair");
     const trackingToken = await createUniqueTrackingToken(ctx);
-    const totalCost = roundMoney(args.laborCost);
     let account; if (args.initialDeposit) { await requirePermission(ctx, "record_collections"); account = await requireActiveFinancialAccount(ctx, args.initialDeposit.accountId); assertFinancialAccountBranch(account, branchId!); }
-    const { initialDeposit: _initialDeposit, date: _date, ...documentArgs } = args;
     const id = await ctx.db.insert("repairs", {
-      ...documentArgs,
+      customerId: args.customerId,
+      customerName: normalizedText.customerName,
+      customerPhone: normalizedText.customerPhone,
+      deviceType: normalizedText.deviceType,
+      deviceBrand: normalizedText.deviceBrand,
+      deviceModel: normalizedText.deviceModel,
+      problem: normalizedText.problem,
+      expectedDate: normalizedText.expectedDate,
+      notes: normalizedText.notes,
+      technicianName: normalizedText.technicianName,
       branchId,
       repairNumber,
       trackingToken,
       parts: [],
+      partsTotal,
+      partsCogsTotal: 0,
+      costingVersion: 1,
       totalCost,
-      laborCost: totalCost, deposit: roundMoney(initialAmount),
-      remaining: roundMoney(totalCost - initialAmount), creationRequestId,
+      laborCost,
+      deposit: roundMoney(initialAmount),
+      remaining: roundMoney(totalCost - initialAmount),
+      creationRequestId,
+      creationFingerprint,
       status: "received",
       receivedDate: date,
     });
+    const storedParts = [];
+    let partsCogsTotal = 0;
+    for (const part of preparedParts) {
+      const valuation = await changeProductStock(ctx, user, {
+        productId: part.product._id,
+        quantityDelta: -part.quantity,
+        unitCost: part.product.costPrice,
+        type: INVENTORY_MOVEMENT_TYPES.repairPartIssue,
+        reason: `صرف قطعة غيار للصيانة ${repairNumber}`,
+        referenceId: String(id),
+        referenceType: "repair",
+      });
+      const inventoryValueRemoved = roundMoney(-valuation.valueDelta);
+      partsCogsTotal = roundMoney(
+        partsCogsTotal + inventoryValueRemoved,
+      );
+      storedParts.push({
+        productId: part.product._id,
+        name: part.product.name,
+        cost: part.unitPrice,
+        quantity: part.quantity,
+        unitPrice: part.unitPrice,
+        lineTotal: part.lineTotal,
+        historicalUnitCost: part.product.costPrice,
+        inventoryValueRemoved,
+      });
+    }
+    await ctx.db.patch(id, { parts: storedParts, partsCogsTotal });
     if (args.customerId) await postCustomerLedgerEntry(ctx, user, { type: "repair_charge", requestId: `${args.creationRequestId}:charge`, customerId: args.customerId, branchId: branchId!, date, receivableDelta: totalCost, advanceDelta: 0, purchasesDelta: totalCost, description: `تكلفة الصيانة ${repairNumber}`, referenceType: "repair", referenceId: String(id), referenceNumber: repairNumber });
     const journal = await postRepairRevenueJournal(ctx, user, {
       branchId: branchId!,
@@ -179,7 +422,9 @@ export const create = mutation({
       requestId: `${args.creationRequestId}:revenue`,
       repairId: id,
       repairNumber,
-      laborCost: args.laborCost,
+      laborCost,
+      partsRevenue: partsTotal,
+      partsCogs: partsCogsTotal,
     });
     if (args.customerId && args.initialDeposit) await postCustomerLedgerEntry(ctx, user, { type: "repair_payment", requestId: `${args.initialDeposit.requestId}:ledger`, customerId: args.customerId, branchId: branchId!, date: args.initialDeposit.paymentDate, receivableDelta: -initialAmount, advanceDelta: 0, purchasesDelta: 0, description: `عربون الصيانة ${repairNumber}`, referenceType: "repair", referenceId: String(id), referenceNumber: repairNumber });
     if (args.initialDeposit && account) await postFinancialTransaction(ctx, user, { type: "repair_payment", requestId: args.initialDeposit.requestId, date: args.initialDeposit.paymentDate, amount: initialAmount, description: args.initialDeposit.notes?.trim() || `عربون الصيانة ${repairNumber}`, branchId: branchId!, referenceType: "repair", referenceId: String(id), referenceNumber: repairNumber, customerId: args.customerId, movements: [{ accountId: account._id, signedAmount: initialAmount }] });
@@ -256,6 +501,37 @@ export const updateStatus = mutation({
     if (!canTransition(REPAIR_TRANSITIONS, repair.status, args.status)) throw new ConvexError(`لا يمكن تغيير حالة الصيانة من ${repair.status} إلى ${args.status}`);
     if (args.status === "cancelled" && repair.deposit > 0) throw new ConvexError("يجب استرداد عربون الصيانة بالكامل قبل الإلغاء");
     if (args.status === "delivered" && repair.remaining > 0) throw new ConvexError("لا يمكن تسليم صيانة عليها مبلغ متبقٍ");
+    if (args.status === "cancelled") {
+      for (const part of repair.parts) {
+        if (
+          !part.productId ||
+          part.inventoryValueRemoved === undefined ||
+          !Number.isFinite(part.inventoryValueRemoved)
+        ) {
+          throw new ConvexError(
+            "أمر الصيانة القديم يحتوي قطعًا بلا تكلفة مخزون تاريخية؛ راجعه يدويًا قبل الإلغاء",
+          );
+        }
+        const product = await ctx.db.get(part.productId);
+        if (!product || product.branchId !== repair.branchId) {
+          throw new ConvexError(
+            "تعذر استعادة قطعة غيار إلى مخزون فرع أمر الصيانة",
+          );
+        }
+        await changeProductStock(ctx, user, {
+          productId: part.productId,
+          quantityDelta: part.quantity,
+          unitCost:
+            part.historicalUnitCost ??
+            part.inventoryValueRemoved / part.quantity,
+          valueDelta: part.inventoryValueRemoved,
+          type: INVENTORY_MOVEMENT_TYPES.repairPartReversal,
+          reason: `عكس قطع غيار الصيانة ${repair.repairNumber}`,
+          referenceId: String(repair._id),
+          referenceType: "repair_cancellation",
+        });
+      }
+    }
     if (args.status === "cancelled" && repair.customerId && cancellationDate && cancellationRequestId) await postCustomerLedgerEntry(ctx, user, { type: "repair_cancel", requestId: `${cancellationRequestId}:ledger`, customerId: repair.customerId, branchId: repair.branchId!, date: cancellationDate, receivableDelta: -repair.remaining, advanceDelta: 0, purchasesDelta: -repair.totalCost, description: `إلغاء الصيانة ${repair.repairNumber}`, referenceType: "repair", referenceId: String(repair._id), referenceNumber: repair.repairNumber });
     const cancellationJournal =
       args.status === "cancelled" &&
@@ -270,7 +546,8 @@ export const updateStatus = mutation({
             repairNumber: repair.repairNumber,
             originalEntryId: repair.journalEntryId,
             reason: cancellationReason,
-            hasAccountingImpact: repair.totalCost > 0,
+            hasAccountingImpact:
+              repair.totalCost > 0 || (repair.partsCogsTotal ?? 0) > 0,
           })
         : null;
     await ctx.db.patch(args.id, {
