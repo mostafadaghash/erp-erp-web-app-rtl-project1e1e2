@@ -26,6 +26,7 @@ export function RepairsPage() {
   const canEdit = usePermission("edit_repairs");
   const canPrint = usePermission("print_repairs");
   const canRefund = usePermission("refund_collections");
+  const canCollect = usePermission("record_collections");
   const canViewBranches = usePermission("view_branches");
   const [showForm, setShowForm] = useState(false);
   const [selectedBranchId, setSelectedBranchId] = useState("");
@@ -64,12 +65,40 @@ export function RepairsPage() {
   const rotateTrackingToken = useMutation(api.repairs.rotateTrackingToken);
   const recordPayment = useMutation(api.repairs.recordPayment);
   const refundPayment = useMutation(api.repairs.refundPayment);
-  const canCollect = usePermission("record_collections");
-  const collectionAccounts = useQuery(api.finance.collectionAccountPicker, canCollect ? {} : "skip") ?? [];
-  const refundAccounts = useQuery(api.finance.refundAccountPicker, canRefund ? {} : "skip") ?? [];
+  const [collectionTarget, setCollectionTarget] = useState<Doc<"repairs"> | null>(null);
+  const [refundTarget, setRefundTarget] = useState<Doc<"repairs"> | null>(null);
+  const collectionAccounts = useQuery(
+    api.finance.collectionAccountPicker,
+    canCollect && (showForm || collectionTarget) ? {} : "skip",
+  ) ?? [];
+  const refundAccounts = useQuery(
+    api.finance.refundAccountPicker,
+    canRefund && refundTarget ? {} : "skip",
+  ) ?? [];
   const [accountId, setAccountId] = useState("");
   const [requestId, setRequestId] = useState(() => crypto.randomUUID());
   const [saving, setSaving] = useState(false);
+  const [financialBusy, setFinancialBusy] = useState<
+    "collection" | "refund" | null
+  >(null);
+  const [collectionRequestId, setCollectionRequestId] = useState(
+    () => crypto.randomUUID(),
+  );
+  const [refundRequestId, setRefundRequestId] = useState(
+    () => crypto.randomUUID(),
+  );
+  const [collectionForm, setCollectionForm] = useState({
+    amount: "",
+    accountId: "",
+    date: new Date().toISOString().slice(0, 10),
+    notes: "",
+  });
+  const [refundForm, setRefundForm] = useState({
+    amount: "",
+    accountId: "",
+    date: new Date().toISOString().slice(0, 10),
+    reason: "",
+  });
 
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState("");
@@ -119,6 +148,21 @@ export function RepairsPage() {
     productId: string;
     quantity: string;
   }>>([]);
+  const initialDepositAccounts = selectedBranchId
+    ? collectionAccounts.filter(
+        (account) => account.branchId === selectedBranchId,
+      )
+    : collectionAccounts;
+  const targetCollectionAccounts = collectionTarget
+    ? collectionAccounts.filter(
+        (account) => account.branchId === collectionTarget.branchId,
+      )
+    : [];
+  const targetRefundAccounts = refundTarget
+    ? refundAccounts.filter(
+        (account) => account.branchId === refundTarget.branchId,
+      )
+    : [];
 
   const partsTotal = parts.reduce((sum, row) => {
     const product = partOptions.find((part) => part._id === row.productId);
@@ -309,13 +353,117 @@ export function RepairsPage() {
     }
   };
 
-  const collectRepair = async (repair: Doc<"repairs">) => {
-    const amount = Number(prompt("قيمة التحصيل")); const selected = collectionAccounts[0]; if (!amount || !selected) return toast.error("اختر حساباً متاحاً وأدخل مبلغاً صحيحاً");
-    try { await recordPayment({ repairId: repair._id, amount, accountId: selected._id, paymentDate: new Date().toISOString().slice(0, 10), requestId: crypto.randomUUID() }); toast.success("تم التحصيل"); } catch (error) { toast.error(getErrorMessage(error, "تعذر التحصيل")); }
+  const openCollection = (repair: Doc<"repairs">) => {
+    setCollectionTarget(repair);
+    setCollectionRequestId(crypto.randomUUID());
+    setCollectionForm({
+      amount: "",
+      accountId: "",
+      date: new Date().toISOString().slice(0, 10),
+      notes: "",
+    });
   };
-  const refundRepair = async (repair: Doc<"repairs">) => {
-    const amount = Number(prompt("قيمة الاسترداد")); const reason = prompt("سبب الاسترداد")?.trim(); const selected = refundAccounts[0]; if (!amount || !reason || !selected) return;
-    try { await refundPayment({ repairId: repair._id, amount, accountId: selected._id, date: new Date().toISOString().slice(0, 10), reason, requestId: crypto.randomUUID() }); toast.success("تم الاسترداد"); } catch (error) { toast.error(getErrorMessage(error, "تعذر الاسترداد")); }
+
+  const openRefund = (repair: Doc<"repairs">) => {
+    setRefundTarget(repair);
+    setRefundRequestId(crypto.randomUUID());
+    setRefundForm({
+      amount: "",
+      accountId: "",
+      date: new Date().toISOString().slice(0, 10),
+      reason: "",
+    });
+  };
+
+  const submitCollection = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!collectionTarget || financialBusy) return;
+    const amount = Number(collectionForm.amount);
+    if (
+      !Number.isFinite(amount) ||
+      amount <= 0 ||
+      amount > collectionTarget.remaining
+    ) {
+      toast.error("مبلغ التحصيل يجب أن يكون أكبر من صفر ولا يتجاوز المتبقي");
+      return;
+    }
+    if (!collectionForm.date) {
+      toast.error("تاريخ التحصيل مطلوب");
+      return;
+    }
+    const account = targetCollectionAccounts.find(
+      (candidate) => candidate._id === collectionForm.accountId,
+    );
+    if (!account) {
+      toast.error("اختر حساب تحصيل تابعًا لفرع أمر الصيانة");
+      return;
+    }
+    setFinancialBusy("collection");
+    try {
+      await recordPayment({
+        repairId: collectionTarget._id,
+        amount,
+        accountId: account._id,
+        paymentDate: collectionForm.date,
+        requestId: collectionRequestId,
+        notes: collectionForm.notes.trim() || undefined,
+      });
+      toast.success("تم تحصيل دفعة الصيانة");
+      setCollectionTarget(null);
+      setCollectionRequestId(crypto.randomUUID());
+    } catch (error) {
+      toast.error(getErrorMessage(error, "تعذر تحصيل دفعة الصيانة"));
+    } finally {
+      setFinancialBusy(null);
+    }
+  };
+
+  const submitRefund = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!refundTarget || financialBusy) return;
+    const amount = Number(refundForm.amount);
+    if (
+      !Number.isFinite(amount) ||
+      amount <= 0 ||
+      amount > refundTarget.deposit
+    ) {
+      toast.error("مبلغ الاسترداد يجب أن يكون أكبر من صفر ولا يتجاوز المحصل");
+      return;
+    }
+    const reason = refundForm.reason.trim();
+    if (!reason) {
+      toast.error("سبب الاسترداد مطلوب");
+      return;
+    }
+    if (!refundForm.date) {
+      toast.error("تاريخ الاسترداد مطلوب");
+      return;
+    }
+    const account = targetRefundAccounts.find(
+      (candidate) => candidate._id === refundForm.accountId,
+    );
+    if (!account) {
+      toast.error("اختر حساب استرداد تابعًا لفرع أمر الصيانة");
+      return;
+    }
+    setFinancialBusy("refund");
+    try {
+      await refundPayment({
+        repairId: refundTarget._id,
+        amount,
+        accountId: account._id,
+        date: refundForm.date,
+        reason,
+        requestId: refundRequestId,
+      });
+      toast.success("تم استرداد مبلغ الصيانة");
+      setRefundTarget(null);
+      setRefundRequestId(crypto.randomUUID());
+    } catch (error) {
+      toast.error(getErrorMessage(error, "تعذر استرداد مبلغ الصيانة"));
+    } finally {
+      setFinancialBusy(null);
+    }
   };
 
   const handleStatusSelection = (repair: Doc<"repairs">, value: string) => {
@@ -530,8 +678,25 @@ export function RepairsPage() {
               )}
 
               <div className="flex gap-2">
-                {canCollect && r.remaining > 0 && <button className="btn-secondary text-xs" onClick={() => void collectRepair(r)}>تحصيل دفعة</button>}
-                {canRefund && r.deposit > 0 && <button className="btn-secondary text-xs" onClick={() => void refundRepair(r)}>استرداد مبلغ</button>}
+                {canCollect &&
+                  r.remaining > 0 &&
+                  r.status !== "delivered" &&
+                  r.status !== "cancelled" && (
+                    <button
+                      className="btn-secondary text-xs"
+                      onClick={() => openCollection(r)}
+                    >
+                      تحصيل دفعة
+                    </button>
+                  )}
+                {canRefund && r.deposit > 0 && (
+                  <button
+                    className="btn-secondary text-xs"
+                    onClick={() => openRefund(r)}
+                  >
+                    استرداد مبلغ
+                  </button>
+                )}
                 {canEdit && ["received", "in_progress"].includes(r.status) && (
                   <button className="btn-secondary text-xs" onClick={() => openEdit(r)}>
                     التفاصيل
@@ -569,6 +734,213 @@ export function RepairsPage() {
           </div>
         )}
       </div>
+
+      {collectionTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" dir="rtl">
+          <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl">
+            <h2 className="text-lg font-black">
+              تحصيل دفعة — {collectionTarget.repairNumber}
+            </h2>
+            <div className="mt-3 grid grid-cols-2 gap-3 rounded-xl bg-slate-50 p-3 text-sm">
+              <div>
+                <p className="text-xs text-slate-500">إجمالي الصيانة</p>
+                <p className="font-bold">{collectionTarget.totalCost.toLocaleString("ar-EG")} ج.م</p>
+              </div>
+              <div>
+                <p className="text-xs text-slate-500">المتبقي</p>
+                <p className="font-bold text-amber-700">{collectionTarget.remaining.toLocaleString("ar-EG")} ج.م</p>
+              </div>
+            </div>
+            <form className="mt-4 space-y-4" onSubmit={submitCollection}>
+              <div>
+                <label className="form-label">المبلغ *</label>
+                <input
+                  required
+                  type="number"
+                  min="0.01"
+                  max={collectionTarget.remaining}
+                  step="0.01"
+                  className="form-input"
+                  value={collectionForm.amount}
+                  onChange={(event) => setCollectionForm({
+                    ...collectionForm,
+                    amount: event.target.value,
+                  })}
+                />
+              </div>
+              <div>
+                <label className="form-label">حساب التحصيل *</label>
+                <select
+                  required
+                  className="form-input"
+                  value={collectionForm.accountId}
+                  onChange={(event) => setCollectionForm({
+                    ...collectionForm,
+                    accountId: event.target.value,
+                  })}
+                >
+                  <option value="">اختر الحساب</option>
+                  {targetCollectionAccounts.map((account) => (
+                    <option key={account._id} value={account._id}>
+                      {account.name}
+                    </option>
+                  ))}
+                </select>
+                {targetCollectionAccounts.length === 0 && (
+                  <p className="mt-1 text-xs text-amber-700">
+                    لا توجد حسابات تحصيل نشطة متاحة لهذا الفرع.
+                  </p>
+                )}
+              </div>
+              <div>
+                <label className="form-label">تاريخ التحصيل *</label>
+                <input
+                  required
+                  type="date"
+                  className="form-input"
+                  value={collectionForm.date}
+                  onChange={(event) => setCollectionForm({
+                    ...collectionForm,
+                    date: event.target.value,
+                  })}
+                />
+              </div>
+              <div>
+                <label className="form-label">ملاحظات</label>
+                <textarea
+                  rows={2}
+                  className="form-input"
+                  value={collectionForm.notes}
+                  onChange={(event) => setCollectionForm({
+                    ...collectionForm,
+                    notes: event.target.value,
+                  })}
+                />
+              </div>
+              <div className="flex gap-3">
+                <button
+                  className="btn-primary flex-1"
+                  disabled={financialBusy !== null || targetCollectionAccounts.length === 0}
+                >
+                  {financialBusy === "collection" ? "جارٍ التحصيل..." : "تأكيد التحصيل"}
+                </button>
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  disabled={financialBusy !== null}
+                  onClick={() => setCollectionTarget(null)}
+                >
+                  إغلاق
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {refundTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" dir="rtl">
+          <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl">
+            <h2 className="text-lg font-black">
+              استرداد مبلغ — {refundTarget.repairNumber}
+            </h2>
+            <div className="mt-3 grid grid-cols-2 gap-3 rounded-xl bg-slate-50 p-3 text-sm">
+              <div>
+                <p className="text-xs text-slate-500">المحصل</p>
+                <p className="font-bold">{refundTarget.deposit.toLocaleString("ar-EG")} ج.م</p>
+              </div>
+              <div>
+                <p className="text-xs text-slate-500">المتبقي الحالي</p>
+                <p className="font-bold">{refundTarget.remaining.toLocaleString("ar-EG")} ج.م</p>
+              </div>
+            </div>
+            <form className="mt-4 space-y-4" onSubmit={submitRefund}>
+              <div>
+                <label className="form-label">المبلغ *</label>
+                <input
+                  required
+                  type="number"
+                  min="0.01"
+                  max={refundTarget.deposit}
+                  step="0.01"
+                  className="form-input"
+                  value={refundForm.amount}
+                  onChange={(event) => setRefundForm({
+                    ...refundForm,
+                    amount: event.target.value,
+                  })}
+                />
+              </div>
+              <div>
+                <label className="form-label">حساب الاسترداد *</label>
+                <select
+                  required
+                  className="form-input"
+                  value={refundForm.accountId}
+                  onChange={(event) => setRefundForm({
+                    ...refundForm,
+                    accountId: event.target.value,
+                  })}
+                >
+                  <option value="">اختر الحساب</option>
+                  {targetRefundAccounts.map((account) => (
+                    <option key={account._id} value={account._id}>
+                      {account.name}
+                    </option>
+                  ))}
+                </select>
+                {targetRefundAccounts.length === 0 && (
+                  <p className="mt-1 text-xs text-amber-700">
+                    لا توجد حسابات استرداد نشطة متاحة لهذا الفرع.
+                  </p>
+                )}
+              </div>
+              <div>
+                <label className="form-label">تاريخ الاسترداد *</label>
+                <input
+                  required
+                  type="date"
+                  className="form-input"
+                  value={refundForm.date}
+                  onChange={(event) => setRefundForm({
+                    ...refundForm,
+                    date: event.target.value,
+                  })}
+                />
+              </div>
+              <div>
+                <label className="form-label">سبب الاسترداد *</label>
+                <textarea
+                  required
+                  rows={3}
+                  className="form-input"
+                  value={refundForm.reason}
+                  onChange={(event) => setRefundForm({
+                    ...refundForm,
+                    reason: event.target.value,
+                  })}
+                />
+              </div>
+              <div className="flex gap-3">
+                <button
+                  className="btn-primary flex-1"
+                  disabled={financialBusy !== null || targetRefundAccounts.length === 0}
+                >
+                  {financialBusy === "refund" ? "جارٍ الاسترداد..." : "تأكيد الاسترداد"}
+                </button>
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  disabled={financialBusy !== null}
+                  onClick={() => setRefundTarget(null)}
+                >
+                  إغلاق
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Print Modal */}
       {canPrint && printRepair && (
@@ -928,7 +1300,7 @@ export function RepairsPage() {
                 <div>
                   <label className="form-label">العربون (ج.م)</label>
                   <input className="form-input" type="number" min="0" step="0.01" max={Number(form.laborCost || 0) + partsTotal} disabled={!canCollect} value={form.deposit} onChange={e => setForm({...form, deposit: e.target.value})} placeholder="0" />
-                  {canCollect && Number(form.deposit) > 0 && <select className="form-input mt-2" value={accountId} onChange={e => setAccountId(e.target.value)}><option value="">اختر حساب التحصيل</option>{collectionAccounts.map(a => <option key={a._id} value={a._id}>{a.name}</option>)}</select>}
+                  {canCollect && Number(form.deposit) > 0 && <select className="form-input mt-2" value={accountId} onChange={e => setAccountId(e.target.value)}><option value="">اختر حساب التحصيل</option>{initialDepositAccounts.map(a => <option key={a._id} value={a._id}>{a.name}</option>)}</select>}
                 </div>
                 <div className="sm:col-span-2 rounded-xl bg-indigo-50 px-4 py-3 text-sm font-bold text-indigo-800">
                   إجمالي أمر الصيانة: {(Number(form.laborCost || 0) + partsTotal).toLocaleString("ar-EG")} ج.م
