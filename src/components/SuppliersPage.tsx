@@ -61,12 +61,12 @@ export function SuppliersPage() {
   const canCreate = usePermission("create_suppliers");
   const canEdit = usePermission("edit_suppliers");
   const canSetActive = usePermission("delete_suppliers");
-  const canViewLedger = usePermission("view_supplier_ledger");
+  const canViewSupplierLedger = usePermission("view_supplier_ledger");
   const me = useQuery(api.employees.me);
   const suppliers = useQuery(api.suppliers.list) ?? [];
   const branches = useQuery(
     api.suppliers.availableBranches,
-    canViewLedger ? {} : "skip",
+    canViewSupplierLedger ? {} : "skip",
   );
   const createSupplier = useMutation(api.suppliers.create);
   const updateSupplier = useMutation(api.suppliers.update);
@@ -84,14 +84,17 @@ export function SuppliersPage() {
 
   const effectiveBranch =
     selectedBranch ?? me?.branchId ?? branches?.[0]?._id ?? null;
+  const pinnedBalanceArgs = canViewSupplierLedger && me?.branchId ? { branchId: me.branchId } : "skip";
+  const supplierBalanceArgs =
+    canViewSupplierLedger && effectiveBranch
+      ? { branchId: effectiveBranch }
+      : pinnedBalanceArgs;
   const supplierBalances = useQuery(
     api.suppliers.branchBalances,
-    canViewLedger && effectiveBranch
-      ? { branchId: effectiveBranch }
-      : "skip",
+    supplierBalanceArgs,
   );
   const ledgerArgs =
-    canViewLedger && effectiveBranch && ledgerTarget
+    canViewSupplierLedger && effectiveBranch && ledgerTarget
       ? {
           supplierId: ledgerTarget._id,
           branchId: effectiveBranch,
@@ -225,7 +228,7 @@ export function SuppliersPage() {
             onChange={(event) => setSearch(event.target.value)}
           />
         </div>
-        {canViewLedger && branches && branches.length > 1 && (
+        {canViewSupplierLedger && branches && branches.length > 1 && (
           <select
             className="form-input sm:max-w-xs"
             aria-label="فرع أرصدة الموردين"
@@ -285,7 +288,7 @@ export function SuppliersPage() {
                 {supplier.address}
               </p>
             )}
-            {canViewLedger && effectiveBranch && (
+            {canViewSupplierLedger && effectiveBranch && (
               <div className="pt-3 border-t border-slate-100 flex justify-between">
                 <p className="text-xs text-slate-500">الرصيد المستحق</p>
                 <p className="font-bold text-sm text-amber-600">
@@ -303,7 +306,7 @@ export function SuppliersPage() {
                   تعديل
                 </button>
               )}
-              {canViewLedger && effectiveBranch && (
+              {canViewSupplierLedger && effectiveBranch && (
                 <button
                   onClick={() => setLedgerTarget(supplier)}
                   className="btn-secondary text-xs flex items-center justify-center gap-1"
@@ -380,7 +383,7 @@ export function SuppliersPage() {
             </header>
             <div className="overflow-y-auto divide-y">
               {ledgerEntries.map((entry) => (
-                <article key={entry.id} className="p-4 text-sm">
+                <article key={entry._id} className="p-4 text-sm">
                   <div className="flex flex-wrap justify-between gap-2">
                     <div>
                       <p className="font-bold">

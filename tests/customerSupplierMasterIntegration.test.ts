@@ -471,15 +471,15 @@ test("CSM-17 supplier ledger paginates real entries and redacts internals", asyn
     paginationOpts: { numItems: 1, cursor: first.continueCursor },
   });
   assert.equal(second.page.length, 1);
-  assert.notEqual(first.page[0].id, second.page[0].id);
+  assert.notEqual(first.page[0]._id, second.page[0]._id);
   assert.deepEqual(Object.keys(first.page[0]).sort(), [
+    "_id",
     "amountDelta",
     "balanceAfter",
     "balanceBefore",
     "date",
     "description",
     "entryNumber",
-    "id",
     "referenceNumber",
     "referenceType",
     "status",

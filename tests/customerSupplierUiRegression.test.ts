@@ -86,7 +86,7 @@ test("CSU-11 supplier activation UI uses delete_suppliers like the backend", () 
 test("CSU-12 supplier branch choices are permission-gated", () => {
   assert.match(
     suppliers,
-    /api\.suppliers\.availableBranches,[\s\S]{0,100}canViewLedger \? \{\} : "skip"/,
+    /api\.suppliers\.availableBranches,[\s\S]{0,100}canViewSupplierLedger \? \{\} : "skip"/,
   );
   assert.match(suppliers, /aria-label="فرع أرصدة الموردين"/);
 });
@@ -94,7 +94,7 @@ test("CSU-12 supplier branch choices are permission-gated", () => {
 test("CSU-13 supplier balances are skipped until a permitted branch exists", () => {
   assert.match(
     suppliers,
-    /canViewLedger && effectiveBranch[\s\S]{0,100}\{ branchId: effectiveBranch \}[\s\S]{0,50}"skip"/,
+    /canViewSupplierLedger && effectiveBranch[\s\S]{0,100}\{ branchId: effectiveBranch \}[\s\S]{0,80}pinnedBalanceArgs/,
   );
 });
 

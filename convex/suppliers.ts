@@ -113,7 +113,7 @@ export const ledger = query({
     return {
       ...page,
       page: page.page.map((entry) => ({
-        id: entry._id,
+        _id: entry._id,
         entryNumber: entry.entryNumber,
         type: entry.type,
         status: entry.status,
