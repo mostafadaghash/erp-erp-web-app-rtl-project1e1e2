@@ -939,3 +939,50 @@ test("RPT-36 monthly trend separates expenses purchases and COD movement", async
   assert.equal(result.trend[2].codSettled, 80);
   assert.equal(result.trend[2].carrierFees, 5);
 });
+
+test("reporting branch options follow central and pinned branch policy", async () => {
+  const e = await fixture();
+  const [admin, accountant, manager, reportOnly] = await Promise.all([
+    e.admin.query(api.reporting.availableBranches, {}),
+    e.accountant.query(api.reporting.availableBranches, {}),
+    e.manager.query(api.reporting.availableBranches, {}),
+    e.reportOnly.query(api.reporting.availableBranches, {}),
+  ]);
+  assert.deepEqual(
+    admin.map((branch) => branch._id).sort(),
+    [e.branchId, e.otherBranchId].sort(),
+  );
+  assert.deepEqual(
+    accountant.map((branch) => branch._id).sort(),
+    [e.branchId, e.otherBranchId].sort(),
+  );
+  assert.deepEqual(manager.map((branch) => branch._id), [e.branchId]);
+  assert.deepEqual(reportOnly.map((branch) => branch._id), [e.branchId]);
+  assert.deepEqual(Object.keys(admin[0]).sort(), ["_id", "name"]);
+});
+
+test("reporting branch options reject users without report permission", async () => {
+  const e = await fixture();
+  await assert.rejects(
+    e.viewer.query(api.reporting.availableBranches, {}),
+    /صلاحية|permission/i,
+  );
+});
+
+test("reporting branch options exclude inactive branches without writing data", async () => {
+  const e = await fixture();
+  const inactiveId = await e.raw.run((ctx) =>
+    ctx.db.insert("branches", {
+      name: "فرع متوقف",
+      address: "القاهرة",
+      isActive: false,
+    }),
+  );
+  const before = await e.raw.run((ctx) => ctx.db.query("branches").collect());
+  const options = await e.admin.query(api.reporting.availableBranches, {});
+  assert.equal(options.some((branch) => branch._id === inactiveId), false);
+  assert.deepEqual(
+    await e.raw.run((ctx) => ctx.db.query("branches").collect()),
+    before,
+  );
+});

@@ -2,12 +2,14 @@ import { useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import type { Page } from "./ERPApp";
 import {
-  TrendingUp, ShoppingCart, Users, Package,
-  Wrench, AlertTriangle, ArrowUpRight, DollarSign,
-  Clock, CheckCircle, UserPlus, Target, PhoneCall, Star
+  TrendingUp, Users, Package,
+  Wrench, AlertTriangle, ArrowUpRight,
+  Clock, CheckCircle, UserPlus, Target, PhoneCall, Star,
+  Truck, WalletCards
 } from "lucide-react";
 import { useCurrency } from "../lib/utils";
 import type { Permission } from "../../convex/lib/permissions";
+import type { ReportingOverview } from "../../shared/reportingView";
 
 interface DashboardProps {
   onNavigate: (page: Page) => void;
@@ -20,58 +22,95 @@ export function Dashboard({ onNavigate, permissions, modules }: DashboardProps) 
   const enabled = (moduleName: string) => modules[moduleName] !== false;
   const canViewInvoices = can("view_invoices") && enabled("invoices");
   const canViewRepairs = can("view_repairs") && enabled("repairs");
-  const canViewExpenses = can("view_expenses") && enabled("expenses");
   const canViewProducts = can("view_products");
   const canViewLeads = can("view_leads") && enabled("crm");
+  const canViewReports = can("view_reports");
+  const canViewProfits = can("view_profits");
 
-  const invoiceStats = useQuery(api.invoices.stats, canViewInvoices ? {} : "skip");
+  const now = new Date();
+  const today = [
+    now.getFullYear(),
+    String(now.getMonth() + 1).padStart(2, "0"),
+    String(now.getDate()).padStart(2, "0"),
+  ].join("-");
+  const monthFrom = `${today.slice(0, 7)}-01`;
+  const report = useQuery(
+    api.reporting.overview,
+    canViewReports ? { from: monthFrom, to: today } : "skip",
+  ) as ReportingOverview | undefined;
   const repairStats = useQuery(api.repairs.getStats, canViewRepairs ? {} : "skip");
-  const expenseStats = useQuery(api.expenses.getStats, canViewExpenses ? {} : "skip");
   const lowStockProducts = useQuery(api.products.list, canViewProducts ? { lowStock: true } : "skip");
   const recentInvoices = useQuery(api.invoices.list, canViewInvoices ? {} : "skip");
   const recentRepairs = useQuery(api.repairs.list, canViewRepairs ? {} : "skip");
   const crmStats = useQuery(api.leads.stats, canViewLeads ? {} : "skip");
 
-  const { formatCurrency, currency } = useCurrency();
+  const { formatCurrency } = useCurrency();
 
-  const statCards = [
-    ...(canViewInvoices ? [{
-      title: "إجمالي المبيعات المدفوعة",
-      value: formatCurrency(invoiceStats?.totalRevenue ?? 0),
-      sub: `${invoiceStats?.paid ?? 0} فاتورة مدفوعة`,
+  const statCards = report ? [{
+      title: "صافي مبيعات الشهر",
+      value: formatCurrency(report.sales.netSales),
+      sub: `${report.sales.invoiceCount.toLocaleString("ar-EG")} فاتورة بعد المرتجعات`,
+      badge: "هذا الشهر",
       icon: TrendingUp,
       color: "from-indigo-500 to-indigo-600",
       bg: "bg-indigo-50",
       text: "text-indigo-600",
     },
     {
-      title: "إجمالي الفواتير",
-      value: formatCurrency(invoiceStats?.totalOutstanding ?? 0),
-      sub: `${invoiceStats?.total ?? 0} فاتورة`,
-      icon: ShoppingCart,
+      title: "صافي تحصيل الشهر",
+      value: formatCurrency(report.collections.netCollections),
+      sub: `رد واسترداد ${formatCurrency(report.collections.refunds)}`,
+      badge: "هذا الشهر",
+      icon: ArrowUpRight,
       color: "from-emerald-500 to-emerald-600",
       bg: "bg-emerald-50",
       text: "text-emerald-600",
     },
     {
       title: "مستحقات العملاء",
-      value: formatCurrency(invoiceStats?.totalOutstanding ?? 0),
-      sub: "مبالغ معلقة",
-      icon: DollarSign,
+      value: formatCurrency(report.currentBalances.customerReceivables),
+      sub: `مقدمات ${formatCurrency(report.currentBalances.customerAdvances)}`,
+      badge: "رصيد حالي",
+      icon: Users,
       color: "from-amber-500 to-amber-600",
       bg: "bg-amber-50",
       text: "text-amber-600",
-    }] : []),
-    ...(canViewExpenses ? [{
-      title: "مصروفات الشهر",
-      value: formatCurrency(expenseStats?.total ?? 0),
-      sub: `${expenseStats?.count ?? 0} عملية`,
-      icon: ArrowUpRight,
+    },
+    {
+      title: "مصروفات ورسوم الشهر",
+      value: formatCurrency(report.expenses.totalExpenses),
+      sub: `رسوم شحن ${formatCurrency(report.expenses.carrierFees)}`,
+      badge: "هذا الشهر",
+      icon: WalletCards,
       color: "from-red-500 to-red-600",
       bg: "bg-red-50",
       text: "text-red-600",
+    },
+    {
+      title: "COD لدى شركات الشحن",
+      value: formatCurrency(report.cod.currentOutstanding),
+      sub: `المسوى ${formatCurrency(report.cod.settled)}`,
+      badge: "رصيد حالي",
+      icon: Truck,
+      color: "from-sky-500 to-sky-600",
+      bg: "bg-sky-50",
+      text: "text-sky-600",
+    },
+    ...(canViewProfits && report.profitability ? [{
+      title: "صافي ربح الشهر",
+      value: report.profitability.netProfit === null
+        ? "بيانات COGS غير مكتملة"
+        : formatCurrency(report.profitability.netProfit),
+      sub: report.profitability.netMargin === null
+        ? `${report.profitability.incompleteCogsInvoices} فاتورة تحتاج مراجعة`
+        : `هامش ${report.profitability.netMargin.toLocaleString("ar-EG")}٪`,
+      badge: "هذا الشهر",
+      icon: TrendingUp,
+      color: "from-violet-500 to-violet-600",
+      bg: "bg-violet-50",
+      text: "text-violet-600",
     }] : []),
-  ];
+  ] : [];
 
   const repairStatusCards = [
     { label: "مستلمة", value: repairStats?.received ?? 0, color: "text-blue-600", bg: "bg-blue-50", icon: Clock },
@@ -101,7 +140,14 @@ export function Dashboard({ onNavigate, permissions, modules }: DashboardProps) 
         </button>}
       </div>
 
-      {/* Stats Grid */}
+      {/* Accounting overview — sourced exclusively from reporting.overview */}
+      {canViewReports && report === undefined && (
+        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+          {Array.from({ length: 4 }, (_, index) => (
+            <div key={index} className="h-32 animate-pulse rounded-2xl bg-slate-100" />
+          ))}
+        </div>
+      )}
       {statCards.length > 0 && <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {statCards.map((card, i) => {
           const Icon = card.icon;
@@ -116,7 +162,7 @@ export function Dashboard({ onNavigate, permissions, modules }: DashboardProps) 
                   <Icon className={`w-5 h-5 ${card.text}`} />
                 </div>
                 <span className={`text-xs font-medium ${card.text} ${card.bg} px-2 py-0.5 rounded-full`}>
-                  اليوم
+                  {card.badge}
                 </span>
               </div>
               <p className="text-xl font-black text-slate-800 leading-tight">{card.value}</p>
@@ -126,6 +172,13 @@ export function Dashboard({ onNavigate, permissions, modules }: DashboardProps) 
           );
         })}
       </div>}
+      {report && canViewProfits && !report.completeness.profitabilityAvailable && (
+        <div className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          <AlertTriangle className="h-4 w-4 shrink-0" />
+          الربحية غير معروضة لأن {report.completeness.incompleteCogsInvoices.toLocaleString("ar-EG")} فاتورة
+          لا تملك COGS تاريخيًا مكتملًا.
+        </div>
+      )}
 
       {/* CRM Quick Stats */}
       {canViewLeads && <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
