@@ -209,7 +209,7 @@ export function RepairsPage() {
     }
   };
 
-  const applyStatus = (repair: Doc<"repairs">, next: RepairStatus) => {
+  const openStatusTransition = (repair: Doc<"repairs">, next: RepairStatus) => {
     setTransitionTarget(repair);
     setTransitionNext(next);
     setTransitionRequestId(crypto.randomUUID());
@@ -226,21 +226,37 @@ export function RepairsPage() {
     event.preventDefault();
     if (!transitionTarget || !transitionNext || updatingId) return;
     setUpdatingId(transitionTarget._id);
-    try {
+    const transitionRequest = {
+      requestId: transitionRequestId,
+    };
+    const applyStatus = async (
+      id: Id<"repairs">,
+      next: RepairStatus,
+      reason?: string,
+    ) => {
       await transitionStatus({
-        id: transitionTarget._id,
-        status: transitionNext,
+        id,
+        status: next,
         date: transitionForm.date,
-        requestId: transitionRequestId,
-        reason: transitionForm.reason.trim() || undefined,
+        requestId: transitionRequest.requestId,
+        reason: reason || undefined,
         diagnosis: transitionForm.diagnosis.trim() || undefined,
         qualityCheckNotes:
           transitionForm.qualityCheckNotes.trim() || undefined,
         warrantyDays:
-          transitionNext === "delivered"
+          next === "delivered"
             ? Number(transitionForm.warrantyDays || 0)
             : undefined,
       });
+    };
+    try {
+      if (transitionNext === "cancelled") {
+        const cancelTarget = transitionTarget;
+        const cancelReason = transitionForm.reason;
+        await applyStatus(cancelTarget._id, "cancelled", cancelReason.trim());
+      } else {
+        await applyStatus(transitionTarget._id, transitionNext);
+      }
       toast.success("تم تحديث حالة الصيانة");
       setTransitionTarget(null);
       setTransitionNext(null);
@@ -305,7 +321,7 @@ export function RepairsPage() {
   const handleStatusSelection = (repair: Doc<"repairs">, value: string) => {
     if (!isRepairStatus(value) || !isRepairStatus(repair.status)) return;
     if (!REPAIR_TRANSITIONS[repair.status].includes(value)) return;
-    applyStatus(repair, value);
+    openStatusTransition(repair, value);
   };
 
   const handleSelectCustomer = (id: string) => {
