@@ -464,7 +464,7 @@ export function RepairsPage() {
 
               {r.status === "delivered" && (
                 <div className="mb-3 rounded-xl bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
-                  تم التسليم {r.deliveredDate ?? "—"}
+                  تم تسليم الجهاز
                   {r.warrantyDays !== undefined && (
                     <span> — ضمان {r.warrantyDays} يوم حتى {r.warrantyUntil ?? "—"}</span>
                   )}

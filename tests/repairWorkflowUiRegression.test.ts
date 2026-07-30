@@ -85,11 +85,12 @@ test("RWU-11 branch selector scopes part technician and create requests", () => 
   assert.match(page, /اختر فرع أمر الصيانة أولًا/);
 });
 
-test("RWU-12 delivered cards display delivery date and warranty", () => {
+test("RWU-12 delivered cards display warranty while print uses server delivery date", () => {
   assert.match(page, /r\.status === "delivered"/);
-  assert.match(page, /r\.deliveredDate/);
   assert.match(page, /r\.warrantyDays/);
   assert.match(page, /r\.warrantyUntil/);
+  assert.match(print, /data\.deliveredDate/);
+  assert.doesNotMatch(page, /deliveredDate/);
 });
 
 test("RWU-13 printable repair includes intake diagnosis quality warranty and creator", () => {
