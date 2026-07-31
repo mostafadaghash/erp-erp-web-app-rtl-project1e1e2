@@ -183,7 +183,7 @@ test("COD-52 قفل الفاتورة والطلب الشامل",async()=>{
     await unchanged(()=>e.t.mutation(api.salesReturns.create,{invoiceId:e.invoiceId,items:[{productId:e.productId,quantity:1}],reason:"مرتجع صحيح",date:"2026-07-10",requestId:`locked-return-${status}`,accountId:e.accountId}),/توصيل نشط/);
     await unchanged(()=>e.t.mutation(api.orders.addPayment,{id:e.orderId,amount:1,accountId:e.accountId,paymentDate:"2026-07-10",requestId:`linked-add-${status}`}),/ربط الطلب بالفاتورة/);
     await unchanged(()=>e.t.mutation(api.orders.refundDeposit,{id:e.orderId,amount:1,accountId:e.accountId,date:"2026-07-10",reason:"استرداد صحيح",requestId:`linked-refund-${status}`}),/ربط الطلب بالفاتورة/);
-    await unchanged(()=>e.t.mutation(api.orders.cancel,{id:e.orderId,reason:"إلغاء مستقل"}),/ربط الطلب بالفاتورة/);
+    await unchanged(()=>e.t.mutation(api.orders.cancel,{id:e.orderId,reason:"إلغاء مستقل"}),/ربطه بالفاتورة/);
     await unchanged(()=>e.t.mutation(api.orders.updateStatus,{id:e.orderId,status:"cancelled",reason:"إلغاء مستقل"}),/مسار إلغاء الطلب المخصص/);
     await unchanged(()=>e.t.mutation(api.orders.updateStatus,{id:e.orderId,status:"delivered"}),/تأكيد التسليم من مسار التوصيل/);
     if(status==="shipped"){
