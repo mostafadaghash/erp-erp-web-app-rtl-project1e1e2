@@ -6,7 +6,7 @@ on:
   pull_request:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   verify:
@@ -14,33 +14,6 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.head_ref || github.ref_name }}
-      - name: Apply COD-52 expectation fix
-        if: github.event_name == 'pull_request' && github.head_ref == 'codex/orders-pagination-ui'
-        run: |
-          python - <<'PY'
-          from pathlib import Path
-          p = Path('tests/deliveryCodIntegration.test.ts')
-          s = p.read_text()
-          replacements = {
-            'api.orders.cancel,{id:e.orderId,reason:"إلغاء مستقل"}),/توصيل نشط/': 'api.orders.cancel,{id:e.orderId,reason:"إلغاء مستقل"}),/ربط الطلب بالفاتورة/',
-            'api.orders.updateStatus,{id:e.orderId,status:"cancelled",reason:"إلغاء مستقل"}),/توصيل نشط/': 'api.orders.updateStatus,{id:e.orderId,status:"cancelled",reason:"إلغاء مستقل"}),/مسار إلغاء الطلب المخصص/',
-            'api.orders.updateStatus,{id:e.orderId,status:"delivered"}),/توصيل نشط/': 'api.orders.updateStatus,{id:e.orderId,status:"delivered"}),/تأكيد التسليم من مسار التوصيل/',
-          }
-          for old, new in replacements.items():
-            if old in s:
-              s = s.replace(old, new, 1)
-          p.write_text(s)
-          PY
-          if git diff --quiet -- tests/deliveryCodIntegration.test.ts; then
-            exit 0
-          fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add tests/deliveryCodIntegration.test.ts
-          git commit -m "test: align COD-52 order guard expectations"
-          git push origin HEAD:${{ github.head_ref }}
       - uses: actions/setup-node@v4
         with:
           node-version: 22
