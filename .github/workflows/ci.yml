@@ -26,7 +26,17 @@ jobs:
         run: node --test --experimental-strip-types tests/ordersPaginationGuard.test.ts
       - name: Full tests
         if: always()
-        run: npm test
+        run: |
+          set -o pipefail
+          npm test 2>&1 | tee test-output.txt
+      - name: Upload test output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-output
+          path: test-output.txt
+          if-no-files-found: error
+          retention-days: 1
       - name: Security check
         if: always()
         run: npm run security:check
