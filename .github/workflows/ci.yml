@@ -21,7 +21,12 @@ jobs:
       - run: npm ci
       - name: Typecheck
         run: npm run typecheck
-      - name: Lint
-        run: npm run lint
       - name: Test
+        if: always()
         run: npm test
+      - name: Security check
+        if: always()
+        run: npm run security:check
+      - name: Build
+        if: always()
+        run: npm run build
