@@ -1,9 +1,22 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync, statSync } from "node:fs";
+import { extname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 const source = readFileSync(new URL("../convex/orderPagination.ts", import.meta.url), "utf8");
+const ordersSource = readFileSync(new URL("../convex/orders.ts", import.meta.url), "utf8");
 const uiSource = readFileSync(new URL("../src/components/OrdersPage.tsx", import.meta.url), "utf8");
+
+function sourceFiles(root: string): string[] {
+  const files: string[] = [];
+  for (const entry of readdirSync(root)) {
+    const path = join(root, entry);
+    if (statSync(path).isDirectory()) files.push(...sourceFiles(path));
+    else if ([".ts", ".tsx"].includes(extname(path))) files.push(path);
+  }
+  return files;
+}
 
 test("Orders pagination endpoint is cursor based and bounded", () => {
   assert.match(source, /paginationOptsValidator/);
@@ -37,4 +50,11 @@ test("Orders UI consumes cursor pagination and exposes bounded load-more", () =>
   assert.match(uiSource, /loadMore\(25\)/);
   assert.match(uiSource, /paginationStatus\s*===\s*"CanLoadMore"/);
   assert.doesNotMatch(uiSource, /useQuery\(api\.orders\.list/);
+});
+
+test("Legacy orders.list is removed and cannot regain UI callers", () => {
+  assert.doesNotMatch(ordersSource, /export const list\s*=\s*query\s*\(/);
+  const srcRoot = fileURLToPath(new URL("../src", import.meta.url));
+  const callers = sourceFiles(srcRoot).filter((path) => /api\.orders\.list\b/.test(readFileSync(path, "utf8")));
+  assert.deepEqual(callers, []);
 });
