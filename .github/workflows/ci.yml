@@ -37,6 +37,14 @@ jobs:
           path: test-output.txt
           if-no-files-found: error
           retention-days: 1
+      - name: Upload failing test source
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: delivery-cod-test-source
+          path: tests/deliveryCodIntegration.test.ts
+          if-no-files-found: error
+          retention-days: 1
       - name: Security check
         if: always()
         run: npm run security:check
