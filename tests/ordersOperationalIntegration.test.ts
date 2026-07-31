@@ -1,9 +1,33 @@
-import test from "node:test";
+import test, { after, before } from "node:test";
 import assert from "node:assert/strict";
+import { existsSync } from "node:fs";
+import { symlink, unlink } from "node:fs/promises";
+import { resolve } from "node:path";
 import { convexTest } from "convex-test";
 import schema from "../convex/schema.ts";
 import { api } from "../convex/_generated/api.js";
 import type { Id } from "../convex/_generated/dataModel";
+
+const links = [
+  ["convex/_generated/server", "server.js"],
+  ["convex/lib/auth", "auth.ts"],
+  ["convex/lib/documentNumbers", "documentNumbers.ts"],
+  ["convex/lib/references", "references.ts"],
+  ["convex/lib/finance", "finance.ts"],
+  ["shared/businessRules", "businessRules.ts"],
+] as const;
+
+before(async () => {
+  for (const [path, target] of links) {
+    if (!existsSync(resolve(path))) await symlink(target, resolve(path));
+  }
+});
+
+after(async () => {
+  for (const [path] of links) {
+    if (existsSync(resolve(path))) await unlink(resolve(path));
+  }
+});
 
 const modules = {
   "../convex/_generated/api.js": () => import("../convex/_generated/api.js"),
@@ -89,17 +113,17 @@ test("ORD-02 confirmed order remains editable before invoice linkage", async () 
 test("ORD-03 ready order rejects body edits atomically", async () => {
   const e = await fixture();
   const id = await insertOrder(e, { status: "ready" });
-  const before = await snapshot(e);
+  const beforeState = await snapshot(e);
   await assert.rejects(e.editor.mutation(api.orders.update, { id, customerName: "تعديل", items: [{ productName: "PS5", quantity: 1, unitPrice: 1 }] }), /لا يمكن تعديل بيانات الطلب/);
-  assert.deepEqual(await snapshot(e), before);
+  assert.deepEqual(await snapshot(e), beforeState);
 });
 
 test("ORD-04 total cannot be reduced below a recorded deposit", async () => {
   const e = await fixture();
   const id = await insertOrder(e, { deposit: 5000, remaining: 20000 });
-  const before = await snapshot(e);
+  const beforeState = await snapshot(e);
   await assert.rejects(e.editor.mutation(api.orders.update, { id, customerName: "أحمد", items: [{ productName: "PS5", quantity: 1, unitPrice: 4000 }] }), /خفض إجمالي الطلب/);
-  assert.deepEqual(await snapshot(e), before);
+  assert.deepEqual(await snapshot(e), beforeState);
 });
 
 test("ORD-05 customer cannot change after deposit", async () => {

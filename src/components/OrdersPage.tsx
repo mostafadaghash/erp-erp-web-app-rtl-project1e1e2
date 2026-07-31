@@ -1,6 +1,6 @@
 import { FinancialHistory } from "./FinancialHistory";
 import { useState } from "react";
-import { useQuery, useMutation } from "convex/react";
+import { usePaginatedQuery, useQuery, useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { usePermission } from "../lib/access";
 import { toast } from "sonner";
@@ -24,7 +24,7 @@ function getWhatsAppMessage(status: string, orderNumber: string, customerName: s
   switch (status) {
     case "confirmed": return `${greeting}\n\nنود إعلامكم بأن طلبكم لدى ${store} قد تم تأكيده ✅\n${ordNum}\n\nسنقوم بإشعاركم فور جاهزية الطلب. شكراً لثقتكم 🙏`;
     case "ready": return `${greeting}\n\nيسعدنا إعلامكم بأن طلبكم لدى ${store} أصبح جاهزاً للاستلام 🎉\n${ordNum}\n${remaining > 0 ? `\nالمبلغ المتبقي: *${remaining.toLocaleString("ar-EG")} ج.م*\n` : ""}\nيمكنكم التفضل باستلامه في أي وقت خلال أوقات الدوام. شكراً لكم 😊`;
-    case "delivered": return `${greeting}\n\nشكراً لزيارتكم ${store} 🌟\n${ordNum}\n\nنتمنى أن تكونوا راضين عن خدمتنا. يسعدنا دائماً خدمتكم 💙`;
+    case "delivered": return `${greeting}\n\nشكراً لزيارتكم ${store} 🌟\n${ordNum}\n\nنتمنى أن تكونوا راضين عن خدمتكم. يسعدنا دائماً خدمتكم 💙`;
     case "cancelled": return `${greeting}\n\nنأسف لإعلامكم بأنه تم إلغاء طلبكم لدى ${store}\n${ordNum}\n\nللاستفسار أو إعادة الطلب، يرجى التواصل معنا. نعتذر عن أي إزعاج 🙏`;
     default: return `${greeting}\n\nتحديث على طلبكم لدى ${store}\n${ordNum}`;
   }
@@ -42,6 +42,14 @@ const statusConfig: Record<OrderStatus, { label: string; badge: string; icon: Re
 };
 
 const statusFlow: OrderStatus[] = ["pending", "confirmed", "ready", "delivered"];
+const orderFilters: Array<{ v: OrderStatus | "all"; l: string }> = [
+  { v: "all", l: "الكل" },
+  { v: "pending", l: "انتظار" },
+  { v: "confirmed", l: "مؤكد" },
+  { v: "ready", l: "جاهز" },
+  { v: "delivered", l: "مُسلَّم" },
+  { v: "cancelled", l: "ملغي" },
+];
 const emptyItem = (): OrderItem => ({ productName: "", quantity: 1, unitPrice: 0 });
 const money = (value: number) => `${value.toLocaleString("ar-EG")} ج.م`;
 
@@ -53,7 +61,7 @@ export function OrdersPage() {
   const canRefund = usePermission("refund_collections");
   const canPrint = usePermission("print_orders");
 
-  const [filterStatus, setFilterStatus] = useState<string>("all");
+  const [filterStatus, setFilterStatus] = useState<OrderStatus | "all">("all");
   const [search, setSearch] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [editTarget, setEditTarget] = useState<Doc<"orders"> | null>(null);
@@ -76,7 +84,11 @@ export function OrdersPage() {
   const [statusBusyId, setStatusBusyId] = useState<Id<"orders"> | null>(null);
   const [printOrder, setPrintOrder] = useState<Doc<"orders"> | null>(null);
 
-  const orders = useQuery(api.orders.list, filterStatus !== "all" ? { status: filterStatus } : {});
+  const { results: orders, status: paginationStatus, loadMore } = usePaginatedQuery(
+    api.orderPagination.list,
+    filterStatus === "all" ? {} : { status: filterStatus },
+    { initialNumItems: 25 },
+  );
   const stats = useQuery(api.orders.stats);
   const details = useQuery(api.orders.details, detailsTarget ? { id: detailsTarget } : "skip");
   const settings = useQuery(api.settings.getPublic);
@@ -88,8 +100,9 @@ export function OrdersPage() {
   const refundAccounts = useQuery(api.finance.refundAccountPicker, canRefund && refundTarget !== null ? {} : "skip") ?? [];
 
   const storeName = settings?.storeName ?? "المتجر";
-  const filtered = (orders ?? []).filter((order) => {
-    const needle = search.trim().toLocaleLowerCase("ar-EG");
+  const isLoadingOrders = paginationStatus === "LoadingFirstPage";
+  const needle = search.trim().toLocaleLowerCase("ar-EG");
+  const filtered = orders.filter((order) => {
     if (!needle) return true;
     return order.customerName.toLocaleLowerCase("ar-EG").includes(needle)
       || order.orderNumber.toLocaleLowerCase("ar-EG").includes(needle)
@@ -206,12 +219,12 @@ export function OrdersPage() {
       <div className="flex gap-3 flex-wrap">
         <div className="relative flex-1 min-w-48"><Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" /><input className="form-input pr-9" placeholder="بحث بالاسم أو رقم الطلب أو الهاتف..." value={search} onChange={(event) => setSearch(event.target.value)} /></div>
         <div className="flex gap-2 flex-wrap">
-          {[{ v: "all", l: "الكل" }, { v: "pending", l: "انتظار" }, { v: "confirmed", l: "مؤكد" }, { v: "ready", l: "جاهز" }, { v: "delivered", l: "مُسلَّم" }, { v: "cancelled", l: "ملغي" }].map((filter) => <button key={filter.v} onClick={() => setFilterStatus(filter.v)} className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${filterStatus === filter.v ? "bg-indigo-600 text-white shadow-sm" : "bg-white text-slate-600 border border-slate-200 hover:border-indigo-300"}`}>{filter.l}</button>)}
+          {orderFilters.map((filter) => <button key={filter.v} onClick={() => setFilterStatus(filter.v)} className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${filterStatus === filter.v ? "bg-indigo-600 text-white shadow-sm" : "bg-white text-slate-600 border border-slate-200 hover:border-indigo-300"}`}>{filter.l}</button>)}
         </div>
       </div>
 
       <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-        {filtered.length === 0 ? <div className="text-center py-16"><div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-4"><ShoppingCart className="w-7 h-7 text-slate-400" /></div><p className="text-slate-500 font-medium">لا توجد أوردرات</p></div> : <div className="overflow-x-auto"><table className="data-table"><thead><tr><th>رقم الطلب</th><th>العميل</th><th>المنتجات</th><th>الإجمالي</th><th>المدفوع</th><th>المتبقي</th><th>الحالة</th><th>المتوقع</th><th>إجراءات</th></tr></thead><tbody>{filtered.map((order) => {
+        {isLoadingOrders ? <div className="text-center py-16 text-slate-400">جارٍ تحميل الأوردرات...</div> : filtered.length === 0 ? <div className="text-center py-16"><div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-4"><ShoppingCart className="w-7 h-7 text-slate-400" /></div><p className="text-slate-500 font-medium">{needle ? "لا توجد نتائج ضمن الأوردرات المحمّلة" : "لا توجد أوردرات"}</p></div> : <div className="overflow-x-auto"><table className="data-table"><thead><tr><th>رقم الطلب</th><th>العميل</th><th>المنتجات</th><th>الإجمالي</th><th>المدفوع</th><th>المتبقي</th><th>الحالة</th><th>المتوقع</th><th>إجراءات</th></tr></thead><tbody>{filtered.map((order) => {
           const cfg = statusConfig[order.status as OrderStatus] ?? statusConfig.pending;
           const Icon = cfg.icon;
           const currentIdx = statusFlow.indexOf(order.status as OrderStatus);
@@ -244,6 +257,7 @@ export function OrdersPage() {
             </div></td>
           </tr>;
         })}</tbody></table></div>}
+        {!isLoadingOrders && orders.length > 0 && <div className="border-t border-slate-100 px-4 py-3 flex items-center justify-between gap-3 flex-wrap"><p className="text-xs text-slate-500">تم تحميل {orders.length.toLocaleString("ar-EG")} أوردر{needle && paginationStatus !== "Exhausted" ? " — البحث الحالي داخل النتائج المحمّلة فقط" : ""}</p><div className="flex items-center gap-2">{paginationStatus === "CanLoadMore" && <button type="button" className="btn-secondary" onClick={() => loadMore(25)}>تحميل المزيد</button>}{paginationStatus === "LoadingMore" && <span className="text-sm text-slate-400">جارٍ تحميل المزيد...</span>}{paginationStatus === "Exhausted" && <span className="text-xs text-slate-400">تم تحميل كل النتائج</span>}</div></div>}
       </div>
 
       {showPayment && <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"><div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6"><div className="flex items-center justify-between mb-5"><h2 className="font-bold text-slate-800 flex items-center gap-2"><CreditCard className="w-5 h-5 text-emerald-600" />تسجيل دفعة</h2><button disabled={busy} onClick={() => setShowPayment(null)} className="p-1.5 hover:bg-slate-100 rounded-lg"><X className="w-4 h-4" /></button></div><div className="space-y-4"><div><label className="form-label">المبلغ المدفوع (ج.م)</label><input className="form-input text-center text-xl font-bold" type="number" min="0.01" step="0.01" value={paymentAmount} onChange={(event) => setPaymentAmount(event.target.value)} autoFocus /></div><select className="form-input" value={paymentAccountId} onChange={(event) => setPaymentAccountId(event.target.value)}><option value="">اختر حساب التحصيل</option>{collectionAccounts.map((account) => <option key={account._id} value={account._id}>{account.name}</option>)}</select><input className="form-input" type="date" value={paymentDate} onChange={(event) => setPaymentDate(event.target.value)} /><textarea className="form-input" placeholder="ملاحظات" value={paymentNotes} onChange={(event) => setPaymentNotes(event.target.value)} /><div className="flex gap-3"><button disabled={busy} onClick={() => setShowPayment(null)} className="btn-secondary flex-1">إلغاء</button><button disabled={busy} onClick={() => handlePayment(showPayment)} className="btn-success flex-1">{busy ? "جارٍ التسجيل..." : "تسجيل"}</button></div></div></div></div>}
