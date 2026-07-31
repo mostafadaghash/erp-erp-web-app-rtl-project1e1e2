@@ -23,24 +23,6 @@ function normalizeOrderItems(items: Array<{ productName: string; quantity: numbe
   });
 }
 
-export const list = query({
-  args: { status: v.optional(v.string()) },
-  handler: async (ctx, args) => {
-    const user = await requireModulePermission(ctx, "view_orders", "orders");
-    let orders;
-    if (args.status) {
-      orders = await ctx.db
-        .query("orders")
-        .withIndex("by_status", (q) => q.eq("status", args.status!))
-        .order("desc")
-        .collect();
-    } else {
-      orders = await ctx.db.query("orders").order("desc").collect();
-    }
-    return filterByBranch(orders, user);
-  },
-});
-
 export const get = query({
   args: { id: v.id("orders") },
   handler: async (ctx, args) => {
