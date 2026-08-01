@@ -24,7 +24,7 @@ test("UI-02 never uses legacy deliveries.create", () =>
 test("UI-03 uses real paginated delivery query", () =>
   assert.match(source, /usePaginatedQuery\(\s*api\.deliveries\.listPaginated/));
 test("UI-04 skips queries without permission or input", () =>
-  assert.match(source, /canSettle&&activeBranch&&accountId\s*\?[\s\S]*:\s*"skip"/));
+  assert.match(source, /canSettle\s*&&\s*activeBranch\s*&&\s*accountId\s*\?[\s\S]*:\s*"skip"/));
 test("UI-05 keeps create requestId stable while retrying", () =>
   assert.match(callArgumentObject("createDelivery"), /requestId:\s*operationRequestId\.current/));
 test("UI-06 keeps confirmation requestId stable while retrying", () =>
@@ -34,13 +34,13 @@ test("UI-07 keeps settlement requestId stable while retrying", () =>
 test("UI-08 keeps reversal requestId stable while retrying", () =>
   assert.match(callArgumentObject("reverseConfirmation"), /requestId:\s*operationRequestId\.current/));
 test("UI-09 create is protected by the shared busy guard", () =>
-  assert.match(source, /run=async[\s\S]*if\(busy\)return/));
+  assert.match(source, /const run\s*=\s*async[\s\S]*if\s*\(busy\)\s*return/));
 test("UI-10 confirmation is protected by busy and validation state", () =>
-  assert.match(source, /disabled=\{busy\|\|Boolean\(validationReason\)\}[\s\S]*confirmDelivered/));
+  assert.match(source, /disabled=\{busy\s*\|\|\s*Boolean\(validationReason\)\}[\s\S]*confirmDelivered/));
 test("UI-11 settlement is protected by busy and validation state", () =>
-  assert.match(source, /disabled=\{busy\|\|Boolean\(validationReason\)\}[\s\S]*createSettlement/));
+  assert.match(source, /disabled=\{busy\s*\|\|\s*Boolean\(validationReason\)\}[\s\S]*createSettlement/));
 test("UI-12 reversal is protected by busy and validation state", () =>
-  assert.match(source, /disabled=\{busy\|\|Boolean\(validationReason\)\}[\s\S]*reverseSettlement/));
+  assert.match(source, /disabled=\{busy\s*\|\|\s*Boolean\(validationReason\)\}[\s\S]*reverseSettlement/));
 test("UI-13 exposes a shipping modal", () =>
   assert.match(source, /ship:\s*"تأكيد الشحن"/));
 test("UI-14 exposes a delivery confirmation modal", () =>
@@ -74,7 +74,7 @@ test("UI-21 shipping settlement pickers are not gated by confirmation permission
 test("UI-22 settlement id and reason use independent state", () => {
   assert.match(source, /selectedSettlementId/);
   assert.match(source, /reversalReason/);
-  assert.match(source, /setSelectedSettlementId\(settlementId\)[\s\S]*setReversalReason\(""\)/);
+  assert.match(source, /const openSettlementReversal[\s\S]*resetOperationState\(\)[\s\S]*setSelectedSettlementId\(settlementId\)/);
 });
 test("UI-23 settlement reversal sends trimmed user reason", () => {
   const args = callArgumentObject("reverseSettlement");
@@ -106,22 +106,22 @@ test("UI-29 avoids prompt global print hooks and unsafe escapes", () =>
     new RegExp(["window\\.prompt", "__deliveryPrint", ["as", "any"].join(" "), ["@ts", "ignore"].join("-")].join("|")),
   ));
 test("UI-30 operations share busy and validation protection", () => {
-  assert.match(source, /if\(busy\)return/);
-  assert.match(source, /disabled=\{busy\|\|Boolean\(validationReason\)\}/);
+  assert.match(source, /if\s*\(busy\)\s*return/);
+  assert.match(source, /disabled=\{busy\s*\|\|\s*Boolean\(validationReason\)\}/);
 });
 test("UI-31 opening any operation resets shared COD form state", () => {
-  assert.match(source, /const resetOperationState=\(\)=>\{[\s\S]*setAccountId\(""\)[\s\S]*setDestinationId\(""\)[\s\S]*setChecked\(new Set<string>\(\)\)/);
-  assert.match(source, /const open=\(kind:Modal,row\?:Selected\)=>\{resetOperationState\(\)/);
-  assert.match(source, /const openSettlementReversal=.*resetOperationState\(\)/);
+  assert.match(source, /const resetOperationState\s*=\s*\(\)\s*=>\s*\{[\s\S]*setAccountId\(""\)[\s\S]*setDestinationId\(""\)[\s\S]*setChecked\(new Set<string>\(\)\)/);
+  assert.match(source, /const open\s*=\s*\(kind:\s*Modal,\s*row\?:\s*Selected\)\s*=>\s*\{[\s\S]*resetOperationState\(\)/);
+  assert.match(source, /const openSettlementReversal[\s\S]*resetOperationState\(\)/);
 });
 test("UI-32 branch changes clear modal and operation state", () => {
-  assert.match(source, /const handleBranchChange=\(value:string\)=>\{[\s\S]*resetOperationState\(\)[\s\S]*setSelected\(null\)[\s\S]*setModal\(null\)/);
+  assert.match(source, /const handleBranchChange\s*=\s*\(value:\s*string\)\s*=>\s*\{[\s\S]*resetOperationState\(\)[\s\S]*setSelected\(null\)[\s\S]*setModal\(null\)/);
   assert.match(source, /onChange=\{\(event\) => handleBranchChange\(event\.target\.value\)\}/);
 });
 test("UI-33 changing settlement source clears stale selected deliveries", () =>
-  assert.match(source, /setAccountId\(event\.target\.value\);setChecked\(new Set<string>\(\)\)[\s\S]*اختر حساب مصدر التسوية/));
+  assert.match(source, /setAccountId\(event\.target\.value\);[\s\S]*setChecked\(new Set<string>\(\)\);[\s\S]*اختر حساب مصدر التسوية/));
 test("UI-34 opening a fresh operation rotates the idempotency request", () =>
-  assert.match(source, /resetOperationState\(\);setSelected\(row\?\?null\);operationRequestId\.current=requestId\(\);setModal\(kind\)/));
+  assert.match(source, /resetOperationState\(\);[\s\S]*setSelected\(row\s*\?\?\s*null\);[\s\S]*operationRequestId\.current\s*=\s*requestId\(\);[\s\S]*setModal\(kind\)/));
 test("UI-35 central validation covers create delivery required inputs", () => {
   for (const message of [
     "اختر الفرع",
