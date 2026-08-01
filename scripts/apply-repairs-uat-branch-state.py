@@ -1,29 +1,8 @@
 from pathlib import Path
-import re
 
-
-def replace_once_or_done(path: str, old: str, new: str, done_marker: str, label: str) -> None:
-    file = Path(path)
-    text = file.read_text()
-    if done_marker in text:
-        return
-    if old not in text:
-        raise SystemExit(f"missing expected {label} source in {path}")
-    file.write_text(text.replace(old, new, 1))
-
-
-def sub_once_or_done(text: str, pattern: str, replacement: str, done_marker: str, label: str) -> str:
-    if done_marker in text:
-        return text
-    updated, count = re.subn(pattern, replacement, text, count=1, flags=re.S)
-    if count != 1:
-        raise SystemExit(f"missing or ambiguous {label}: {count}")
-    return updated
-
-
-replace_once_or_done(
-    "convex/repairs.ts",
-    '''export const list = query({
+path = Path("convex/repairs.ts")
+text = path.read_text()
+old = '''export const list = query({
   args: {},
   handler: async (ctx) => {
     const user = await requireModulePermission(ctx, "view_repairs", "repairs");
@@ -32,8 +11,8 @@ replace_once_or_done(
       publicRepair(repair, user.permissions.includes("view_profits")),
     );
   },
-});''',
-    '''export const list = query({
+});'''
+new = '''export const list = query({
   args: { branchId: v.optional(v.id("branches")) },
   handler: async (ctx, args) => {
     const user = await requireModulePermission(ctx, "view_repairs", "repairs");
@@ -52,222 +31,10 @@ replace_once_or_done(
       publicRepair(repair, user.permissions.includes("view_profits")),
     );
   },
-});''',
-    'args: { branchId: v.optional(v.id("branches")) }',
-    "repair branch-scoped list",
-)
+});'''
 
-replace_once_or_done(
-    "convex/customers.ts",
-    'import { assertBranchAccess, requirePermission, filterByBranch, resolveWriteBranch, logAction } from "./lib/auth.ts";',
-    'import { assertBranchAccess, requirePermission, resolveWriteBranch, logAction } from "./lib/auth.ts";',
-    'import { assertBranchAccess, requirePermission, resolveWriteBranch, logAction }',
-    "customer auth import",
-)
-replace_once_or_done(
-    "convex/customers.ts",
-    '''export const repairPicker = query({
-  args: {},
-  handler: async (ctx) => {
-    const user = await requirePermission(ctx, "create_repairs");
-    const customers = user.branchId
-      ? await ctx.db
-          .query("customers")
-          .withIndex("by_branch", (q) => q.eq("branchId", user.branchId))
-          .collect()
-      : filterByBranch(await ctx.db.query("customers").collect(), user);
-    const activeCustomers = customers.filter(customer => customer.isActive !== false);
-    return activeCustomers.map(({ _id, name, phone }) => ({ _id, name, phone }));
-  },
-});''',
-    '''export const repairPicker = query({
-  args: { branchId: v.optional(v.id("branches")) },
-  handler: async (ctx, args) => {
-    const user = await requirePermission(ctx, "create_repairs");
-    const requestedBranchId = args.branchId;
-    if (requestedBranchId) assertBranchAccess(user, { branchId: requestedBranchId });
-    const branchId = user.role === "admin"
-      ? requestedBranchId ?? user.branchId
-      : user.branchId;
-    if (!branchId) return [];
-    const customers = await ctx.db
-      .query("customers")
-      .withIndex("by_branch", (q) => q.eq("branchId", branchId))
-      .collect();
-    const activeCustomers = customers.filter(customer => customer.isActive !== false);
-    return activeCustomers.map(({ _id, name, phone }) => ({ _id, name, phone }));
-  },
-});''',
-    'export const repairPicker = query({\n  args: { branchId:',
-    "repair customer picker",
-)
-
-page = Path("src/components/RepairsPage.tsx")
-text = page.read_text()
-
-if "const emptyRepairForm" not in text:
-    marker = "};\n\nexport function RepairsPage()"
-    if marker not in text:
-        raise SystemExit("missing RepairsPage status marker")
-    text = text.replace(
-        marker,
-        '''};
-
-const emptyRepairForm = () => ({
-  customerName: "", customerPhone: "", customerId: "",
-  deviceType: "موبايل", deviceBrand: "", deviceModel: "",
-  problem: "", laborCost: "", deposit: "",
-  expectedDate: "", notes: "", technicianProfileId: "",
-  serialNumber: "", accessories: "", intakeCondition: "",
-});
-
-export function RepairsPage()''',
-        1,
-    )
-
-text = sub_once_or_done(
-    text,
-    r'  const branches = useQuery\(\s*api\.branches\.list,\s*canViewBranches \? \{\} : "skip",\s*\) \?\? \[\];\s*const repairs = useQuery\(api\.repairs\.list\) \?\? \[\];\s*const customers = useQuery\(api\.customers\.repairPicker, canCreate \? \{\} : "skip"\) \?\? \[\];\s*const partPickerGate = canCreate && showForm \? \{\} : "skip";',
-    '''  const branchesQuery = useQuery(
-    api.branches.list,
-    canViewBranches ? {} : "skip",
-  );
-  const branches = branchesQuery ?? [];
-  const repairBranchArgs = selectedBranchId
-    ? { branchId: selectedBranchId as Id<"branches"> }
-    : {};
-  const requiresBranchSelection =
-    canViewBranches && branches.length > 0 && !selectedBranchId;
-  const repairsQuery = useQuery(api.repairs.list, repairBranchArgs);
-  const repairs = repairsQuery ?? [];
-  const customerPickerArgs = canCreate && !requiresBranchSelection
-    ? repairBranchArgs
-    : "skip";
-  const customersQuery = useQuery(
-    api.customers.repairPicker,
-    customerPickerArgs,
-  );
-  const customers = customersQuery ?? [];
-  const partPickerGate = canCreate && showForm && !requiresBranchSelection ? {} : "skip";''',
-    "const repairBranchArgs = selectedBranchId",
-    "repair query block",
-)
-
-text = sub_once_or_done(
-    text,
-    r'  const \[form, setForm\] = useState\(\{\s*customerName: "", customerPhone: "", customerId: "",\s*deviceType: "موبايل", deviceBrand: "", deviceModel: "",\s*problem: "", laborCost: "", deposit: "",\s*expectedDate: "", notes: "", technicianProfileId: "",\s*serialNumber: "", accessories: "", intakeCondition: "",\s*\}\);',
-    '  const [form, setForm] = useState(emptyRepairForm);',
-    "useState(emptyRepairForm)",
-    "repair form state",
-)
-
-if "const resetCreateState" not in text:
-    pattern = r'(  const \[parts, setParts\] = useState<Array<\{\s*productId: string;\s*quantity: string;\s*\}>>\(\[\]\);)'
-    replacement = r'''\1
-  const resetCreateState = () => {
-    setParts([]);
-    setAccountId("");
-    setRequestId(crypto.randomUUID());
-    setForm(emptyRepairForm());
-  };
-  const closeCreateForm = () => {
-    if (saving) return;
-    resetCreateState();
-    setShowForm(false);
-  };
-  const handleBranchChange = (value: string) => {
-    setSelectedBranchId(value);
-    resetCreateState();
-    setShowForm(false);
-  };'''
-    text, count = re.subn(pattern, replacement, text, count=1, flags=re.S)
-    if count != 1:
-        raise SystemExit(f"missing repair state helpers: {count}")
-
-if "resetCreateState();\n      setShowForm(false);" not in text:
-    text, count = re.subn(
-        r'      setRequestId\(crypto\.randomUUID\(\)\);\s*setShowForm\(false\);\s*setParts\(\[\]\);\s*setForm\(\{ customerName: "", customerPhone: "", customerId: "", deviceType: "موبايل", deviceBrand: "", deviceModel: "", problem: "", laborCost: "", deposit: "", expectedDate: "", notes: "", technicianProfileId: "", serialNumber: "", accessories: "", intakeCondition: "" \}\);',
-        '      resetCreateState();\n      setShowForm(false);',
-        text,
-        count=1,
-        flags=re.S,
-    )
-    if count != 1:
-        raise SystemExit(f"missing create success reset: {count}")
-
-if 'resetCreateState();\n    setShowForm(true);' not in text:
-    old = '    setRequestId(crypto.randomUUID()); setParts([]); setAccountId(""); setShowForm(true);'
-    if old not in text:
-        raise SystemExit("missing open repair reset")
-    text = text.replace(old, '    resetCreateState();\n    setShowForm(true);', 1)
-
-if "handleBranchChange(event.target.value)" not in text:
-    text, count = re.subn(
-        r'              onChange=\{\(event\) => \{\s*setSelectedBranchId\(event\.target\.value\);\s*setParts\(\[\]\);\s*\}\}',
-        '              onChange={(event) => handleBranchChange(event.target.value)}',
-        text,
-        count=1,
-        flags=re.S,
-    )
-    if count != 1:
-        raise SystemExit(f"missing branch change handler: {count}")
-
-if "جارٍ تحميل طلبات الصيانة" not in text:
-    old = '          <p className="text-slate-500 text-sm mt-0.5">{repairs.length} طلب صيانة</p>'
-    if old not in text:
-        raise SystemExit("missing repair count")
-    text = text.replace(
-        old,
-        '''          <p className="text-slate-500 text-sm mt-0.5">
-            {requiresBranchSelection
-              ? "اختر الفرع لعرض طلبات الصيانة"
-              : repairsQuery === undefined
-                ? "جارٍ تحميل طلبات الصيانة"
-                : `${repairs.length} طلب صيانة`}
-          </p>''',
-        1,
-    )
-
-if "!requiresBranchSelection && repairsQuery === undefined" not in text:
-    old = '''        {filtered.length === 0 && (
-          <div className="col-span-full text-center py-12 text-slate-400">
-            <Wrench className="w-10 h-10 mx-auto mb-2 opacity-30" />
-            لا توجد طلبات صيانة
-          </div>
-        )}'''
-    if old not in text:
-        raise SystemExit("missing repair empty state")
-    text = text.replace(
-        old,
-        '''        {requiresBranchSelection && (
-          <div className="col-span-full text-center py-12 text-slate-400">
-            <Wrench className="w-10 h-10 mx-auto mb-2 opacity-30" />
-            اختر الفرع لعرض طلبات الصيانة
-          </div>
-        )}
-        {!requiresBranchSelection && repairsQuery === undefined && (
-          <div className="col-span-full text-center py-12 text-slate-400">
-            <Wrench className="w-10 h-10 mx-auto mb-2 opacity-30" />
-            جارٍ تحميل طلبات الصيانة
-          </div>
-        )}
-        {!requiresBranchSelection && repairsQuery !== undefined && filtered.length === 0 && (
-          <div className="col-span-full text-center py-12 text-slate-400">
-            <Wrench className="w-10 h-10 mx-auto mb-2 opacity-30" />
-            لا توجد طلبات صيانة
-          </div>
-        )}''',
-        1,
-    )
-
-text = text.replace(
-    '              <button onClick={() => setShowForm(false)} className="p-2 hover:bg-slate-100 rounded-lg">',
-    '              <button onClick={closeCreateForm} className="p-2 hover:bg-slate-100 rounded-lg">',
-    1,
-)
-text = text.replace(
-    '                <button type="button" onClick={() => setShowForm(false)} className="btn-secondary">إلغاء</button>',
-    '                <button type="button" onClick={closeCreateForm} className="btn-secondary">إلغاء</button>',
-    1,
-)
-page.write_text(text)
+if new in text:
+    raise SystemExit(0)
+if old not in text:
+    raise SystemExit("missing exact repairs.list source")
+path.write_text(text.replace(old, new, 1))
