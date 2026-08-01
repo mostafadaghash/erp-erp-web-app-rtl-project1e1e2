@@ -6,7 +6,7 @@ on:
   pull_request:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   verify:
@@ -14,45 +14,6 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.head_ref || github.ref_name }}
-      - name: Apply Delivery COD UAT state safety patch
-        if: github.event_name == 'pull_request' && github.head_ref == 'codex/delivery-cod-uat-state-safety'
-        run: |
-          python - <<'PY'
-          from pathlib import Path
-          path = Path("src/components/DeliveriesPage.tsx")
-          text = path.read_text()
-
-          old_handlers = '''  const open=(kind:Modal,row?:Selected)=>{setSelected(row??null);setReason("");setSelectedSettlementId(null);setReversalReason("");operationRequestId.current=requestId();setModal(kind)};
-  const openSettlementReversal=(settlementId:Id<"codSettlements">)=>{setSelectedSettlementId(settlementId);setReversalReason("");operationRequestId.current=requestId();setModal("reverse-settlement")};'''
-          new_handlers = '''  const resetOperationState=()=>{setOrderId("");setInvoiceId("");setCity("");setAddress("");setCompany("");setTracking("");setFee("0");setDate(new Date().toISOString().slice(0,10));setReason("");setAccountId("");setDestinationId("");setChecked(new Set<string>());setSelectedSettlementId(null);setReversalReason("")};
-  const open=(kind:Modal,row?:Selected)=>{resetOperationState();setSelected(row??null);operationRequestId.current=requestId();setModal(kind)};
-  const openSettlementReversal=(settlementId:Id<"codSettlements">)=>{resetOperationState();setSelectedSettlementId(settlementId);operationRequestId.current=requestId();setModal("reverse-settlement")};
-  const handleBranchChange=(value:string)=>{setBranchId(value?value as Id<"branches">:undefined);resetOperationState();setSelected(null);setModal(null);operationRequestId.current=requestId()};'''
-          old_branch = 'onChange={e=>setBranchId(e.target.value as Id<"branches">)}'
-          new_branch = 'onChange={e=>handleBranchChange(e.target.value)}'
-          old_source = 'onChange={e=>setAccountId(e.target.value)}><option>اختر حساب مصدر التسوية</option>'
-          new_source = 'onChange={e=>{setAccountId(e.target.value);setChecked(new Set<string>())}}><option>اختر حساب مصدر التسوية</option>'
-
-          for label, old, new in [
-              ("modal handlers", old_handlers, new_handlers),
-              ("branch handler", old_branch, new_branch),
-              ("settlement source handler", old_source, new_source),
-          ]:
-              if old not in text:
-                  raise SystemExit(f"missing expected {label} source")
-              text = text.replace(old, new, 1)
-
-          path.write_text(text)
-          PY
-          if ! git diff --quiet -- src/components/DeliveriesPage.tsx; then
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add src/components/DeliveriesPage.tsx
-            git commit -m "fix: isolate Delivery COD operation state"
-            git push origin HEAD:${{ github.head_ref }}
-          fi
       - uses: actions/setup-node@v4
         with:
           node-version: 22
