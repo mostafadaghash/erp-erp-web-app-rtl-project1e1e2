@@ -1,5 +1,8 @@
-import test from "node:test";
+import test, { after, before } from "node:test";
 import assert from "node:assert/strict";
+import { existsSync } from "node:fs";
+import { symlink, unlink } from "node:fs/promises";
+import { resolve } from "node:path";
 import { convexTest } from "convex-test";
 import schema from "../convex/schema.ts";
 import type { Id } from "../convex/_generated/dataModel";
@@ -11,7 +14,17 @@ import {
 } from "../convex/lib/orderStats.ts";
 import type { AuthUser } from "../convex/lib/auth.ts";
 
-const modules = {};
+const links = [["convex/_generated/server", "server.js"]] as const;
+before(async () => {
+  for (const [path, target] of links) if (!existsSync(resolve(path))) await symlink(target, resolve(path));
+});
+after(async () => {
+  for (const [path] of links) if (existsSync(resolve(path))) await unlink(resolve(path));
+});
+const modules = {
+  "../convex/_generated/api.js": () => import("../convex/_generated/api.js"),
+  "../convex/_generated/server.js": () => import("../convex/_generated/server.js"),
+};
 
 async function fixture() {
   const raw = convexTest(schema, modules);
