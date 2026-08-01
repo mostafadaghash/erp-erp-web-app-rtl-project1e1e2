@@ -14,6 +14,20 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
+      - name: Upload source snapshot
+        uses: actions/upload-artifact@v4
+        with:
+          name: source-snapshot
+          path: |
+            convex
+            src
+            tests
+            shared
+            package.json
+            package-lock.json
+            tsconfig.json
+          if-no-files-found: error
+          retention-days: 1
       - uses: actions/setup-node@v4
         with:
           node-version: 22
