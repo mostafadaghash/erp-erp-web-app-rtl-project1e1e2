@@ -1,0 +1,1 @@
+The UI now computes one validation reason per modal and disables submission until required operational data is complete. The backend remains authoritative; this layer improves UAT feedback and prevents avoidable rejected mutations.
