@@ -283,6 +283,34 @@ const applicationTables = {
     cancelledAt: v.optional(v.number()), cancelledBy: v.optional(v.string()), cancellationReason: v.optional(v.string()),
   }).index("by_status", ["status"]).index("by_branch_status", ["branchId", "status"]).index("by_customer", ["customerId"]).index("by_order_number", ["orderNumber"]).index("by_creation_request", ["creationRequestId"]),
 
+  orderStatsState: defineTable({
+    key: v.literal("orders"),
+    status: v.union(v.literal("building"), v.literal("ready")),
+    activeGeneration: v.optional(v.number()),
+    buildingGeneration: v.optional(v.number()),
+    rebuildCursor: v.optional(v.string()),
+    processedCount: v.number(),
+    startedAt: v.number(),
+    updatedAt: v.number(),
+    completedAt: v.optional(v.number()),
+    startedBy: v.string(),
+  }).index("by_key", ["key"]),
+
+  orderStatsAggregates: defineTable({
+    key: v.string(),
+    generation: v.number(),
+    scope: v.union(v.literal("global"), v.literal("branch")),
+    branchId: v.optional(v.id("branches")),
+    pending: v.number(),
+    confirmed: v.number(),
+    ready: v.number(),
+    delivered: v.number(),
+    totalValue: v.number(),
+    pendingValue: v.number(),
+    total: v.number(),
+    updatedAt: v.number(),
+  }).index("by_key", ["key"]).index("by_generation", ["generation"]),
+
   // الصيانة
   repairs: defineTable({
     repairNumber: v.string(),

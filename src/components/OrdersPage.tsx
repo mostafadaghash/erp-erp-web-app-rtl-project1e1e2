@@ -204,6 +204,8 @@ export function OrdersPage() {
         {canCreate && <button onClick={() => setShowForm(true)} className="btn-primary flex items-center gap-2"><Plus className="w-4 h-4" />أوردر جديد</button>}
       </div>
 
+      {stats && !stats.isReady && <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">إحصائيات الطلبات قيد التهيئة أو إعادة البناء. قائمة الطلبات تعمل بصورة طبيعية، لكن بطاقات الملخص لن تُعتمد حتى اكتمال التهيئة.</div>}
+
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
           { label: "قيد الانتظار", value: stats?.pending ?? 0, color: "text-amber-600", bg: "bg-amber-50", icon: Clock },

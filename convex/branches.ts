@@ -1,6 +1,7 @@
 import { query, mutation } from "./_generated/server";
 import { v, ConvexError } from "convex/values";
 import { hasPermission, requireModulePermission, logAction } from "./lib/auth";
+import { applyOrderStatsChange } from "./lib/orderStats.ts";
 
 export const list = query({
   args: {},
@@ -137,7 +138,7 @@ export const assignLegacyData = mutation({
     for (const item of await ctx.db.query("products").collect()) if (!item.branchId) { await ctx.db.patch(item._id, { branchId: args.branchId }); assigned++; }
     for (const item of await ctx.db.query("customers").collect()) if (!item.branchId) { await ctx.db.patch(item._id, { branchId: args.branchId }); assigned++; }
     for (const item of await ctx.db.query("invoices").collect()) if (!item.branchId) { await ctx.db.patch(item._id, { branchId: args.branchId }); assigned++; }
-    for (const item of await ctx.db.query("orders").collect()) if (!item.branchId) { await ctx.db.patch(item._id, { branchId: args.branchId }); assigned++; }
+    for (const item of await ctx.db.query("orders").collect()) if (!item.branchId) { await ctx.db.patch(item._id, { branchId: args.branchId }); await applyOrderStatsChange(ctx, item, { ...item, branchId: args.branchId }); assigned++; }
     for (const item of await ctx.db.query("repairs").collect()) if (!item.branchId) { await ctx.db.patch(item._id, { branchId: args.branchId }); assigned++; }
     for (const item of await ctx.db.query("shipments").collect()) if (!item.branchId) { await ctx.db.patch(item._id, { branchId: args.branchId }); assigned++; }
     for (const item of await ctx.db.query("expenses").collect()) if (!item.branchId) { await ctx.db.patch(item._id, { branchId: args.branchId }); assigned++; }
