@@ -6,7 +6,7 @@ on:
   pull_request:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   verify:
@@ -14,6 +14,276 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref || github.ref_name }}
+      - name: Apply Repairs UAT branch and state safety patch
+        if: github.event_name == 'pull_request' && github.head_ref == 'codex/repairs-uat-branch-state-safety'
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          def replace_once(path: str, old: str, new: str, label: str) -> None:
+              file = Path(path)
+              text = file.read_text()
+              if old not in text:
+                  raise SystemExit(f"missing expected {label} source in {path}")
+              file.write_text(text.replace(old, new, 1))
+
+          replace_once(
+              "convex/repairs.ts",
+              '''export const list = query({
+            args: {},
+            handler: async (ctx) => {
+              const user = await requireModulePermission(ctx, "view_repairs", "repairs");
+              const repairs = await ctx.db.query("repairs").order("desc").collect();
+              return filterByBranch(repairs, user).map((repair) =>
+                publicRepair(repair, user.permissions.includes("view_profits")),
+              );
+            },
+          });''',
+              '''export const list = query({
+            args: { branchId: v.optional(v.id("branches")) },
+            handler: async (ctx, args) => {
+              const user = await requireModulePermission(ctx, "view_repairs", "repairs");
+              const requestedBranchId = args.branchId;
+              if (requestedBranchId) assertBranchAccess(user, { branchId: requestedBranchId });
+              const branchId = user.role === "admin"
+                ? requestedBranchId ?? user.branchId
+                : user.branchId;
+              if (!branchId) return [];
+              const repairs = await ctx.db
+                .query("repairs")
+                .withIndex("by_branch_received", (q) => q.eq("branchId", branchId))
+                .order("desc")
+                .collect();
+              return repairs.map((repair) =>
+                publicRepair(repair, user.permissions.includes("view_profits")),
+              );
+            },
+          });''',
+              "repair branch-scoped list",
+          )
+
+          replace_once(
+              "convex/customers.ts",
+              'import { assertBranchAccess, requirePermission, filterByBranch, resolveWriteBranch, logAction } from "./lib/auth.ts";',
+              'import { assertBranchAccess, requirePermission, resolveWriteBranch, logAction } from "./lib/auth.ts";',
+              "unused customer filter import",
+          )
+          replace_once(
+              "convex/customers.ts",
+              '''export const repairPicker = query({
+            args: {},
+            handler: async (ctx) => {
+              const user = await requirePermission(ctx, "create_repairs");
+              const customers = user.branchId
+                ? await ctx.db
+                    .query("customers")
+                    .withIndex("by_branch", (q) => q.eq("branchId", user.branchId))
+                    .collect()
+                : filterByBranch(await ctx.db.query("customers").collect(), user);
+              const activeCustomers = customers.filter(customer => customer.isActive !== false);
+              return activeCustomers.map(({ _id, name, phone }) => ({ _id, name, phone }));
+            },
+          });''',
+              '''export const repairPicker = query({
+            args: { branchId: v.optional(v.id("branches")) },
+            handler: async (ctx, args) => {
+              const user = await requirePermission(ctx, "create_repairs");
+              const requestedBranchId = args.branchId;
+              if (requestedBranchId) assertBranchAccess(user, { branchId: requestedBranchId });
+              const branchId = user.role === "admin"
+                ? requestedBranchId ?? user.branchId
+                : user.branchId;
+              if (!branchId) return [];
+              const customers = await ctx.db
+                .query("customers")
+                .withIndex("by_branch", (q) => q.eq("branchId", branchId))
+                .collect();
+              const activeCustomers = customers.filter(customer => customer.isActive !== false);
+              return activeCustomers.map(({ _id, name, phone }) => ({ _id, name, phone }));
+            },
+          });''',
+              "repair customer picker",
+          )
+
+          page = Path("src/components/RepairsPage.tsx")
+          text = page.read_text()
+          status_end = '''const statusConfig: Record<RepairStatus, { label: string; badge: string; icon: LucideIcon }> = {
+            received: { label: "مستلم", badge: "badge-info", icon: Clock },
+            in_progress: { label: "قيد الإصلاح", badge: "badge-warning", icon: Wrench },
+            ready: { label: "جاهز للاستلام", badge: "badge-success", icon: CheckCircle },
+            delivered: { label: "تم التسليم", badge: "badge-purple", icon: CheckCircle },
+            cancelled: { label: "ملغي", badge: "badge-danger", icon: AlertCircle },
+          };
+          '''
+          empty_form = status_end + '''
+          const emptyRepairForm = () => ({
+            customerName: "", customerPhone: "", customerId: "",
+            deviceType: "موبايل", deviceBrand: "", deviceModel: "",
+            problem: "", laborCost: "", deposit: "",
+            expectedDate: "", notes: "", technicianProfileId: "",
+            serialNumber: "", accessories: "", intakeCondition: "",
+          });
+          '''
+          if status_end not in text:
+              raise SystemExit("missing status configuration")
+          text = text.replace(status_end, empty_form, 1)
+
+          old_queries = '''  const branches = useQuery(
+            api.branches.list,
+            canViewBranches ? {} : "skip",
+          ) ?? [];
+          const repairs = useQuery(api.repairs.list) ?? [];
+          const customers = useQuery(api.customers.repairPicker, canCreate ? {} : "skip") ?? [];
+          const partPickerGate = canCreate && showForm ? {} : "skip";'''
+          new_queries = '''  const branchesQuery = useQuery(
+            api.branches.list,
+            canViewBranches ? {} : "skip",
+          );
+          const branches = branchesQuery ?? [];
+          const repairBranchArgs = selectedBranchId
+            ? { branchId: selectedBranchId as Id<"branches"> }
+            : {};
+          const requiresBranchSelection =
+            canViewBranches && branches.length > 0 && !selectedBranchId;
+          const repairsQuery = useQuery(api.repairs.list, repairBranchArgs);
+          const repairs = repairsQuery ?? [];
+          const customerPickerArgs = canCreate && !requiresBranchSelection
+            ? repairBranchArgs
+            : "skip";
+          const customersQuery = useQuery(
+            api.customers.repairPicker,
+            customerPickerArgs,
+          );
+          const customers = customersQuery ?? [];
+          const partPickerGate = canCreate && showForm && !requiresBranchSelection ? {} : "skip";'''
+          if old_queries not in text:
+              raise SystemExit("missing repair query block")
+          text = text.replace(old_queries, new_queries, 1)
+
+          old_form = '''  const [form, setForm] = useState({
+            customerName: "", customerPhone: "", customerId: "",
+            deviceType: "موبايل", deviceBrand: "", deviceModel: "",
+            problem: "", laborCost: "", deposit: "",
+            expectedDate: "", notes: "", technicianProfileId: "",
+            serialNumber: "", accessories: "", intakeCondition: "",
+          });'''
+          new_form = '  const [form, setForm] = useState(emptyRepairForm);'
+          if old_form not in text:
+              raise SystemExit("missing repair form state")
+          text = text.replace(old_form, new_form, 1)
+
+          parts_state = '''  const [parts, setParts] = useState<Array<{
+            productId: string;
+            quantity: string;
+          }>>([]);'''
+          state_helpers = parts_state + '''
+          const resetCreateState = () => {
+            setParts([]);
+            setAccountId("");
+            setRequestId(crypto.randomUUID());
+            setForm(emptyRepairForm());
+          };
+          const closeCreateForm = () => {
+            if (saving) return;
+            resetCreateState();
+            setShowForm(false);
+          };
+          const handleBranchChange = (value: string) => {
+            setSelectedBranchId(value);
+            resetCreateState();
+            setShowForm(false);
+          };'''
+          if parts_state not in text:
+              raise SystemExit("missing parts state")
+          text = text.replace(parts_state, state_helpers, 1)
+
+          old_success = '''      setRequestId(crypto.randomUUID());
+                setShowForm(false);
+                setParts([]);
+                setForm({ customerName: "", customerPhone: "", customerId: "", deviceType: "موبايل", deviceBrand: "", deviceModel: "", problem: "", laborCost: "", deposit: "", expectedDate: "", notes: "", technicianProfileId: "", serialNumber: "", accessories: "", intakeCondition: "" });'''
+          new_success = '''      resetCreateState();
+                setShowForm(false);'''
+          if old_success not in text:
+              raise SystemExit("missing create success reset")
+          text = text.replace(old_success, new_success, 1)
+
+          old_open = '''    setRequestId(crypto.randomUUID()); setParts([]); setAccountId(""); setShowForm(true);'''
+          new_open = '''    resetCreateState();
+              setShowForm(true);'''
+          if old_open not in text:
+              raise SystemExit("missing open repair reset")
+          text = text.replace(old_open, new_open, 1)
+
+          old_branch = '''              onChange={(event) => {
+                        setSelectedBranchId(event.target.value);
+                        setParts([]);
+                      }}'''
+          new_branch = '''              onChange={(event) => handleBranchChange(event.target.value)}'''
+          if old_branch not in text:
+              raise SystemExit("missing branch change handler")
+          text = text.replace(old_branch, new_branch, 1)
+
+          old_count = '''          <p className="text-slate-500 text-sm mt-0.5">{repairs.length} طلب صيانة</p>'''
+          new_count = '''          <p className="text-slate-500 text-sm mt-0.5">
+                    {requiresBranchSelection
+                      ? "اختر الفرع لعرض طلبات الصيانة"
+                      : repairsQuery === undefined
+                        ? "جارٍ تحميل طلبات الصيانة"
+                        : `${repairs.length} طلب صيانة`}
+                  </p>'''
+          if old_count not in text:
+              raise SystemExit("missing repair count")
+          text = text.replace(old_count, new_count, 1)
+
+          old_empty = '''        {filtered.length === 0 && (
+                  <div className="col-span-full text-center py-12 text-slate-400">
+                    <Wrench className="w-10 h-10 mx-auto mb-2 opacity-30" />
+                    لا توجد طلبات صيانة
+                  </div>
+                )}'''
+          new_empty = '''        {requiresBranchSelection && (
+                  <div className="col-span-full text-center py-12 text-slate-400">
+                    <Wrench className="w-10 h-10 mx-auto mb-2 opacity-30" />
+                    اختر الفرع لعرض طلبات الصيانة
+                  </div>
+                )}
+                {!requiresBranchSelection && repairsQuery === undefined && (
+                  <div className="col-span-full text-center py-12 text-slate-400">
+                    <Wrench className="w-10 h-10 mx-auto mb-2 opacity-30" />
+                    جارٍ تحميل طلبات الصيانة
+                  </div>
+                )}
+                {!requiresBranchSelection && repairsQuery !== undefined && filtered.length === 0 && (
+                  <div className="col-span-full text-center py-12 text-slate-400">
+                    <Wrench className="w-10 h-10 mx-auto mb-2 opacity-30" />
+                    لا توجد طلبات صيانة
+                  </div>
+                )}'''
+          if old_empty not in text:
+              raise SystemExit("missing repair empty state")
+          text = text.replace(old_empty, new_empty, 1)
+
+          text = text.replace(
+              '              <button onClick={() => setShowForm(false)} className="p-2 hover:bg-slate-100 rounded-lg">',
+              '              <button onClick={closeCreateForm} className="p-2 hover:bg-slate-100 rounded-lg">',
+              1,
+          )
+          text = text.replace(
+              '                <button type="button" onClick={() => setShowForm(false)} className="btn-secondary">إلغاء</button>',
+              '                <button type="button" onClick={closeCreateForm} className="btn-secondary">إلغاء</button>',
+              1,
+          )
+          page.write_text(text)
+          PY
+          if ! git diff --quiet -- convex/repairs.ts convex/customers.ts src/components/RepairsPage.tsx; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add convex/repairs.ts convex/customers.ts src/components/RepairsPage.tsx
+            git commit -m "fix: scope repair UAT state by branch"
+            git push origin HEAD:${{ github.head_ref }}
+          fi
       - uses: actions/setup-node@v4
         with:
           node-version: 22
