@@ -65,7 +65,7 @@ test("UI-32 branch changes clear modal and operation state", () => {
   assert.match(source, /onChange=\{e=>handleBranchChange\(e\.target\.value\)\}/);
 });
 test("UI-33 changing settlement source clears stale selected deliveries", () => {
-  assert.match(source, /اختر حساب مصدر التسوية[\s\S]*setChecked\(new Set<string>\(\)\)/);
+  assert.match(source, /setAccountId\(e\.target\.value\);setChecked\(new Set<string>\(\)\)[\s\S]*اختر حساب مصدر التسوية/);
 });
 test("UI-34 opening a fresh operation rotates the idempotency request", () => {
   assert.match(source, /resetOperationState\(\);setSelected\(row\?\?null\);operationRequestId\.current=requestId\(\);setModal\(kind\)/);
