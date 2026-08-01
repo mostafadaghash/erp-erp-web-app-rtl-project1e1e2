@@ -1,6 +1,6 @@
 import { query, mutation } from "./_generated/server.js";
 import { v, ConvexError } from "convex/values";
-import { assertBranchAccess, requirePermission, filterByBranch, resolveWriteBranch, logAction } from "./lib/auth.ts";
+import { assertBranchAccess, requirePermission, resolveWriteBranch, logAction } from "./lib/auth.ts";
 import { initializeCustomerBalance } from "./lib/customerLedger.ts";
 import type { MutationCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
@@ -100,15 +100,19 @@ export const list = query({
 
 /** Minimal customer data for employees who may create repairs without viewing CRM records. */
 export const repairPicker = query({
-  args: {},
-  handler: async (ctx) => {
+  args: { branchId: v.optional(v.id("branches")) },
+  handler: async (ctx, args) => {
     const user = await requirePermission(ctx, "create_repairs");
-    const customers = user.branchId
-      ? await ctx.db
-          .query("customers")
-          .withIndex("by_branch", (q) => q.eq("branchId", user.branchId))
-          .collect()
-      : filterByBranch(await ctx.db.query("customers").collect(), user);
+    const requestedBranchId = args.branchId;
+    if (requestedBranchId) assertBranchAccess(user, { branchId: requestedBranchId });
+    const branchId = user.role === "admin"
+      ? requestedBranchId ?? user.branchId
+      : user.branchId;
+    if (!branchId) return [];
+    const customers = await ctx.db
+      .query("customers")
+      .withIndex("by_branch", (q) => q.eq("branchId", branchId))
+      .collect();
     const activeCustomers = customers.filter(customer => customer.isActive !== false);
     return activeCustomers.map(({ _id, name, phone }) => ({ _id, name, phone }));
   },

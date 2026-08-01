@@ -21,6 +21,14 @@ const statusConfig: Record<RepairStatus, { label: string; badge: string; icon: L
   cancelled: { label: "ملغي", badge: "badge-danger", icon: AlertCircle },
 };
 
+const emptyRepairForm = () => ({
+  customerName: "", customerPhone: "", customerId: "",
+  deviceType: "موبايل", deviceBrand: "", deviceModel: "",
+  problem: "", laborCost: "", deposit: "",
+  expectedDate: "", notes: "", technicianProfileId: "",
+  serialNumber: "", accessories: "", intakeCondition: "",
+});
+
 export function RepairsPage() {
   const canCreate = usePermission("create_repairs");
   const canEdit = usePermission("edit_repairs");
@@ -30,13 +38,27 @@ export function RepairsPage() {
   const canViewBranches = usePermission("view_branches");
   const [showForm, setShowForm] = useState(false);
   const [selectedBranchId, setSelectedBranchId] = useState("");
-  const branches = useQuery(
+  const branchesQuery = useQuery(
     api.branches.list,
     canViewBranches ? {} : "skip",
-  ) ?? [];
-  const repairs = useQuery(api.repairs.list) ?? [];
-  const customers = useQuery(api.customers.repairPicker, canCreate ? {} : "skip") ?? [];
-  const partPickerGate = canCreate && showForm ? {} : "skip";
+  );
+  const branches = branchesQuery ?? [];
+  const repairBranchArgs = selectedBranchId
+    ? { branchId: selectedBranchId as Id<"branches"> }
+    : {};
+  const requiresBranchSelection =
+    canViewBranches && branches.length > 0 && !selectedBranchId;
+  const repairsQuery = useQuery(api.repairs.list, repairBranchArgs);
+  const repairs = repairsQuery ?? [];
+  const customerPickerArgs = canCreate && !requiresBranchSelection
+    ? repairBranchArgs
+    : "skip";
+  const customersQuery = useQuery(
+    api.customers.repairPicker,
+    customerPickerArgs,
+  );
+  const customers = customersQuery ?? [];
+  const partPickerGate = canCreate && showForm && !requiresBranchSelection ? {} : "skip";
   const partOptions = useQuery(
     api.repairs.partPicker,
     partPickerGate !== "skip"
@@ -137,17 +159,27 @@ export function RepairsPage() {
     notes: "",
   });
   const [updatingId, setUpdatingId] = useState<Id<"repairs"> | null>(null);
-  const [form, setForm] = useState({
-    customerName: "", customerPhone: "", customerId: "",
-    deviceType: "موبايل", deviceBrand: "", deviceModel: "",
-    problem: "", laborCost: "", deposit: "",
-    expectedDate: "", notes: "", technicianProfileId: "",
-    serialNumber: "", accessories: "", intakeCondition: "",
-  });
+  const [form, setForm] = useState(emptyRepairForm);
   const [parts, setParts] = useState<Array<{
     productId: string;
     quantity: string;
   }>>([]);
+  const resetCreateState = () => {
+    setParts([]);
+    setAccountId("");
+    setRequestId(crypto.randomUUID());
+    setForm(emptyRepairForm());
+  };
+  const closeCreateForm = () => {
+    if (saving) return;
+    resetCreateState();
+    setShowForm(false);
+  };
+  const handleBranchChange = (value: string) => {
+    setSelectedBranchId(value);
+    resetCreateState();
+    setShowForm(false);
+  };
   const initialDepositAccounts = selectedBranchId
     ? collectionAccounts.filter(
         (account) => account.branchId === selectedBranchId,
@@ -242,10 +274,8 @@ export function RepairsPage() {
           : undefined,
       });
       toast.success("تم إضافة طلب الصيانة بنجاح");
-      setRequestId(crypto.randomUUID());
+      resetCreateState();
       setShowForm(false);
-      setParts([]);
-      setForm({ customerName: "", customerPhone: "", customerId: "", deviceType: "موبايل", deviceBrand: "", deviceModel: "", problem: "", laborCost: "", deposit: "", expectedDate: "", notes: "", technicianProfileId: "", serialNumber: "", accessories: "", intakeCondition: "" });
     } catch (error) {
       toast.error(getErrorMessage(error, "تعذر إضافة طلب الصيانة"));
     } finally {
@@ -496,7 +526,8 @@ export function RepairsPage() {
       toast.error("اختر فرع أمر الصيانة أولًا");
       return;
     }
-    setRequestId(crypto.randomUUID()); setParts([]); setAccountId(""); setShowForm(true);
+    resetCreateState();
+    setShowForm(true);
   };
 
   return (
@@ -507,17 +538,20 @@ export function RepairsPage() {
             <Wrench className="w-6 h-6 text-indigo-600" />
             الصيانة
           </h1>
-          <p className="text-slate-500 text-sm mt-0.5">{repairs.length} طلب صيانة</p>
+          <p className="text-slate-500 text-sm mt-0.5">
+            {requiresBranchSelection
+              ? "اختر الفرع لعرض طلبات الصيانة"
+              : repairsQuery === undefined
+                ? "جارٍ تحميل طلبات الصيانة"
+                : `${repairs.length} طلب صيانة`}
+          </p>
         </div>
         <div className="flex items-center gap-2">
           {canViewBranches && branches.length > 0 && (
             <select
               className="form-input min-w-40"
               value={selectedBranchId}
-              onChange={(event) => {
-                setSelectedBranchId(event.target.value);
-                setParts([]);
-              }}
+              onChange={(event) => handleBranchChange(event.target.value)}
               aria-label="فرع أمر الصيانة"
             >
               <option value="">اختر الفرع</option>
@@ -727,7 +761,19 @@ export function RepairsPage() {
             </div>
           );
         })}
-        {filtered.length === 0 && (
+        {requiresBranchSelection && (
+          <div className="col-span-full text-center py-12 text-slate-400">
+            <Wrench className="w-10 h-10 mx-auto mb-2 opacity-30" />
+            اختر الفرع لعرض طلبات الصيانة
+          </div>
+        )}
+        {!requiresBranchSelection && repairsQuery === undefined && (
+          <div className="col-span-full text-center py-12 text-slate-400">
+            <Wrench className="w-10 h-10 mx-auto mb-2 opacity-30" />
+            جارٍ تحميل طلبات الصيانة
+          </div>
+        )}
+        {!requiresBranchSelection && repairsQuery !== undefined && filtered.length === 0 && (
           <div className="col-span-full text-center py-12 text-slate-400">
             <Wrench className="w-10 h-10 mx-auto mb-2 opacity-30" />
             لا توجد طلبات صيانة
@@ -1146,7 +1192,7 @@ export function RepairsPage() {
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto animate-fade-in-up">
             <div className="p-6 border-b border-slate-100 flex items-center justify-between">
               <h2 className="text-lg font-bold text-slate-800">طلب صيانة جديد</h2>
-              <button onClick={() => setShowForm(false)} className="p-2 hover:bg-slate-100 rounded-lg">
+              <button onClick={closeCreateForm} className="p-2 hover:bg-slate-100 rounded-lg">
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
@@ -1323,7 +1369,7 @@ export function RepairsPage() {
               </div>
               <div className="flex gap-3 pt-2">
                 <button type="submit" disabled={saving} className="btn-primary flex-1 disabled:opacity-50">حفظ طلب الصيانة</button>
-                <button type="button" onClick={() => setShowForm(false)} className="btn-secondary">إلغاء</button>
+                <button type="button" onClick={closeCreateForm} className="btn-secondary">إلغاء</button>
               </div>
             </form>
           </div>
