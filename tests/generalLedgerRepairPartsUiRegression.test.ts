@@ -4,9 +4,10 @@ import fs from "node:fs";
 
 const source = fs.readFileSync("src/components/RepairsPage.tsx", "utf8");
 
-test("RPU-01 repair form loads the dedicated part picker only while open", () => {
+test("RPU-01 repair form loads the dedicated part picker only while open and branch-ready", () => {
   assert.match(source, /api\.repairs\.partPicker/);
-  assert.match(source, /canCreate && showForm \? \{\} : "skip"/);
+  assert.match(source, /canCreate && showForm && !requiresBranchSelection \? \{\} : "skip"/);
+  assert.match(source, /branchId:\s*selectedBranchId[\s\S]*as Id<"branches">/);
 });
 
 test("RPU-02 repair form sends inventory product IDs and integer quantities", () => {
@@ -49,12 +50,13 @@ test("RPU-07 deposit is capped by labor plus parts total", () => {
 
 test("RPU-08 creation request ID stays stable through a failed save", () => {
   const submitStart = source.indexOf("const handleSubmit");
-  const submitEnd = source.indexOf("const applyStatus");
+  const submitEnd = source.indexOf("const openStatusTransition");
   const submit = source.slice(submitStart, submitEnd);
   assert.match(submit, /creationRequestId:\s*requestId/);
-  assert.match(submit, /setRequestId\(crypto\.randomUUID\(\)\)/);
+  const successBlock = submit.slice(submit.indexOf("await createRepair"), submit.indexOf("catch"));
+  assert.match(successBlock, /resetCreateState\(\)/);
   const catchBlock = submit.slice(submit.indexOf("catch"));
-  assert.doesNotMatch(catchBlock, /setRequestId/);
+  assert.doesNotMatch(catchBlock, /resetCreateState|setRequestId/);
 });
 
 test("RPU-09 save busy guard prevents double part consumption", () => {
@@ -63,12 +65,13 @@ test("RPU-09 save busy guard prevents double part consumption", () => {
   assert.match(source, /disabled=\{saving\}/);
 });
 
-test("RPU-10 a new form clears stale part and account state", () => {
+test("RPU-10 a new form and branch change clear stale creation state", () => {
   assert.match(
     source,
-    /setRequestId\(crypto\.randomUUID\(\)\); setParts\(\[\]\); setAccountId\(""\); setShowForm\(true\)/,
+    /const resetCreateState = \(\) => \{[\s\S]*setParts\(\[\]\)[\s\S]*setAccountId\(""\)[\s\S]*setRequestId\(crypto\.randomUUID\(\)\)[\s\S]*setForm\(emptyRepairForm\(\)\)/,
   );
-  assert.match(source, /setParts\(\[\]\)/);
+  assert.match(source, /const openNewRepair = \(\) => \{[\s\S]*resetCreateState\(\);[\s\S]*setShowForm\(true\)/);
+  assert.match(source, /const handleBranchChange = \(value: string\) => \{[\s\S]*resetCreateState\(\);[\s\S]*setShowForm\(false\)/);
 });
 
 test("RPU-11 repair cards display stored part snapshots and line totals", () => {
