@@ -55,3 +55,18 @@ test("UI-27 delivery and settlement print structured Arabic vouchers", () => { a
 test("UI-28 stats cards use branch-scoped getStats", () => { assert.match(source, /api\.deliveries\.getStats,activeBranch\?\{branchId:activeBranch\}/); for(const label of ["COD لدى شركات الشحن","COD تمت تسويته","COD معكوس","رسوم شركات الشحن"])assert.ok(source.includes(label)); });
 test("UI-29 avoids prompt global print hooks and unsafe escapes", () => { assert.doesNotMatch(source, new RegExp(["window\\.prompt","__deliveryPrint",["as","any"].join(" "),["@ts","ignore"].join("-")].join("|"))); });
 test("UI-30 reversal creation confirmation and settlement share busy protection", () => { assert.match(source, /if\(busy\)return/); assert.match(source, /disabled=\{busy\}/); });
+test("UI-31 opening any operation resets shared COD form state", () => {
+  assert.match(source, /const resetOperationState=\(\)=>\{[\s\S]*setAccountId\(""\)[\s\S]*setDestinationId\(""\)[\s\S]*setChecked\(new Set<string>\(\)\)/);
+  assert.match(source, /const open=\(kind:Modal,row\?:Selected\)=>\{resetOperationState\(\)/);
+  assert.match(source, /const openSettlementReversal=.*resetOperationState\(\)/);
+});
+test("UI-32 branch changes clear modal and operation state", () => {
+  assert.match(source, /const handleBranchChange=\(value:string\)=>\{[\s\S]*resetOperationState\(\)[\s\S]*setSelected\(null\)[\s\S]*setModal\(null\)/);
+  assert.match(source, /onChange=\{e=>handleBranchChange\(e\.target\.value\)\}/);
+});
+test("UI-33 changing settlement source clears stale selected deliveries", () => {
+  assert.match(source, /setAccountId\(e\.target\.value\);setChecked\(new Set<string>\(\)\)[\s\S]*اختر حساب مصدر التسوية/);
+});
+test("UI-34 opening a fresh operation rotates the idempotency request", () => {
+  assert.match(source, /resetOperationState\(\);setSelected\(row\?\?null\);operationRequestId\.current=requestId\(\);setModal\(kind\)/);
+});
