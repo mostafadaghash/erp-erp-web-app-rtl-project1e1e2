@@ -214,11 +214,21 @@ function publicRepair<T extends Doc<"repairs">>(
 }
 
 export const list = query({
-  args: {},
-  handler: async (ctx) => {
+  args: { branchId: v.optional(v.id("branches")) },
+  handler: async (ctx, args) => {
     const user = await requireModulePermission(ctx, "view_repairs", "repairs");
-    const repairs = await ctx.db.query("repairs").order("desc").collect();
-    return filterByBranch(repairs, user).map((repair) =>
+    const requestedBranchId = args.branchId;
+    if (requestedBranchId) assertBranchAccess(user, { branchId: requestedBranchId });
+    const branchId = user.role === "admin"
+      ? requestedBranchId ?? user.branchId
+      : user.branchId;
+    if (!branchId) return [];
+    const repairs = await ctx.db
+      .query("repairs")
+      .withIndex("by_branch_received", (q) => q.eq("branchId", branchId))
+      .order("desc")
+      .collect();
+    return repairs.map((repair) =>
       publicRepair(repair, user.permissions.includes("view_profits")),
     );
   },
