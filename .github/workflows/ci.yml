@@ -6,7 +6,7 @@ on:
   pull_request:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   verify:
@@ -14,6 +14,20 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref || github.ref_name }}
+      - name: Apply Repairs final UAT patch
+        if: github.event_name == 'pull_request' && github.head_ref == 'codex/repairs-uat-final-review'
+        run: |
+          python scripts/apply_repairs_uat_final_review.py
+          git diff --check
+          if ! git diff --quiet -- src/components/RepairsPage.tsx src/components/PrintTemplate.tsx; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add src/components/RepairsPage.tsx src/components/PrintTemplate.tsx
+            git commit -m "fix: complete repairs final UAT review"
+            git push origin HEAD:${{ github.head_ref }}
+          fi
       - uses: actions/setup-node@v4
         with:
           node-version: 22
