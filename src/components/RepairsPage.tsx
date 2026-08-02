@@ -13,6 +13,14 @@ import type { Doc, Id } from "../../convex/_generated/dataModel";
 import { isRepairStatus, REPAIR_TRANSITIONS, type RepairStatus } from "../../shared/businessRules";
 import { getErrorMessage } from "../lib/errors";
 
+const isIsoDate = (value: string) => {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const parsed = new Date(`${value}T00:00:00.000Z`);
+  return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
+};
+const isMoney = (value: number) =>
+  Number.isFinite(value) && value >= 0 && Math.round(value * 100) / 100 === value;
+
 const statusConfig: Record<RepairStatus, { label: string; badge: string; icon: LucideIcon }> = {
   received: { label: "مستلم", badge: "badge-info", icon: Clock },
   in_progress: { label: "قيد الإصلاح", badge: "badge-warning", icon: Wrench },
@@ -201,6 +209,104 @@ export function RepairsPage() {
     return sum + (product?.sellPrice ?? 0) * Number(row.quantity || 0);
   }, 0);
 
+  const laborCostAmount = Number(form.laborCost || 0);
+  const depositAmount = Number(form.deposit || 0);
+  const completedPartRows = parts.filter((part) => part.productId);
+
+  const createValidationReason = (() => {
+    if (requiresBranchSelection) return "اختر فرع أمر الصيانة";
+    if (!form.customerName.trim()) return "أدخل اسم العميل";
+    if (!form.customerPhone.trim()) return "أدخل رقم الهاتف";
+    if (!form.deviceBrand.trim()) return "أدخل ماركة الجهاز";
+    if (!form.deviceModel.trim()) return "أدخل موديل الجهاز";
+    if (!form.problem.trim()) return "أدخل وصف المشكلة";
+    if (!isMoney(laborCostAmount)) return "أدخل تكلفة عمالة صحيحة";
+    if (parts.length > 100) return "لا يمكن إضافة أكثر من 100 قطعة لأمر الصيانة";
+    if (parts.some((part) => !part.productId)) {
+      return "اختر قطعة الغيار أو احذف السطر غير المكتمل";
+    }
+    if (completedPartRows.some((part) =>
+      !Number.isInteger(Number(part.quantity)) || Number(part.quantity) <= 0
+    )) return "كمية قطعة الغيار يجب أن تكون عددًا صحيحًا أكبر من صفر";
+    if (new Set(completedPartRows.map((part) => part.productId)).size !== completedPartRows.length) {
+      return "لا يمكن تكرار قطعة الغيار";
+    }
+    const stockViolation = completedPartRows.find((part) => {
+      const product = partOptions.find((option) => option._id === part.productId);
+      return product && Number(part.quantity) > product.stock;
+    });
+    if (stockViolation) {
+      const product = partOptions.find((option) => option._id === stockViolation.productId);
+      return `كمية ${product?.name ?? "قطعة الغيار"} تتجاوز المخزون المتاح`;
+    }
+    if (!isMoney(depositAmount)) return "أدخل عربونًا صحيحًا";
+    if (depositAmount > laborCostAmount + partsTotal) {
+      return "العربون لا يمكن أن يتجاوز إجمالي أمر الصيانة";
+    }
+    if (depositAmount > 0 && !canCollect) return "لا تملك صلاحية تحصيل العربون";
+    if (depositAmount > 0 && !initialDepositAccounts.some((account) => account._id === accountId)) {
+      return "اختر حساب تحصيل العربون";
+    }
+    if (form.expectedDate && !isIsoDate(form.expectedDate)) {
+      return "تاريخ التسليم المتوقع غير صالح";
+    }
+    return null;
+  })();
+
+  const transitionValidationReason = (() => {
+    if (!transitionTarget || !transitionNext) return null;
+    if (!isIsoDate(transitionForm.date)) return "اختر تاريخ عملية صالحًا";
+    if (transitionNext === "in_progress" && !transitionTarget.technicianName) {
+      return "عيّن فنيًا قبل بدء الإصلاح";
+    }
+    if (transitionNext === "ready" && !transitionForm.diagnosis.trim()) {
+      return "أدخل التشخيص النهائي قبل اعتماد الجاهزية";
+    }
+    if (transitionNext === "cancelled") {
+      if (transitionTarget.deposit > 0) return "استرد العربون بالكامل قبل إلغاء الصيانة";
+      if (!transitionForm.reason.trim()) return "أدخل سبب الإلغاء";
+    }
+    if (transitionNext === "delivered") {
+      if (transitionTarget.remaining > 0) return "حصّل المبلغ المتبقي قبل تسليم الجهاز";
+      const warrantyDays = Number(transitionForm.warrantyDays || 0);
+      if (!Number.isInteger(warrantyDays) || warrantyDays < 0 || warrantyDays > 365) {
+        return "مدة الضمان يجب أن تكون عدد أيام صحيحًا من صفر إلى 365";
+      }
+    }
+    return null;
+  })();
+
+  const collectionValidationReason = (() => {
+    if (!collectionTarget) return null;
+    const amount = Number(collectionForm.amount);
+    if (!isMoney(amount) || amount <= 0 || amount > collectionTarget.remaining) {
+      return "مبلغ التحصيل يجب أن يكون أكبر من صفر ولا يتجاوز المتبقي";
+    }
+    if (!targetCollectionAccounts.some((account) => account._id === collectionForm.accountId)) {
+      return "اختر حساب تحصيل تابعًا لفرع أمر الصيانة";
+    }
+    if (!isIsoDate(collectionForm.date)) return "اختر تاريخ تحصيل صالحًا";
+    return null;
+  })();
+
+  const refundValidationReason = (() => {
+    if (!refundTarget) return null;
+    const amount = Number(refundForm.amount);
+    if (!isMoney(amount) || amount <= 0 || amount > refundTarget.deposit) {
+      return "مبلغ الاسترداد يجب أن يكون أكبر من صفر ولا يتجاوز المحصل";
+    }
+    if (!refundForm.reason.trim()) return "سبب الاسترداد مطلوب";
+    if (!targetRefundAccounts.some((account) => account._id === refundForm.accountId)) {
+      return "اختر حساب استرداد تابعًا لفرع أمر الصيانة";
+    }
+    if (!isIsoDate(refundForm.date)) return "اختر تاريخ استرداد صالحًا";
+    return null;
+  })();
+
+  const editValidationReason = editTarget && editForm.expectedDate && !isIsoDate(editForm.expectedDate)
+    ? "تاريخ التسليم المتوقع غير صالح"
+    : null;
+
   useEffect(() => {
     if (!printableRepair) return;
     setPrintRepair(printableRepair);
@@ -222,6 +328,7 @@ export function RepairsPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (saving) return;
+    if (createValidationReason) { toast.error(createValidationReason); return; }
     if (Number(form.deposit) > 0 && !accountId) { toast.error("اختر حساب تحصيل العربون"); return; }
     const completedParts = parts.filter((part) => part.productId);
     if (
@@ -299,6 +406,7 @@ export function RepairsPage() {
   const submitTransition = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!transitionTarget || !transitionNext || updatingId) return;
+    if (transitionValidationReason) { toast.error(transitionValidationReason); return; }
     setUpdatingId(transitionTarget._id);
     const transitionRequest = {
       requestId: transitionRequestId,
@@ -359,6 +467,7 @@ export function RepairsPage() {
   const saveDetails = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!editTarget || updatingId) return;
+    if (editValidationReason) { toast.error(editValidationReason); return; }
     setUpdatingId(editTarget._id);
     try {
       await updateDetails({
@@ -408,6 +517,7 @@ export function RepairsPage() {
   const submitCollection = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!collectionTarget || financialBusy) return;
+    if (collectionValidationReason) { toast.error(collectionValidationReason); return; }
     const amount = Number(collectionForm.amount);
     if (
       !Number.isFinite(amount) ||
@@ -451,6 +561,7 @@ export function RepairsPage() {
   const submitRefund = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!refundTarget || financialBusy) return;
+    if (refundValidationReason) { toast.error(refundValidationReason); return; }
     const amount = Number(refundForm.amount);
     if (
       !Number.isFinite(amount) ||
@@ -863,10 +974,12 @@ export function RepairsPage() {
                   })}
                 />
               </div>
+              {collectionValidationReason && <p role="alert" className="rounded-lg bg-amber-50 p-3 text-sm font-medium text-amber-800">{collectionValidationReason}</p>}
               <div className="flex gap-3">
                 <button
                   className="btn-primary flex-1"
-                  disabled={financialBusy !== null || targetCollectionAccounts.length === 0}
+                  title={collectionValidationReason ?? undefined}
+                  disabled={financialBusy !== null || Boolean(collectionValidationReason)}
                 >
                   {financialBusy === "collection" ? "جارٍ التحصيل..." : "تأكيد التحصيل"}
                 </button>
@@ -967,10 +1080,12 @@ export function RepairsPage() {
                   })}
                 />
               </div>
+              {refundValidationReason && <p role="alert" className="rounded-lg bg-amber-50 p-3 text-sm font-medium text-amber-800">{refundValidationReason}</p>}
               <div className="flex gap-3">
                 <button
                   className="btn-primary flex-1"
-                  disabled={financialBusy !== null || targetRefundAccounts.length === 0}
+                  title={refundValidationReason ?? undefined}
+                  disabled={financialBusy !== null || Boolean(refundValidationReason)}
                 >
                   {financialBusy === "refund" ? "جارٍ الاسترداد..." : "تأكيد الاسترداد"}
                 </button>
@@ -1081,10 +1196,12 @@ export function RepairsPage() {
                   />
                 </div>
               )}
+              {transitionValidationReason && <p role="alert" className="rounded-lg bg-amber-50 p-3 text-sm font-medium text-amber-800">{transitionValidationReason}</p>}
               <div className="flex gap-3">
                 <button
                   className="btn-primary flex-1"
-                  disabled={updatingId !== null}
+                  title={transitionValidationReason ?? undefined}
+                  disabled={updatingId !== null || Boolean(transitionValidationReason)}
                 >
                   {updatingId ? "جارٍ الحفظ..." : "تأكيد الانتقال"}
                 </button>
@@ -1145,8 +1262,9 @@ export function RepairsPage() {
                 <label className="form-label">ملاحظات</label>
                 <textarea className="form-input" rows={2} value={editForm.notes} onChange={(event) => setEditForm({...editForm, notes: event.target.value})} />
               </div>
+              {editValidationReason && <p role="alert" className="sm:col-span-2 rounded-lg bg-amber-50 p-3 text-sm font-medium text-amber-800">{editValidationReason}</p>}
               <div className="flex gap-3 sm:col-span-2">
-                <button className="btn-primary flex-1" disabled={updatingId !== null}>{updatingId ? "جارٍ الحفظ..." : "حفظ التفاصيل"}</button>
+                <button className="btn-primary flex-1" title={editValidationReason ?? undefined} disabled={updatingId !== null || Boolean(editValidationReason)}>{updatingId ? "جارٍ الحفظ..." : "حفظ التفاصيل"}</button>
                 <button type="button" className="btn-secondary" disabled={updatingId !== null} onClick={() => setEditTarget(null)}>إغلاق</button>
               </div>
             </form>
@@ -1367,8 +1485,9 @@ export function RepairsPage() {
                   <textarea className="form-input" rows={2} value={form.notes} onChange={e => setForm({...form, notes: e.target.value})} />
                 </div>
               </div>
+              {createValidationReason && <p role="alert" className="rounded-lg bg-amber-50 p-3 text-sm font-medium text-amber-800">{createValidationReason}</p>}
               <div className="flex gap-3 pt-2">
-                <button type="submit" disabled={saving} className="btn-primary flex-1 disabled:opacity-50">حفظ طلب الصيانة</button>
+                <button type="submit" title={createValidationReason ?? undefined} disabled={saving || Boolean(createValidationReason)} className="btn-primary flex-1 disabled:opacity-50">حفظ طلب الصيانة</button>
                 <button type="button" onClick={closeCreateForm} className="btn-secondary">إلغاء</button>
               </div>
             </form>
