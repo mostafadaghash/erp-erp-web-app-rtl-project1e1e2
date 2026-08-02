@@ -9,7 +9,10 @@ test("CUAT-01 customers require an explicit branch for unpinned admins", () => {
   assert.match(customers, /const canViewBranches = usePermission\("view_branches"\)/);
   assert.match(customers, /const \[selectedBranchId, setSelectedBranchId\] = useState\(""\)/);
   assert.match(customers, /const effectiveBranchId =[\s\S]*me\?\.branchId[\s\S]*selectedBranchId/);
-  assert.match(customers, /const requiresBranchSelection =[\s\S]*!me\?\.branchId[\s\S]*!selectedBranchId/);
+  assert.match(
+    customers,
+    /const requiresBranchSelection = Boolean\([\s\S]*me && !me\.branchId[\s\S]*!selectedBranchId/,
+  );
 });
 
 test("CUAT-02 customer list and balances use the same branch scope", () => {
@@ -44,7 +47,10 @@ test("SUAT-01 supplier ledger scope never defaults to the first branch", () => {
 });
 
 test("SUAT-02 unpinned supplier ledger users choose a branch explicitly", () => {
-  assert.match(suppliers, /const requiresLedgerBranchSelection =[\s\S]*!me\?\.branchId[\s\S]*!selectedBranch/);
+  assert.match(
+    suppliers,
+    /const requiresLedgerBranchSelection = Boolean\([\s\S]*me &&[\s\S]*!me\.branchId[\s\S]*!selectedBranch/,
+  );
   assert.ok(suppliers.includes("اختر فرع الأرصدة"));
   assert.match(suppliers, /value=\{selectedBranch \?\? ""\}/);
 });
