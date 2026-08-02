@@ -20,14 +20,13 @@ import {
 import { toast } from "sonner";
 import { usePermission } from "../lib/access";
 import { getErrorMessage } from "../lib/errors";
+import { ContactFormModal } from "./ContactFormModal";
+import {
+  type ContactFormValues,
+  validateContactForm,
+} from "../lib/contactForm";
 
-type SupplierForm = {
-  name: string;
-  phone: string;
-  email: string;
-  address: string;
-  notes: string;
-};
+type SupplierForm = ContactFormValues;
 
 type SupplierCard = {
   _id: Id<"suppliers">;
@@ -82,6 +81,7 @@ export function SuppliersPage() {
   const [saving, setSaving] = useState(false);
   const [updatingId, setUpdatingId] = useState<Id<"suppliers"> | null>(null);
   const [form, setForm] = useState<SupplierForm>(emptyForm);
+  const formValidation = validateContactForm(form);
 
   const effectiveBranch = me?.branchId ?? selectedBranch;
   const requiresLedgerBranchSelection = Boolean(
@@ -157,15 +157,14 @@ export function SuppliersPage() {
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (saving || !form.name.trim() || !form.phone.trim()) return;
+    if (saving) return;
+    if (!formValidation.ok) {
+      toast.error(formValidation.reason);
+      return;
+    }
+    const { payload, normalizedForm } = formValidation;
+    setForm(normalizedForm);
     setSaving(true);
-    const payload = {
-      name: form.name,
-      phone: form.phone,
-      email: form.email,
-      address: form.address,
-      notes: form.notes,
-    };
     try {
       if (editingId) {
         await updateSupplier({ id: editingId, ...payload });
@@ -204,7 +203,12 @@ export function SuppliersPage() {
       await setSupplierActive({ id, isActive });
       toast.success(isActive ? "تمت إعادة تفعيل المورد" : "تم تعطيل المورد");
     } catch (error) {
-      toast.error(getErrorMessage(error, "تعذر تحديث حالة المورد"));
+      toast.error(
+        getErrorMessage(
+          error,
+          isActive ? "تعذر إعادة تفعيل المورد" : "تعذر تعطيل المورد",
+        ),
+      );
     } finally {
       setUpdatingId(null);
     }
@@ -383,10 +387,12 @@ export function SuppliersPage() {
       </div>
 
       {showForm && (
-        <SupplierModal
+        <ContactFormModal
           title={editingId ? "تعديل بيانات المورد" : "إضافة مورد جديد"}
+          nameLabel="اسم المورد *"
           form={form}
           saving={saving}
+          validation={formValidation}
           onChange={setForm}
           onClose={closeForm}
           onSubmit={handleSubmit}
@@ -478,119 +484,3 @@ export function SuppliersPage() {
   );
 }
 
-function SupplierModal({
-  title,
-  form,
-  saving,
-  onChange,
-  onClose,
-  onSubmit,
-}: {
-  title: string;
-  form: SupplierForm;
-  saving: boolean;
-  onChange: (form: SupplierForm) => void;
-  onClose: () => void;
-  onSubmit: (event: React.FormEvent) => void;
-}) {
-  return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md animate-fade-in-up">
-        <header className="p-5 border-b flex items-center justify-between">
-          <h2 className="text-lg font-bold text-slate-800">{title}</h2>
-          <button
-            type="button"
-            disabled={saving}
-            onClick={onClose}
-            className="p-2 hover:bg-slate-100 rounded-lg"
-            aria-label="إغلاق"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </header>
-        <form onSubmit={onSubmit} className="p-6 space-y-4">
-          <SupplierField
-            label="اسم المورد *"
-            value={form.name}
-            required
-            onChange={(name) => onChange({ ...form, name })}
-          />
-          <SupplierField
-            label="رقم الهاتف *"
-            value={form.phone}
-            required
-            onChange={(phone) => onChange({ ...form, phone })}
-          />
-          <SupplierField
-            label="البريد الإلكتروني"
-            value={form.email}
-            type="email"
-            onChange={(email) => onChange({ ...form, email })}
-          />
-          <SupplierField
-            label="العنوان"
-            value={form.address}
-            onChange={(address) => onChange({ ...form, address })}
-          />
-          <label className="block">
-            <span className="form-label">ملاحظات</span>
-            <textarea
-              className="form-input"
-              rows={2}
-              maxLength={1000}
-              value={form.notes}
-              onChange={(event) =>
-                onChange({ ...form, notes: event.target.value })
-              }
-            />
-          </label>
-          <div className="flex gap-3 pt-2">
-            <button
-              type="submit"
-              disabled={saving}
-              className="btn-primary flex-1"
-            >
-              {saving ? "جارٍ الحفظ..." : "حفظ"}
-            </button>
-            <button
-              type="button"
-              disabled={saving}
-              onClick={onClose}
-              className="btn-secondary"
-            >
-              إلغاء
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-}
-
-function SupplierField({
-  label,
-  value,
-  onChange,
-  required = false,
-  type = "text",
-}: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  required?: boolean;
-  type?: "text" | "email";
-}) {
-  return (
-    <label className="block">
-      <span className="form-label">{label}</span>
-      <input
-        className="form-input"
-        type={type}
-        required={required}
-        maxLength={type === "email" ? 254 : 300}
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-      />
-    </label>
-  );
-}

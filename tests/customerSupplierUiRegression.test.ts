@@ -10,6 +10,10 @@ const suppliers = readFileSync(
   new URL("../src/components/SuppliersPage.tsx", import.meta.url),
   "utf8",
 );
+const contactModal = readFileSync(
+  new URL("../src/components/ContactFormModal.tsx", import.meta.url),
+  "utf8",
+);
 const app = readFileSync(
   new URL("../src/components/ERPApp.tsx", import.meta.url),
   "utf8",
@@ -30,10 +34,11 @@ test("CSU-02 customer modal supports create and edit with one trusted form", () 
   assert.match(customers, /openCreate/);
 });
 
-test("CSU-03 customer save has a busy guard and disables modal actions", () => {
-  assert.match(customers, /if \(saving \|\| !form\.name\.trim\(\) \|\| !form\.phone\.trim\(\)\) return/);
-  assert.match(customers, /disabled=\{saving\}/);
-  assert.match(customers, /saving \? "جارٍ الحفظ\.\.\." : "حفظ"/);
+test("CSU-03 customer save has busy and validation guards", () => {
+  assert.match(customers, /if \(saving\) return/);
+  assert.match(customers, /if \(!formValidation\.ok\)/);
+  assert.match(contactModal, /disabled=\{saving \|\| !validation\.ok\}/);
+  assert.match(contactModal, /saving \? "جارٍ الحفظ\.\.\." : "حفظ"/);
 });
 
 test("CSU-04 customer activation UI uses delete_customers like the backend", () => {
@@ -122,10 +127,10 @@ test("CSU-17 operational master-data UI has no prompt or unsafe TypeScript escap
   }
 });
 
-test("CSU-18 both edit forms submit every visible contact field", () => {
+test("CSU-18 both edit forms submit the normalized shared payload", () => {
   for (const source of [customers, suppliers]) {
-    for (const field of ["name", "phone", "email", "address", "notes"]) {
-      assert.match(source, new RegExp(`${field}: form\\.${field}`), field);
-    }
+    assert.match(source, /const formValidation = validateContactForm\(form\)/);
+    assert.match(source, /const \{ payload, normalizedForm \} = formValidation/);
+    assert.match(source, /setForm\(normalizedForm\)/);
   }
 });

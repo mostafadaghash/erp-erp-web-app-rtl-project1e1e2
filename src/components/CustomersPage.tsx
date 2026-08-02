@@ -2,18 +2,17 @@ import { useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
-import { BookOpen, Edit3, Mail, MapPin, Phone, Plus, Search, Users, X } from "lucide-react";
+import { BookOpen, Edit3, Mail, MapPin, Phone, Plus, Search, Users } from "lucide-react";
 import { toast } from "sonner";
 import { usePermission } from "../lib/access";
 import { getErrorMessage } from "../lib/errors";
+import { ContactFormModal } from "./ContactFormModal";
+import {
+  type ContactFormValues,
+  validateContactForm,
+} from "../lib/contactForm";
 
-type CustomerForm = {
-  name: string;
-  phone: string;
-  email: string;
-  address: string;
-  notes: string;
-};
+type CustomerForm = ContactFormValues;
 
 type CustomerCard = {
   _id: Id<"customers">;
@@ -63,6 +62,7 @@ export function CustomersPage({
   const [saving, setSaving] = useState(false);
   const [updatingId, setUpdatingId] = useState<Id<"customers"> | null>(null);
   const [form, setForm] = useState<CustomerForm>(emptyForm);
+  const formValidation = validateContactForm(form);
 
   const branchesQuery = useQuery(
     api.branches.list,
@@ -146,24 +146,23 @@ export function CustomersPage({
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (saving || !form.name.trim() || !form.phone.trim()) return;
+    if (saving) return;
+    if (!editingId && !effectiveBranchId) {
+      toast.error("اختر فرع العميل أولًا");
+      return;
+    }
+    if (!formValidation.ok) {
+      toast.error(formValidation.reason);
+      return;
+    }
+    const { payload, normalizedForm } = formValidation;
+    setForm(normalizedForm);
     setSaving(true);
-    const payload = {
-      name: form.name,
-      phone: form.phone,
-      email: form.email,
-      address: form.address,
-      notes: form.notes,
-    };
     try {
       if (editingId) {
         await updateCustomer({ id: editingId, ...payload });
         toast.success("تم تحديث بيانات العميل");
-      } else {
-        if (!effectiveBranchId) {
-          toast.error("اختر فرع العميل أولًا");
-          return;
-        }
+      } else if (effectiveBranchId) {
         await createCustomer({ ...payload, branchId: effectiveBranchId });
         toast.success("تمت إضافة العميل");
       }
@@ -197,7 +196,12 @@ export function CustomersPage({
       await setCustomerActive({ id, isActive });
       toast.success(isActive ? "تمت إعادة تفعيل العميل" : "تم تعطيل العميل");
     } catch (error) {
-      toast.error(getErrorMessage(error, "تعذر تحديث حالة العميل"));
+      toast.error(
+        getErrorMessage(
+          error,
+          isActive ? "تعذر إعادة تفعيل العميل" : "تعذر تعطيل العميل",
+        ),
+      );
     } finally {
       setUpdatingId(null);
     }
@@ -444,10 +448,12 @@ export function CustomersPage({
       </div>
 
       {showForm && (
-        <ContactModal
+        <ContactFormModal
           title={editingId ? "تعديل بيانات العميل" : "إضافة عميل جديد"}
+          nameLabel="الاسم *"
           form={form}
           saving={saving}
+          validation={formValidation}
           onChange={setForm}
           onClose={closeForm}
           onSubmit={handleSubmit}
@@ -479,119 +485,3 @@ function StatCard({
   );
 }
 
-function ContactModal({
-  title,
-  form,
-  saving,
-  onChange,
-  onClose,
-  onSubmit,
-}: {
-  title: string;
-  form: CustomerForm;
-  saving: boolean;
-  onChange: (form: CustomerForm) => void;
-  onClose: () => void;
-  onSubmit: (event: React.FormEvent) => void;
-}) {
-  return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md animate-fade-in-up">
-        <div className="p-5 border-b flex items-center justify-between">
-          <h2 className="text-lg font-bold text-slate-800">{title}</h2>
-          <button
-            type="button"
-            disabled={saving}
-            onClick={onClose}
-            className="p-2 hover:bg-slate-100 rounded-lg"
-            aria-label="إغلاق"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-        <form onSubmit={onSubmit} className="p-6 space-y-4">
-          <ContactField
-            label="الاسم *"
-            value={form.name}
-            required
-            onChange={(name) => onChange({ ...form, name })}
-          />
-          <ContactField
-            label="رقم الهاتف *"
-            value={form.phone}
-            required
-            onChange={(phone) => onChange({ ...form, phone })}
-          />
-          <ContactField
-            label="البريد الإلكتروني"
-            value={form.email}
-            type="email"
-            onChange={(email) => onChange({ ...form, email })}
-          />
-          <ContactField
-            label="العنوان"
-            value={form.address}
-            onChange={(address) => onChange({ ...form, address })}
-          />
-          <label className="block">
-            <span className="form-label">ملاحظات</span>
-            <textarea
-              className="form-input"
-              rows={2}
-              maxLength={1000}
-              value={form.notes}
-              onChange={(event) =>
-                onChange({ ...form, notes: event.target.value })
-              }
-            />
-          </label>
-          <div className="flex gap-3 pt-2">
-            <button
-              type="submit"
-              disabled={saving}
-              className="btn-primary flex-1"
-            >
-              {saving ? "جارٍ الحفظ..." : "حفظ"}
-            </button>
-            <button
-              type="button"
-              disabled={saving}
-              onClick={onClose}
-              className="btn-secondary"
-            >
-              إلغاء
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-}
-
-function ContactField({
-  label,
-  value,
-  onChange,
-  required = false,
-  type = "text",
-}: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  required?: boolean;
-  type?: "text" | "email";
-}) {
-  return (
-    <label className="block">
-      <span className="form-label">{label}</span>
-      <input
-        className="form-input"
-        type={type}
-        required={required}
-        maxLength={type === "email" ? 254 : 300}
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-      />
-    </label>
-  );
-}
