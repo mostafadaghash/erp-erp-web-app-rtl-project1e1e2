@@ -1,0 +1,260 @@
+name: Apply Repairs UAT Action Validation
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.head_ref == 'codex/repairs-uat-action-validation'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+      - name: Apply RepairsPage validation patch
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path("src/components/RepairsPage.tsx")
+          text = path.read_text()
+
+          def replace_once(label: str, old: str, new: str):
+              global text
+              if old not in text:
+                  raise SystemExit(f"missing expected source: {label}")
+              text = text.replace(old, new, 1)
+
+          replace_once(
+              "validation helpers",
+              'import { getErrorMessage } from "../lib/errors";\n\nconst statusConfig',
+              'import { getErrorMessage } from "../lib/errors";\n\nconst isIsoDate = (value: string) => {\n  if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(value)) return false;\n  const parsed = new Date(`${value}T00:00:00.000Z`);\n  return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;\n};\nconst isMoney = (value: number) =>\n  Number.isFinite(value) && value >= 0 && Math.round(value * 100) / 100 === value;\n\nconst statusConfig',
+          )
+
+          validation_block = '''  const laborCostAmount = Number(form.laborCost || 0);
+  const depositAmount = Number(form.deposit || 0);
+  const completedPartRows = parts.filter((part) => part.productId);
+
+  const createValidationReason = (() => {
+    if (requiresBranchSelection) return "اختر فرع أمر الصيانة";
+    if (!form.customerName.trim()) return "أدخل اسم العميل";
+    if (!form.customerPhone.trim()) return "أدخل رقم الهاتف";
+    if (!form.deviceBrand.trim()) return "أدخل ماركة الجهاز";
+    if (!form.deviceModel.trim()) return "أدخل موديل الجهاز";
+    if (!form.problem.trim()) return "أدخل وصف المشكلة";
+    if (!isMoney(laborCostAmount)) return "أدخل تكلفة عمالة صحيحة";
+    if (parts.length > 100) return "لا يمكن إضافة أكثر من 100 قطعة لأمر الصيانة";
+    if (parts.some((part) => !part.productId)) {
+      return "اختر قطعة الغيار أو احذف السطر غير المكتمل";
+    }
+    if (completedPartRows.some((part) =>
+      !Number.isInteger(Number(part.quantity)) || Number(part.quantity) <= 0
+    )) return "كمية قطعة الغيار يجب أن تكون عددًا صحيحًا أكبر من صفر";
+    if (new Set(completedPartRows.map((part) => part.productId)).size !== completedPartRows.length) {
+      return "لا يمكن تكرار قطعة الغيار";
+    }
+    const stockViolation = completedPartRows.find((part) => {
+      const product = partOptions.find((option) => option._id === part.productId);
+      return product && Number(part.quantity) > product.stock;
+    });
+    if (stockViolation) {
+      const product = partOptions.find((option) => option._id === stockViolation.productId);
+      return `كمية ${product?.name ?? "قطعة الغيار"} تتجاوز المخزون المتاح`;
+    }
+    if (!isMoney(depositAmount)) return "أدخل عربونًا صحيحًا";
+    if (depositAmount > laborCostAmount + partsTotal) {
+      return "العربون لا يمكن أن يتجاوز إجمالي أمر الصيانة";
+    }
+    if (depositAmount > 0 && !canCollect) return "لا تملك صلاحية تحصيل العربون";
+    if (depositAmount > 0 && !initialDepositAccounts.some((account) => account._id === accountId)) {
+      return "اختر حساب تحصيل العربون";
+    }
+    if (form.expectedDate && !isIsoDate(form.expectedDate)) {
+      return "تاريخ التسليم المتوقع غير صالح";
+    }
+    return null;
+  })();
+
+  const transitionValidationReason = (() => {
+    if (!transitionTarget || !transitionNext) return null;
+    if (!isIsoDate(transitionForm.date)) return "اختر تاريخ عملية صالحًا";
+    if (transitionNext === "in_progress" && !transitionTarget.technicianName) {
+      return "عيّن فنيًا قبل بدء الإصلاح";
+    }
+    if (transitionNext === "ready" && !transitionForm.diagnosis.trim()) {
+      return "أدخل التشخيص النهائي قبل اعتماد الجاهزية";
+    }
+    if (transitionNext === "cancelled") {
+      if (transitionTarget.deposit > 0) return "استرد العربون بالكامل قبل إلغاء الصيانة";
+      if (!transitionForm.reason.trim()) return "أدخل سبب الإلغاء";
+    }
+    if (transitionNext === "delivered") {
+      if (transitionTarget.remaining > 0) return "حصّل المبلغ المتبقي قبل تسليم الجهاز";
+      const warrantyDays = Number(transitionForm.warrantyDays || 0);
+      if (!Number.isInteger(warrantyDays) || warrantyDays < 0 || warrantyDays > 365) {
+        return "مدة الضمان يجب أن تكون عدد أيام صحيحًا من صفر إلى 365";
+      }
+    }
+    return null;
+  })();
+
+  const collectionValidationReason = (() => {
+    if (!collectionTarget) return null;
+    const amount = Number(collectionForm.amount);
+    if (!isMoney(amount) || amount <= 0 || amount > collectionTarget.remaining) {
+      return "مبلغ التحصيل يجب أن يكون أكبر من صفر ولا يتجاوز المتبقي";
+    }
+    if (!targetCollectionAccounts.some((account) => account._id === collectionForm.accountId)) {
+      return "اختر حساب تحصيل تابعًا لفرع أمر الصيانة";
+    }
+    if (!isIsoDate(collectionForm.date)) return "اختر تاريخ تحصيل صالحًا";
+    return null;
+  })();
+
+  const refundValidationReason = (() => {
+    if (!refundTarget) return null;
+    const amount = Number(refundForm.amount);
+    if (!isMoney(amount) || amount <= 0 || amount > refundTarget.deposit) {
+      return "مبلغ الاسترداد يجب أن يكون أكبر من صفر ولا يتجاوز المحصل";
+    }
+    if (!refundForm.reason.trim()) return "سبب الاسترداد مطلوب";
+    if (!targetRefundAccounts.some((account) => account._id === refundForm.accountId)) {
+      return "اختر حساب استرداد تابعًا لفرع أمر الصيانة";
+    }
+    if (!isIsoDate(refundForm.date)) return "اختر تاريخ استرداد صالحًا";
+    return null;
+  })();
+
+  const editValidationReason = editTarget && editForm.expectedDate && !isIsoDate(editForm.expectedDate)
+    ? "تاريخ التسليم المتوقع غير صالح"
+    : null;
+
+'''
+          replace_once(
+              "central validation block",
+              '''  const partsTotal = parts.reduce((sum, row) => {
+    const product = partOptions.find((part) => part._id === row.productId);
+    return sum + (product?.sellPrice ?? 0) * Number(row.quantity || 0);
+  }, 0);
+
+  useEffect(() => {''',
+              '''  const partsTotal = parts.reduce((sum, row) => {
+    const product = partOptions.find((part) => part._id === row.productId);
+    return sum + (product?.sellPrice ?? 0) * Number(row.quantity || 0);
+  }, 0);
+
+''' + validation_block + '''  useEffect(() => {''',
+          )
+
+          replace_once(
+              "create handler guard",
+              '''    if (saving) return;
+    if (Number(form.deposit) > 0 && !accountId)''',
+              '''    if (saving) return;
+    if (createValidationReason) { toast.error(createValidationReason); return; }
+    if (Number(form.deposit) > 0 && !accountId)''',
+          )
+          replace_once(
+              "transition handler guard",
+              '''    if (!transitionTarget || !transitionNext || updatingId) return;
+    setUpdatingId(transitionTarget._id);''',
+              '''    if (!transitionTarget || !transitionNext || updatingId) return;
+    if (transitionValidationReason) { toast.error(transitionValidationReason); return; }
+    setUpdatingId(transitionTarget._id);''',
+          )
+          replace_once(
+              "edit handler guard",
+              '''    if (!editTarget || updatingId) return;
+    setUpdatingId(editTarget._id);''',
+              '''    if (!editTarget || updatingId) return;
+    if (editValidationReason) { toast.error(editValidationReason); return; }
+    setUpdatingId(editTarget._id);''',
+          )
+          replace_once(
+              "collection handler guard",
+              '''    if (!collectionTarget || financialBusy) return;
+    const amount = Number(collectionForm.amount);''',
+              '''    if (!collectionTarget || financialBusy) return;
+    if (collectionValidationReason) { toast.error(collectionValidationReason); return; }
+    const amount = Number(collectionForm.amount);''',
+          )
+          replace_once(
+              "refund handler guard",
+              '''    if (!refundTarget || financialBusy) return;
+    const amount = Number(refundForm.amount);''',
+              '''    if (!refundTarget || financialBusy) return;
+    if (refundValidationReason) { toast.error(refundValidationReason); return; }
+    const amount = Number(refundForm.amount);''',
+          )
+
+          alert_class = 'rounded-lg bg-amber-50 p-3 text-sm font-medium text-amber-800'
+          replace_once(
+              "collection action button",
+              '''              <div className="flex gap-3">
+                <button
+                  className="btn-primary flex-1"
+                  disabled={financialBusy !== null || targetCollectionAccounts.length === 0}''',
+              f'''              {{collectionValidationReason && <p role="alert" className="{alert_class}">{{collectionValidationReason}}</p>}}
+              <div className="flex gap-3">
+                <button
+                  className="btn-primary flex-1"
+                  title={{collectionValidationReason ?? undefined}}
+                  disabled={{financialBusy !== null || Boolean(collectionValidationReason)}}''',
+          )
+          replace_once(
+              "refund action button",
+              '''              <div className="flex gap-3">
+                <button
+                  className="btn-primary flex-1"
+                  disabled={financialBusy !== null || targetRefundAccounts.length === 0}''',
+              f'''              {{refundValidationReason && <p role="alert" className="{alert_class}">{{refundValidationReason}}</p>}}
+              <div className="flex gap-3">
+                <button
+                  className="btn-primary flex-1"
+                  title={{refundValidationReason ?? undefined}}
+                  disabled={{financialBusy !== null || Boolean(refundValidationReason)}}''',
+          )
+          replace_once(
+              "transition action button",
+              '''              <div className="flex gap-3">
+                <button
+                  className="btn-primary flex-1"
+                  disabled={updatingId !== null}''',
+              f'''              {{transitionValidationReason && <p role="alert" className="{alert_class}">{{transitionValidationReason}}</p>}}
+              <div className="flex gap-3">
+                <button
+                  className="btn-primary flex-1"
+                  title={{transitionValidationReason ?? undefined}}
+                  disabled={{updatingId !== null || Boolean(transitionValidationReason)}}''',
+          )
+          replace_once(
+              "edit action button",
+              '''              <div className="flex gap-3 sm:col-span-2">
+                <button className="btn-primary flex-1" disabled={updatingId !== null}>{updatingId ? "جارٍ الحفظ..." : "حفظ التفاصيل"}</button>''',
+              f'''              {{editValidationReason && <p role="alert" className="sm:col-span-2 {alert_class}">{{editValidationReason}}</p>}}
+              <div className="flex gap-3 sm:col-span-2">
+                <button className="btn-primary flex-1" title={{editValidationReason ?? undefined}} disabled={{updatingId !== null || Boolean(editValidationReason)}}>{{updatingId ? "جارٍ الحفظ..." : "حفظ التفاصيل"}}</button>''',
+          )
+          replace_once(
+              "create action button",
+              '''              <div className="flex gap-3 pt-2">
+                <button type="submit" disabled={saving} className="btn-primary flex-1 disabled:opacity-50">حفظ طلب الصيانة</button>''',
+              f'''              {{createValidationReason && <p role="alert" className="{alert_class}">{{createValidationReason}}</p>}}
+              <div className="flex gap-3 pt-2">
+                <button type="submit" title={{createValidationReason ?? undefined}} disabled={{saving || Boolean(createValidationReason)}} className="btn-primary flex-1 disabled:opacity-50">حفظ طلب الصيانة</button>''',
+          )
+
+          path.write_text(text)
+          PY
+          git diff --check
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/components/RepairsPage.tsx
+          if ! git diff --cached --quiet; then
+            git commit -m "fix: validate repairs actions before submit"
+            git push origin HEAD:${{ github.head_ref }}
+          fi
