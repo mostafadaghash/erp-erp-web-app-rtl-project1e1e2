@@ -71,6 +71,13 @@ interface RepairData {
   warrantyUntil?: string;
   qualityCheckNotes?: string;
   employeeName?: string;
+  history?: Array<{
+    fromStatus?: string;
+    toStatus: string;
+    date: string;
+    reason?: string;
+    employeeName: string;
+  }>;
   notes?: string;
   _creationTime: number;
 }
@@ -562,6 +569,35 @@ function RepairTemplate({ data, settings }: { data: RepairData; settings: any })
           )}
         </div>
       </div>
+
+      {data.history && data.history.length > 0 && (
+        <>
+          <div className="print-section-title">سجل حالات الصيانة</div>
+          <table className="print-table">
+            <thead>
+              <tr>
+                <th className="print-th">التاريخ</th>
+                <th className="print-th">الانتقال</th>
+                <th className="print-th">بواسطة</th>
+                <th className="print-th">السبب</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.history.map((entry, index) => (
+                <tr key={`${entry.date}-${entry.toStatus}-${index}`} className={index % 2 === 0 ? "print-tr-even" : ""}>
+                  <td className="print-td">{entry.date}</td>
+                  <td className="print-td">
+                    {entry.fromStatus ? `${statusLabel[entry.fromStatus] ?? entry.fromStatus} ← ` : ""}
+                    {statusLabel[entry.toStatus] ?? entry.toStatus}
+                  </td>
+                  <td className="print-td">{entry.employeeName}</td>
+                  <td className="print-td">{entry.reason ?? "—"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </>
+      )}
 
       {/* ملاحظات */}
       {data.notes && (
