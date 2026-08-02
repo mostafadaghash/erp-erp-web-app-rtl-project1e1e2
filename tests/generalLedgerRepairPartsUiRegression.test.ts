@@ -59,10 +59,11 @@ test("RPU-08 creation request ID stays stable through a failed save", () => {
   assert.doesNotMatch(catchBlock, /resetCreateState|setRequestId/);
 });
 
-test("RPU-09 save busy guard prevents double part consumption", () => {
+test("RPU-09 save busy and action validation guards prevent double part consumption", () => {
   assert.match(source, /if \(saving\) return/);
+  assert.match(source, /if \(createValidationReason\)/);
   assert.match(source, /setSaving\(true\)/);
-  assert.match(source, /disabled=\{saving\}/);
+  assert.match(source, /disabled=\{saving \|\| Boolean\(createValidationReason\)\}/);
 });
 
 test("RPU-10 a new form and branch change clear stale creation state", () => {
