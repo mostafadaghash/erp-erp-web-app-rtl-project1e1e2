@@ -47,10 +47,10 @@ test("CSU-05 customer list waits for the user and supplies branch scope", () => 
   assert.match(customers, /useQuery\(api\.customers\.list, customerArgs\)/);
 });
 
-test("CSU-06 customer balances are skipped without ledger permission or branch", () => {
+test("CSU-06 customer balances are skipped without ledger permission or effective branch", () => {
   assert.match(
     customers,
-    /canViewLedger && me\?\.branchId \? \{ branchId: me\.branchId \} : "skip"/,
+    /canViewLedger && effectiveBranchId[\s\S]{0,100}\{ branchId: effectiveBranchId \}[\s\S]{0,40}: "skip"/,
   );
 });
 
@@ -91,11 +91,12 @@ test("CSU-12 supplier branch choices are permission-gated", () => {
   assert.match(suppliers, /aria-label="فرع أرصدة الموردين"/);
 });
 
-test("CSU-13 supplier balances are skipped until a permitted branch exists", () => {
+test("CSU-13 supplier balances are skipped until an explicit permitted branch exists", () => {
   assert.match(
     suppliers,
-    /canViewSupplierLedger && effectiveBranch[\s\S]{0,100}\{ branchId: effectiveBranch \}[\s\S]{0,80}pinnedBalanceArgs/,
+    /canViewSupplierLedger && effectiveBranch[\s\S]{0,100}\{ branchId: effectiveBranch \}[\s\S]{0,40}: "skip"/,
   );
+  assert.doesNotMatch(suppliers, /pinnedBalanceArgs|branches\?\.\[0\]\?\._id/);
 });
 
 test("CSU-14 supplier ledger uses Convex pagination with selected supplier and branch", () => {
