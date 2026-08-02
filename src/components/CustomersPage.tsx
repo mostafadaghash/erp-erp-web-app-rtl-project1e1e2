@@ -53,21 +53,10 @@ export function CustomersPage({
   const canEdit = usePermission("edit_customers");
   const canSetActive = usePermission("delete_customers");
   const canViewLedger = usePermission("view_customer_ledger");
+  const canViewBranches = usePermission("view_branches");
   const me = useQuery(api.employees.me);
-  const customerArgs = me
-    ? me.branchId
-      ? { branchId: me.branchId }
-      : {}
-    : "skip";
-  const customers = useQuery(api.customers.list, customerArgs) ?? [];
-  const balances = useQuery(
-    api.customerLedger.branchBalances,
-    canViewLedger && me?.branchId ? { branchId: me.branchId } : "skip",
-  ) as CustomerBalance[] | undefined;
-  const createCustomer = useMutation(api.customers.create);
-  const updateCustomer = useMutation(api.customers.update);
-  const setCustomerActive = useMutation(api.customers.setActive);
 
+  const [selectedBranchId, setSelectedBranchId] = useState("");
   const [search, setSearch] = useState("");
   const [editingId, setEditingId] = useState<Id<"customers"> | null>(null);
   const [showForm, setShowForm] = useState(false);
@@ -75,15 +64,56 @@ export function CustomersPage({
   const [updatingId, setUpdatingId] = useState<Id<"customers"> | null>(null);
   const [form, setForm] = useState<CustomerForm>(emptyForm);
 
+  const branchesQuery = useQuery(
+    api.branches.list,
+    canViewBranches && !me?.branchId ? {} : "skip",
+  );
+  const branches = branchesQuery ?? [];
+  const effectiveBranchId = me?.branchId ??
+    (selectedBranchId ? selectedBranchId as Id<"branches"> : null);
+  const requiresBranchSelection = Boolean(
+    me && !me.branchId && canViewBranches && branches.length > 0 && !selectedBranchId,
+  );
+  const noCustomerBranchAvailable = Boolean(
+    me &&
+      !me.branchId &&
+      canViewBranches &&
+      branchesQuery !== undefined &&
+      branches.length === 0,
+  );
+  const customerArgs = me && effectiveBranchId
+    ? { branchId: effectiveBranchId }
+    : "skip";
+  const customersQuery = useQuery(api.customers.list, customerArgs);
+  const customers = customersQuery ?? [];
+  const balances = useQuery(
+    api.customerLedger.branchBalances,
+    canViewLedger && effectiveBranchId
+      ? { branchId: effectiveBranchId }
+      : "skip",
+  ) as CustomerBalance[] | undefined;
+  const createCustomer = useMutation(api.customers.create);
+  const updateCustomer = useMutation(api.customers.update);
+  const setCustomerActive = useMutation(api.customers.setActive);
+
   const balanceFor = (id: Id<"customers">) =>
     balances?.find((balance) => balance.customerId === id);
   const hasBalanceScope =
-    canViewLedger && Boolean(me?.branchId) && balances !== undefined;
+    canViewLedger && Boolean(effectiveBranchId) && balances !== undefined;
   const filtered = customers.filter(
     (customer) =>
       customer.name.toLowerCase().includes(search.trim().toLowerCase()) ||
       customer.phone.includes(search.trim()),
   );
+
+  const handleCustomerBranchChange = (value: string) => {
+    if (saving || updatingId !== null) return;
+    setSelectedBranchId(value);
+    setShowForm(false);
+    setEditingId(null);
+    setForm(emptyForm);
+    setSearch("");
+  };
 
   const closeForm = () => {
     if (saving) return;
@@ -93,6 +123,10 @@ export function CustomersPage({
   };
 
   const openCreate = () => {
+    if (!effectiveBranchId) {
+      toast.error("اختر فرع العميل أولًا");
+      return;
+    }
     setEditingId(null);
     setForm(emptyForm);
     setShowForm(true);
@@ -126,7 +160,11 @@ export function CustomersPage({
         await updateCustomer({ id: editingId, ...payload });
         toast.success("تم تحديث بيانات العميل");
       } else {
-        await createCustomer({ ...payload, branchId: me?.branchId });
+        if (!effectiveBranchId) {
+          toast.error("اختر فرع العميل أولًا");
+          return;
+        }
+        await createCustomer({ ...payload, branchId: effectiveBranchId });
         toast.success("تمت إضافة العميل");
       }
       setShowForm(false);
@@ -166,7 +204,7 @@ export function CustomersPage({
   };
 
   const openLedger = (customer: CustomerCard) => {
-    const branchId = customer.branchId ?? me?.branchId;
+    const branchId = customer.branchId ?? effectiveBranchId;
     if (!onOpenLedger || !branchId) {
       toast.error("اختر فرع العمل قبل فتح دفتر العميل");
       return;
@@ -176,25 +214,49 @@ export function CustomersPage({
 
   return (
     <div className="p-4 lg:p-6 space-y-5">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-black text-slate-800 flex items-center gap-2">
             <Users className="w-6 h-6 text-indigo-600" />
             العملاء
           </h1>
-          <p className="text-slate-500 text-sm mt-0.5">{customers.length} عميل</p>
+          <p className="text-slate-500 text-sm mt-0.5">
+            {noCustomerBranchAvailable
+              ? "لا توجد فروع نشطة"
+              : requiresBranchSelection
+                ? "اختر الفرع لعرض العملاء"
+                : customersQuery === undefined
+                  ? "جارٍ تحميل العملاء"
+                  : `${customers.length} عميل`}
+          </p>
         </div>
-        {canCreate && (
-          <button
-            onClick={openCreate}
-            disabled={!me?.branchId}
-            className="btn-primary flex items-center gap-2"
-            title={!me?.branchId ? "اختر فرع العمل أولًا" : undefined}
-          >
-            <Plus className="w-4 h-4" />
-            عميل جديد
-          </button>
-        )}
+        <div className="flex items-center gap-2">
+          {canViewBranches && !me?.branchId && branches.length > 0 && (
+            <select
+              className="form-input min-w-40"
+              aria-label="فرع العملاء"
+              value={selectedBranchId}
+              disabled={saving || updatingId !== null}
+              onChange={(event) => handleCustomerBranchChange(event.target.value)}
+            >
+              <option value="">اختر الفرع</option>
+              {branches.map((branch: { _id: Id<"branches">; name: string }) => (
+                <option key={branch._id} value={branch._id}>{branch.name}</option>
+              ))}
+            </select>
+          )}
+          {canCreate && (
+            <button
+              onClick={openCreate}
+              disabled={!effectiveBranchId}
+              className="btn-primary flex items-center gap-2"
+              title={!effectiveBranchId ? "اختر فرع العميل أولًا" : undefined}
+            >
+              <Plus className="w-4 h-4" />
+              عميل جديد
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
@@ -355,10 +417,28 @@ export function CustomersPage({
             </article>
           );
         })}
-        {filtered.length === 0 && (
+        {requiresBranchSelection && (
           <div className="col-span-full text-center py-12 text-slate-400">
             <Users className="w-10 h-10 mx-auto mb-2 opacity-30" />
-            لا يوجد عملاء
+            اختر الفرع لعرض العملاء
+          </div>
+        )}
+        {!requiresBranchSelection && !noCustomerBranchAvailable && customersQuery === undefined && (
+          <div className="col-span-full text-center py-12 text-slate-400">
+            <Users className="w-10 h-10 mx-auto mb-2 opacity-30" />
+            جارٍ تحميل العملاء
+          </div>
+        )}
+        {!requiresBranchSelection && customersQuery !== undefined && customers.length === 0 && (
+          <div className="col-span-full text-center py-12 text-slate-400">
+            <Users className="w-10 h-10 mx-auto mb-2 opacity-30" />
+            لا يوجد عملاء في هذا الفرع
+          </div>
+        )}
+        {customers.length > 0 && filtered.length === 0 && (
+          <div className="col-span-full text-center py-12 text-slate-400">
+            <Users className="w-10 h-10 mx-auto mb-2 opacity-30" />
+            لا توجد نتائج مطابقة للبحث
           </div>
         )}
       </div>

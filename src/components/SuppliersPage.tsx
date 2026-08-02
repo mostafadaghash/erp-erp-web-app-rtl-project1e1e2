@@ -63,7 +63,8 @@ export function SuppliersPage() {
   const canSetActive = usePermission("delete_suppliers");
   const canViewSupplierLedger = usePermission("view_supplier_ledger");
   const me = useQuery(api.employees.me);
-  const suppliers = useQuery(api.suppliers.list) ?? [];
+  const suppliersQuery = useQuery(api.suppliers.list);
+  const suppliers = suppliersQuery ?? [];
   const branches = useQuery(
     api.suppliers.availableBranches,
     canViewSupplierLedger ? {} : "skip",
@@ -82,13 +83,18 @@ export function SuppliersPage() {
   const [updatingId, setUpdatingId] = useState<Id<"suppliers"> | null>(null);
   const [form, setForm] = useState<SupplierForm>(emptyForm);
 
-  const effectiveBranch =
-    selectedBranch ?? me?.branchId ?? branches?.[0]?._id ?? null;
-  const pinnedBalanceArgs = canViewSupplierLedger && me?.branchId ? { branchId: me.branchId } : "skip";
+  const effectiveBranch = me?.branchId ?? selectedBranch;
+  const requiresLedgerBranchSelection = Boolean(
+    canViewSupplierLedger &&
+      me &&
+      !me.branchId &&
+      (branches?.length ?? 0) > 0 &&
+      !selectedBranch,
+  );
   const supplierBalanceArgs =
     canViewSupplierLedger && effectiveBranch
       ? { branchId: effectiveBranch }
-      : pinnedBalanceArgs;
+      : "skip";
   const supplierBalances = useQuery(
     api.suppliers.branchBalances,
     supplierBalanceArgs,
@@ -110,12 +116,19 @@ export function SuppliersPage() {
 
   const balanceFor = (supplierId: Id<"suppliers">) =>
     supplierBalances?.find((balance) => balance.supplierId === supplierId)
-      ?.balance ?? 0;
+      ?.balance;
+  const hasSupplierBalanceScope =
+    supplierBalances !== undefined && Boolean(effectiveBranch);
   const filtered = suppliers.filter(
     (supplier) =>
       supplier.name.toLowerCase().includes(search.trim().toLowerCase()) ||
       supplier.phone.includes(search.trim()),
   );
+
+  const handleSupplierBranchChange = (value: string) => {
+    setSelectedBranch(value ? value as Id<"branches"> : null);
+    setLedgerTarget(null);
+  };
 
   const closeForm = () => {
     if (saving) return;
@@ -205,7 +218,11 @@ export function SuppliersPage() {
             <Truck className="w-6 h-6 text-indigo-600" />
             الموردون
           </h1>
-          <p className="text-slate-500 text-sm mt-0.5">{suppliers.length} مورد</p>
+          <p className="text-slate-500 text-sm mt-0.5">
+            {suppliersQuery === undefined
+              ? "جارٍ تحميل الموردين"
+              : `${suppliers.length} مورد`}
+          </p>
         </div>
         {canCreate && (
           <button
@@ -228,16 +245,14 @@ export function SuppliersPage() {
             onChange={(event) => setSearch(event.target.value)}
           />
         </div>
-        {canViewSupplierLedger && branches && branches.length > 1 && (
+        {canViewSupplierLedger && !me?.branchId && branches && branches.length > 0 && (
           <select
             className="form-input sm:max-w-xs"
             aria-label="فرع أرصدة الموردين"
-            value={effectiveBranch ?? ""}
-            onChange={(event) => {
-              setSelectedBranch(event.target.value as Id<"branches">);
-              setLedgerTarget(null);
-            }}
+            value={selectedBranch ?? ""}
+            onChange={(event) => handleSupplierBranchChange(event.target.value)}
           >
+            <option value="">اختر فرع الأرصدة</option>
             {branches.map((branch) => (
               <option key={branch._id} value={branch._id}>
                 {branch.name}
@@ -288,11 +303,17 @@ export function SuppliersPage() {
                 {supplier.address}
               </p>
             )}
-            {canViewSupplierLedger && effectiveBranch && (
-              <div className="pt-3 border-t border-slate-100 flex justify-between">
+            {canViewSupplierLedger && (
+              <div className="pt-3 border-t border-slate-100 flex justify-between gap-3">
                 <p className="text-xs text-slate-500">الرصيد المستحق</p>
-                <p className="font-bold text-sm text-amber-600">
-                  {balanceFor(supplier._id).toLocaleString("ar-EG")} ج.م
+                <p className="font-bold text-sm text-amber-600 text-left">
+                  {requiresLedgerBranchSelection
+                    ? "اختر فرع الأرصدة"
+                    : effectiveBranch && supplierBalances === undefined
+                      ? "جارٍ تحميل رصيد الفرع"
+                      : hasSupplierBalanceScope
+                        ? `${(balanceFor(supplier._id) ?? 0).toLocaleString("ar-EG")} ج.م`
+                        : "—"}
                 </p>
               </div>
             )}
@@ -306,7 +327,7 @@ export function SuppliersPage() {
                   تعديل
                 </button>
               )}
-              {canViewSupplierLedger && effectiveBranch && (
+              {canViewSupplierLedger && hasSupplierBalanceScope && (
                 <button
                   onClick={() => setLedgerTarget(supplier)}
                   className="btn-secondary text-xs flex items-center justify-center gap-1"
@@ -341,10 +362,22 @@ export function SuppliersPage() {
             )}
           </article>
         ))}
-        {filtered.length === 0 && (
+        {suppliersQuery === undefined && (
+          <div className="col-span-full text-center py-12 text-slate-400">
+            <Truck className="w-10 h-10 mx-auto mb-2 opacity-30" />
+            جارٍ تحميل الموردين
+          </div>
+        )}
+        {suppliersQuery !== undefined && suppliers.length === 0 && (
           <div className="col-span-full text-center py-12 text-slate-400">
             <Truck className="w-10 h-10 mx-auto mb-2 opacity-30" />
             لا يوجد موردون
+          </div>
+        )}
+        {suppliers.length > 0 && filtered.length === 0 && (
+          <div className="col-span-full text-center py-12 text-slate-400">
+            <Truck className="w-10 h-10 mx-auto mb-2 opacity-30" />
+            لا توجد نتائج مطابقة للبحث
           </div>
         )}
       </div>
@@ -370,7 +403,7 @@ export function SuppliersPage() {
                 </h2>
                 <p className="text-sm text-slate-500">
                   الرصيد الحالي:{" "}
-                  {balanceFor(ledgerTarget._id).toLocaleString("ar-EG")} ج.م
+                  {(balanceFor(ledgerTarget._id) ?? 0).toLocaleString("ar-EG")} ج.م
                 </p>
               </div>
               <button
@@ -382,6 +415,9 @@ export function SuppliersPage() {
               </button>
             </header>
             <div className="overflow-y-auto divide-y">
+              {ledgerStatus === "LoadingFirstPage" && (
+                <p className="p-8 text-center text-slate-400">جارٍ تحميل دفتر المورد</p>
+              )}
               {ledgerEntries.map((entry) => (
                 <article key={entry._id} className="p-4 text-sm">
                   <div className="flex flex-wrap justify-between gap-2">
@@ -414,7 +450,7 @@ export function SuppliersPage() {
                   </p>
                 </article>
               ))}
-              {ledgerEntries.length === 0 && ledgerStatus !== "LoadingFirstPage" && (
+              {ledgerEntries.length === 0 && ledgerStatus === "Exhausted" && (
                 <p className="p-8 text-center text-slate-400">
                   لا توجد حركات لهذا المورد في الفرع المحدد
                 </p>
@@ -428,6 +464,11 @@ export function SuppliersPage() {
                 >
                   تحميل المزيد
                 </button>
+              </footer>
+            )}
+            {ledgerStatus === "LoadingMore" && (
+              <footer className="p-4 border-t text-center text-sm text-slate-400">
+                جارٍ تحميل المزيد
               </footer>
             )}
           </section>
