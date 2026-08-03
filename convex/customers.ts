@@ -192,6 +192,13 @@ export const update = mutation({
       normalized.phone,
       customer._id,
     );
+    const customerUnchanged =
+      normalized.name === customer.name &&
+      normalized.phone === customer.phone &&
+      normalized.email === customer.email &&
+      normalized.address === customer.address &&
+      normalized.notes === customer.notes;
+    if (customerUnchanged) return;
     await ctx.db.patch(id, normalized);
     await logAction(ctx, user, {
       action: "update",
@@ -207,8 +214,11 @@ export const setActive = mutation({
   args: { id: v.id("customers"), isActive: v.boolean() },
   handler: async (ctx, args) => {
     const user = await requirePermission(ctx, "delete_customers");
-    const customer = await ctx.db.get(args.id); if (!customer) throw new ConvexError("العميل غير موجود");
-    assertBranchAccess(user, customer); await ctx.db.patch(args.id, { isActive: args.isActive });
+    const customer = await ctx.db.get(args.id);
+    if (!customer) throw new ConvexError("العميل غير موجود");
+    assertBranchAccess(user, customer);
+    if (customer.isActive === args.isActive) return;
+    await ctx.db.patch(args.id, { isActive: args.isActive });
     await logAction(ctx, user, { action: args.isActive ? "activate" : "deactivate", module: "customers", recordId: args.id, recordLabel: customer.name, details: `${args.isActive ? "تفعيل" : "تعطيل"} العميل ${customer.name}` });
   },
 });
