@@ -100,6 +100,12 @@ export function CustomersPage({
     balances?.find((balance) => balance.customerId === id);
   const hasBalanceScope =
     canViewLedger && Boolean(effectiveBranchId) && balances !== undefined;
+  const customersLoaded = customersQuery !== undefined;
+  const balancesLoading =
+    canViewLedger && Boolean(effectiveBranchId) && balances === undefined;
+  const missingCustomerBranchAccess = Boolean(
+    me && !me.branchId && !canViewBranches,
+  );
   const filtered = customers.filter(
     (customer) =>
       customer.name.toLowerCase().includes(search.trim().toLowerCase()) ||
@@ -227,7 +233,9 @@ export function CustomersPage({
           <p className="text-slate-500 text-sm mt-0.5">
             {noCustomerBranchAvailable
               ? "لا توجد فروع نشطة"
-              : requiresBranchSelection
+              : missingCustomerBranchAccess
+                ? "لا يوجد فرع عمل متاح لعرض العملاء"
+                : requiresBranchSelection
                 ? "اختر الفرع لعرض العملاء"
                 : customersQuery === undefined
                   ? "جارٍ تحميل العملاء"
@@ -264,30 +272,38 @@ export function CustomersPage({
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-        <StatCard label="إجمالي العملاء" value={customers.length} color="indigo" />
+        <StatCard
+          label="إجمالي العملاء"
+          value={customersLoaded ? customers.length : "—"}
+          color="indigo"
+        />
         <StatCard
           label="عملاء بمديونية"
           value={
-            hasBalanceScope
-              ? customers.filter(
+            balancesLoading
+              ? "…"
+              : hasBalanceScope
+                ? customers.filter(
                   (customer) =>
                     (balanceFor(customer._id)?.receivableBalance ?? 0) > 0,
-                ).length
-              : "—"
+                  ).length
+                : "—"
           }
           color="amber"
         />
         <StatCard
           label="إجمالي المديونيات"
           value={
-            hasBalanceScope
-              ? `${(balances ?? [])
+            balancesLoading
+              ? "…"
+              : hasBalanceScope
+                ? `${(balances ?? [])
                   .reduce(
                     (sum, balance) => sum + balance.receivableBalance,
                     0,
                   )
-                  .toLocaleString("ar-EG")} ج.م`
-              : "—"
+                    .toLocaleString("ar-EG")} ج.م`
+                : "—"
           }
           color="emerald"
         />
@@ -299,6 +315,8 @@ export function CustomersPage({
           className="form-input pr-10"
           placeholder="بحث بالاسم أو رقم الهاتف..."
           value={search}
+          disabled={!customersLoaded}
+          title={!customersLoaded ? "اختر الفرع وانتظر تحميل العملاء" : undefined}
           onChange={(event) => setSearch(event.target.value)}
         />
       </div>
@@ -421,13 +439,19 @@ export function CustomersPage({
             </article>
           );
         })}
+        {missingCustomerBranchAccess && (
+          <div className="col-span-full text-center py-12 text-amber-700">
+            <Users className="w-10 h-10 mx-auto mb-2 opacity-30" />
+            لا يوجد فرع عمل متاح لعرض العملاء
+          </div>
+        )}
         {requiresBranchSelection && (
           <div className="col-span-full text-center py-12 text-slate-400">
             <Users className="w-10 h-10 mx-auto mb-2 opacity-30" />
             اختر الفرع لعرض العملاء
           </div>
         )}
-        {!requiresBranchSelection && !noCustomerBranchAvailable && customersQuery === undefined && (
+        {!requiresBranchSelection && !noCustomerBranchAvailable && !missingCustomerBranchAccess && customersQuery === undefined && (
           <div className="col-span-full text-center py-12 text-slate-400">
             <Users className="w-10 h-10 mx-auto mb-2 opacity-30" />
             جارٍ تحميل العملاء
