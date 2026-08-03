@@ -37,7 +37,7 @@ test("contact form normalization matches the backend contact rules", () => {
   });
 });
 
-test("empty optional contact fields are omitted from mutation payloads", () => {
+test("empty optional contact fields stay explicit so updates can clear stored values", () => {
   const result = validateContactForm({
     ...baseForm,
     email: "   ",
@@ -50,7 +50,11 @@ test("empty optional contact fields are omitted from mutation payloads", () => {
   assert.deepEqual(result.payload, {
     name: "عميل تجريبي",
     phone: "01012345678",
+    email: "",
+    address: "",
+    notes: "",
   });
+  assert.deepEqual(result.normalizedForm, result.payload);
 });
 
 test("contact validation reports specific required and format failures", () => {

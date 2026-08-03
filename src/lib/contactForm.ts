@@ -16,9 +16,9 @@ export type ContactFormValues = {
 export type ContactPayload = {
   name: string;
   phone: string;
-  email?: string;
-  address?: string;
-  notes?: string;
+  email: string;
+  address: string;
+  notes: string;
 };
 
 export type ContactFormErrors = Partial<
@@ -104,20 +104,14 @@ export function validateContactForm(
   const payload: ContactPayload = {
     name,
     phone,
-    ...(email ? { email } : {}),
-    ...(address ? { address } : {}),
-    ...(notes ? { notes } : {}),
+    email: email ?? "",
+    address: address ?? "",
+    notes: notes ?? "",
   };
 
   return {
     ok: true,
     payload,
-    normalizedForm: {
-      name,
-      phone,
-      email: email ?? "",
-      address: address ?? "",
-      notes: notes ?? "",
-    },
+    normalizedForm: payload,
   };
 }
