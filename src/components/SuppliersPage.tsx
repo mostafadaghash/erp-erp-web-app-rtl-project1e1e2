@@ -124,6 +124,22 @@ export function SuppliersPage() {
       supplier.name.toLowerCase().includes(search.trim().toLowerCase()) ||
       supplier.phone.includes(search.trim()),
   );
+  const supplierBranchStatus = (() => {
+    if (!canViewSupplierLedger) return null;
+    if (me === undefined || (!me.branchId && branches === undefined)) {
+      return "جارٍ تحميل فروع الأرصدة";
+    }
+    if (!me?.branchId && (branches?.length ?? 0) === 0) {
+      return "لا توجد فروع نشطة لعرض أرصدة الموردين";
+    }
+    if (requiresLedgerBranchSelection) {
+      return "اختر فرعًا لعرض أرصدة ودفاتر الموردين";
+    }
+    if (effectiveBranch && supplierBalances === undefined) {
+      return "جارٍ تحميل أرصدة الموردين للفرع المحدد";
+    }
+    return null;
+  })();
 
   const handleSupplierBranchChange = (value: string) => {
     setSelectedBranch(value ? value as Id<"branches"> : null);
@@ -265,6 +281,15 @@ export function SuppliersPage() {
           </select>
         )}
       </div>
+
+      {supplierBranchStatus && (
+        <p
+          role="status"
+          className="rounded-xl bg-slate-100 p-3 text-sm font-medium text-slate-700"
+        >
+          {supplierBranchStatus}
+        </p>
+      )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {filtered.map((supplier) => (
