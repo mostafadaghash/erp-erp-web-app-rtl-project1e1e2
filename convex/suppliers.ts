@@ -190,6 +190,13 @@ export const update = mutation({
       notes: args.notes !== undefined ? args.notes : supplier.notes,
     });
     await assertUniqueSupplierPhone(ctx, normalized.phone, supplier._id);
+    const supplierUnchanged =
+      normalized.name === supplier.name &&
+      normalized.phone === supplier.phone &&
+      normalized.email === supplier.email &&
+      normalized.address === supplier.address &&
+      normalized.notes === supplier.notes;
+    if (supplierUnchanged) return;
     await ctx.db.patch(id, normalized);
     await logAction(ctx, user, {
       action: "update",
@@ -203,6 +210,13 @@ export const update = mutation({
 
 export const setActive = mutation({
   args: { id: v.id("suppliers"), isActive: v.boolean() },
-  handler: async (ctx, args) => { const user = await requireModulePermission(ctx, "delete_suppliers", "suppliers"); const supplier = await ctx.db.get(args.id); if (!supplier) throw new ConvexError("المورد غير موجود"); await ctx.db.patch(args.id, { isActive: args.isActive }); await logAction(ctx, user, { action: args.isActive ? "activate" : "deactivate", module: "suppliers", recordId: args.id, recordLabel: supplier.name, details: `${args.isActive ? "تفعيل" : "تعطيل"} المورد ${supplier.name}` }); },
+  handler: async (ctx, args) => {
+    const user = await requireModulePermission(ctx, "delete_suppliers", "suppliers");
+    const supplier = await ctx.db.get(args.id);
+    if (!supplier) throw new ConvexError("المورد غير موجود");
+    if (supplier.isActive === args.isActive) return;
+    await ctx.db.patch(args.id, { isActive: args.isActive });
+    await logAction(ctx, user, { action: args.isActive ? "activate" : "deactivate", module: "suppliers", recordId: args.id, recordLabel: supplier.name, details: `${args.isActive ? "تفعيل" : "تعطيل"} المورد ${supplier.name}` });
+  },
 });
 export const remove = mutation({ args: { id: v.id("suppliers") }, handler: async () => { throw new ConvexError("استخدم تعطيل المورد بدلاً من الحذف"); } });

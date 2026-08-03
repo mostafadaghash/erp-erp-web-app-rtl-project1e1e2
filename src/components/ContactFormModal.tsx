@@ -1,4 +1,4 @@
-import type { FormEvent } from "react";
+import { useEffect, useRef, type FormEvent } from "react";
 import { X } from "lucide-react";
 import type {
   ContactFormValidation,
@@ -27,6 +27,18 @@ export function ContactFormModal({
   onSubmit,
 }: ContactFormModalProps) {
   const errors = validation.ok ? undefined : validation.errors;
+  const submitLock = useRef(false);
+
+  useEffect(() => {
+    if (!saving) submitLock.current = false;
+  }, [saving]);
+
+  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (submitLock.current) return;
+    submitLock.current = true;
+    onSubmit(event);
+  };
 
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
@@ -43,7 +55,7 @@ export function ContactFormModal({
             <X className="w-5 h-5" />
           </button>
         </header>
-        <form noValidate onSubmit={onSubmit} className="p-6 space-y-4">
+        <form noValidate onSubmit={handleSubmit} className="p-6 space-y-4">
           <ContactField
             id="contact-name"
             label={nameLabel}
