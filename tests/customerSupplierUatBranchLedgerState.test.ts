@@ -10,7 +10,7 @@ test("CSU-01 customer summary cards do not present loading as zero", () => {
   assert.match(customers, /const customersLoaded = customersQuery !== undefined/);
   assert.match(customers, /value=\{customersLoaded \? customers\.length : "—"\}/);
   assert.match(customers, /const balancesLoading =[\s\S]*balances === undefined/);
-  assert.match(customers, /balancesLoading \? "…"/);
+  assert.match(customers, /balancesLoading\s*\?\s*"…"/);
 });
 
 test("CSU-02 customer search is disabled until a branch list is ready", () => {
