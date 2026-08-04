@@ -16,7 +16,7 @@ replaceOnce(
     module: "customer_ledger",
     recordId: String(entryId),
     recordLabel: entryNumber,
-    details: \`${input.description} (${customer.name})\`,
+    details: input.description + " (" + customer.name + ")",
     branchId: input.branchId,
     sourceType: input.referenceType,
     sourceId: input.referenceId,
@@ -76,7 +76,7 @@ replaceOnce(
     module: "supplier_payments",
     recordId: String(paymentId),
     recordLabel: paymentNumber,
-    details: \`دفعة مورد ${paymentNumber}\`,
+    details: "دفعة مورد " + paymentNumber,
     branchId,
     sourceType: "supplier_payment",
     sourceId: String(paymentId),
@@ -214,7 +214,7 @@ test("ALP-08 audit UI names ledger and payment references without URL navigation
   }
   assert.doesNotMatch(auditUi, /href=\\{.*log\\./);
   assert.doesNotMatch(auditUi, /navigate\\(.*log\\./);
-  const newAudits = \`${customerLedger}\\n${supplierLedger}\\n${supplierPayments}\`;
+  const newAudits = customerLedger + "\n" + supplierLedger + "\n" + supplierPayments;
   assert.doesNotMatch(newAudits, /before:\\s*\\{[^}]*(requestId|idempotency|fingerprint|token)/i);
   assert.doesNotMatch(newAudits, /after:\\s*\\{[^}]*(requestId|idempotency|fingerprint|token)/i);
 });

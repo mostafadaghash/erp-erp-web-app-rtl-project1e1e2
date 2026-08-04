@@ -73,6 +73,9 @@ const MODULE_LABELS: Record<string, string> = {
   settings: "الإعدادات",
   finance: "المالية",
   general_ledger: "الأستاذ العام",
+  customer_ledger: "دفتر العملاء",
+  supplier_ledger: "دفتر الموردين",
+  supplier_payments: "مدفوعات الموردين",
 };
 
 const FIELD_LABELS: Record<string, string> = {
@@ -95,6 +98,19 @@ const FIELD_LABELS: Record<string, string> = {
   minStock: "حد المخزون",
   unit: "الوحدة",
   stock: "المخزون",
+  type: "نوع الحركة",
+  status: "الحالة",
+  date: "التاريخ",
+  amount: "المبلغ",
+  amountDelta: "أثر الحركة",
+  balance: "الرصيد",
+  receivableBalance: "مديونية العميل",
+  advanceBalance: "الرصيد المقدم",
+  totalPurchases: "إجمالي المشتريات",
+  allocationsCount: "عدد التوزيعات",
+  accountName: "الحساب المالي",
+  supplierName: "المورد",
+  reversalReason: "سبب العكس",
 };
 
 type SnapshotRow = { field: string; value: string };
@@ -108,6 +124,19 @@ const DOCUMENT_TYPE_LABELS: Record<string, string> = {
   accounting_period: "فترة محاسبية",
   general_ledger_settings: "إعدادات الأستاذ",
   general_ledger_opening: "افتتاح الأستاذ",
+  customer: "عميل",
+  customer_ledger_entry: "حركة دفتر عميل",
+  supplier: "مورد",
+  supplier_ledger_entry: "حركة دفتر مورد",
+  supplier_payment: "سند دفع مورد",
+  supplier_payment_reversal: "عكس سند دفع مورد",
+  purchase_receipt: "مستند شراء",
+  purchase_return: "مرتجع شراء",
+  supplier_refund: "استرداد مورد",
+  invoice: "فاتورة",
+  order: "طلب",
+  repair: "إصلاح",
+  delivery: "توصيل",
 };
 
 function DocumentLinks({
