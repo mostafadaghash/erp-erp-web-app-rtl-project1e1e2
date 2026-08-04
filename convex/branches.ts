@@ -43,6 +43,8 @@ export const create = mutation({
       recordId: id,
       recordLabel: args.name,
       details: `إضافة فرع جديد: ${args.name} - ${args.address}`,
+      branchId: id,
+      after: { name: args.name, address: args.address, phone: args.phone, isActive: args.isActive ?? true },
     });
     return id;
   },
@@ -68,13 +70,38 @@ export const update = mutation({
       recordId: id,
       recordLabel: args.name,
       details: `تحديث بيانات الفرع: ${args.name}`,
+      branchId: id,
+      before: { name: branch.name, address: branch.address, phone: branch.phone, isActive: branch.isActive },
+      after: { name: data.name, address: data.address, phone: data.phone, isActive: data.isActive },
     });
   },
 });
 
 export const setActive = mutation({
   args: { id: v.id("branches"), isActive: v.boolean() },
-  handler: async (ctx, args) => { const user = await requireModulePermission(ctx, "manage_branches", "branches"); const branch = await ctx.db.get(args.id); if (!branch) throw new ConvexError("الفرع غير موجود"); if (!args.isActive) { const employees = (await ctx.db.query("userProfiles").collect()).filter(profile => profile.branchId === args.id && profile.isActive); if (employees.length) throw new ConvexError("لا يمكن تعطيل فرع يحتوي على موظفين نشطين"); } await ctx.db.patch(args.id, { isActive: args.isActive }); await logAction(ctx, user, { action: args.isActive ? "activate" : "deactivate", module: "branches", recordId: args.id, recordLabel: branch.name, details: `${args.isActive ? "تفعيل" : "تعطيل"} الفرع ${branch.name}` }); },
+  handler: async (ctx, args) => {
+    const user = await requireModulePermission(ctx, "manage_branches", "branches");
+    const branch = await ctx.db.get(args.id);
+    if (!branch) throw new ConvexError("الفرع غير موجود");
+    if (branch.isActive === args.isActive) return;
+    if (!args.isActive) {
+      const employees = (await ctx.db.query("userProfiles").collect()).filter(
+        (profile) => profile.branchId === args.id && profile.isActive,
+      );
+      if (employees.length) throw new ConvexError("لا يمكن تعطيل فرع يحتوي على موظفين نشطين");
+    }
+    await ctx.db.patch(args.id, { isActive: args.isActive });
+    await logAction(ctx, user, {
+      action: args.isActive ? "activate" : "deactivate",
+      module: "branches",
+      recordId: args.id,
+      recordLabel: branch.name,
+      details: `${args.isActive ? "تفعيل" : "تعطيل"} الفرع ${branch.name}`,
+      branchId: args.id,
+      before: { isActive: branch.isActive },
+      after: { isActive: args.isActive },
+    });
+  },
 });
 export const remove = mutation({ args: { id: v.id("branches") }, handler: async () => { throw new ConvexError("استخدم تعطيل الفرع بدلاً من الحذف"); } });
 
@@ -152,6 +179,8 @@ export const assignLegacyData = mutation({
       recordId: args.branchId,
       recordLabel: branch.name,
       details: `إسناد ${assigned} سجل قديم بدون فرع إلى ${branch.name}`,
+      branchId: args.branchId,
+      after: { assignedRecords: assigned, targetBranch: branch.name },
     });
     return assigned;
   },

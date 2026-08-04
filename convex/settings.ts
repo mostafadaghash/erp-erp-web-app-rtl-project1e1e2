@@ -64,6 +64,9 @@ export const upsert = mutation({
       recordId: id,
       recordLabel: args.storeName,
       details: `تحديث إعدادات المتجر: ${args.storeName}`,
+      branchId: null,
+      before: existing ? { storeName: existing.storeName, storeType: existing.storeType, currency: existing.currency, taxRate: existing.taxRate } : undefined,
+      after: { storeName: normalizedArgs.storeName, storeType: normalizedArgs.storeType, currency: normalizedArgs.currency, taxRate: normalizedArgs.taxRate },
     });
   },
 });
@@ -108,6 +111,9 @@ export const updateModules = mutation({
       recordId: id,
       recordLabel: "modules",
       details: `تحديث تفعيل الوحدات`,
+      branchId: null,
+      before: existing?.modules,
+      after: args.modules,
     });
   },
 });

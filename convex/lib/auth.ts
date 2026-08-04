@@ -172,10 +172,55 @@ export function resolveWriteBranch(
 }
 
 // ──────────────────────────────────────────────
-// logAction — centralized audit logging
-// Matches the call signature used by all modules:
-//   logAction(ctx, user, { action, module, recordId, recordLabel, details })
+// logAction — centralized immutable audit logging
+// Callers pass only explicitly safe scalar snapshot fields.
 // ──────────────────────────────────────────────
+export type AuditSnapshotValue = string | number | boolean | null | undefined;
+export type AuditSnapshotInput = Record<string, AuditSnapshotValue>;
+type AuditSnapshotRow = { field: string; value: string };
+
+const MAX_AUDIT_FIELDS = 24;
+const MAX_AUDIT_VALUE_LENGTH = 300;
+const SENSITIVE_AUDIT_FIELD = /(password|secret|token|hash|authorization|cookie|session|invitecode|requestfingerprint|idempotencykey)/i;
+
+function formatAuditValue(field: string, value: AuditSnapshotValue): string {
+  if (SENSITIVE_AUDIT_FIELD.test(field)) return "[محجوب]";
+  if (value === undefined) return "—";
+  if (value === null) return "فارغ";
+  if (typeof value === "boolean") return value ? "نعم" : "لا";
+  if (typeof value === "number") return Number.isFinite(value) ? String(value) : "غير صالح";
+  const normalized = value.trim().replace(/\s+/g, " ");
+  return (normalized || "فارغ").slice(0, MAX_AUDIT_VALUE_LENGTH);
+}
+
+export function createAuditSnapshot(
+  input?: AuditSnapshotInput,
+): AuditSnapshotRow[] | undefined {
+  if (!input) return undefined;
+  const rows = Object.entries(input)
+    .slice(0, MAX_AUDIT_FIELDS)
+    .map(([field, value]) => ({
+      field: field.trim().slice(0, 64),
+      value: formatAuditValue(field, value),
+    }))
+    .filter((row) => row.field.length > 0);
+  return rows.length > 0 ? rows : undefined;
+}
+
+function changedAuditFields(
+  before?: AuditSnapshotRow[],
+  after?: AuditSnapshotRow[],
+): string[] | undefined {
+  if (!before && !after) return undefined;
+  const beforeValues = new Map((before ?? []).map((row) => [row.field, row.value]));
+  const afterValues = new Map((after ?? []).map((row) => [row.field, row.value]));
+  const fields = new Set([...beforeValues.keys(), ...afterValues.keys()]);
+  const changed = [...fields].filter(
+    (field) => beforeValues.get(field) !== afterValues.get(field),
+  );
+  return changed.length > 0 ? changed : undefined;
+}
+
 export async function logAction(
   ctx: MutationCtx,
   user: AuthUser,
@@ -185,17 +230,28 @@ export async function logAction(
     recordId?: string;
     recordLabel?: string;
     details?: string;
-  }
+    branchId?: Id<"branches"> | null;
+    before?: AuditSnapshotInput;
+    after?: AuditSnapshotInput;
+  },
 ) {
+  const beforeSnapshot = createAuditSnapshot(params.before);
+  const afterSnapshot = createAuditSnapshot(params.after);
+  const hasBranchOverride = Object.prototype.hasOwnProperty.call(params, "branchId");
   await ctx.db.insert("auditLogs", {
     userId: user.userId,
     userName: user.name,
-    branchId: user.branchId,
-    action: params.action,
-    module: params.module,
-    recordId: params.recordId ? String(params.recordId) : undefined,
-    recordLabel: params.recordLabel,
-    details: params.details ?? "",
+    branchId: hasBranchOverride ? params.branchId ?? undefined : user.branchId,
+    action: params.action.trim().slice(0, 64),
+    module: params.module.trim().slice(0, 64),
+    recordId: params.recordId ? String(params.recordId).slice(0, 200) : undefined,
+    recordLabel: params.recordLabel?.trim().slice(0, 200),
+    details: params.details?.trim().slice(0, 1000) ?? "",
+    beforeSnapshot,
+    afterSnapshot,
+    changedFields: changedAuditFields(beforeSnapshot, afterSnapshot),
+    snapshotVersion: beforeSnapshot || afterSnapshot ? 1 : undefined,
+    timestamp: Date.now(),
   });
 }
 

@@ -15,6 +15,10 @@ function toAuditLogDto(log: Doc<"auditLogs">) {
     recordId: log.recordId ?? null,
     recordLabel: log.recordLabel ?? null,
     details: log.details ?? null,
+    beforeSnapshot: log.beforeSnapshot ?? [],
+    afterSnapshot: log.afterSnapshot ?? [],
+    changedFields: log.changedFields ?? [],
+    snapshotVersion: log.snapshotVersion ?? null,
     branchId: log.branchId ?? null,
   };
 }

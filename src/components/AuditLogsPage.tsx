@@ -71,6 +71,52 @@ const MODULE_LABELS: Record<string, string> = {
   general_ledger: "الأستاذ العام",
 };
 
+const FIELD_LABELS: Record<string, string> = {
+  name: "الاسم",
+  role: "الدور",
+  branchId: "الفرع",
+  isActive: "نشط",
+  permissionsCount: "عدد الصلاحيات",
+  storeName: "اسم المتجر",
+  storeType: "نوع المتجر",
+  currency: "العملة",
+  taxRate: "الضريبة",
+  phoneLast4: "آخر 4 أرقام",
+  hasEmail: "يوجد بريد",
+  hasAddress: "يوجد عنوان",
+  hasNotes: "توجد ملاحظات",
+  sku: "SKU",
+  categoryId: "الفئة",
+  supplierId: "المورد",
+  minStock: "حد المخزون",
+  unit: "الوحدة",
+  stock: "المخزون",
+};
+
+type SnapshotRow = { field: string; value: string };
+
+function SnapshotList({ title, rows }: { title: string; rows: SnapshotRow[] }) {
+  return (
+    <div className="rounded-lg border border-slate-200 bg-white p-3">
+      <p className="mb-2 text-xs font-bold text-slate-700">{title}</p>
+      {rows.length === 0 ? (
+        <p className="text-xs text-slate-400">لا توجد بيانات</p>
+      ) : (
+        <dl className="space-y-1.5">
+          {rows.map((row) => (
+            <div key={row.field} className="grid grid-cols-[minmax(6rem,auto)_1fr] gap-2 text-xs">
+              <dt className="font-medium text-slate-500">
+                {FIELD_LABELS[row.field] ?? row.field}
+              </dt>
+              <dd className="break-words text-slate-700">{row.value}</dd>
+            </div>
+          ))}
+        </dl>
+      )}
+    </div>
+  );
+}
+
 function startOfDay(value: string) {
   return value ? new Date(`${value}T00:00:00`).getTime() : undefined;
 }
@@ -113,6 +159,9 @@ export function AuditLogsPage() {
           log.userName,
           log.details ?? "",
           MODULE_LABELS[log.module] ?? log.module,
+          ...log.beforeSnapshot.flatMap((row) => [row.field, row.value]),
+          ...log.afterSnapshot.flatMap((row) => [row.field, row.value]),
+          ...log.changedFields,
         ].some((value) =>
           value.toLocaleLowerCase("ar-EG").includes(normalizedSearch),
         );
@@ -372,11 +421,23 @@ export function AuditLogsPage() {
                       <td className="px-4 py-3 text-sm text-slate-600">
                         {log.userName}
                       </td>
-                      <td
-                        className="px-4 py-3 text-xs text-slate-500 max-w-72"
-                        title={log.details ?? undefined}
-                      >
-                        <span className="line-clamp-2">{log.details ?? "—"}</span>
+                      <td className="px-4 py-3 text-xs text-slate-500 min-w-72 max-w-xl">
+                        <div className="space-y-2">
+                          <span className="line-clamp-2" title={log.details ?? undefined}>
+                            {log.details ?? "—"}
+                          </span>
+                          {log.changedFields.length > 0 && (
+                            <details className="rounded-lg border border-indigo-100 bg-indigo-50/50 p-2">
+                              <summary className="cursor-pointer font-bold text-indigo-700">
+                                عرض Before / After ({log.changedFields.length})
+                              </summary>
+                              <div className="mt-3 grid gap-3 lg:grid-cols-2">
+                                <SnapshotList title="قبل" rows={log.beforeSnapshot} />
+                                <SnapshotList title="بعد" rows={log.afterSnapshot} />
+                              </div>
+                            </details>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   );

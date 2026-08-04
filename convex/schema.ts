@@ -550,6 +550,10 @@ const applicationTables = {
     recordId: v.optional(v.string()),
     recordLabel: v.optional(v.string()),
     details: v.optional(v.string()),
+    beforeSnapshot: v.optional(v.array(v.object({ field: v.string(), value: v.string() }))),
+    afterSnapshot: v.optional(v.array(v.object({ field: v.string(), value: v.string() }))),
+    changedFields: v.optional(v.array(v.string())),
+    snapshotVersion: v.optional(v.number()),
     branchId: v.optional(v.id("branches")),
     timestamp: v.optional(v.number()),
   })
