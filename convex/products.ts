@@ -69,7 +69,7 @@ export const create = mutation({
       unit: normalized.unit, branchId, description: args.description?.trim() || undefined, isActive: true,
     });
     if (args.stock > 0) await changeProductStock(ctx, user, { productId: id, quantityDelta: args.stock, unitCost: args.costPrice, type: INVENTORY_MOVEMENT_TYPES.openingBalance, reason: "الرصيد الافتتاحي" });
-    await logAction(ctx, user, { action: "create", module: "products", recordId: id, recordLabel: normalized.name, details: `إضافة منتج جديد: ${normalized.name}` });
+    await logAction(ctx, user, { action: "create", module: "products", recordId: id, recordLabel: normalized.name, details: `إضافة منتج جديد: ${normalized.name}`, branchId, after: { name: normalized.name, sku: normalized.sku, categoryId: args.categoryId ? String(args.categoryId) : null, supplierId: args.supplierId ? String(args.supplierId) : null, minStock: args.minStock, unit: normalized.unit, stock: args.stock, isActive: true } });
     return id;
   },
 });
@@ -99,7 +99,7 @@ export const update = mutation({
       sellPrice: args.sellPrice, minStock: args.minStock, unit: normalized.unit,
       branchId, description: args.description?.trim() || undefined,
     });
-    await logAction(ctx, user, { action: "update", module: "products", recordId: args.id, recordLabel: normalized.name, details: `تعديل المنتج: ${normalized.name}` });
+    await logAction(ctx, user, { action: "update", module: "products", recordId: args.id, recordLabel: normalized.name, details: `تعديل المنتج: ${normalized.name}`, branchId, before: { name: product.name, sku: product.sku, categoryId: product.categoryId ? String(product.categoryId) : null, supplierId: product.supplierId ? String(product.supplierId) : null, minStock: product.minStock, unit: product.unit }, after: { name: normalized.name, sku: normalized.sku, categoryId: args.categoryId ? String(args.categoryId) : null, supplierId: args.supplierId ? String(args.supplierId) : null, minStock: args.minStock, unit: normalized.unit } });
   },
 });
 
@@ -109,7 +109,7 @@ export const adjustStock = mutation({
     const user = await requirePermission(ctx, "edit_products");
     const current = await ctx.db.get(args.id); if (!current) throw new ConvexError("المنتج غير موجود");
     await changeProductStock(ctx, user, { productId: args.id, quantityDelta: args.adjustment, unitCost: current.costPrice, type: INVENTORY_MOVEMENT_TYPES.manualAdjustment, reason: args.reason });
-    await logAction(ctx, user, { action: "update", module: "products", recordId: args.id, details: `تعديل يدوي للمخزون: ${args.adjustment > 0 ? "+" : ""}${args.adjustment} - ${args.reason.trim()}` });
+    await logAction(ctx, user, { action: "adjust_stock", module: "products", recordId: args.id, recordLabel: current.name, details: `تعديل يدوي للمخزون: ${args.adjustment > 0 ? "+" : ""}${args.adjustment} - ${args.reason.trim()}`, branchId: current.branchId, before: { stock: current.stock }, after: { stock: current.stock + args.adjustment, adjustment: args.adjustment, reason: args.reason.trim() } });
   },
 });
 
@@ -131,7 +131,7 @@ async function applyActiveState(ctx: MutationCtx, user: AuthUser, id: Id<"produc
   if (!product) throw new ConvexError("المنتج غير موجود");
   assertBranchAccess(user, product);
   await ctx.db.patch(id, { isActive });
-  await logAction(ctx, user, { action: "update", module: "products", recordId: id, recordLabel: product.name, details: `${isActive ? "إعادة تفعيل" : "تعطيل"} المنتج: ${product.name}` });
+  await logAction(ctx, user, { action: isActive ? "activate" : "deactivate", module: "products", recordId: id, recordLabel: product.name, details: `${isActive ? "إعادة تفعيل" : "تعطيل"} المنتج: ${product.name}`, branchId: product.branchId, before: { isActive: product.isActive ?? true }, after: { isActive } });
 }
 
 export const setActive = mutation({

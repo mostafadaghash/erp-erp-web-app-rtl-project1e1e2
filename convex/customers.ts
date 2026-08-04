@@ -159,6 +159,8 @@ export const create = mutation({
       recordId: id,
       recordLabel: normalized.name,
       details: `إضافة عميل جديد: ${normalized.name} - ${normalized.phone}`,
+      branchId,
+      after: { name: normalized.name, phoneLast4: normalized.phone.slice(-4), hasEmail: Boolean(normalized.email), hasAddress: Boolean(normalized.address), hasNotes: Boolean(normalized.notes), isActive: true },
     });
     return id;
   },
@@ -206,6 +208,9 @@ export const update = mutation({
       recordId: id,
       recordLabel: normalized.name,
       details: `تحديث بيانات العميل: ${customer.name} ← ${normalized.name}`,
+      branchId: customer.branchId,
+      before: { name: customer.name, phoneLast4: customer.phone.slice(-4), hasEmail: Boolean(customer.email), hasAddress: Boolean(customer.address), hasNotes: Boolean(customer.notes) },
+      after: { name: normalized.name, phoneLast4: normalized.phone.slice(-4), hasEmail: Boolean(normalized.email), hasAddress: Boolean(normalized.address), hasNotes: Boolean(normalized.notes) },
     });
   },
 });
@@ -219,7 +224,7 @@ export const setActive = mutation({
     assertBranchAccess(user, customer);
     if (customer.isActive === args.isActive) return;
     await ctx.db.patch(args.id, { isActive: args.isActive });
-    await logAction(ctx, user, { action: args.isActive ? "activate" : "deactivate", module: "customers", recordId: args.id, recordLabel: customer.name, details: `${args.isActive ? "تفعيل" : "تعطيل"} العميل ${customer.name}` });
+    await logAction(ctx, user, { action: args.isActive ? "activate" : "deactivate", module: "customers", recordId: args.id, recordLabel: customer.name, details: `${args.isActive ? "تفعيل" : "تعطيل"} العميل ${customer.name}`, branchId: customer.branchId, before: { isActive: customer.isActive ?? true }, after: { isActive: args.isActive } });
   },
 });
 export const remove = mutation({ args: { id: v.id("customers") }, handler: async () => { throw new ConvexError("استخدم تعطيل العميل بدلاً من الحذف"); } });

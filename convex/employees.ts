@@ -1,6 +1,6 @@
 import { query, mutation } from "./_generated/server";
 import { v, ConvexError } from "convex/values";
-import { assertBranchAccess, filterByBranch, requireAuth, requireModulePermission, resolveWriteBranch, logAction, hasAdmin, getAuthProfile } from "./lib/auth";
+import { assertBranchAccess, filterByBranch, requireAuth, requireModulePermission, resolveWriteBranch, logAction, hasAdmin, getAuthProfile, createAuditSnapshot } from "./lib/auth";
 import { ROLES, ROLE_PERMISSIONS, isPermission } from "./lib/permissions";
 import { INVITE_TTL_MS, isValidEmail, normalizeEmail } from "./lib/identity";
 
@@ -56,6 +56,23 @@ export const createFirstAdmin = mutation({
         userId: stableUserId,
         tokenIdentifier: stableUserId,
       });
+      const beforeSnapshot = createAuditSnapshot({ name: existing.name, role: existing.role, branchId: existing.branchId ? String(existing.branchId) : null, isActive: existing.isActive, permissionsCount: existing.permissions.length });
+      const afterSnapshot = createAuditSnapshot({ name: args.name, role: "admin", branchId: existing.branchId ? String(existing.branchId) : null, isActive: true, permissionsCount: ROLE_PERMISSIONS.admin.length });
+      await ctx.db.insert("auditLogs", {
+        userId: stableUserId,
+        userName: args.name,
+        action: "setup",
+        module: "system",
+        recordId: String(existing._id),
+        recordLabel: args.name,
+        details: `إعداد النظام وترقية أول مدير: ${args.name}`,
+        branchId: existing.branchId,
+        beforeSnapshot,
+        afterSnapshot,
+        changedFields: ["name", "role", "isActive", "permissionsCount"],
+        snapshotVersion: 1,
+        timestamp: Date.now(),
+      });
       return existing._id;
     }
 
@@ -79,6 +96,10 @@ export const createFirstAdmin = mutation({
       recordId: String(id),
       recordLabel: args.name,
       details: `إعداد النظام وإنشاء أول مدير: ${args.name}`,
+      afterSnapshot: createAuditSnapshot({ name: args.name, role: "admin", branchId: null, isActive: true, permissionsCount: ROLE_PERMISSIONS.admin.length }),
+      changedFields: ["name", "role", "isActive", "permissionsCount"],
+      snapshotVersion: 1,
+      timestamp: Date.now(),
     });
 
     return id;
@@ -210,6 +231,9 @@ export const setWorkingBranch = mutation({
       recordId: args.branchId,
       recordLabel: branch.name,
       details: `اختيار فرع العمل: ${branch.name}`,
+      branchId: args.branchId,
+      before: { branchId: user.branchId ? String(user.branchId) : null },
+      after: { branchId: String(args.branchId) },
     });
   },
 });
@@ -266,6 +290,8 @@ export const create = mutation({
       recordId: id,
       recordLabel: args.name,
       details: `إضافة موظف جديد: ${args.name} (${args.role})`,
+      branchId,
+      after: { name: args.name, role: args.role, branchId: branchId ? String(branchId) : null, isActive: args.isActive ?? true, permissionsCount: permissions.length },
     });
     return { id, inviteCode: String(id), email };
   },
@@ -344,6 +370,9 @@ export const update = mutation({
       recordId: id,
       recordLabel: args.name,
       details: `تعديل بيانات الموظف: ${args.name}`,
+      branchId,
+      before: { name: emp.name, role: emp.role, branchId: emp.branchId ? String(emp.branchId) : null, isActive: emp.isActive, permissionsCount: emp.permissions.length },
+      after: { name: args.name, role: args.role, branchId: branchId ? String(branchId) : null, isActive: args.isActive, permissionsCount: permissions.length },
     });
   },
 });
@@ -373,11 +402,14 @@ export const toggleActive = mutation({
 
     await ctx.db.patch(args.id, { isActive: !emp.isActive });
     await logAction(ctx, user, {
-      action: "update",
+      action: emp.isActive ? "deactivate" : "activate",
       module: "employees",
       recordId: args.id,
       recordLabel: emp.name,
       details: `${emp.isActive ? "إيقاف" : "تفعيل"} الموظف: ${emp.name}`,
+      branchId: emp.branchId,
+      before: { isActive: emp.isActive },
+      after: { isActive: !emp.isActive },
     });
   },
 });
@@ -415,6 +447,9 @@ export const remove = mutation({
       recordId: args.id,
       recordLabel: emp.name,
       details: `إلغاء تنشيط الموظف مع الاحتفاظ بسجل الحساب: ${emp.name}`,
+      branchId: emp.branchId,
+      before: { isActive: emp.isActive, invitationActive: Boolean(emp.inviteExpiresAt) },
+      after: { isActive: false, invitationActive: false },
     });
   },
 });
@@ -442,6 +477,9 @@ export const renewInvitation = mutation({
       recordId: args.id,
       recordLabel: employee.name,
       details: `تجديد دعوة الموظف: ${employee.name}`,
+      branchId: employee.branchId,
+      before: { isActive: employee.isActive, invitationActive: Boolean(employee.inviteExpiresAt) },
+      after: { isActive: true, invitationActive: true },
     });
     return { inviteCode: String(args.id), email: employee.email };
   },
@@ -474,6 +512,9 @@ export const updatePermissions = mutation({
       recordId: args.id,
       recordLabel: emp.name,
       details: `تحديث صلاحيات الموظف: ${emp.name}`,
+      branchId: emp.branchId,
+      before: { permissionsCount: emp.permissions.length },
+      after: { permissionsCount: permissions.length },
     });
   },
 });

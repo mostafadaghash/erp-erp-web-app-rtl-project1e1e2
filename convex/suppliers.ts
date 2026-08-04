@@ -163,6 +163,8 @@ export const create = mutation({
       recordId: id,
       recordLabel: normalized.name,
       details: `إضافة مورد جديد: ${normalized.name} - ${normalized.phone}`,
+      branchId: null,
+      after: { name: normalized.name, phoneLast4: normalized.phone.slice(-4), hasEmail: Boolean(normalized.email), hasAddress: Boolean(normalized.address), hasNotes: Boolean(normalized.notes), isActive: true },
     });
     return id;
   },
@@ -204,6 +206,9 @@ export const update = mutation({
       recordId: id,
       recordLabel: normalized.name,
       details: `تحديث بيانات المورد: ${supplier.name} ← ${normalized.name}`,
+      branchId: null,
+      before: { name: supplier.name, phoneLast4: supplier.phone.slice(-4), hasEmail: Boolean(supplier.email), hasAddress: Boolean(supplier.address), hasNotes: Boolean(supplier.notes) },
+      after: { name: normalized.name, phoneLast4: normalized.phone.slice(-4), hasEmail: Boolean(normalized.email), hasAddress: Boolean(normalized.address), hasNotes: Boolean(normalized.notes) },
     });
   },
 });
@@ -216,7 +221,7 @@ export const setActive = mutation({
     if (!supplier) throw new ConvexError("المورد غير موجود");
     if (supplier.isActive === args.isActive) return;
     await ctx.db.patch(args.id, { isActive: args.isActive });
-    await logAction(ctx, user, { action: args.isActive ? "activate" : "deactivate", module: "suppliers", recordId: args.id, recordLabel: supplier.name, details: `${args.isActive ? "تفعيل" : "تعطيل"} المورد ${supplier.name}` });
+    await logAction(ctx, user, { action: args.isActive ? "activate" : "deactivate", module: "suppliers", recordId: args.id, recordLabel: supplier.name, details: `${args.isActive ? "تفعيل" : "تعطيل"} المورد ${supplier.name}`, branchId: null, before: { isActive: supplier.isActive ?? true }, after: { isActive: args.isActive } });
   },
 });
 export const remove = mutation({ args: { id: v.id("suppliers") }, handler: async () => { throw new ConvexError("استخدم تعطيل المورد بدلاً من الحذف"); } });
