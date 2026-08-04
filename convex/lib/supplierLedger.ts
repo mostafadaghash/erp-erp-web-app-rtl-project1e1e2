@@ -46,7 +46,29 @@ export async function postSupplierBalanceMovement(ctx: MutationCtx, user: AuthUs
     referenceId: input.referenceId, referenceNumber: input.referenceNumber, externalInvoiceNumber: input.externalInvoiceNumber, dueDate: input.dueDate,
     description: input.description, userId: user.userId, createdAt: now, originalEntryId: input.originalEntryId });
   if (input.originalEntryId) await ctx.db.patch(input.originalEntryId, { status: "reversed", reversedAt: now, reversedBy: user.userId, reversalReason: input.reversalReason, reversalDate: input.reversalDate, reversalEntryId: id });
-  await logAction(ctx, user, { action: input.type === "reversal" ? "reverse" : "post", module: "supplier_ledger", recordId: id, recordLabel: entryNumber, details: JSON.stringify({ type: input.type, amountDelta, balanceBefore, balanceAfter, branchId: input.branchId }) });
+  await logAction(ctx, user, {
+    action: input.type === "reversal" ? "reverse" : "post",
+    module: "supplier_ledger",
+    recordId: String(id),
+    recordLabel: entryNumber,
+    details: input.description,
+    branchId: input.branchId,
+    sourceType: input.referenceType,
+    sourceId: input.referenceId,
+    sourceNumber: input.referenceNumber,
+    relatedType: "supplier",
+    relatedId: String(input.supplierId),
+    reversalOfId: input.originalEntryId ? String(input.originalEntryId) : undefined,
+    before: { balance: balanceBefore },
+    after: {
+      type: input.type,
+      status: "posted",
+      date: input.date,
+      amountDelta,
+      balance: balanceAfter,
+      reversalReason: input.reversalReason ?? null,
+    },
+  });
   const entry = await ctx.db.get(id);
   if (!entry) throw new ConvexError("تعذر إنشاء حركة المورد");
   return entry;

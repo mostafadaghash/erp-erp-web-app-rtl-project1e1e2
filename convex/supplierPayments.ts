@@ -41,7 +41,29 @@ export const create = mutation({ args: { supplierId: v.id("suppliers"), branchId
   const ledger = await postSupplierBalanceMovement(ctx, user, { type: "supplier_payment", requestId, supplierId: supplier._id, branchId, date: args.date, amountDelta: -amount, referenceType: "supplier_payment", referenceId: String(paymentId), referenceNumber: paymentNumber, description: `دفعة مورد ${paymentNumber}` });
   for (let index = 0; index < sorted.length; index++) await ctx.db.patch(receipts[index]._id, derivePurchaseReceiptState(receipts[index].netPayableAmount ?? receipts[index].payableAmount, receipts[index].paidAmount + sorted[index].amount));
   await ctx.db.patch(paymentId, { financialTransactionId: financial.transactionId, supplierLedgerEntryId: ledger._id });
-  await logAction(ctx, user, { action: "post", module: "supplier_payments", recordId: paymentId, recordLabel: paymentNumber, details: JSON.stringify({ amount, allocations: sorted.length }) });
+  await logAction(ctx, user, {
+    action: "post",
+    module: "supplier_payments",
+    recordId: String(paymentId),
+    recordLabel: paymentNumber,
+    details: "دفعة مورد " + paymentNumber,
+    branchId,
+    sourceType: "supplier_payment",
+    sourceId: String(paymentId),
+    sourceNumber: paymentNumber,
+    relatedType: "supplier_ledger_entry",
+    relatedId: String(ledger._id),
+    relatedNumber: ledger.entryNumber,
+    financialTransactionId: String(financial.transactionId),
+    after: {
+      status: "posted",
+      date: args.date,
+      amount,
+      allocationsCount: sorted.length,
+      supplierName: supplier.name,
+      accountName: account.name,
+    },
+  });
   return paymentId;
 } });
 
@@ -59,7 +81,30 @@ export const reverse = mutation({ args: { paymentId: v.id("supplierPayments"), r
   const ledger = await postSupplierBalanceMovement(ctx, user, { type: "reversal", requestId, supplierId: payment.supplierId, branchId: payment.branchId, date: args.date, amountDelta: payment.amount, referenceType: "supplier_payment_reversal", referenceId: String(payment._id), referenceNumber: payment.paymentNumber, description: `عكس دفعة ${payment.paymentNumber}: ${reason}`, originalEntryId: payment.supplierLedgerEntryId, reversalReason: reason, reversalDate: args.date });
   for (const allocation of allocations) { const receipt = await ctx.db.get(allocation.purchaseReceiptId); if (!receipt) throw new ConvexError("مستند شراء مرتبط مفقود"); await ctx.db.patch(receipt._id, reverseAllocatedPayment(receipt.netPayableAmount ?? receipt.payableAmount, receipt.paidAmount, allocation.amount)); }
   await ctx.db.patch(payment._id, { status: "reversed", reversedAt: Date.now(), reversedBy: user.userId, reversalReason: reason, reversalDate: args.date, reversalFingerprint, reversalRequestId: requestId, reversalFinancialTransactionId: financialId, reversalSupplierLedgerEntryId: ledger._id });
-  await logAction(ctx, user, { action: "reverse", module: "supplier_payments", recordId: payment._id, recordLabel: payment.paymentNumber, details: reason }); return financialId;
+  await logAction(ctx, user, {
+    action: "reverse",
+    module: "supplier_payments",
+    recordId: String(payment._id),
+    recordLabel: payment.paymentNumber,
+    details: reason,
+    branchId: payment.branchId,
+    sourceType: "supplier_payment",
+    sourceId: String(payment._id),
+    sourceNumber: payment.paymentNumber,
+    relatedType: "supplier_ledger_entry",
+    relatedId: String(ledger._id),
+    relatedNumber: ledger.entryNumber,
+    financialTransactionId: String(financialId),
+    reversalOfId: String(payment.financialTransactionId),
+    before: { status: "posted", amount: payment.amount },
+    after: {
+      status: "reversed",
+      date: args.date,
+      amount: payment.amount,
+      reversalReason: reason,
+    },
+  });
+  return financialId;
 } });
 
 export const openPurchaseReceipts = query({ args: { supplierId: v.id("suppliers"), branchId: v.optional(v.id("branches")) }, handler: async (ctx, args) => { const user = await requirePermission(ctx, "record_supplier_payments"); const branchId = resolveWriteBranch(user, args.branchId); if (!branchId) throw new ConvexError("اختر الفرع"); return (await ctx.db.query("purchaseReceipts").withIndex("by_supplier_branch_date", q => q.eq("supplierId", args.supplierId).eq("branchId", branchId)).collect()).filter(x => x.remainingAmount > 0 && x.status !== "paid").map(x => ({ _id: x._id, receiptNumber: x.receiptNumber, receiptDate: x.receiptDate, dueDate: x.dueDate, payableAmount: x.netPayableAmount ?? x.payableAmount, paidAmount: x.paidAmount, remainingAmount: x.remainingAmount, status: x.status, supplierId: x.supplierId, supplierName: x.supplierName, branchId: x.branchId })); } });

@@ -101,7 +101,33 @@ export async function postCustomerLedgerEntry(ctx: MutationCtx, user: AuthUser, 
   const values = { receivableBalance: receivableAfter, advanceBalance: advanceAfter, totalPurchases: totalPurchasesAfter, updatedAt: now, ...(input.openingBalance ? { openingBalancePostedAt: now } : {}) };
   if (snapshot) await ctx.db.patch(snapshot._id, values);
   else await ctx.db.insert("customerBalances", { key, customerId: input.customerId, branchId: input.branchId, ...values });
-  await logAction(ctx, user, { action: "post", module: "customer_ledger", recordId: entryId, recordLabel: entryNumber, details: `${input.description} (${customer.name})` });
+  await logAction(ctx, user, {
+    action: input.type === "reversal" ? "reverse" : "post",
+    module: "customer_ledger",
+    recordId: String(entryId),
+    recordLabel: entryNumber,
+    details: input.description + " (" + customer.name + ")",
+    branchId: input.branchId,
+    sourceType: input.referenceType,
+    sourceId: input.referenceId,
+    sourceNumber: input.referenceNumber,
+    relatedType: "customer",
+    relatedId: String(input.customerId),
+    reversalOfId: input.originalEntryId ? String(input.originalEntryId) : undefined,
+    before: {
+      receivableBalance: receivableBefore,
+      advanceBalance: advanceBefore,
+      totalPurchases: totalPurchasesBefore,
+    },
+    after: {
+      type: input.type,
+      status: "posted",
+      date: input.date,
+      receivableBalance: receivableAfter,
+      advanceBalance: advanceAfter,
+      totalPurchases: totalPurchasesAfter,
+    },
+  });
   return { entryId, duplicate: false, entry: await ctx.db.get(entryId) };
 }
 
