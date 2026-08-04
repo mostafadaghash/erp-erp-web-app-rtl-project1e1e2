@@ -15,6 +15,12 @@ function expectAll(source: string, tokens: string[]) {
   for (const token of tokens) assert.ok(source.includes(token), `Missing ${token}`);
 }
 
+function auditSnapshots(source: string) {
+  return [...source.matchAll(/(?:before|after):\s*\{([^{}]*)\}/g)]
+    .map((match) => match[1])
+    .join("\n");
+}
+
 test("AOD-01 invoices expose document branch customer and safe state snapshots", () => {
   expectAll(invoices, [
     'sourceType: "invoice"',
@@ -70,9 +76,7 @@ test("AOD-05 repairs use safe summaries and never snapshot the tracking token", 
     'hasDiagnosis:',
     'journalEntryId: cancellationJournal?._id ? String(cancellationJournal._id) : undefined',
   ]);
-  const auditCalls = repairs.split('await logAction').slice(1).join('await logAction');
-  assert.doesNotMatch(auditCalls, /before:\s*\{[^}]*trackingToken/i);
-  assert.doesNotMatch(auditCalls, /after:\s*\{[^}]*trackingToken/i);
+  assert.doesNotMatch(auditSnapshots(repairs), /trackingToken/i);
 });
 
 test("AOD-06 sales return credit notes link invoices and finance reversals", () => {
@@ -97,9 +101,10 @@ test("AOD-07 purchase returns link receipt finance journal and reversal lineage"
 });
 
 test("AOD-08 operational audit snapshots exclude request and idempotency material", () => {
-  const sources = [invoices, orders, deliveries, repairs, salesReturns, purchaseReturns].join("\n");
-  assert.doesNotMatch(sources, /before:\s*\{[^}]*(requestId|requestFingerprint|idempotencyKey|trackingToken)/i);
-  assert.doesNotMatch(sources, /after:\s*\{[^}]*(requestId|requestFingerprint|idempotencyKey|trackingToken)/i);
+  const snapshots = [invoices, orders, deliveries, repairs, salesReturns, purchaseReturns]
+    .map(auditSnapshots)
+    .join("\n");
+  assert.doesNotMatch(snapshots, /requestId|requestFingerprint|idempotencyKey|trackingToken/i);
 });
 
 test("AOD-09 Audit Log UI labels new actions modules documents and fields", () => {
