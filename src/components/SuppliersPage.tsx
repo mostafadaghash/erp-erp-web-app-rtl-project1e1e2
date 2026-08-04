@@ -262,6 +262,8 @@ export function SuppliersPage() {
             className="form-input pr-10"
             placeholder="بحث بالاسم أو الهاتف..."
             value={search}
+            disabled={suppliersQuery === undefined}
+            title={suppliersQuery === undefined ? "انتظر تحميل الموردين" : undefined}
             onChange={(event) => setSearch(event.target.value)}
           />
         </div>
@@ -474,6 +476,21 @@ export function SuppliersPage() {
                     </div>
                   </div>
                   <p className="mt-2 text-slate-600">{entry.description}</p>
+                  {entry.externalInvoiceNumber && (
+                    <p className="mt-1 text-xs text-slate-500">
+                      فاتورة المورد: {entry.externalInvoiceNumber}
+                    </p>
+                  )}
+                  {entry.reversalDate && (
+                    <p className="mt-1 text-xs text-rose-700">
+                      تاريخ العكس: {entry.reversalDate}
+                    </p>
+                  )}
+                  {entry.reversalReason && (
+                    <p className="mt-1 text-xs text-rose-700 break-words">
+                      سبب العكس: {entry.reversalReason}
+                    </p>
+                  )}
                   <p className="mt-1 text-xs text-slate-500">
                     الرصيد: {entry.balanceBefore.toLocaleString("ar-EG")} ←{" "}
                     {entry.balanceAfter.toLocaleString("ar-EG")}

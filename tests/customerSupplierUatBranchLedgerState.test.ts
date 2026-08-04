@@ -54,7 +54,9 @@ test("CSU-06 changing customer-ledger branch clears branch-sensitive state", () 
 
 test("CSU-07 customer options expose loading and true-empty states", () => {
   assert.ok(ledger.includes("جارٍ تحميل عملاء الفرع"));
-  assert.ok(ledger.includes("لا يوجد عملاء نشطون في هذا الفرع"));
+  assert.ok(ledger.includes("لا يوجد عملاء في هذا الفرع"));
+  assert.match(ledger, /customer\.isActive === false/);
+  assert.ok(ledger.includes("معطل"));
   assert.match(ledger, /options === undefined/);
   assert.match(ledger, /options\.customers\.length === 0/);
 });
