@@ -55,6 +55,30 @@ export async function postJournal(ctx:MutationCtx,user:AuthUser,input:PostingReq
   const entryNumber=await nextDocumentNumber(ctx,"journal",new Date(`${date}T00:00:00Z`)), now=Date.now();
   const entryId=await ctx.db.insert("journalEntries",{entryNumber,branchId:input.branchId,entryDate:date,periodKey,sourceType:input.sourceType,status:"posted",memo,totalDebit:fromCents(debitCents),totalCredit:fromCents(creditCents),lineCount:prepared.length,requestId,idempotencyKey,requestFingerprint,originalEntryId:input.originalEntryId,reversalReason:input.reversalReason,operationType:input.operationType,referenceType:input.referenceType,referenceId:input.referenceId,referenceNumber:input.referenceNumber,financialTransactionId:input.financialTransactionId,postedAt:now,postedBy:user.userId});
   for(const line of prepared) { await ctx.db.insert("journalLines",{entryId,entryNumber,lineNumber:line.lineNumber,branchId:input.branchId,entryDate:date,periodKey,accountId:line.account._id,accountCodeSnapshot:line.account.code,accountNameSnapshot:line.account.nameAr,normalSideSnapshot:line.account.normalSide,debit:line.debit,credit:line.credit,description:line.description}); await updateBalances(ctx,entryId,input.branchId,date,periodKey,line.account._id,line.debit,line.credit); }
-  await logAction(ctx,user,{action:"post",module:"general_ledger",recordId:String(entryId),recordLabel:entryNumber,details:`${input.sourceType}; debit=${fromCents(debitCents)}; credit=${fromCents(creditCents)}`});
+  await logAction(ctx,user,{
+    action: input.sourceType.includes("reversal") || input.sourceType === "reversal" ? "reverse" : "post",
+    module:"general_ledger",
+    recordId:String(entryId),
+    recordLabel:entryNumber,
+    details:`${input.sourceType}; debit=${fromCents(debitCents)}; credit=${fromCents(creditCents)}`,
+    branchId: input.branchId,
+    sourceType: input.referenceType ?? "journal_entry",
+    sourceId: input.referenceId ?? String(entryId),
+    sourceNumber: input.referenceNumber ?? entryNumber,
+    relatedType: input.originalEntryId ? "journal_entry" : undefined,
+    relatedId: input.originalEntryId ? String(input.originalEntryId) : undefined,
+    financialTransactionId: input.financialTransactionId ? String(input.financialTransactionId) : undefined,
+    journalEntryId: String(entryId),
+    reversalOfId: input.originalEntryId ? String(input.originalEntryId) : undefined,
+    after: {
+      sourceType: input.sourceType,
+      status: "posted",
+      date,
+      amount: fromCents(debitCents),
+      branchId: String(input.branchId),
+      referenceType: input.referenceType ?? null,
+      referenceNumber: input.referenceNumber ?? null,
+    },
+  });
   const entry=await ctx.db.get(entryId); if(!entry) throw new ConvexError("تعذر حفظ القيد"); return entry;
 }

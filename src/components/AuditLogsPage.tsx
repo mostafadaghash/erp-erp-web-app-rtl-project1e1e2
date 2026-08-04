@@ -46,6 +46,10 @@ const ACTION_CONFIG: Record<
     color: "bg-amber-100 text-amber-700",
     icon: Trash2,
   },
+  post: { label: "ترحيل", color: "bg-indigo-100 text-indigo-700", icon: Plus },
+  initialize: { label: "تهيئة", color: "bg-emerald-100 text-emerald-700", icon: Plus },
+  confirm_opening: { label: "اعتماد افتتاح", color: "bg-emerald-100 text-emerald-700", icon: Plus },
+  activate_financial_posting: { label: "تفعيل الربط", color: "bg-emerald-100 text-emerald-700", icon: Plus },
   reverse: {
     label: "عكس",
     color: "bg-orange-100 text-orange-700",
@@ -94,6 +98,56 @@ const FIELD_LABELS: Record<string, string> = {
 };
 
 type SnapshotRow = { field: string; value: string };
+
+type AuditDocumentLink = { type: string | null; id: string | null; number: string | null };
+
+const DOCUMENT_TYPE_LABELS: Record<string, string> = {
+  financial_transaction: "حركة مالية",
+  journal_entry: "قيد يومية",
+  chart_of_account: "حساب مالي",
+  accounting_period: "فترة محاسبية",
+  general_ledger_settings: "إعدادات الأستاذ",
+  general_ledger_opening: "افتتاح الأستاذ",
+};
+
+function DocumentLinks({
+  source,
+  related,
+  financialTransactionId,
+  journalEntryId,
+  reversalOfId,
+}: {
+  source: AuditDocumentLink;
+  related: AuditDocumentLink;
+  financialTransactionId: string | null;
+  journalEntryId: string | null;
+  reversalOfId: string | null;
+}) {
+  const rows = [
+    source.type || source.id || source.number
+      ? { label: "المستند", type: source.type, id: source.id, number: source.number }
+      : null,
+    related.type || related.id || related.number
+      ? { label: "مرتبط بـ", type: related.type, id: related.id, number: related.number }
+      : null,
+    financialTransactionId ? { label: "الحركة المالية", type: "financial_transaction", id: financialTransactionId, number: null } : null,
+    journalEntryId ? { label: "القيد المحاسبي", type: "journal_entry", id: journalEntryId, number: null } : null,
+    reversalOfId ? { label: "عكس لـ", type: null, id: reversalOfId, number: null } : null,
+  ].filter(Boolean) as Array<{ label: string; type: string | null; id: string | null; number: string | null }>;
+  if (rows.length === 0) return null;
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {rows.map((row) => (
+        <span key={`${row.label}:${row.type ?? ""}:${row.id ?? ""}:${row.number ?? ""}`} className="rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] text-slate-600">
+          <strong className="text-slate-700">{row.label}:</strong>{" "}
+          {row.type ? (DOCUMENT_TYPE_LABELS[row.type] ?? row.type) : "مرجع"}
+          {row.number ? ` #${row.number}` : ""}
+          {!row.number && row.id ? ` (${row.id.slice(0, 12)}…)` : ""}
+        </span>
+      ))}
+    </div>
+  );
+}
 
 function SnapshotList({ title, rows }: { title: string; rows: SnapshotRow[] }) {
   return (
@@ -162,6 +216,8 @@ export function AuditLogsPage() {
           ...log.beforeSnapshot.flatMap((row) => [row.field, row.value]),
           ...log.afterSnapshot.flatMap((row) => [row.field, row.value]),
           ...log.changedFields,
+          log.sourceType ?? "", log.sourceNumber ?? "", log.relatedType ?? "", log.relatedNumber ?? "",
+          log.financialTransactionId ?? "", log.journalEntryId ?? "", log.reversalOfId ?? "",
         ].some((value) =>
           value.toLocaleLowerCase("ar-EG").includes(normalizedSearch),
         );
@@ -426,6 +482,13 @@ export function AuditLogsPage() {
                           <span className="line-clamp-2" title={log.details ?? undefined}>
                             {log.details ?? "—"}
                           </span>
+                          <DocumentLinks
+                            source={{ type: log.sourceType, id: log.sourceId, number: log.sourceNumber }}
+                            related={{ type: log.relatedType, id: log.relatedId, number: log.relatedNumber }}
+                            financialTransactionId={log.financialTransactionId}
+                            journalEntryId={log.journalEntryId}
+                            reversalOfId={log.reversalOfId}
+                          />
                           {log.changedFields.length > 0 && (
                             <details className="rounded-lg border border-indigo-100 bg-indigo-50/50 p-2">
                               <summary className="cursor-pointer font-bold text-indigo-700">
