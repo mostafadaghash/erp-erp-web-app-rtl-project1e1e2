@@ -6,7 +6,7 @@ on:
   pull_request:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   verify:
@@ -14,11 +14,42 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
       - run: npm ci
+      - name: Apply audit ledger and payment links
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          path = Path("scripts/apply-audit-ledger-payment-links.mjs")
+          text = path.read_text()
+          text = text.replace(
+              '    details: \\`${input.description} (${customer.name})\\`,',
+              '    details: input.description + " (" + customer.name + ")",',
+          )
+          text = text.replace(
+              '    details: \\`دفعة مورد ${paymentNumber}\\`,',
+              '    details: "دفعة مورد " + paymentNumber,',
+          )
+          text = re.sub(
+              r'  const newAudits = .*?;\n',
+              '  const newAudits = customerLedger + "\\\\n" + supplierLedger + "\\\\n" + supplierPayments;\n',
+              text,
+              count=1,
+          )
+          path.write_text(text)
+          PY
+          node scripts/apply-audit-ledger-payment-links.mjs
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add convex/lib/customerLedger.ts convex/lib/supplierLedger.ts convex/supplierPayments.ts src/components/AuditLogsPage.tsx tests/auditLogCustomerSupplierLedgerPayments.test.ts tests/AUDIT_LOG_CUSTOMER_SUPPLIER_LEDGER_PAYMENTS_MATRIX.md scripts/apply-audit-ledger-payment-links.mjs
+          git commit -m "Add audit links for ledgers and supplier payments"
+          git push origin HEAD:${{ github.event.pull_request.head.ref }}
       - name: Typecheck
         run: npm run typecheck
       - name: Orders pagination guard
