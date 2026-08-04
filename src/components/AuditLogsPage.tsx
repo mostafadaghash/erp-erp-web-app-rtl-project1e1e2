@@ -1,119 +1,230 @@
-import { useState } from "react";
-import { useQuery } from "convex/react";
+import { useMemo, useState, type ElementType } from "react";
+import { usePaginatedQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import {
-  Shield, Search, Filter, Trash2, Plus, Edit2,
-  Eye, AlertTriangle, RefreshCw, BarChart3
+  Shield,
+  Search,
+  Trash2,
+  Plus,
+  Edit2,
+  Eye,
+  BarChart3,
+  ChevronDown,
 } from "lucide-react";
 
-const ACTION_CONFIG: Record<string, { label: string; color: string; icon: React.ElementType }> = {
-  create: { label: "إنشاء",  color: "bg-emerald-100 text-emerald-700", icon: Plus },
-  update: { label: "تعديل",  color: "bg-blue-100 text-blue-700",       icon: Edit2 },
-  delete: { label: "حذف",    color: "bg-red-100 text-red-700",         icon: Trash2 },
-  view:   { label: "عرض",    color: "bg-slate-100 text-slate-600",     icon: Eye },
+const ACTION_CONFIG: Record<
+  string,
+  { label: string; color: string; icon: ElementType }
+> = {
+  create: {
+    label: "إنشاء",
+    color: "bg-emerald-100 text-emerald-700",
+    icon: Plus,
+  },
+  update: {
+    label: "تعديل",
+    color: "bg-blue-100 text-blue-700",
+    icon: Edit2,
+  },
+  delete: {
+    label: "حذف",
+    color: "bg-red-100 text-red-700",
+    icon: Trash2,
+  },
+  view: {
+    label: "عرض",
+    color: "bg-slate-100 text-slate-600",
+    icon: Eye,
+  },
+  activate: {
+    label: "تفعيل",
+    color: "bg-emerald-100 text-emerald-700",
+    icon: Plus,
+  },
+  deactivate: {
+    label: "تعطيل",
+    color: "bg-amber-100 text-amber-700",
+    icon: Trash2,
+  },
+  reverse: {
+    label: "عكس",
+    color: "bg-orange-100 text-orange-700",
+    icon: Trash2,
+  },
 };
 
 const MODULE_LABELS: Record<string, string> = {
-  invoices:   "الفواتير",
-  orders:     "الأوردرات",
+  invoices: "الفواتير",
+  orders: "الأوردرات",
   deliveries: "التوصيلات",
-  repairs:    "الصيانة",
-  expenses:   "المصروفات",
-  suppliers:  "الموردين",
-  shipments:  "الشحنات",
-  crm:        "CRM",
-  branches:   "الفروع",
-  employees:  "الموظفون",
-  products:   "المنتجات",
-  customers:  "العملاء",
-  settings:   "الإعدادات",
+  repairs: "الصيانة",
+  expenses: "المصروفات",
+  suppliers: "الموردون",
+  shipments: "الشحنات",
+  crm: "CRM",
+  branches: "الفروع",
+  employees: "الموظفون",
+  products: "المنتجات",
+  customers: "العملاء",
+  settings: "الإعدادات",
+  finance: "المالية",
+  general_ledger: "الأستاذ العام",
 };
 
-export function AuditLogsPage() {
-  const logs = useQuery(api.auditLogs.list, { limit: 200 }) ?? [];
-  const stats = useQuery(api.auditLogs.getStats);
+function startOfDay(value: string) {
+  return value ? new Date(`${value}T00:00:00`).getTime() : undefined;
+}
 
+function endOfDay(value: string) {
+  return value ? new Date(`${value}T23:59:59.999`).getTime() : undefined;
+}
+
+export function AuditLogsPage() {
   const [search, setSearch] = useState("");
   const [filterAction, setFilterAction] = useState("all");
   const [filterModule, setFilterModule] = useState("all");
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
 
-  const filtered = logs.filter(l => {
-    const matchSearch =
-      (l.recordLabel ?? "").includes(search) ||
-      (l.userName ?? "").includes(search) ||
-      (l.details ?? "").includes(search) ||
-      (MODULE_LABELS[l.module] ?? l.module).includes(search);
-    const matchAction = filterAction === "all" || l.action === filterAction;
-    const matchModule = filterModule === "all" || l.module === filterModule;
-    return matchSearch && matchAction && matchModule;
-  });
+  const queryArgs = useMemo(
+    () => ({
+      module: filterModule === "all" ? undefined : filterModule,
+      action: filterAction === "all" ? undefined : filterAction,
+      fromTimestamp: startOfDay(fromDate),
+      toTimestamp: endOfDay(toDate),
+    }),
+    [filterAction, filterModule, fromDate, toDate],
+  );
 
-  const uniqueModules = [...new Set(logs.map(l => l.module))];
+  const { results, status, loadMore } = usePaginatedQuery(
+    api.auditLogs.listPaginated,
+    queryArgs,
+    { initialNumItems: 50 },
+  );
 
-  const formatTime = (ts: number) => {
-    const d = new Date(ts);
-    return d.toLocaleString("ar-EG", {
-      year: "numeric", month: "short", day: "numeric",
-      hour: "2-digit", minute: "2-digit"
+  const normalizedSearch = search.trim().toLocaleLowerCase("ar-EG");
+  const filtered = useMemo(
+    () =>
+      results.filter((log) => {
+        if (!normalizedSearch) return true;
+        return [
+          log.recordLabel ?? "",
+          log.recordId ?? "",
+          log.userName,
+          log.details ?? "",
+          MODULE_LABELS[log.module] ?? log.module,
+        ].some((value) =>
+          value.toLocaleLowerCase("ar-EG").includes(normalizedSearch),
+        );
+      }),
+    [normalizedSearch, results],
+  );
+
+  const loadedStats = useMemo(() => {
+    const byAction: Record<string, number> = {};
+    const byModule: Record<string, number> = {};
+    for (const log of results) {
+      byAction[log.action] = (byAction[log.action] ?? 0) + 1;
+      byModule[log.module] = (byModule[log.module] ?? 0) + 1;
+    }
+    return { byAction, byModule };
+  }, [results]);
+
+  const formatTime = (timestamp: number) =>
+    new Date(timestamp).toLocaleString("ar-EG", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
     });
-  };
+
+  const isLoadingFirstPage = status === "LoadingFirstPage";
+  const isLoadingMore = status === "LoadingMore";
+  const canLoadMore = status === "CanLoadMore";
+  const trueEmpty = status === "Exhausted" && results.length === 0;
+  const searchEmpty = results.length > 0 && filtered.length === 0;
 
   return (
     <div className="p-4 lg:p-6 space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-black text-slate-800 flex items-center gap-2">
             <Shield className="w-6 h-6 text-indigo-600" />
             سجل العمليات
           </h1>
-          <p className="text-slate-500 text-sm mt-0.5">تتبع جميع الإجراءات التي تمت على النظام</p>
+          <p className="text-slate-500 text-sm mt-0.5">
+            تتبع الإجراءات المسجلة على النظام بتحميل متدرج
+          </p>
         </div>
         <span className="text-xs font-medium px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-100">
-          سجل محفوظ وغير قابل للمسح
+          سجل محفوظ ولا توجد واجهة لحذفه
         </span>
       </div>
 
-      {/* Stats */}
-      {stats && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          {[
-            { label: "إجمالي العمليات", value: stats.total,                    color: "bg-slate-100 text-slate-700" },
-            { label: "إنشاء",           value: stats.byAction["create"] ?? 0,  color: "bg-emerald-100 text-emerald-700" },
-            { label: "تعديل",           value: stats.byAction["update"] ?? 0,  color: "bg-blue-100 text-blue-700" },
-            { label: "حذف",             value: stats.byAction["delete"] ?? 0,  color: "bg-red-100 text-red-700" },
-          ].map(s => (
-            <div key={s.label} className={`rounded-xl p-4 text-center ${s.color}`}>
-              <p className="text-2xl font-black">{s.value}</p>
-              <p className="text-xs font-medium mt-0.5">{s.label}</p>
-            </div>
-          ))}
-        </div>
-      )}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {[
+          {
+            label: "السجلات المحملة",
+            value: results.length,
+            color: "bg-slate-100 text-slate-700",
+          },
+          {
+            label: "إنشاء",
+            value: loadedStats.byAction.create ?? 0,
+            color: "bg-emerald-100 text-emerald-700",
+          },
+          {
+            label: "تعديل",
+            value: loadedStats.byAction.update ?? 0,
+            color: "bg-blue-100 text-blue-700",
+          },
+          {
+            label: "حذف/تعطيل",
+            value:
+              (loadedStats.byAction.delete ?? 0) +
+              (loadedStats.byAction.deactivate ?? 0),
+            color: "bg-red-100 text-red-700",
+          },
+        ].map((item) => (
+          <div
+            key={item.label}
+            className={`rounded-xl p-4 text-center ${item.color}`}
+          >
+            <p className="text-2xl font-black">{item.value}</p>
+            <p className="text-xs font-medium mt-0.5">{item.label}</p>
+          </div>
+        ))}
+      </div>
 
-      {/* Module Activity */}
-      {stats && Object.keys(stats.byModule).length > 0 && (
+      {Object.keys(loadedStats.byModule).length > 0 && (
         <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
           <h3 className="font-bold text-slate-700 mb-4 flex items-center gap-2">
             <BarChart3 className="w-4 h-4 text-indigo-500" />
-            نشاط الأقسام
+            نشاط الأقسام في السجلات المحملة
           </h3>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-            {Object.entries(stats.byModule)
-              .sort(([, a], [, b]) => b - a)
-              .map(([mod, count]) => {
-                const maxCount = Math.max(...Object.values(stats.byModule));
-                const pct = Math.round((count / maxCount) * 100);
+            {Object.entries(loadedStats.byModule)
+              .sort(([, first], [, second]) => second - first)
+              .map(([moduleName, count]) => {
+                const maxCount = Math.max(
+                  ...Object.values(loadedStats.byModule),
+                );
+                const percentage = Math.round((count / maxCount) * 100);
                 return (
-                  <div key={mod} className="bg-slate-50 rounded-xl p-3">
+                  <div key={moduleName} className="bg-slate-50 rounded-xl p-3">
                     <div className="flex justify-between items-center mb-2">
-                      <span className="text-xs font-bold text-slate-700">{MODULE_LABELS[mod] ?? mod}</span>
-                      <span className="text-xs font-black text-indigo-600">{count}</span>
+                      <span className="text-xs font-bold text-slate-700">
+                        {MODULE_LABELS[moduleName] ?? moduleName}
+                      </span>
+                      <span className="text-xs font-black text-indigo-600">
+                        {count}
+                      </span>
                     </div>
                     <div className="h-1.5 bg-slate-200 rounded-full overflow-hidden">
                       <div
                         className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full transition-all"
-                        style={{ width: `${pct}%` }}
+                        style={{ width: `${percentage}%` }}
                       />
                     </div>
                   </div>
@@ -123,73 +234,131 @@ export function AuditLogsPage() {
         </div>
       )}
 
-      {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-3">
-        <div className="relative flex-1">
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+        <div className="relative xl:col-span-2">
           <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <input
             className="form-input pr-9"
-            placeholder="بحث في السجلات..."
+            placeholder="بحث داخل السجلات المحملة..."
             value={search}
-            onChange={e => setSearch(e.target.value)}
+            onChange={(event) => setSearch(event.target.value)}
+            disabled={isLoadingFirstPage}
           />
         </div>
         <select
-          className="form-input sm:w-40"
+          className="form-input"
           value={filterAction}
-          onChange={e => setFilterAction(e.target.value)}
+          onChange={(event) => setFilterAction(event.target.value)}
         >
           <option value="all">كل العمليات</option>
-          {Object.entries(ACTION_CONFIG).map(([k, v]) => (
-            <option key={k} value={k}>{v.label}</option>
+          {Object.entries(ACTION_CONFIG).map(([key, config]) => (
+            <option key={key} value={key}>
+              {config.label}
+            </option>
           ))}
         </select>
         <select
-          className="form-input sm:w-40"
+          className="form-input"
           value={filterModule}
-          onChange={e => setFilterModule(e.target.value)}
+          onChange={(event) => setFilterModule(event.target.value)}
         >
           <option value="all">كل الأقسام</option>
-          {uniqueModules.map(m => (
-            <option key={m} value={m}>{MODULE_LABELS[m] ?? m}</option>
+          {Object.entries(MODULE_LABELS).map(([key, label]) => (
+            <option key={key} value={key}>
+              {label}
+            </option>
           ))}
         </select>
+        <div className="grid grid-cols-2 gap-2">
+          <input
+            type="date"
+            className="form-input"
+            aria-label="من تاريخ"
+            value={fromDate}
+            max={toDate || undefined}
+            onChange={(event) => setFromDate(event.target.value)}
+          />
+          <input
+            type="date"
+            className="form-input"
+            aria-label="إلى تاريخ"
+            value={toDate}
+            min={fromDate || undefined}
+            onChange={(event) => setToDate(event.target.value)}
+          />
+        </div>
       </div>
 
-      {/* Logs Table */}
+      {search && results.length > 0 && (
+        <p className="text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
+          البحث النصي يطابق السجلات المحملة فقط. استخدم القسم والعملية والتاريخ
+          لتضييق النتائج على الخادم.
+        </p>
+      )}
+
       <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-        {filtered.length === 0 ? (
+        {isLoadingFirstPage ? (
+          <div className="text-center py-16 text-slate-500 font-medium">
+            جارٍ تحميل سجل العمليات...
+          </div>
+        ) : trueEmpty ? (
           <div className="text-center py-16">
             <Shield className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-            <p className="text-slate-500 font-medium">لا توجد سجلات</p>
-            <p className="text-slate-400 text-sm mt-1">ستظهر هنا العمليات التي تتم على النظام</p>
+            <p className="text-slate-500 font-medium">
+              لا توجد سجلات تطابق الفلاتر المحددة
+            </p>
+          </div>
+        ) : searchEmpty ? (
+          <div className="text-center py-16">
+            <Search className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+            <p className="text-slate-500 font-medium">
+              لا توجد نتائج بحث داخل السجلات المحملة
+            </p>
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
                 <tr className="bg-gradient-to-b from-slate-50 to-slate-100 border-b border-slate-200">
-                  <th className="text-right px-4 py-3 text-xs font-bold text-slate-600 uppercase">الوقت</th>
-                  <th className="text-right px-4 py-3 text-xs font-bold text-slate-600 uppercase">العملية</th>
-                  <th className="text-right px-4 py-3 text-xs font-bold text-slate-600 uppercase">القسم</th>
-                  <th className="text-right px-4 py-3 text-xs font-bold text-slate-600 uppercase">السجل</th>
-                  <th className="text-right px-4 py-3 text-xs font-bold text-slate-600 uppercase">المستخدم</th>
-                  <th className="text-right px-4 py-3 text-xs font-bold text-slate-600 uppercase">التفاصيل</th>
+                  <th className="text-right px-4 py-3 text-xs font-bold text-slate-600">
+                    الوقت
+                  </th>
+                  <th className="text-right px-4 py-3 text-xs font-bold text-slate-600">
+                    العملية
+                  </th>
+                  <th className="text-right px-4 py-3 text-xs font-bold text-slate-600">
+                    القسم
+                  </th>
+                  <th className="text-right px-4 py-3 text-xs font-bold text-slate-600">
+                    السجل
+                  </th>
+                  <th className="text-right px-4 py-3 text-xs font-bold text-slate-600">
+                    المستخدم
+                  </th>
+                  <th className="text-right px-4 py-3 text-xs font-bold text-slate-600">
+                    التفاصيل
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {filtered.map(log => {
-                  const actionCfg = ACTION_CONFIG[log.action] ?? ACTION_CONFIG.view;
-                  const ActionIcon = actionCfg.icon;
+                {filtered.map((log) => {
+                  const actionConfig = ACTION_CONFIG[log.action] ?? {
+                    label: log.action,
+                    color: "bg-slate-100 text-slate-700",
+                    icon: Eye,
+                  };
+                  const ActionIcon = actionConfig.icon;
                   return (
-                    <tr key={log._id} className="hover:bg-slate-50 transition-colors">
+                    <tr key={log.id} className="hover:bg-slate-50 transition-colors">
                       <td className="px-4 py-3 text-xs text-slate-500 whitespace-nowrap">
-                        {formatTime(log._creationTime)}
+                        {formatTime(log.createdAt)}
                       </td>
                       <td className="px-4 py-3">
-                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold ${actionCfg.color}`}>
+                        <span
+                          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold ${actionConfig.color}`}
+                        >
                           <ActionIcon className="w-3 h-3" />
-                          {actionCfg.label}
+                          {actionConfig.label}
                         </span>
                       </td>
                       <td className="px-4 py-3">
@@ -201,10 +370,13 @@ export function AuditLogsPage() {
                         {log.recordLabel ?? log.recordId ?? "—"}
                       </td>
                       <td className="px-4 py-3 text-sm text-slate-600">
-                        {log.userName ?? "النظام"}
+                        {log.userName}
                       </td>
-                      <td className="px-4 py-3 text-xs text-slate-500 max-w-48 truncate">
-                        {log.details ?? "—"}
+                      <td
+                        className="px-4 py-3 text-xs text-slate-500 max-w-72"
+                        title={log.details ?? undefined}
+                      >
+                        <span className="line-clamp-2">{log.details ?? "—"}</span>
                       </td>
                     </tr>
                   );
@@ -215,10 +387,28 @@ export function AuditLogsPage() {
         )}
       </div>
 
-      {filtered.length > 0 && (
-        <p className="text-center text-xs text-slate-400">
-          عرض {filtered.length} من {logs.length} سجل
-        </p>
+      {!isLoadingFirstPage && results.length > 0 && (
+        <div className="flex flex-col items-center gap-2">
+          <p className="text-center text-xs text-slate-400">
+            عرض {filtered.length} نتيجة من {results.length} سجل محمل
+          </p>
+          {(canLoadMore || isLoadingMore) && (
+            <button
+              type="button"
+              className="btn-secondary inline-flex items-center gap-2"
+              disabled={isLoadingMore}
+              onClick={() => loadMore(50)}
+            >
+              <ChevronDown className="w-4 h-4" />
+              {isLoadingMore ? "جارٍ تحميل المزيد..." : "تحميل 50 سجلًا إضافيًا"}
+            </button>
+          )}
+          {status === "Exhausted" && (
+            <span className="text-xs text-slate-400">
+              تم تحميل كل السجلات المطابقة
+            </span>
+          )}
+        </div>
       )}
     </div>
   );
