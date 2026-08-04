@@ -3,7 +3,7 @@ import type { Doc, Id } from "../_generated/dataModel";
 import { ConvexError } from "convex/values";
 import { roundMoney } from "../../shared/businessRules.ts";
 import { nextDocumentNumber } from "./documentNumbers.ts";
-import type { AuthUser } from "./auth";
+import { logAction, type AuthUser } from "./auth";
 import { isValidIsoDate } from "../../shared/businessRules.ts";
 import { postFinancialTransactionJournal } from "./generalLedgerOperations.ts";
 
@@ -124,9 +124,33 @@ export async function postFinancialTransaction(ctx: MutationCtx, user: AuthUser,
       balanceBefore: movement.before, balanceAfter: movement.after, branchId: movement.account.branchId, date: input.date,
       availableAt: availableAt(input.date, movement.account, movement.signedAmount), createdAt: Date.now() });
   }
-  await postFinancialTransactionJournal(ctx, user, transactionId);
-  await ctx.db.insert("auditLogs", { userId: user.userId, userName: user.name, action: "post", module: "finance",
-    recordId: String(transactionId), recordLabel: transactionNumber, details: input.description, branchId: input.branchId, timestamp: Date.now() });
+  const journalEntry = await postFinancialTransactionJournal(ctx, user, transactionId);
+  await logAction(ctx, user, {
+    action: input.type === "reversal" ? "reverse" : "post",
+    module: "finance",
+    recordId: String(transactionId),
+    recordLabel: transactionNumber,
+    details: input.description,
+    branchId: input.branchId,
+    sourceType: input.referenceType ?? "financial_transaction",
+    sourceId: input.referenceId ?? String(transactionId),
+    sourceNumber: input.referenceNumber ?? transactionNumber,
+    relatedType: input.originalTransactionId ? "financial_transaction" : undefined,
+    relatedId: input.originalTransactionId ? String(input.originalTransactionId) : undefined,
+    financialTransactionId: String(transactionId),
+    journalEntryId: journalEntry?._id ? String(journalEntry._id) : undefined,
+    reversalOfId: input.originalTransactionId ? String(input.originalTransactionId) : undefined,
+    after: {
+      type: input.type,
+      status: "posted",
+      date: input.date,
+      amount,
+      feeAmount,
+      branchId: String(input.branchId),
+      referenceType: input.referenceType ?? null,
+      referenceNumber: input.referenceNumber ?? null,
+    },
+  });
   return { transactionId, duplicate: false };
 }
 

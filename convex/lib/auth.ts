@@ -181,6 +181,7 @@ type AuditSnapshotRow = { field: string; value: string };
 
 const MAX_AUDIT_FIELDS = 24;
 const MAX_AUDIT_VALUE_LENGTH = 300;
+const MAX_AUDIT_LINK_LENGTH = 200;
 const SENSITIVE_AUDIT_FIELD = /(password|secret|token|hash|authorization|cookie|session|invitecode|requestfingerprint|idempotencykey)/i;
 
 function formatAuditValue(field: string, value: AuditSnapshotValue): string {
@@ -205,6 +206,11 @@ export function createAuditSnapshot(
     }))
     .filter((row) => row.field.length > 0);
   return rows.length > 0 ? rows : undefined;
+}
+
+function safeAuditLink(value?: string | null): string | undefined {
+  const normalized = value?.trim().replace(/\s+/g, " ");
+  return normalized ? normalized.slice(0, MAX_AUDIT_LINK_LENGTH) : undefined;
 }
 
 function changedAuditFields(
@@ -233,6 +239,15 @@ export async function logAction(
     branchId?: Id<"branches"> | null;
     before?: AuditSnapshotInput;
     after?: AuditSnapshotInput;
+    sourceType?: string;
+    sourceId?: string;
+    sourceNumber?: string;
+    relatedType?: string;
+    relatedId?: string;
+    relatedNumber?: string;
+    financialTransactionId?: string;
+    journalEntryId?: string;
+    reversalOfId?: string;
   },
 ) {
   const beforeSnapshot = createAuditSnapshot(params.before);
@@ -251,6 +266,15 @@ export async function logAction(
     afterSnapshot,
     changedFields: changedAuditFields(beforeSnapshot, afterSnapshot),
     snapshotVersion: beforeSnapshot || afterSnapshot ? 1 : undefined,
+    sourceType: safeAuditLink(params.sourceType),
+    sourceId: safeAuditLink(params.sourceId),
+    sourceNumber: safeAuditLink(params.sourceNumber),
+    relatedType: safeAuditLink(params.relatedType),
+    relatedId: safeAuditLink(params.relatedId),
+    relatedNumber: safeAuditLink(params.relatedNumber),
+    financialTransactionId: safeAuditLink(params.financialTransactionId),
+    journalEntryId: safeAuditLink(params.journalEntryId),
+    reversalOfId: safeAuditLink(params.reversalOfId),
     timestamp: Date.now(),
   });
 }
