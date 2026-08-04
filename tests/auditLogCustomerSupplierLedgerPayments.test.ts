@@ -67,9 +67,7 @@ test("ALP-08 audit UI names ledger and payment references without URL navigation
   }
   assert.doesNotMatch(auditUi, /href=\{.*log\./);
   assert.doesNotMatch(auditUi, /navigate\(.*log\./);
-  const newAudits = customerLedger + "
-" + supplierLedger + "
-" + supplierPayments;
+  const newAudits = customerLedger + "\n" + supplierLedger + "\n" + supplierPayments;
   assert.doesNotMatch(newAudits, /before:\s*\{[^}]*(requestId|idempotency|fingerprint|token)/i);
   assert.doesNotMatch(newAudits, /after:\s*\{[^}]*(requestId|idempotency|fingerprint|token)/i);
 });
