@@ -3,7 +3,7 @@ import type { Doc, Id } from "../_generated/dataModel";
 import { ConvexError } from "convex/values";
 import { roundMoney } from "../../shared/businessRules.ts";
 import { nextDocumentNumber } from "./documentNumbers.ts";
-import { logAction, type AuthUser } from "./auth";
+import { logAction, type AuthUser } from "./auth.ts";
 import { isValidIsoDate } from "../../shared/businessRules.ts";
 import { postFinancialTransactionJournal } from "./generalLedgerOperations.ts";
 

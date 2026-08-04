@@ -52,7 +52,7 @@ test("financial bridge guard keeps posting inside the central finance mutation",
   const posting = finance.indexOf(
     "postFinancialTransactionJournal(ctx, user, transactionId)",
   );
-  const audit = finance.indexOf('ctx.db.insert("auditLogs"');
+  const audit = finance.indexOf("await logAction(ctx, user, {", posting);
   assert.ok(movements >= 0 && movements < posting && posting < audit);
   assert.match(finance, /requestFingerprint/);
   assert.match(finance, /معرف الطلب مستخدم بحركة مالية مختلفة/);
