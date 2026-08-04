@@ -228,7 +228,7 @@ export const create = mutation({
     await applyOrderStatsChange(ctx, undefined, { status: "pending", total, remaining, branchId });
     if (args.initialDeposit && args.customerId) await postCustomerLedgerEntry(ctx, user, { type: "order_deposit", requestId: `${args.initialDeposit.requestId}:ledger`, customerId: args.customerId, branchId: branchId!, date: args.initialDeposit.paymentDate, receivableDelta: 0, advanceDelta: deposit, purchasesDelta: 0, description: `عربون الطلب ${orderNumber}`, referenceType: "order", referenceId: String(id), referenceNumber: orderNumber });
     if (args.initialDeposit && account) await postFinancialTransaction(ctx, user, { type: "order_deposit", requestId: args.initialDeposit.requestId, date: args.initialDeposit.paymentDate, amount: deposit, description: args.initialDeposit.notes?.trim() || `عربون الطلب ${orderNumber}`, branchId: branchId!, referenceType: "order", referenceId: String(id), referenceNumber: orderNumber, customerId: args.customerId, movements: [{ accountId: account._id, signedAmount: deposit }] });
-    await logAction(ctx, user, { action: "create", module: "orders", recordId: id, recordLabel: orderNumber, details: `إنشاء طلب جديد: ${orderNumber} للعميل ${customerName}` });
+    await logAction(ctx, user, { action: "create", module: "orders", recordId: String(id), recordLabel: orderNumber, details: `إنشاء طلب جديد: ${orderNumber} للعميل ${customerName}`, branchId, sourceType: "order", sourceId: String(id), sourceNumber: orderNumber, relatedType: args.customerId ? "customer" : undefined, relatedId: args.customerId ? String(args.customerId) : undefined, after: { status: "pending", total, deposit, remaining, customerName } });
     return id;
   },
 });
@@ -287,7 +287,7 @@ export const update = mutation({
       notes: args.notes?.trim() || undefined,
     });
     await applyOrderStatsChange(ctx, order, { ...order, total, remaining });
-    await logAction(ctx, user, { action: "update", module: "orders", recordId: order._id, recordLabel: order.orderNumber, details: `تعديل بيانات وبنود الطلب ${order.orderNumber}` });
+    await logAction(ctx, user, { action: "update", module: "orders", recordId: String(order._id), recordLabel: order.orderNumber, details: `تعديل بيانات وبنود الطلب ${order.orderNumber}`, branchId: order.branchId, sourceType: "order", sourceId: String(order._id), sourceNumber: order.orderNumber, relatedType: customerId ? "customer" : undefined, relatedId: customerId ? String(customerId) : undefined, before: { status: order.status, total: order.total, deposit: order.deposit, remaining: order.remaining, customerName: order.customerName }, after: { status: order.status, total, deposit: order.deposit, remaining, customerName } });
   },
 });
 
@@ -304,7 +304,7 @@ export const updateStatus = mutation({
     if (!canTransition(ORDER_TRANSITIONS, order.status, args.status)) throw new ConvexError(`لا يمكن تغيير حالة الطلب من ${order.status} إلى ${args.status}`);
     await ctx.db.patch(args.id, { status: args.status });
     await applyOrderStatsChange(ctx, order, { ...order, status: args.status });
-    await logAction(ctx, user, { action: "update", module: "orders", recordId: args.id, recordLabel: order.orderNumber, details: `تحديث حالة الطلب ${order.orderNumber} إلى: ${args.status}` });
+    await logAction(ctx, user, { action: "update_status", module: "orders", recordId: String(args.id), recordLabel: order.orderNumber, details: `تحديث حالة الطلب ${order.orderNumber} إلى: ${args.status}`, branchId: order.branchId, sourceType: "order", sourceId: String(args.id), sourceNumber: order.orderNumber, relatedType: order.customerId ? "customer" : undefined, relatedId: order.customerId ? String(order.customerId) : undefined, before: { status: order.status }, after: { status: args.status } });
   },
 });
 
@@ -328,7 +328,7 @@ export const addPayment = mutation({
     await postCustomerLedgerEntry(ctx, user, { type: "order_deposit", requestId: `${args.requestId}:ledger`, customerId: order.customerId, branchId: order.branchId, date: args.paymentDate, receivableDelta: 0, advanceDelta: args.amount, purchasesDelta: 0, description: `دفعة الطلب ${order.orderNumber}`, referenceType: "order", referenceId: String(order._id), referenceNumber: order.orderNumber });
     await ctx.db.patch(args.id, { deposit: newDeposit, remaining: newRemaining, status: order.status });
     await applyOrderStatsChange(ctx, order, { ...order, remaining: newRemaining });
-    await logAction(ctx, user, { action: "update", module: "orders", recordId: args.id, recordLabel: order.orderNumber, details: `دفعة جديدة بقيمة ${args.amount} للطلب ${order.orderNumber}` });
+    await logAction(ctx, user, { action: "record_payment", module: "orders", recordId: String(args.id), recordLabel: order.orderNumber, details: `دفعة جديدة بقيمة ${args.amount} للطلب ${order.orderNumber}`, branchId: order.branchId, sourceType: "order", sourceId: String(args.id), sourceNumber: order.orderNumber, relatedType: "customer", relatedId: String(order.customerId), financialTransactionId: String(posted.transactionId), before: { status: order.status, deposit: order.deposit, remaining: order.remaining }, after: { status: order.status, deposit: newDeposit, remaining: newRemaining, amount: args.amount, accountName: account.name } });
     return posted.transactionId;
   },
 });
@@ -355,7 +355,7 @@ export const refundDeposit = mutation({
     const nextRemaining = roundMoney(order.remaining + args.amount);
     await ctx.db.patch(order._id, { deposit: roundMoney(order.deposit - args.amount), remaining: nextRemaining });
     await applyOrderStatsChange(ctx, order, { ...order, remaining: nextRemaining });
-    await logAction(ctx, user, { action: "refund", module: "orders", recordId: order._id, recordLabel: order.orderNumber, details: `استرداد عربون بقيمة ${args.amount}: ${reason}` });
+    await logAction(ctx, user, { action: "refund", module: "orders", recordId: String(order._id), recordLabel: order.orderNumber, details: `استرداد عربون بقيمة ${args.amount}: ${reason}`, branchId: order.branchId, sourceType: "order", sourceId: String(order._id), sourceNumber: order.orderNumber, relatedType: "customer", relatedId: String(order.customerId), financialTransactionId: String(posted.transactionId), before: { status: order.status, deposit: order.deposit, remaining: order.remaining }, after: { status: order.status, deposit: roundMoney(order.deposit - args.amount), remaining: nextRemaining, amount: args.amount, accountName: account.name, reversalReason: reason } });
     return posted.transactionId;
   },
 });
@@ -376,7 +376,7 @@ export const cancel = mutation({
     if (order.deposit > 0) throw new ConvexError("الطلب يحتوي عربوناً ويحتاج معالجة استرداد مالي");
     await ctx.db.patch(args.id, { status: "cancelled", cancelledAt: Date.now(), cancelledBy: user.userId, cancellationReason: reason });
     await applyOrderStatsChange(ctx, order, { ...order, status: "cancelled" });
-    await logAction(ctx, user, { action: "cancel", module: "orders", recordId: args.id, recordLabel: order.orderNumber, details: `إلغاء الطلب ${order.orderNumber}: ${reason}` });
+    await logAction(ctx, user, { action: "cancel", module: "orders", recordId: String(args.id), recordLabel: order.orderNumber, details: `إلغاء الطلب ${order.orderNumber}: ${reason}`, branchId: order.branchId, sourceType: "order", sourceId: String(args.id), sourceNumber: order.orderNumber, relatedType: order.customerId ? "customer" : undefined, relatedId: order.customerId ? String(order.customerId) : undefined, before: { status: order.status, total: order.total, deposit: order.deposit, remaining: order.remaining }, after: { status: "cancelled", cancellationReason: reason } });
   },
 });
 

@@ -650,9 +650,17 @@ export const create = mutation({
     await logAction(ctx, user, {
       action: "create",
       module: "repairs",
-      recordId: id,
+      recordId: String(id),
       recordLabel: repairNumber,
       details: `استلام جهاز للصيانة: ${repairNumber} - ${args.deviceBrand} ${args.deviceModel} للعميل ${args.customerName}`,
+      branchId,
+      sourceType: "repair",
+      sourceId: String(id),
+      sourceNumber: repairNumber,
+      relatedType: args.customerId ? "customer" : undefined,
+      relatedId: args.customerId ? String(args.customerId) : undefined,
+      journalEntryId: journal?._id ? String(journal._id) : undefined,
+      after: { status: "received", date, totalCost, deposit: initialAmount, remaining: roundMoney(totalCost - initialAmount), laborCost, partsCount: storedParts.length, customerName: normalizedText.customerName, technicianName: technicianName ?? null },
     });
     return id;
   },
@@ -670,9 +678,17 @@ export const rotateTrackingToken = mutation({
     await logAction(ctx, user, {
       action: "rotate_tracking_token",
       module: "repairs",
-      recordId: args.id,
+      recordId: String(args.id),
       recordLabel: repair.repairNumber,
       details: `تجديد رابط تتبع الصيانة ${repair.repairNumber}`,
+      branchId: repair.branchId,
+      sourceType: "repair",
+      sourceId: String(args.id),
+      sourceNumber: repair.repairNumber,
+      relatedType: repair.customerId ? "customer" : undefined,
+      relatedId: repair.customerId ? String(repair.customerId) : undefined,
+      before: { publicTrackingActive: Boolean(repair.trackingToken) },
+      after: { publicTrackingActive: true, publicTrackingRotated: true },
     });
     return trackingToken;
   },
@@ -745,9 +761,17 @@ export const updateDetails = mutation({
     await logAction(ctx, user, {
       action: "update_details",
       module: "repairs",
-      recordId: args.id,
+      recordId: String(args.id),
       recordLabel: repair.repairNumber,
       details: `تحديث بيانات الجهاز والتشخيص للصيانة ${repair.repairNumber}`,
+      branchId: repair.branchId,
+      sourceType: "repair",
+      sourceId: String(args.id),
+      sourceNumber: repair.repairNumber,
+      relatedType: repair.customerId ? "customer" : undefined,
+      relatedId: repair.customerId ? String(repair.customerId) : undefined,
+      before: { technicianName: repair.technicianName ?? null, hasDiagnosis: Boolean(repair.diagnosis), hasSerialNumber: Boolean(repair.serialNumber), expectedDate: repair.expectedDate ?? null, hasQualityCheckNotes: Boolean(repair.qualityCheckNotes) },
+      after: { technicianName: technician?.name ?? repair.technicianName ?? null, hasDiagnosis: args.diagnosis === undefined ? Boolean(repair.diagnosis) : Boolean(normalizeOptionalText(args.diagnosis)), hasSerialNumber: args.serialNumber === undefined ? Boolean(repair.serialNumber) : Boolean(normalizeOptionalText(args.serialNumber)), expectedDate: args.expectedDate === undefined ? repair.expectedDate ?? null : expectedDate ?? null, hasQualityCheckNotes: args.qualityCheckNotes === undefined ? Boolean(repair.qualityCheckNotes) : Boolean(normalizeOptionalText(args.qualityCheckNotes)) },
     });
     return args.id;
   },
@@ -935,9 +959,18 @@ async function transitionRepair(
   await logAction(ctx, user, {
     action: "update_status",
     module: "repairs",
-    recordId: args.id,
+    recordId: String(args.id),
     recordLabel: repair.repairNumber,
     details: `تحديث حالة الصيانة ${repair.repairNumber} من ${repair.status} إلى ${args.status}`,
+    branchId: repair.branchId,
+    sourceType: "repair",
+    sourceId: String(args.id),
+    sourceNumber: repair.repairNumber,
+    relatedType: repair.customerId ? "customer" : undefined,
+    relatedId: repair.customerId ? String(repair.customerId) : undefined,
+    journalEntryId: cancellationJournal?._id ? String(cancellationJournal._id) : undefined,
+    before: { status: repair.status },
+    after: { status: args.status, date, reversalReason: reason ?? null, warrantyDays: warrantyDays ?? null },
   });
   return args.id;
 }

@@ -55,6 +55,13 @@ const ACTION_CONFIG: Record<
     color: "bg-orange-100 text-orange-700",
     icon: Trash2,
   },
+  cancel: { label: "إلغاء", color: "bg-red-100 text-red-700", icon: Trash2 },
+  confirm: { label: "تأكيد", color: "bg-emerald-100 text-emerald-700", icon: Plus },
+  refund: { label: "استرداد", color: "bg-orange-100 text-orange-700", icon: Trash2 },
+  record_payment: { label: "تحصيل", color: "bg-emerald-100 text-emerald-700", icon: Plus },
+  update_status: { label: "تغيير حالة", color: "bg-blue-100 text-blue-700", icon: Edit2 },
+  update_details: { label: "تعديل تفاصيل", color: "bg-blue-100 text-blue-700", icon: Edit2 },
+  rotate_tracking_token: { label: "تجديد التتبع", color: "bg-amber-100 text-amber-700", icon: Edit2 },
 };
 
 const MODULE_LABELS: Record<string, string> = {
@@ -76,6 +83,9 @@ const MODULE_LABELS: Record<string, string> = {
   customer_ledger: "دفتر العملاء",
   supplier_ledger: "دفتر الموردين",
   supplier_payments: "مدفوعات الموردين",
+  sales_returns: "مرتجعات المبيعات",
+  purchase_returns: "مرتجعات المشتريات",
+  cod_settlements: "تسويات COD",
 };
 
 const FIELD_LABELS: Record<string, string> = {
@@ -111,6 +121,37 @@ const FIELD_LABELS: Record<string, string> = {
   accountName: "الحساب المالي",
   supplierName: "المورد",
   reversalReason: "سبب العكس",
+  cancellationReason: "سبب الإلغاء",
+  customerName: "العميل",
+  total: "الإجمالي",
+  paid: "المدفوع",
+  remaining: "المتبقي",
+  deposit: "العربون",
+  totalAmount: "قيمة التوصيل",
+  codAmount: "تحصيل COD",
+  prepaidAmount: "المدفوع مقدمًا",
+  expectedCarrierFee: "رسوم الناقل المتوقعة",
+  attemptNumber: "رقم المحاولة",
+  deliveriesCount: "عدد التوصيلات",
+  grossAmount: "الإجمالي المحصل",
+  feeAmount: "الرسوم",
+  netAmount: "الصافي",
+  sourceAccountName: "حساب المصدر",
+  destinationAccountName: "حساب الوجهة",
+  laborCost: "تكلفة العمالة",
+  partsCount: "عدد القطع",
+  technicianName: "الفني",
+  warrantyDays: "أيام الضمان",
+  itemsCount: "عدد البنود",
+  totalCredit: "قيمة الإشعار",
+  debtReduction: "تخفيض المديونية",
+  cashRefund: "الرد النقدي",
+  inventoryValueRemoved: "قيمة المخزون",
+  publicTrackingActive: "التتبع العام فعال",
+  publicTrackingRotated: "تم تجديد التتبع",
+  hasDiagnosis: "يوجد تشخيص",
+  hasSerialNumber: "يوجد رقم تسلسلي",
+  hasQualityCheckNotes: "توجد ملاحظات فحص",
 };
 
 type SnapshotRow = { field: string; value: string };
@@ -137,6 +178,9 @@ const DOCUMENT_TYPE_LABELS: Record<string, string> = {
   order: "طلب",
   repair: "إصلاح",
   delivery: "توصيل",
+  delivery_confirmation: "تأكيد توصيل",
+  cod_settlement: "تسوية COD",
+  sales_return: "إشعار دائن مبيعات",
 };
 
 function DocumentLinks({

@@ -230,9 +230,22 @@ export const create = mutation({
     await logAction(ctx, user, {
       action: "create",
       module: "invoices",
-      recordId: id,
+      recordId: String(id),
       recordLabel: invoiceNumber,
       details: `إنشاء فاتورة ${invoiceNumber} بقيمة ${prepared.total} للعميل ${customerName}`,
+      branchId,
+      sourceType: "invoice",
+      sourceId: String(id),
+      sourceNumber: invoiceNumber,
+      relatedType: args.customerId ? "customer" : undefined,
+      relatedId: args.customerId ? String(args.customerId) : undefined,
+      after: {
+        status: deriveInvoiceStatus({ netTotal: prepared.total, creditedTotal: 0, paid: prepared.paid, remaining: prepared.remaining }),
+        total: prepared.total,
+        paid: prepared.paid,
+        remaining: prepared.remaining,
+        customerName,
+      },
     });
 
     return id;
@@ -329,9 +342,29 @@ export const update = mutation({
     await logAction(ctx, user, {
       action: "update",
       module: "invoices",
-      recordId: id,
+      recordId: String(id),
       recordLabel: inv.invoiceNumber,
       details: `تعديل الفاتورة ${inv.invoiceNumber}`,
+      branchId,
+      sourceType: "invoice",
+      sourceId: String(id),
+      sourceNumber: inv.invoiceNumber,
+      relatedType: data.customerId ? "customer" : undefined,
+      relatedId: data.customerId ? String(data.customerId) : undefined,
+      before: {
+        status: inv.status,
+        total: inv.total,
+        paid: inv.paid,
+        remaining: inv.remaining,
+        customerName: inv.customerName,
+      },
+      after: {
+        status: deriveInvoiceStatus({ netTotal: prepared.total, creditedTotal: 0, paid: prepared.paid, remaining: prepared.remaining }),
+        total: prepared.total,
+        paid: prepared.paid,
+        remaining: prepared.remaining,
+        customerName,
+      },
     });
   },
 });
@@ -352,11 +385,19 @@ export const updateStatus = mutation({
     }
     await ctx.db.patch(args.id, { status: args.status });
     await logAction(ctx, user, {
-      action: "update",
+      action: "update_status",
       module: "invoices",
-      recordId: args.id,
+      recordId: String(args.id),
       recordLabel: inv.invoiceNumber,
       details: `تغيير حالة الفاتورة ${inv.invoiceNumber} إلى ${args.status}`,
+      branchId: inv.branchId,
+      sourceType: "invoice",
+      sourceId: String(args.id),
+      sourceNumber: inv.invoiceNumber,
+      relatedType: inv.customerId ? "customer" : undefined,
+      relatedId: inv.customerId ? String(inv.customerId) : undefined,
+      before: { status: inv.status },
+      after: { status: args.status },
     });
   },
 });
@@ -392,9 +433,17 @@ export const cancel = mutation({
     await logAction(ctx, user, {
       action: "cancel",
       module: "invoices",
-      recordId: args.id,
+      recordId: String(args.id),
       recordLabel: inv.invoiceNumber,
       details: `إلغاء الفاتورة ${inv.invoiceNumber}: ${reason}`,
+      branchId: inv.branchId,
+      sourceType: "invoice",
+      sourceId: String(args.id),
+      sourceNumber: inv.invoiceNumber,
+      relatedType: inv.customerId ? "customer" : undefined,
+      relatedId: inv.customerId ? String(inv.customerId) : undefined,
+      before: { status: inv.status, total: inv.total, paid: inv.paid, remaining: inv.remaining },
+      after: { status: "cancelled", cancellationReason: reason },
     });
   },
 });
