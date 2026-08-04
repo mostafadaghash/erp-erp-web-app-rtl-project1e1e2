@@ -1,65 +1,146 @@
 import { query } from "./_generated/server";
-import { v } from "convex/values";
+import type { Doc } from "./_generated/dataModel";
+import { paginationOptsValidator } from "convex/server";
+import { ConvexError, v } from "convex/values";
 import { requirePermission } from "./lib/auth";
 
-export const list = query({
+function toAuditLogDto(log: Doc<"auditLogs">) {
+  return {
+    id: log._id,
+    createdAt: log.timestamp ?? log._creationTime,
+    userId: log.userId ?? null,
+    userName: log.userName ?? "النظام",
+    action: log.action,
+    module: log.module,
+    recordId: log.recordId ?? null,
+    recordLabel: log.recordLabel ?? null,
+    details: log.details ?? null,
+    branchId: log.branchId ?? null,
+  };
+}
+
+export const listPaginated = query({
   args: {
+    paginationOpts: paginationOptsValidator,
     module: v.optional(v.string()),
     action: v.optional(v.string()),
-    userId: v.optional(v.id("userProfiles")),
+    userId: v.optional(v.string()),
     branchId: v.optional(v.id("branches")),
-    limit: v.optional(v.number()),
+    fromTimestamp: v.optional(v.number()),
+    toTimestamp: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const user = await requirePermission(ctx, "view_audit_logs");
-    let logs = await ctx.db.query("auditLogs").collect();
-    // Non-admins only see their own logs
-    if (user.role !== "admin") {
-      logs = logs.filter(l => l.userId === user.userId);
-    }
-    if (args.module) {
-      logs = logs.filter(l => l.module === args.module);
-    }
-    if (args.action) {
-      logs = logs.filter(l => l.action === args.action);
-    }
-    if (args.userId) {
-      logs = logs.filter(l => l.userId === args.userId);
-    }
-    if (args.branchId) {
-      logs = logs.filter(l => l.branchId === args.branchId);
-    }
-    logs = logs.sort((a, b) => b._creationTime - a._creationTime);
-    if (args.limit) {
-      logs = logs.slice(0, args.limit);
-    }
-    return logs;
-  },
-});
+    const moduleFilter = args.module?.trim() || undefined;
+    const actionFilter = args.action?.trim() || undefined;
+    const requestedUserId = args.userId?.trim() || undefined;
 
-export const getStats = query({
-  args: {},
-  handler: async (ctx) => {
-    const user = await requirePermission(ctx, "view_audit_logs");
-    let logs = await ctx.db.query("auditLogs").collect();
+    if (
+      args.fromTimestamp !== undefined &&
+      args.toTimestamp !== undefined &&
+      args.fromTimestamp > args.toTimestamp
+    ) {
+      throw new ConvexError("نطاق تاريخ سجل العمليات غير صالح");
+    }
+
     if (user.role !== "admin") {
-      logs = logs.filter(l => l.userId === user.userId);
+      if (requestedUserId && requestedUserId !== user.userId) {
+        throw new ConvexError("ليس لديك صلاحية لعرض سجل مستخدم آخر");
+      }
+      if (args.branchId && args.branchId !== user.branchId) {
+        throw new ConvexError("ليس لديك صلاحية لعرض سجل فرع آخر");
+      }
     }
-    const byModule: Record<string, number> = {};
-    const byAction: Record<string, number> = {};
-    for (const l of logs) {
-      byModule[l.module] = (byModule[l.module] ?? 0) + 1;
-      byAction[l.action] = (byAction[l.action] ?? 0) + 1;
+
+    const effectiveUserId = user.role === "admin" ? requestedUserId : user.userId;
+    const effectiveBranchId = args.branchId;
+
+    let logsQuery = ctx.db.query("auditLogs").order("desc");
+
+    if (effectiveUserId && moduleFilter && actionFilter) {
+      logsQuery = ctx.db
+        .query("auditLogs")
+        .withIndex("by_user_module_action", (q) =>
+          q
+            .eq("userId", effectiveUserId)
+            .eq("module", moduleFilter)
+            .eq("action", actionFilter),
+        )
+        .order("desc");
+    } else if (effectiveUserId) {
+      logsQuery = ctx.db
+        .query("auditLogs")
+        .withIndex("by_user", (q) => q.eq("userId", effectiveUserId))
+        .order("desc");
+    } else if (effectiveBranchId && moduleFilter && actionFilter) {
+      logsQuery = ctx.db
+        .query("auditLogs")
+        .withIndex("by_branch_module_action", (q) =>
+          q
+            .eq("branchId", effectiveBranchId)
+            .eq("module", moduleFilter)
+            .eq("action", actionFilter),
+        )
+        .order("desc");
+    } else if (effectiveBranchId) {
+      logsQuery = ctx.db
+        .query("auditLogs")
+        .withIndex("by_branch", (q) => q.eq("branchId", effectiveBranchId))
+        .order("desc");
+    } else if (moduleFilter && actionFilter) {
+      logsQuery = ctx.db
+        .query("auditLogs")
+        .withIndex("by_module_action", (q) =>
+          q.eq("module", moduleFilter).eq("action", actionFilter),
+        )
+        .order("desc");
+    } else if (moduleFilter) {
+      logsQuery = ctx.db
+        .query("auditLogs")
+        .withIndex("by_module", (q) => q.eq("module", moduleFilter))
+        .order("desc");
+    } else if (actionFilter) {
+      logsQuery = ctx.db
+        .query("auditLogs")
+        .withIndex("by_action", (q) => q.eq("action", actionFilter))
+        .order("desc");
     }
-    const now = Date.now();
-    const dayAgo = now - 24 * 60 * 60 * 1000;
-    const weekAgo = now - 7 * 24 * 60 * 60 * 1000;
+
+    if (effectiveUserId) {
+      logsQuery = logsQuery.filter((q) =>
+        q.eq(q.field("userId"), effectiveUserId),
+      );
+    }
+    if (effectiveBranchId) {
+      logsQuery = logsQuery.filter((q) =>
+        q.eq(q.field("branchId"), effectiveBranchId),
+      );
+    }
+    if (moduleFilter) {
+      logsQuery = logsQuery.filter((q) =>
+        q.eq(q.field("module"), moduleFilter),
+      );
+    }
+    if (actionFilter) {
+      logsQuery = logsQuery.filter((q) =>
+        q.eq(q.field("action"), actionFilter),
+      );
+    }
+    if (args.fromTimestamp !== undefined) {
+      logsQuery = logsQuery.filter((q) =>
+        q.gte(q.field("_creationTime"), args.fromTimestamp!),
+      );
+    }
+    if (args.toTimestamp !== undefined) {
+      logsQuery = logsQuery.filter((q) =>
+        q.lte(q.field("_creationTime"), args.toTimestamp!),
+      );
+    }
+
+    const result = await logsQuery.paginate(args.paginationOpts);
     return {
-      total: logs.length,
-      last24h: logs.filter(l => l._creationTime > dayAgo).length,
-      last7d: logs.filter(l => l._creationTime > weekAgo).length,
-      byModule,
-      byAction,
+      ...result,
+      page: result.page.map(toAuditLogDto),
     };
   },
 });
