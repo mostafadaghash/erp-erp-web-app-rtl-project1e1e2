@@ -31,11 +31,11 @@ export const customerOptions = query({ args: { branchId: v.id("branches") }, han
   const user = await requirePermission(ctx, "view_customer_ledger"); assertLedgerBranch(user, args.branchId);
   const branch = await ctx.db.get(args.branchId); if (!branch?.isActive) throw new ConvexError("الفرع غير موجود أو معطل");
   const settings = await ctx.db.query("financeSettings").first();
-  const customers = (await ctx.db.query("customers").withIndex("by_branch", q => q.eq("branchId", args.branchId)).collect()).filter(customer => customer.isActive !== false);
+  const customers = await ctx.db.query("customers").withIndex("by_branch", q => q.eq("branchId", args.branchId)).collect();
   return { cutoverDate: settings?.cutoverDate ?? null, customers: await Promise.all(customers.map(async customer => {
     const balance = await ctx.db.query("customerBalances").withIndex("by_customer_branch", q => q.eq("customerId", customer._id).eq("branchId", args.branchId)).unique();
     const policy = await deriveCustomerLedgerOpeningState(ctx, customer._id, args.branchId);
-    return { customerId: customer._id, customerName: customer.name, phone: customer.phone, branchId: args.branchId, receivableBalance: balance?.receivableBalance ?? 0, advanceBalance: balance?.advanceBalance ?? 0, totalPurchases: balance?.totalPurchases ?? 0, ...policy };
+    return { customerId: customer._id, customerName: customer.name, phone: customer.phone, isActive: customer.isActive !== false, branchId: args.branchId, receivableBalance: balance?.receivableBalance ?? 0, advanceBalance: balance?.advanceBalance ?? 0, totalPurchases: balance?.totalPurchases ?? 0, ...policy };
   })) };
 } });
 

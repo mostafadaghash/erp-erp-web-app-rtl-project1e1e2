@@ -253,7 +253,7 @@ export function CustomerLedgerPage({
           )}
           {options && options.customers.length === 0 && (
             <p className="p-5 text-center text-sm text-slate-400">
-              لا يوجد عملاء نشطون في هذا الفرع
+              لا يوجد عملاء في هذا الفرع
             </p>
           )}
           {options?.customers.map((customer) => (
@@ -265,7 +265,12 @@ export function CustomerLedgerPage({
                 customer.customerId === customerId ? "bg-indigo-50 ring-1 ring-indigo-200" : ""
               }`}
             >
-              <b>{customer.customerName}</b>
+              <div className="flex items-center justify-between gap-2">
+                <b>{customer.customerName}</b>
+                {customer.isActive === false && (
+                  <span className="badge badge-danger text-[10px]">معطل</span>
+                )}
+              </div>
               <div className="text-xs mt-1">
                 مديونية: {customer.receivableBalance.toLocaleString("ar-EG")} · عربون: {customer.advanceBalance.toLocaleString("ar-EG")}
               </div>
