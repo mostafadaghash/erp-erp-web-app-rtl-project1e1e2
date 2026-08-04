@@ -6,7 +6,7 @@ on:
   pull_request:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   verify:
@@ -14,21 +14,11 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.pull_request.head.ref }}
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Apply shipment and expense audit links
-        run: |
-          node scripts/apply-audit-shipments-expenses-links.mjs
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add convex/shipments.ts convex/expenses.ts src/components/AuditLogsPage.tsx tests/auditLogShipmentsExpensesLinks.test.ts tests/AUDIT_LOG_SHIPMENTS_EXPENSES_LINKS_MATRIX.md
-          git commit -m "Add audit links for shipments and expenses"
-          git push origin HEAD:${{ github.event.pull_request.head.ref }}
       - name: Typecheck
         run: npm run typecheck
       - name: Orders pagination guard
