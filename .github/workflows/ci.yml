@@ -6,7 +6,7 @@ on:
   pull_request:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   verify:
@@ -14,23 +14,10 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.head_ref }}
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
-      - name: Apply structured audit snapshots
-        if: github.event_name == 'pull_request'
-        run: |
-          python3 scripts/apply-audit-structured-snapshots.py
-          if [ -n "$(git status --porcelain)" ]; then
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add convex/schema.ts convex/lib/auth.ts convex/auditLogs.ts src/components/AuditLogsPage.tsx convex/branches.ts convex/settings.ts convex/customers.ts convex/suppliers.ts convex/products.ts convex/employees.ts
-            git commit -m "feat: add structured audit snapshots"
-            git push origin HEAD:${GITHUB_HEAD_REF}
-          fi
       - run: npm ci
       - name: Typecheck
         run: npm run typecheck
