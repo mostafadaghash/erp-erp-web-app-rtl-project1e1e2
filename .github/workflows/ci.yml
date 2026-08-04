@@ -20,15 +20,15 @@ jobs:
         with:
           node-version: 22
           cache: npm
-      - name: Generate audit write inventory
+      - name: Apply structured audit snapshots
         if: github.event_name == 'pull_request'
         run: |
-          python3 scripts/inventory-audit-writes.py
+          python3 scripts/apply-audit-structured-snapshots.py
           if [ -n "$(git status --porcelain)" ]; then
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add tests/AUDIT_WRITE_INVENTORY.md
-            git commit -m "chore: generate audit write inventory"
+            git add convex/schema.ts convex/lib/auth.ts convex/auditLogs.ts src/components/AuditLogsPage.tsx convex/branches.ts convex/settings.ts convex/customers.ts convex/suppliers.ts convex/products.ts convex/employees.ts
+            git commit -m "feat: add structured audit snapshots"
             git push origin HEAD:${GITHUB_HEAD_REF}
           fi
       - run: npm ci
