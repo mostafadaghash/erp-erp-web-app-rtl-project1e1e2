@@ -44,9 +44,24 @@ export const create = mutation({
     await logAction(ctx, user, {
       action: "create",
       module: "expenses",
-      recordId: id,
-      recordLabel: args.title,
-      details: `تسجيل مصروف: ${args.title} - ${args.amount} (${args.category})`,
+      recordId: String(id),
+      recordLabel: title,
+      details: `تسجيل مصروف: ${title} - ${roundMoney(args.amount)} (${category})`,
+      branchId,
+      sourceType: "expense",
+      sourceId: String(id),
+      relatedType: "financial_account",
+      relatedId: String(account._id),
+      relatedNumber: account.name,
+      financialTransactionId: String(posted.transactionId),
+      after: {
+        status: "active",
+        date: args.date,
+        title,
+        category,
+        amount: roundMoney(args.amount),
+        accountName: account.name,
+      },
     });
     return id;
   },
@@ -63,18 +78,33 @@ export const voidExpense = mutation({
     if (!reason) throw new ConvexError("سبب الإبطال مطلوب");
     if (expense.status === "voided") throw new ConvexError("المصروف مبطل بالفعل");
     if (!isValidIsoDate(args.date)) throw new ConvexError("تاريخ الإبطال غير صالح");
+    let reversalTransactionId: string | undefined;
     if (expense.financialTransactionId) {
       const original = await ctx.db.get(expense.financialTransactionId); if (!original) throw new ConvexError("المعاملة الأصلية غير موجودة");
       const movements = await ctx.db.query("financialMovements").withIndex("by_transaction", q => q.eq("transactionId", original._id)).collect();
       const posted = await postFinancialTransaction(ctx, user, { type: "reversal", requestId: args.requestId, date: args.date, amount: original.amount, description: `عكس المصروف ${expense.title}: ${reason}`, branchId: original.branchId, referenceType: "expense", referenceId: String(expense._id), originalTransactionId: original._id, movements: movements.map(m => ({ accountId: m.accountId, signedAmount: -m.signedAmount })) });
       if (posted.duplicate) return posted.transactionId;
+      reversalTransactionId = String(posted.transactionId);
       await ctx.db.patch(original._id, { status: "reversed", reversedAt: Date.now(), reversedBy: user.userId, reversalReason: reason, reversalTransactionId: posted.transactionId });
     } else {
       const settings = await ctx.db.query("financeSettings").first();
       if (!settings || expense.date >= settings.cutoverDate) throw new ConvexError("المصروف التشغيلي لا يحتوي على معاملة مالية");
     }
     await ctx.db.patch(args.id, { status: "voided", voidedAt: Date.now(), voidedBy: user.userId, voidReason: reason });
-    await logAction(ctx, user, { action: "void", module: "expenses", recordId: args.id, recordLabel: expense.title, details: `إبطال المصروف ${expense.title}: ${reason}` });
+    await logAction(ctx, user, {
+      action: "void",
+      module: "expenses",
+      recordId: String(args.id),
+      recordLabel: expense.title,
+      details: `إبطال المصروف ${expense.title}: ${reason}`,
+      branchId: expense.branchId,
+      sourceType: "expense",
+      sourceId: String(args.id),
+      financialTransactionId: reversalTransactionId,
+      reversalOfId: expense.financialTransactionId ? String(expense.financialTransactionId) : undefined,
+      before: { status: expense.status, amount: expense.amount },
+      after: { status: "voided", date: args.date, amount: expense.amount, voidReason: reason },
+    });
     return expense.financialTransactionId ?? null;
   },
 });
