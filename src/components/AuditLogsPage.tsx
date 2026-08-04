@@ -62,6 +62,8 @@ const ACTION_CONFIG: Record<
   update_status: { label: "تغيير حالة", color: "bg-blue-100 text-blue-700", icon: Edit2 },
   update_details: { label: "تعديل تفاصيل", color: "bg-blue-100 text-blue-700", icon: Edit2 },
   rotate_tracking_token: { label: "تجديد التتبع", color: "bg-amber-100 text-amber-700", icon: Edit2 },
+  receive: { label: "استلام", color: "bg-emerald-100 text-emerald-700", icon: Plus },
+  void: { label: "إبطال", color: "bg-red-100 text-red-700", icon: Trash2 },
 };
 
 const MODULE_LABELS: Record<string, string> = {
@@ -152,6 +154,19 @@ const FIELD_LABELS: Record<string, string> = {
   hasDiagnosis: "يوجد تشخيص",
   hasSerialNumber: "يوجد رقم تسلسلي",
   hasQualityCheckNotes: "توجد ملاحظات فحص",
+  title: "العنوان",
+  category: "التصنيف",
+  totalCost: "تكلفة البضاعة",
+  shippingCost: "تكلفة الشحن",
+  grandTotal: "إجمالي الشحنة",
+  expectedDate: "التاريخ المتوقع",
+  receiptDate: "تاريخ الاستلام",
+  purchaseReceiptNumber: "رقم مستند الشراء",
+  payableAmount: "المستحق للمورد",
+  totalLandedCost: "إجمالي التكلفة الواصلة",
+  supplierFreightAmount: "شحن المورد",
+  hasSupplierLedgerEntry: "تم إنشاء حركة مورد",
+  voidReason: "سبب الإبطال",
 };
 
 type SnapshotRow = { field: string; value: string };
@@ -181,6 +196,9 @@ const DOCUMENT_TYPE_LABELS: Record<string, string> = {
   delivery_confirmation: "تأكيد توصيل",
   cod_settlement: "تسوية COD",
   sales_return: "إشعار دائن مبيعات",
+  shipment: "شحنة واردة",
+  expense: "مصروف",
+  financial_account: "حساب مالي",
 };
 
 function DocumentLinks({
