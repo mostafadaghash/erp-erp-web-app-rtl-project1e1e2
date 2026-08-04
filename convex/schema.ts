@@ -555,7 +555,11 @@ const applicationTables = {
   })
     .index("by_user", ["userId"])
     .index("by_module", ["module"])
-    .index("by_action", ["action"]),
+    .index("by_action", ["action"])
+    .index("by_branch", ["branchId"])
+    .index("by_branch_module_action", ["branchId", "module", "action"])
+    .index("by_user_module_action", ["userId", "module", "action"])
+    .index("by_module_action", ["module", "action"]),
 };
 
 export default defineSchema({
