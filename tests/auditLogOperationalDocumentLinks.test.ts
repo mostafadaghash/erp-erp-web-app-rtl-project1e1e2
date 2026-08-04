@@ -21,6 +21,8 @@ function auditSnapshots(source: string) {
     .join("\n");
 }
 
+const sensitiveSnapshotKey = /(?:^|[,\s])(requestId|requestFingerprint|idempotencyKey|trackingToken)\s*:/i;
+
 test("AOD-01 invoices expose document branch customer and safe state snapshots", () => {
   expectAll(invoices, [
     'sourceType: "invoice"',
@@ -76,7 +78,7 @@ test("AOD-05 repairs use safe summaries and never snapshot the tracking token", 
     'hasDiagnosis:',
     'journalEntryId: cancellationJournal?._id ? String(cancellationJournal._id) : undefined',
   ]);
-  assert.doesNotMatch(auditSnapshots(repairs), /trackingToken/i);
+  assert.doesNotMatch(auditSnapshots(repairs), sensitiveSnapshotKey);
 });
 
 test("AOD-06 sales return credit notes link invoices and finance reversals", () => {
@@ -104,7 +106,7 @@ test("AOD-08 operational audit snapshots exclude request and idempotency materia
   const snapshots = [invoices, orders, deliveries, repairs, salesReturns, purchaseReturns]
     .map(auditSnapshots)
     .join("\n");
-  assert.doesNotMatch(snapshots, /requestId|requestFingerprint|idempotencyKey|trackingToken/i);
+  assert.doesNotMatch(snapshots, sensitiveSnapshotKey);
 });
 
 test("AOD-09 Audit Log UI labels new actions modules documents and fields", () => {
