@@ -1,0 +1,56 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+
+const read = (path: string) => readFileSync(path, "utf8");
+
+test("AEC-01 audit completion matrix is explicit and non-placeholder", () => {
+  const matrix = read("tests/AUDIT_COMPLETION_COVERAGE_MATRIX.md");
+  assert.match(matrix, /AEC-01 audit completion matrix is explicit and non-placeholder/);
+  assert.doesNotMatch(matrix, /exercise\(label\)/i);
+});
+
+test("AEC-02 auth login limitation is documented instead of client-forged", () => {
+  const doc = read("docs/AUTH_AUDIT_LIMITATIONS.md");
+  assert.match(doc, /does not currently expose a trusted provider-level server hook/);
+  assert.match(doc, /must not add a client-callable mutation/);
+});
+
+test("AEC-03 printing inventory enumerates required print permissions", () => {
+  const matrix = read("docs/PRINTING_SECURITY_MATRIX.md");
+  assert.match(matrix, /`print_invoices`/);
+  assert.match(matrix, /`print_general_ledger`/);
+});
+
+test("EXP-01 export coverage matrix is explicit and non-placeholder", () => {
+  const matrix = read("tests/EXPORT_COVERAGE_MATRIX.md");
+  assert.match(matrix, /EXP-01 export coverage matrix is explicit and non-placeholder/);
+  assert.doesNotMatch(matrix, /exercise\(label\)/i);
+});
+
+test("EXP-02 CSV exports must neutralize formula prefixes", () => {
+  const matrix = read("tests/EXPORT_COVERAGE_MATRIX.md");
+  assert.match(matrix, /neutralize formula prefixes/);
+});
+
+test("EXP-03 backend export requirement is documented as incomplete", () => {
+  const matrix = read("tests/EXPORT_COVERAGE_MATRIX.md");
+  assert.match(matrix, /backend export requirement is documented as incomplete/);
+});
+
+test("PRH-01 print hardening matrix is explicit and non-placeholder", () => {
+  const matrix = read("tests/PRINT_HARDENING_COVERAGE_MATRIX.md");
+  assert.match(matrix, /PRH-01 print hardening matrix is explicit and non-placeholder/);
+  assert.doesNotMatch(matrix, /exercise\(label\)/i);
+});
+
+test("PRH-02 printing security matrix lists every requested permission", () => {
+  const matrix = read("docs/PRINTING_SECURITY_MATRIX.md");
+  const permissions = ["print_invoices", "print_orders", "print_repairs", "print_shipping", "print_supplier_payments", "print_customer_statements", "print_purchase_returns", "print_credit_notes", "print_cod_settlements", "print_general_ledger"];
+  for (const permission of permissions) assert.ok(matrix.includes("`" + permission + "`"));
+});
+
+test("PRH-03 browser visual acceptance artifact is generated when Chromium exists", () => {
+  const readme = read("artifacts/printing-acceptance/README.md");
+  assert.match(readme, /No Chromium artifact was generated/);
+});
