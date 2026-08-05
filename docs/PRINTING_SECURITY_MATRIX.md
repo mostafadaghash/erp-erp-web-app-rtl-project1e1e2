@@ -1,0 +1,16 @@
+# Printing Security Matrix
+
+| Permission | Backend Print Query | Page / Handler | Allowed DTO | Paper | Permission Test | Branch Test | Redaction Test | HTML Injection Test | Visual Status |
+|---|---|---|---|---|---|---|---|---|---|
+| `print_invoices` | `invoices.print` | `src/components/InvoicesPage.tsx` print handler | invoice number, branch, customer display fields, items, totals, status | A4 + Thermal | existing print permission tests | existing branch isolation tests | cost/profit gated | escaped print helper coverage | baseline only |
+| `print_orders` | `orders.print` | orders page print handler | order number, branch, customer display fields, items, totals, status | A4 + Thermal | existing print_orders tests | existing branch isolation tests | internal IDs omitted | escaped print helper coverage | baseline only |
+| `print_repairs` | `repairs.print` | repairs page print handler | repair number, branch, customer/device/status history display fields | A4 | existing repair print tests | existing branch isolation tests | tracking token/internal fields omitted | escaped print helper coverage | baseline only |
+| `print_shipping` | `deliveries.print` / settlement print | deliveries page print handlers | delivery/settlement voucher display fields | A4 + Thermal where suitable | existing COD print tests | existing branch isolation tests | financial internals omitted | escaped print helper coverage | baseline only |
+| `print_supplier_payments` | `supplierPayments.print` | supplier payments page print handler | supplier payment voucher fields | A4 + Thermal | existing SPP print tests | existing branch isolation tests | balances/internal IDs omitted | escaped print helper coverage | baseline only |
+| `print_customer_statements` | `customerLedger.printStatement` | customer ledger print handler | statement rows and safe balances | A4 | existing customer ledger print tests | existing branch isolation tests | legacy fields omitted | escaped print helper coverage | baseline only |
+| `print_purchase_returns` | `purchaseReturns.print` | purchase returns print handler | return number, receipt link, items, totals, status | A4 | existing PRT print tests | existing branch isolation tests | request/fingerprint omitted | escaped print helper coverage | baseline only |
+| `print_credit_notes` | `salesReturns.print` | sales returns print handler | credit note display fields | A4 | existing sales return print tests | existing branch isolation tests | cost/profit gated | escaped print helper coverage | baseline only |
+| `print_cod_settlements` | `deliveries.printCodSettlement` | COD settlement print handler | settlement totals, accounts display names, dates | A4 | existing COD settlement print tests | existing branch isolation tests | account balances omitted | escaped print helper coverage | baseline only |
+| `print_general_ledger` | `generalLedger.printEntry` / trial balance print | GL page print handlers | journal/trial-balance display DTOs | A4; Thermal N/A | existing GLUI print tests | existing GLF branch tests | raw user/token fields omitted | GLUI escape tests | baseline only |
+
+`baseline only` means this branch records the inventory but does not claim the requested Chromium A4/Thermal acceptance as complete unless the browser artifact test succeeds.
