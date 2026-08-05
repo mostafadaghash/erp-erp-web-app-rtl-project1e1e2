@@ -277,9 +277,7 @@ export function DeliveriesPage() {
     const popup = window.open("", "_blank");
     if (!popup) throw new Error("تعذر فتح نافذة الطباعة");
     popup.opener = null;
-    popup.document.write(
-      `<html dir="rtl"><head><meta charset="utf-8"><title>${escapeHtml(title)}</title><style>body{font-family:Arial;padding:24px}table{width:100%;border-collapse:collapse}td,th{border:1px solid #999;padding:8px}.signatures{display:flex;justify-content:space-between;margin-top:48px}</style></head><body><h1>${escapeHtml(title)}</h1>${bodyHtml}<div class="signatures"><span>توقيع الناقل: __________</span><span>توقيع المحاسب: __________</span></div></body></html>`,
-    );
+    popup.document.body.innerHTML = `<html dir="rtl"><head><meta charset="utf-8"><title>${escapeHtml(title)}</title><style>body{font-family:Arial;padding:24px}table{width:100%;border-collapse:collapse}td,th{border:1px solid #999;padding:8px}.signatures{display:flex;justify-content:space-between;margin-top:48px}</style></head><body><h1>${escapeHtml(title)}</h1>${bodyHtml}<div class="signatures"><span>توقيع الناقل: __________</span><span>توقيع المحاسب: __________</span></div></body></html>`;
     popup.document.close();
     popup.print();
   };
