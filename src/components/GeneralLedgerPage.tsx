@@ -615,9 +615,7 @@ export function GeneralLedgerPage() {
   const openPrintWindow = (title: string, body: string) => {
     const popup = window.open("", "_blank");
     if (!popup) throw new Error("تعذر فتح نافذة الطباعة");
-    popup.document.write(
-      `<!doctype html><html dir="rtl"><head><meta charset="utf-8"><title>${escapeHtml(title)}</title><style>body{font-family:Arial,sans-serif;padding:28px;color:#0f172a}h1,h2{text-align:center}table{width:100%;border-collapse:collapse;margin-top:20px}th,td{border:1px solid #94a3b8;padding:8px;text-align:right}.summary{display:flex;justify-content:space-between;margin:18px 0}.signatures{display:flex;justify-content:space-between;margin-top:56px}.muted{color:#64748b;font-size:12px}</style></head><body><h1>${escapeHtml(title)}</h1>${body}<div class="signatures"><span>إعداد: __________</span><span>مراجعة: __________</span><span>اعتماد: __________</span></div></body></html>`,
-    );
+    popup.document.body.innerHTML = `<!doctype html><html dir="rtl"><head><meta charset="utf-8"><title>${escapeHtml(title)}</title><style>body{font-family:Arial,sans-serif;padding:28px;color:#0f172a}h1,h2{text-align:center}table{width:100%;border-collapse:collapse;margin-top:20px}th,td{border:1px solid #94a3b8;padding:8px;text-align:right}.summary{display:flex;justify-content:space-between;margin:18px 0}.signatures{display:flex;justify-content:space-between;margin-top:56px}.muted{color:#64748b;font-size:12px}</style></head><body><h1>${escapeHtml(title)}</h1>${body}<div class="signatures"><span>إعداد: __________</span><span>مراجعة: __________</span><span>اعتماد: __________</span></div></body></html>`;
     popup.document.close();
     popup.focus();
     popup.print();

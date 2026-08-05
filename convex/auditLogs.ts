@@ -8,7 +8,7 @@ function toAuditLogDto(log: Doc<"auditLogs">) {
   return {
     id: log._id,
     createdAt: log.timestamp ?? log._creationTime,
-    userId: log.userId ?? null,
+    actor: log.userName ?? "النظام",
     userName: log.userName ?? "النظام",
     action: log.action,
     module: log.module,
