@@ -1,5 +1,8 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { spawnSync } from "node:child_process";
 import { test } from "node:test";
 import {
   normalizePhone,
@@ -119,4 +122,30 @@ test("migration CLI source has no Convex write/import primitives", async () => {
     assert.equal(source.includes(forbidden), false, `dry-run CLI must not contain ${forbidden}`);
   }
   assert.match(source, /No application data was written/);
+});
+
+test("migration CLI produces and verifies a complete dry-run package", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "erp-migration-"));
+  try {
+    const prepare = spawnSync(process.execPath, [
+      "scripts/migration/prepare.mjs",
+      "--input", "migration/example.input.json",
+      "--output", dir,
+      "--fail-on-rejects",
+      "--fail-on-differences",
+    ], { encoding: "utf8" });
+    assert.equal(prepare.status, 0, prepare.stderr);
+    assert.match(prepare.stdout, /No application data was written/);
+
+    const verify = spawnSync(process.execPath, ["scripts/migration/verify-package.mjs", dir], { encoding: "utf8" });
+    assert.equal(verify.status, 0, verify.stderr);
+    assert.match(verify.stdout, /writes remain disabled/);
+
+    for (const name of ["manifest.json", "accepted.json", "rejected.json", "mapping.json", "reconciliation.json", "apply-plan.json"]) {
+      const value = JSON.parse(await readFile(join(dir, name), "utf8"));
+      assert.ok(value !== undefined, `${name} should be valid JSON`);
+    }
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
 });
