@@ -1,6 +1,7 @@
 const required = [
   "STAGING_BASE_URL",
   "STAGING_ENVIRONMENT",
+  "E2E_PRODUCT_QUERY",
   "E2E_ADMIN_EMAIL",
   "E2E_ADMIN_PASSWORD",
 ];
