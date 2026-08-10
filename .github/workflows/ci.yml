@@ -48,6 +48,9 @@ jobs:
       - name: Build
         if: always()
         run: npm run build
+      - name: Release candidate preflight
+        if: always()
+        run: npm run release:preflight
 
   browser-contract:
     name: browser-contract
