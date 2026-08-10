@@ -7,6 +7,7 @@ import { test } from "node:test";
 import {
   normalizePhone,
   prepareMigration,
+  sha256,
 } from "../scripts/migration/lib.mjs";
 
 const validInput = () => ({
@@ -54,6 +55,18 @@ test("migration normalization is deterministic and rerunnable", () => {
   assert.equal(first.accepted.branches[0].code, "MAIN");
   assert.equal(first.accepted.products[0].sku, "ABC-1");
   assert.equal(first.accepted.products[0].inventoryValue, 20.5);
+});
+
+test("migration fingerprint survives JSON serialization and reload", () => {
+  const result = prepareMigration(validInput());
+  const persistedAccepted = JSON.parse(JSON.stringify(result.accepted));
+  const persistedFingerprint = sha256({
+    schemaVersion: result.manifest.schemaVersion,
+    sourceSystem: result.manifest.sourceSystem,
+    cutoverDate: result.manifest.cutoverDate,
+    accepted: persistedAccepted,
+  });
+  assert.equal(persistedFingerprint, result.manifest.fingerprint);
 });
 
 test("Egypt phone normalization accepts Arabic/Persian digits and country code", () => {
