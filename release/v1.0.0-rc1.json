@@ -1,0 +1,40 @@
+{
+  "version": "v1.0.0-rc1",
+  "preparedOn": "2026-08-10",
+  "status": "repository-prepared",
+  "productionEligible": false,
+  "repositoryGates": [
+    "CI / verify",
+    "CI / browser-contract",
+    "CI / release-gate"
+  ],
+  "liveGates": [
+    "separate Convex Staging deployment created",
+    "staging frontend deployed over HTTPS",
+    "staging secrets and dedicated UAT accounts configured",
+    "authenticated browser E2E passed against Staging",
+    "load test passed against Staging",
+    "deployed security headers/session/CORS/CSP checks passed",
+    "migration dry-run has zero unresolved rejects and supplied control differences",
+    "migration rehearsal and post-write reconciliation passed on Staging",
+    "backup and destructive restore drill passed on isolated Staging",
+    "role-based human UAT signed off",
+    "A4 and physical thermal printing accepted",
+    "monitoring and alerting verified",
+    "go/no-go approval recorded"
+  ],
+  "requiredEvidence": [
+    "staging deployment identifier",
+    "frontend staging URL",
+    "Git commit SHA",
+    "CI workflow run",
+    "Staging Release Gate run",
+    "load test report",
+    "security acceptance record",
+    "migration manifest fingerprint and reconciliation report",
+    "backup snapshot SHA-256 and restore drill record",
+    "UAT sign-off",
+    "production rollback recovery point"
+  ],
+  "notes": "This file defines the candidate contract only. Do not create or promote a production release/tag from this candidate until every live gate has recorded evidence."
+}
