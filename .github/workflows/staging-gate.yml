@@ -1,0 +1,95 @@
+name: Staging Release Gate
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - "src/**"
+      - "convex/**"
+      - "tests/e2e/**"
+      - "playwright.config.ts"
+      - "package.json"
+      - ".github/workflows/staging-gate.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: staging-gate-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Repository verification
+        run: npm run verify
+
+  browser-e2e:
+    name: browser-e2e
+    needs: quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: staging
+    env:
+      STAGING_ENVIRONMENT: staging
+      STAGING_BASE_URL: ${{ vars.STAGING_BASE_URL }}
+      E2E_ADMIN_EMAIL: ${{ secrets.E2E_ADMIN_EMAIL }}
+      E2E_ADMIN_PASSWORD: ${{ secrets.E2E_ADMIN_PASSWORD }}
+      E2E_MANAGER_EMAIL: ${{ secrets.E2E_MANAGER_EMAIL }}
+      E2E_MANAGER_PASSWORD: ${{ secrets.E2E_MANAGER_PASSWORD }}
+      E2E_ACCOUNTANT_EMAIL: ${{ secrets.E2E_ACCOUNTANT_EMAIL }}
+      E2E_ACCOUNTANT_PASSWORD: ${{ secrets.E2E_ACCOUNTANT_PASSWORD }}
+      E2E_SALES_EMAIL: ${{ secrets.E2E_SALES_EMAIL }}
+      E2E_SALES_PASSWORD: ${{ secrets.E2E_SALES_PASSWORD }}
+      E2E_VIEWER_EMAIL: ${{ secrets.E2E_VIEWER_EMAIL }}
+      E2E_VIEWER_PASSWORD: ${{ secrets.E2E_VIEWER_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Install pinned Playwright runner
+        run: npm install --no-save --package-lock=false @playwright/test@1.55.0
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Validate isolated staging target
+        run: npm run staging:check
+      - name: Authenticated browser acceptance
+        run: npm run test:e2e:staging
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            playwright-report
+            test-results/e2e
+          if-no-files-found: ignore
+          retention-days: 7
+
+  release-gate:
+    name: release-gate
+    needs: [quality, browser-e2e]
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Block release unless all gates passed
+        env:
+          QUALITY_RESULT: ${{ needs.quality.result }}
+          E2E_RESULT: ${{ needs.browser-e2e.result }}
+        run: |
+          test "$QUALITY_RESULT" = "success"
+          test "$E2E_RESULT" = "success"
+          echo "Staging release gate passed."
