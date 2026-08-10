@@ -19,6 +19,11 @@ migration/input/
 migration/output/
 !migration/example.input.json
 
+# Convex snapshots and restore evidence contain production/business data.
+backups/
+restore-evidence/
+*.zip.manifest.json
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
