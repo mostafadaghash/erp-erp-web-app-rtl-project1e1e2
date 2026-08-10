@@ -1,11 +1,11 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 import { login, navigateTo } from "./helpers";
 
-async function inputNextToLabel(page: Page, label: string) {
+function inputNextToLabel(page: Page, label: string) {
   return page.getByText(label, { exact: true }).locator("..").locator("input, textarea").first();
 }
 
-async function selectFirstRealOption(select: ReturnType<Page["locator"]>) {
+async function selectFirstRealOption(select: Locator) {
   const options = select.locator("option");
   const count = await options.count();
   expect(count).toBeGreaterThan(1);
@@ -23,7 +23,7 @@ test.describe("critical operational flow readiness", () => {
     await page.getByRole("button", { name: "فاتورة جديدة", exact: true }).first().click();
     await expect(page.getByRole("heading", { name: "فاتورة جديدة", exact: true })).toBeVisible();
 
-    await (await inputNextToLabel(page, "اسم العميل *")).fill(`E2E Invoice ${Date.now()}`);
+    await inputNextToLabel(page, "اسم العميل *").fill(`E2E Invoice ${Date.now()}`);
     const search = page.getByPlaceholder("ابحث عن منتج...");
     await search.fill(productQuery!);
 
@@ -62,12 +62,12 @@ test.describe("critical operational flow readiness", () => {
     await expect(page.getByRole("heading", { name: "طلب صيانة جديد", exact: true })).toBeVisible();
 
     const suffix = Date.now().toString().slice(-7);
-    await (await inputNextToLabel(page, "اسم العميل *")).fill(`E2E Repair ${suffix}`);
-    await (await inputNextToLabel(page, "رقم الهاتف *")).fill(`010${suffix}`);
+    await inputNextToLabel(page, "اسم العميل *").fill(`E2E Repair ${suffix}`);
+    await inputNextToLabel(page, "رقم الهاتف *").fill(`010${suffix}`);
     await page.getByPlaceholder("مثال: Samsung, Apple").fill("Sony");
     await page.getByPlaceholder("مثال: Galaxy S23").fill("PlayStation 5");
     await page.getByPlaceholder("اشرح المشكلة بالتفصيل...").fill("E2E staging intake validation");
-    await (await inputNextToLabel(page, "تكلفة العمالة (ج.م)")).fill("100");
+    await inputNextToLabel(page, "تكلفة العمالة (ج.م)").fill("100");
 
     await expect(page.getByRole("button", { name: "حفظ طلب الصيانة", exact: true })).toBeEnabled();
   });
