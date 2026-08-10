@@ -24,6 +24,7 @@ const requiredFiles = [
 
 const requiredScripts = [
   "verify",
+  "release:preflight",
   "staging:check",
   "migration:prepare",
   "migration:verify",
@@ -37,7 +38,7 @@ const requiredScripts = [
   "test:e2e:flows",
 ];
 
-async function fail(message) {
+function fail(message) {
   console.error(`Release preflight failed: ${message}`);
   process.exit(1);
 }
@@ -47,41 +48,41 @@ try {
     try {
       await access(path);
     } catch {
-      await fail(`missing required file: ${path}`);
+      fail(`missing required file: ${path}`);
     }
   }
 
   const candidate = JSON.parse(await readFile(candidatePath, "utf8"));
-  if (candidate.version !== "v1.0.0-rc1") await fail("candidate version must be v1.0.0-rc1");
-  if (candidate.status !== "repository-prepared") await fail("candidate status must remain repository-prepared before live acceptance");
-  if (candidate.productionEligible !== false) await fail("candidate must not be Production-eligible before live acceptance");
-  if (!Array.isArray(candidate.liveGates) || candidate.liveGates.length < 10) await fail("candidate live gate contract is incomplete");
-  if (!Array.isArray(candidate.requiredEvidence) || candidate.requiredEvidence.length < 8) await fail("candidate evidence contract is incomplete");
+  if (candidate.version !== "v1.0.0-rc1") fail("candidate version must be v1.0.0-rc1");
+  if (candidate.status !== "repository-prepared") fail("candidate status must remain repository-prepared before live acceptance");
+  if (candidate.productionEligible !== false) fail("candidate must not be Production-eligible before live acceptance");
+  if (!Array.isArray(candidate.liveGates) || candidate.liveGates.length < 10) fail("candidate live gate contract is incomplete");
+  if (!Array.isArray(candidate.requiredEvidence) || candidate.requiredEvidence.length < 8) fail("candidate evidence contract is incomplete");
 
   const packageJson = JSON.parse(await readFile("package.json", "utf8"));
   for (const name of requiredScripts) {
-    if (!packageJson.scripts?.[name]) await fail(`missing npm script: ${name}`);
+    if (!packageJson.scripts?.[name]) fail(`missing npm script: ${name}`);
   }
 
   const ci = await readFile(".github/workflows/ci.yml", "utf8");
-  if (!ci.includes("browser-contract")) await fail("CI browser-contract gate is missing");
-  if (!ci.includes("release-gate")) await fail("CI release-gate is missing");
+  if (!ci.includes("browser-contract")) fail("CI browser-contract gate is missing");
+  if (!ci.includes("release-gate")) fail("CI release-gate is missing");
 
   const staging = await readFile(".github/workflows/staging-gate.yml", "utf8");
-  if (!staging.includes("workflow_dispatch")) await fail("Staging gate must remain manually invokable before live configuration");
-  if (!staging.includes("release-gate")) await fail("Staging release-gate is missing");
+  if (!staging.includes("workflow_dispatch")) fail("Staging gate must remain manually invokable before live configuration");
+  if (!staging.includes("release-gate")) fail("Staging release-gate is missing");
 
   const migration = await readFile("scripts/migration/prepare.mjs", "utf8");
-  if (!migration.includes("No application data was written")) await fail("migration dry-run safety marker is missing");
+  if (!migration.includes("No application data was written")) fail("migration dry-run safety marker is missing");
 
   const restore = await readFile("scripts/backup/restore.mjs", "utf8");
-  if (!restore.includes("PLAN ONLY: no restore command was executed")) await fail("restore plan-only safety marker is missing");
-  if (!restore.includes("--pre-restore-manifest")) await fail("restore pre-restore backup requirement is missing");
+  if (!restore.includes("PLAN ONLY: no restore command was executed")) fail("restore plan-only safety marker is missing");
+  if (!restore.includes("--pre-restore-manifest")) fail("restore pre-restore backup requirement is missing");
 
   console.log(`Release candidate repository preflight passed: ${candidate.version}`);
   console.log(`Status: ${candidate.status}`);
   console.log(`Production eligible: ${candidate.productionEligible}`);
   console.log(`Live gates still required: ${candidate.liveGates.length}`);
 } catch (error) {
-  await fail(error instanceof Error ? error.message : String(error));
+  fail(error instanceof Error ? error.message : String(error));
 }
