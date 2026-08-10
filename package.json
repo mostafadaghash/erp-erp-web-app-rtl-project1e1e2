@@ -13,7 +13,14 @@
     "security:check": "node scripts/security-check.mjs",
     "verify": "npm run typecheck && npm test && npm run security:check && npm run build",
     "lint": "npm run verify",
-    "pretest": "node scripts/install-convex-test.mjs"
+    "pretest": "node scripts/install-convex-test.mjs",
+    "staging:check": "node scripts/staging-env-check.mjs",
+    "e2e:install": "npm install --no-save --package-lock=false @playwright/test@1.55.0",
+    "test:e2e": "playwright test",
+    "test:e2e:smoke": "playwright test --grep @smoke",
+    "test:e2e:roles": "playwright test --grep @roles",
+    "test:e2e:flows": "playwright test --grep @flows",
+    "test:e2e:staging": "npm run staging:check && playwright test"
   },
   "dependencies": {
     "@convex-dev/auth": "^0.0.80",
