@@ -14,6 +14,11 @@ dist-ssr
 playwright-report/
 test-results/
 
+# Migration inputs/outputs may contain business or personal data.
+migration/input/
+migration/output/
+!migration/example.input.json
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
