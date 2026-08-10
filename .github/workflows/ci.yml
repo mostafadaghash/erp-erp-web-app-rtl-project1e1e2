@@ -49,15 +49,33 @@ jobs:
         if: always()
         run: npm run build
 
+  browser-contract:
+    name: browser-contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Install pinned Playwright runner without changing lockfile
+        run: npm install --no-save --package-lock=false @playwright/test@1.55.0
+      - name: Compile and discover browser tests
+        run: npx playwright test --list
+
   release-gate:
     name: release-gate
-    needs: verify
+    needs: [verify, browser-contract]
     if: ${{ always() }}
     runs-on: ubuntu-latest
     steps:
-      - name: Require successful verification
+      - name: Require successful verification and browser contract
         env:
           VERIFY_RESULT: ${{ needs.verify.result }}
+          BROWSER_CONTRACT_RESULT: ${{ needs.browser-contract.result }}
         run: |
           test "$VERIFY_RESULT" = "success"
+          test "$BROWSER_CONTRACT_RESULT" = "success"
           echo "CI release gate passed."
