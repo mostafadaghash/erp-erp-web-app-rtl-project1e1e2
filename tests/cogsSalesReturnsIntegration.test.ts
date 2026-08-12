@@ -1,6 +1,6 @@
 import test, { after, before } from "node:test";
 import assert from "node:assert/strict";
-import { existsSync } from "node:fs"; import { symlink, unlink } from "node:fs/promises"; import { resolve } from "node:path";
+import { existsSync } from "node:fs"; import { symlink, unlink } from "./moduleLinkTestUtils.ts"; import { resolve } from "node:path";
 import { convexTest } from "convex-test"; import schema from "../convex/schema.ts"; import { api } from "../convex/_generated/api.js";
 
 const links = [["convex/_generated/server","server.js"],["convex/lib/auth","auth.ts"],["convex/lib/inventory","inventory.ts"],["convex/lib/documentNumbers","documentNumbers.ts"],["convex/lib/permissions","permissions.ts"],["convex/lib/references","references.ts"],["convex/lib/finance","finance.ts"],["convex/lib/productVisibility","productVisibility.ts"],["convex/lib/supplierLedger","supplierLedger.ts"],["shared/businessRules","businessRules.ts"],["shared/inventoryRules","inventoryRules.ts"],["shared/productRules","productRules.ts"]] as const;
@@ -61,3 +61,4 @@ test("COGS-35B cash-refund reversal links both financial transactions",async()=>
 
 test("COGS-35C cash reversal insufficient account state rolls back atomically",async()=>{const e=await setup(),a=await account(e),x=await sold(e,2);await e.t.mutation(api.invoices.recordPayment,{invoiceId:x.iid,amount:60,accountId:a,paymentDate:"2026-07-20",requestId:"poor-reverse-pay"});const id=await returnOne(e,x,"poor-reverse-return",{accountId:a});await e.raw.run(ctx=>ctx.db.patch(a,{currentBalance:-40}));const before=await snapshot(e);await assert.rejects(e.t.mutation(api.salesReturns.reverse,{id,reason:"x",date:"2026-07-22",requestId:"poor-reverse"}),/الرصيد غير كاف/);assert.deepEqual(await snapshot(e),before);});
 test("COGS-35D reversal date is persisted and cutover enforced",async()=>{const e=await setup(),x=await sold(e,2),id=await returnOne(e,x,"dated-return"),before=await snapshot(e);await assert.rejects(e.t.mutation(api.salesReturns.reverse,{id,reason:"x",date:"2026-06-30",requestId:"early-reverse"}),/تاريخ القطع/);assert.deepEqual(await snapshot(e),before);await e.t.mutation(api.salesReturns.reverse,{id,reason:"x",date:"2026-07-23",requestId:"dated-reverse"});assert.equal((await snapshot(e)).notes[0].reversalDate,"2026-07-23");});
+

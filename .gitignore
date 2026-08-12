@@ -13,6 +13,7 @@ dist-ssr
 *.local
 playwright-report/
 test-results/
+.env.staging.local
 
 # Migration inputs/outputs may contain business or personal data.
 migration/input/

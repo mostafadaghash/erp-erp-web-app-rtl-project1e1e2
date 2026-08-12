@@ -333,7 +333,7 @@ export function DeliveriesPage() {
   const settlementEmpty = activeBranch && settlements.status !== "LoadingFirstPage" && settlements.results.length === 0;
 
   return (
-    <div dir="rtl" className="p-6 space-y-5">
+    <div dir="rtl" className="p-6 space-y-5" data-testid="deliveries-page">
       <header className="flex justify-between gap-3">
         <div>
           <h1 className="text-2xl font-black flex gap-2">
@@ -343,7 +343,7 @@ export function DeliveriesPage() {
           <p className="text-slate-500">دورة موثقة من الطلب والفاتورة حتى التسوية</p>
         </div>
         {canCreate && (
-          <button className="btn-primary" onClick={() => open("create")} disabled={!activeBranch}>
+          <button data-testid="delivery-create-open" className="btn-primary" onClick={() => open("create")} disabled={!activeBranch}>
             إنشاء من طلب وفاتورة
           </button>
         )}
@@ -351,6 +351,7 @@ export function DeliveriesPage() {
 
       {branches && (
         <select
+          data-testid="delivery-branch-select"
           className="form-input max-w-xs"
           value={activeBranch ?? ""}
           onChange={(event) => handleBranchChange(event.target.value)}
@@ -409,7 +410,7 @@ export function DeliveriesPage() {
               </tr>
             )}
             {rows.map((delivery) => (
-              <tr key={delivery._id}>
+              <tr key={delivery._id} data-testid="delivery-row" data-delivery-number={delivery.deliveryNumber} data-customer-name={delivery.customerName} data-status={delivery.status}>
                 <td>{delivery.deliveryNumber}</td>
                 <td>{delivery.customerName}</td>
                 <td>{statusLabel(delivery.status)}</td>
@@ -420,7 +421,7 @@ export function DeliveriesPage() {
                   </button>
                   {canEdit && delivery.status === "pending" && (
                     <>
-                      <button onClick={() => open("ship", delivery)}>تأكيد الشحن</button>
+                      <button data-testid="delivery-ship-open" onClick={() => open("ship", delivery)}>تأكيد الشحن</button>
                       <button onClick={() => open("cancel", delivery)}>إلغاء</button>
                     </>
                   )}
@@ -428,7 +429,7 @@ export function DeliveriesPage() {
                     <button onClick={() => open("return", delivery)}>إرجاع قبل التسليم</button>
                   )}
                   {canConfirm && delivery.status === "shipped" && (
-                    <button onClick={() => open("deliver", delivery)}>تأكيد التسليم</button>
+                    <button data-testid="delivery-confirm-open" onClick={() => open("deliver", delivery)}>تأكيد التسليم</button>
                   )}
                   {canReverse && delivery.status === "delivered" && (
                     <button onClick={() => open("reverse-confirmation", delivery)}>عكس التأكيد</button>
@@ -455,7 +456,7 @@ export function DeliveriesPage() {
       </div>
 
       {canSettle && (
-        <button className="btn-primary" onClick={() => open("settle")} disabled={!activeBranch}>
+        <button data-testid="delivery-settlement-open" className="btn-primary" onClick={() => open("settle")} disabled={!activeBranch}>
           إنشاء تسوية COD مجمعة
         </button>
       )}
@@ -493,7 +494,7 @@ export function DeliveriesPage() {
 
       {modal && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl p-5 w-[min(95vw,650px)] max-h-[90vh] overflow-y-auto space-y-3">
+          <div data-testid="delivery-action-modal" data-modal={modal} className="bg-white rounded-2xl p-5 w-[min(95vw,650px)] max-h-[90vh] overflow-y-auto space-y-3">
             <button onClick={close} aria-label="إغلاق">
               <X />
             </button>
@@ -561,6 +562,7 @@ export function DeliveriesPage() {
                 {options === undefined && <p role="status" className="text-slate-500">جارٍ تحميل الطلبات الجاهزة…</p>}
                 {options?.length === 0 && <p className="text-slate-500">لا توجد طلبات جاهزة مؤهلة للتوصيل.</p>}
                 <select
+                  data-testid="delivery-order-select"
                   className="form-input"
                   value={orderId}
                   onChange={(event) => {
@@ -576,6 +578,7 @@ export function DeliveriesPage() {
                   ))}
                 </select>
                 <select
+                  data-testid="delivery-invoice-select"
                   className="form-input"
                   value={invoiceId}
                   onChange={(event) => setInvoiceId(event.target.value)}
@@ -600,11 +603,11 @@ export function DeliveriesPage() {
                     </ul>
                   </div>
                 )}
-                <input className="form-input" placeholder="المدينة" value={city} onChange={(event) => setCity(event.target.value)} />
-                <input className="form-input" placeholder="العنوان" value={address} onChange={(event) => setAddress(event.target.value)} />
-                <input className="form-input" placeholder="شركة الشحن" value={company} onChange={(event) => setCompany(event.target.value)} />
-                <input className="form-input" placeholder="رقم التتبع" value={tracking} onChange={(event) => setTracking(event.target.value)} />
-                <input className="form-input" type="number" step="0.01" min="0" placeholder="تكلفة الناقل المتوقعة" value={fee} onChange={(event) => setFee(event.target.value)} />
+                <input data-testid="delivery-city" className="form-input" placeholder="المدينة" value={city} onChange={(event) => setCity(event.target.value)} />
+                <input data-testid="delivery-address" className="form-input" placeholder="العنوان" value={address} onChange={(event) => setAddress(event.target.value)} />
+                <input data-testid="delivery-company" className="form-input" placeholder="شركة الشحن" value={company} onChange={(event) => setCompany(event.target.value)} />
+                <input data-testid="delivery-tracking" className="form-input" placeholder="رقم التتبع" value={tracking} onChange={(event) => setTracking(event.target.value)} />
+                <input data-testid="delivery-carrier-fee" className="form-input" type="number" step="0.01" min="0" placeholder="تكلفة الناقل المتوقعة" value={fee} onChange={(event) => setFee(event.target.value)} />
                 <p className="text-amber-700">تكلفة الناقل لا تضاف للعميل؛ يجب إدراج أي شحن يتحمله العميل داخل الفاتورة.</p>
               </>
             )}
@@ -617,7 +620,7 @@ export function DeliveriesPage() {
                 {(selected?.codAmount ?? 0) > 0 && confirmationAccounts?.length === 0 && (
                   <p role="alert" className="text-amber-800">لا توجد حسابات مؤهلة لتأكيد COD في هذا الفرع.</p>
                 )}
-                <select className="form-input" value={accountId} onChange={(event) => setAccountId(event.target.value)}>
+                <select data-testid="delivery-confirmation-account" className="form-input" value={accountId} onChange={(event) => setAccountId(event.target.value)}>
                   <option value="">اختر حساب تأكيد COD</option>
                   {confirmationAccounts?.map((account) => (
                     <option key={account._id} value={account._id}>
@@ -633,6 +636,7 @@ export function DeliveriesPage() {
                 {settlementSources === undefined && <p role="status" className="text-slate-500">جارٍ تحميل حسابات التسوية…</p>}
                 {settlementSources?.length === 0 && <p role="alert" className="text-amber-800">لا توجد حسابات مصدر مؤهلة للتسوية.</p>}
                 <select
+                  data-testid="delivery-settlement-source"
                   className="form-input"
                   value={accountId}
                   onChange={(event) => {
@@ -654,6 +658,8 @@ export function DeliveriesPage() {
                   {unsettled?.map((delivery) => (
                     <label key={delivery._id} className="block">
                       <input
+                        data-testid="delivery-settlement-item"
+                        data-delivery-number={delivery.deliveryNumber}
                         type="checkbox"
                         checked={checked.has(String(delivery._id))}
                         onChange={() =>
@@ -672,7 +678,7 @@ export function DeliveriesPage() {
 
                 {destinations === undefined && <p role="status" className="text-slate-500">جارٍ تحميل حسابات الوجهة…</p>}
                 {destinations?.length === 0 && <p role="alert" className="text-amber-800">لا توجد خزينة أو حساب بنكي مؤهل كوجهة.</p>}
-                <select className="form-input" value={destinationId} onChange={(event) => setDestinationId(event.target.value)}>
+                <select data-testid="delivery-settlement-destination" className="form-input" value={destinationId} onChange={(event) => setDestinationId(event.target.value)}>
                   <option value="">البنك أو الخزينة الوجهة</option>
                   {destinations?.map((account) => (
                     <option key={account._id} value={account._id}>
@@ -693,7 +699,7 @@ export function DeliveriesPage() {
             )}
 
             {["create", "deliver", "reverse-confirmation", "settle", "reverse-settlement"].includes(modal) && (
-              <input className="form-input" type="date" value={date} onChange={(event) => setDate(event.target.value)} />
+              <input data-testid="delivery-action-date" className="form-input" type="date" value={date} onChange={(event) => setDate(event.target.value)} />
             )}
 
             {modal !== "details" && validationReason && (
@@ -704,6 +710,7 @@ export function DeliveriesPage() {
 
             {modal !== "details" && (
               <button
+                data-testid="delivery-action-submit"
                 disabled={busy || Boolean(validationReason)}
                 aria-describedby={validationReason ? "delivery-action-validation" : undefined}
                 title={validationReason ?? undefined}
@@ -777,3 +784,4 @@ export function DeliveriesPage() {
     </div>
   );
 }
+

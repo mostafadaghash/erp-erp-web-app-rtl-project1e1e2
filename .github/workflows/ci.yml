@@ -23,7 +23,9 @@ jobs:
         with:
           node-version: 22
           cache: npm
-      - run: npm ci
+      - run: npm ci --ignore-scripts
+      - name: Dependency audit
+        run: npm audit --audit-level=low
       - name: Typecheck
         run: npm run typecheck
       - name: Orders pagination guard
@@ -62,7 +64,7 @@ jobs:
         with:
           node-version: 22
           cache: npm
-      - run: npm ci
+      - run: npm ci --ignore-scripts
       - name: Install pinned Playwright runner without changing lockfile
         run: npm install --no-save --package-lock=false @playwright/test@1.55.0
       - name: Compile and discover browser tests

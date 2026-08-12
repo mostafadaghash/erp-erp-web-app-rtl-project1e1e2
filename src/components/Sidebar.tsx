@@ -136,6 +136,7 @@ export function Sidebar({ currentPage, onNavigate, storeName, onClose, permissio
           <button
             onClick={onClose}
             className="lg:hidden p-1.5 rounded-lg hover:bg-white/10 text-slate-400 hover:text-white transition-colors"
+            aria-label="إغلاق القائمة الرئيسية"
           >
             <X className="w-4 h-4" />
           </button>
@@ -217,3 +218,4 @@ export function Sidebar({ currentPage, onNavigate, storeName, onClose, permissio
     </div>
   );
 }
+

@@ -1,0 +1,232 @@
+name: Staging acceptance
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_load_test:
+        description: Run the bounded load gate after browser acceptance
+        required: true
+        default: false
+        type: boolean
+      run_business_cycles:
+        description: Create disposable sales, purchase, repair, delivery, and COD records
+        required: true
+        default: false
+        type: boolean
+      load_requests:
+        description: Total bounded load requests
+        required: true
+        default: "25000"
+        type: string
+      load_concurrency:
+        description: Concurrent workers (maximum 256)
+        required: true
+        default: "256"
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: staging-acceptance
+  cancel-in-progress: false
+
+jobs:
+  staging-preflight:
+    name: Staging target preflight
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: staging
+    env:
+      STAGING_BASE_URL: ${{ vars.STAGING_BASE_URL }}
+      STAGING_CONVEX_URL: ${{ vars.STAGING_CONVEX_URL }}
+      STAGING_CONVEX_SITE_URL: ${{ vars.STAGING_CONVEX_SITE_URL }}
+      STAGING_TARGET_CONFIRMATION: ${{ vars.STAGING_TARGET_CONFIRMATION }}
+      PRODUCTION_BASE_URL: ${{ vars.PRODUCTION_BASE_URL }}
+      PRODUCTION_CONVEX_URL: ${{ vars.PRODUCTION_CONVEX_URL }}
+      PRODUCTION_CONVEX_SITE_URL: ${{ vars.PRODUCTION_CONVEX_SITE_URL }}
+      E2E_ENVIRONMENT: staging
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: Validate exact Staging target without network mutation
+        run: npm run test:staging-preflight -- --validate-config
+      - name: Verify published frontend Convex binding auth issuer and headers
+        run: npm run test:staging-preflight
+      - name: Upload Staging preflight evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: staging-preflight-evidence
+          path: test-results/staging-preflight
+          if-no-files-found: warn
+          retention-days: 14
+
+  browser-e2e:
+    name: Authenticated role Browser E2E
+    needs: staging-preflight
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: staging
+    env:
+      STAGING_BASE_URL: ${{ vars.STAGING_BASE_URL }}
+      STAGING_CONVEX_URL: ${{ vars.STAGING_CONVEX_URL }}
+      STAGING_CONVEX_SITE_URL: ${{ vars.STAGING_CONVEX_SITE_URL }}
+      STAGING_TARGET_CONFIRMATION: ${{ vars.STAGING_TARGET_CONFIRMATION }}
+      PRODUCTION_BASE_URL: ${{ vars.PRODUCTION_BASE_URL }}
+      PRODUCTION_CONVEX_URL: ${{ vars.PRODUCTION_CONVEX_URL }}
+      PRODUCTION_CONVEX_SITE_URL: ${{ vars.PRODUCTION_CONVEX_SITE_URL }}
+      E2E_ENVIRONMENT: staging
+      E2E_REQUIRE_ALL_ROLES: "true"
+      E2E_ROLE_ACCOUNTS_JSON: ${{ secrets.E2E_ROLE_ACCOUNTS_JSON }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: Validate repository before external acceptance
+        run: npm run typecheck && npm run security:check
+      - name: Run authenticated browser role matrix
+        run: npm run test:e2e-staging
+      - name: Upload staging browser evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: staging-browser-evidence
+          path: test-results/staging-e2e
+          if-no-files-found: warn
+          retention-days: 14
+
+  bounded-load:
+    name: Bounded Staging load gate
+    if: ${{ always() && inputs.run_load_test && needs.browser-e2e.result == 'success' && (needs.mutable-business-cycles.result == 'success' || needs.mutable-business-cycles.result == 'skipped') }}
+    needs: [browser-e2e, mutable-business-cycles]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: staging
+    env:
+      STAGING_BASE_URL: ${{ vars.STAGING_BASE_URL }}
+      STAGING_CONVEX_URL: ${{ vars.STAGING_CONVEX_URL }}
+      STAGING_CONVEX_SITE_URL: ${{ vars.STAGING_CONVEX_SITE_URL }}
+      STAGING_TARGET_CONFIRMATION: ${{ vars.STAGING_TARGET_CONFIRMATION }}
+      PRODUCTION_BASE_URL: ${{ vars.PRODUCTION_BASE_URL }}
+      PRODUCTION_CONVEX_URL: ${{ vars.PRODUCTION_CONVEX_URL }}
+      PRODUCTION_CONVEX_SITE_URL: ${{ vars.PRODUCTION_CONVEX_SITE_URL }}
+      E2E_ENVIRONMENT: staging
+      E2E_LOAD_CONFIRMED: isolated-staging-only
+      LOAD_REQUESTS: ${{ inputs.load_requests }}
+      LOAD_CONCURRENCY: ${{ inputs.load_concurrency }}
+      LOAD_P95_LIMIT_MS: "2000"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: Validate bounded load target and limits without requests
+        run: npm run test:load-staging -- --validate-config
+      - name: Run bounded staging load gate
+        run: npm run test:load-staging
+      - name: Upload load result
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: staging-load-result
+          path: test-results/staging-load
+          if-no-files-found: error
+          retention-days: 14
+
+  mutable-business-cycles:
+    name: Disposable mutable business Browser E2E
+    if: ${{ inputs.run_business_cycles }}
+    needs: browser-e2e
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    environment: staging
+    env:
+      STAGING_BASE_URL: ${{ vars.STAGING_BASE_URL }}
+      STAGING_CONVEX_URL: ${{ vars.STAGING_CONVEX_URL }}
+      STAGING_CONVEX_SITE_URL: ${{ vars.STAGING_CONVEX_SITE_URL }}
+      STAGING_TARGET_CONFIRMATION: ${{ vars.STAGING_TARGET_CONFIRMATION }}
+      PRODUCTION_BASE_URL: ${{ vars.PRODUCTION_BASE_URL }}
+      PRODUCTION_CONVEX_URL: ${{ vars.PRODUCTION_CONVEX_URL }}
+      PRODUCTION_CONVEX_SITE_URL: ${{ vars.PRODUCTION_CONVEX_SITE_URL }}
+      E2E_ENVIRONMENT: staging
+      E2E_REQUIRE_ALL_ROLES: "false"
+      E2E_MUTATIONS_CONFIRMED: isolated-staging-only
+      E2E_ROLE_ACCOUNTS_JSON: ${{ secrets.E2E_ROLE_ACCOUNTS_JSON }}
+      E2E_BUSINESS_FIXTURES_JSON: ${{ secrets.E2E_BUSINESS_FIXTURES_JSON }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: Validate mutable staging configuration without opening a browser
+        run: npm run test:e2e-business-staging -- --validate-config
+      - name: Run isolated mutable business cycles
+        run: npm run test:e2e-business-staging
+      - name: Upload mutable business evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: staging-business-evidence
+          path: test-results/staging-business-e2e
+          if-no-files-found: error
+          retention-days: 14
+
+  staging-required-gate:
+    name: Staging required gate
+    if: always()
+    needs:
+      - staging-preflight
+      - browser-e2e
+      - bounded-load
+      - mutable-business-cycles
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Require selected Staging acceptance jobs
+        env:
+          PREFLIGHT_RESULT: ${{ needs.staging-preflight.result }}
+          BROWSER_RESULT: ${{ needs.browser-e2e.result }}
+          LOAD_RESULT: ${{ needs.bounded-load.result }}
+          BUSINESS_RESULT: ${{ needs.mutable-business-cycles.result }}
+          RUN_LOAD: ${{ inputs.run_load_test }}
+          RUN_BUSINESS: ${{ inputs.run_business_cycles }}
+        run: |
+          test "$PREFLIGHT_RESULT" = "success"
+          test "$BROWSER_RESULT" = "success"
+          if [ "$RUN_LOAD" = "true" ]; then
+            test "$LOAD_RESULT" = "success"
+          else
+            test "$LOAD_RESULT" = "skipped"
+          fi
+          if [ "$RUN_BUSINESS" = "true" ]; then
+            test "$BUSINESS_RESULT" = "success"
+          else
+            test "$BUSINESS_RESULT" = "skipped"
+          fi
+          {
+            echo "## Staging acceptance gate"
+            echo "- Preflight: $PREFLIGHT_RESULT"
+            echo "- Browser roles: $BROWSER_RESULT"
+            echo "- Bounded load: $LOAD_RESULT"
+            echo "- Mutable business cycles: $BUSINESS_RESULT"
+          } >> "$GITHUB_STEP_SUMMARY"

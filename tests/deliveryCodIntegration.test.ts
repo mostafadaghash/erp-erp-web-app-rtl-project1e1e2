@@ -1,7 +1,7 @@
 import test, { after, before } from "node:test";
 import assert from "node:assert/strict";
 import { existsSync } from "node:fs";
-import { symlink, unlink } from "node:fs/promises";
+import { symlink, unlink } from "./moduleLinkTestUtils.ts";
 import { resolve } from "node:path";
 import { convexTest } from "convex-test";
 import schema from "../convex/schema.ts";

@@ -8,7 +8,7 @@ import type { Page } from "./ERPApp";
 import { FileText, Plus, Search, Printer } from "lucide-react";
 import { PrintModal } from "./PrintTemplate";
 import { useCurrency } from "../lib/utils";
-import type { Doc } from "../../convex/_generated/dataModel";
+import type { Doc, Id } from "../../convex/_generated/dataModel";
 import { toast } from "sonner";
 import { getErrorMessage } from "../lib/errors";
 
@@ -26,8 +26,6 @@ export function InvoicesPage({ onNavigate }: InvoicesPageProps) {
   const cancelInvoice = useMutation(api.invoices.cancel);
   const recordPayment = useMutation(api.invoices.recordPayment);
   const refundPayment = useMutation(api.invoices.refundPayment);
-  const collectionAccounts = useQuery(api.finance.collectionAccountPicker, canCollect ? {} : "skip") ?? [];
-  const refundAccounts = useQuery(api.finance.refundAccountPicker, canRefund ? {} : "skip") ?? [];
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState("");
   const [printInvoice, setPrintInvoice] = useState<Doc<"invoices"> | null>(null);
@@ -35,6 +33,22 @@ export function InvoicesPage({ onNavigate }: InvoicesPageProps) {
   const [cancelReason, setCancelReason] = useState("");
   const [isCancelling, setIsCancelling] = useState(false);
   const cancelRequestId = useRef(crypto.randomUUID());
+  const [collectTarget, setCollectTarget] = useState<Doc<"invoices"> | null>(null);
+  const [collectionAmount, setCollectionAmount] = useState("");
+  const [collectionAccountId, setCollectionAccountId] = useState("");
+  const [collectionDate, setCollectionDate] = useState(new Date().toISOString().slice(0, 10));
+  const [collectionNotes, setCollectionNotes] = useState("");
+  const [isCollecting, setIsCollecting] = useState(false);
+  const collectionRequestId = useRef(crypto.randomUUID());
+  const [refundTarget, setRefundTarget] = useState<Doc<"invoices"> | null>(null);
+  const [refundAmount, setRefundAmount] = useState("");
+  const [refundAccountId, setRefundAccountId] = useState("");
+  const [refundDate, setRefundDate] = useState(new Date().toISOString().slice(0, 10));
+  const [refundReason, setRefundReason] = useState("");
+  const [isRefunding, setIsRefunding] = useState(false);
+  const refundRequestId = useRef(crypto.randomUUID());
+  const collectionAccounts = useQuery(api.finance.collectionAccountPicker, canCollect && collectTarget ? {} : "skip") ?? [];
+  const refundAccounts = useQuery(api.finance.refundAccountPicker, canRefund && refundTarget ? {} : "skip") ?? [];
 
   const handleCancel = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -52,8 +66,77 @@ export function InvoicesPage({ onNavigate }: InvoicesPageProps) {
       setIsCancelling(false);
     }
   };
-  const collect = async (invoice: Doc<"invoices">) => { const amount = Number(prompt("المبلغ المراد تحصيله")); const account = collectionAccounts[0]; if (!amount || !account) return toast.error("لا يوجد حساب تحصيل متاح"); try { await recordPayment({ invoiceId: invoice._id, amount, accountId: account._id, paymentDate: new Date().toISOString().slice(0, 10), requestId: crypto.randomUUID() }); toast.success("تم التحصيل"); } catch (error) { toast.error(getErrorMessage(error, "تعذر التحصيل")); } };
-  const refund = async (invoice: Doc<"invoices">) => { const amount = Number(prompt("المبلغ المراد استرداده")); const reason = prompt("سبب الاسترداد")?.trim(); const account = refundAccounts[0]; if (!amount || !reason || !account) return; try { await refundPayment({ invoiceId: invoice._id, amount, accountId: account._id, date: new Date().toISOString().slice(0, 10), reason, requestId: crypto.randomUUID() }); toast.success("تم الاسترداد"); } catch (error) { toast.error(getErrorMessage(error, "تعذر الاسترداد")); } };
+  const collect = (invoice: Doc<"invoices">) => {
+    setCollectTarget(invoice);
+    setCollectionAmount("");
+    setCollectionAccountId("");
+    setCollectionDate(new Date().toISOString().slice(0, 10));
+    setCollectionNotes("");
+    collectionRequestId.current = crypto.randomUUID();
+  };
+  const submitCollection = async (event: React.FormEvent) => {
+    event.preventDefault();
+    const amount = Number(collectionAmount);
+    if (!collectTarget || isCollecting) return;
+    if (!Number.isFinite(amount) || amount <= 0 || amount > collectTarget.remaining) {
+      return toast.error("أدخل مبلغ تحصيل صحيحًا");
+    }
+    if (!collectionAccountId) return toast.error("اختر حساب التحصيل");
+    setIsCollecting(true);
+    try {
+      await recordPayment({
+        invoiceId: collectTarget._id,
+        amount,
+        accountId: collectionAccountId as Id<"financialAccounts">,
+        paymentDate: collectionDate,
+        requestId: collectionRequestId.current,
+        notes: collectionNotes.trim() || undefined,
+      });
+      toast.success("تم التحصيل");
+      setCollectTarget(null);
+      collectionRequestId.current = crypto.randomUUID();
+    } catch (error) {
+      toast.error(getErrorMessage(error, "تعذر التحصيل"));
+    } finally {
+      setIsCollecting(false);
+    }
+  };
+  const refund = (invoice: Doc<"invoices">) => {
+    setRefundTarget(invoice);
+    setRefundAmount("");
+    setRefundAccountId("");
+    setRefundDate(new Date().toISOString().slice(0, 10));
+    setRefundReason("");
+    refundRequestId.current = crypto.randomUUID();
+  };
+  const submitRefund = async (event: React.FormEvent) => {
+    event.preventDefault();
+    const amount = Number(refundAmount);
+    if (!refundTarget || isRefunding) return;
+    if (!Number.isFinite(amount) || amount <= 0 || amount > refundTarget.paid) {
+      return toast.error("أدخل مبلغ استرداد صحيحًا");
+    }
+    if (!refundAccountId) return toast.error("اختر حساب الاسترداد");
+    if (!refundReason.trim()) return toast.error("اكتب سبب الاسترداد");
+    setIsRefunding(true);
+    try {
+      await refundPayment({
+        invoiceId: refundTarget._id,
+        amount,
+        accountId: refundAccountId as Id<"financialAccounts">,
+        date: refundDate,
+        reason: refundReason.trim(),
+        requestId: refundRequestId.current,
+      });
+      toast.success("تم الاسترداد");
+      setRefundTarget(null);
+      refundRequestId.current = crypto.randomUUID();
+    } catch (error) {
+      toast.error(getErrorMessage(error, "تعذر الاسترداد"));
+    } finally {
+      setIsRefunding(false);
+    }
+  };
 
   const filtered = invoices.filter(inv =>
     inv.invoiceNumber.includes(search) ||
@@ -68,7 +151,7 @@ export function InvoicesPage({ onNavigate }: InvoicesPageProps) {
   const { formatCurrency } = useCurrency();
 
   return (
-    <div className="p-4 lg:p-6 space-y-5">
+    <div className="p-4 lg:p-6 space-y-5" data-testid="invoices-page">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-black text-slate-800 flex items-center gap-2">
@@ -143,11 +226,11 @@ export function InvoicesPage({ onNavigate }: InvoicesPageProps) {
             </thead>
             <tbody>
               {filtered.map((inv) => (
-                <tr key={inv._id}>
+                <tr key={inv._id} data-testid="invoice-row" data-invoice-number={inv.invoiceNumber} data-paid={inv.paid} data-remaining={inv.remaining}>
                   <td className="font-mono text-xs text-indigo-600 font-bold">{inv.invoiceNumber}<details><summary>السجل المالي</summary><FinancialHistory referenceType="invoice" referenceId={String(inv._id)} /></details></td>
                   <td>
-                    {canCollect && inv.status !== "cancelled" && inv.status !== "returned" && inv.remaining > 0 && <button className="mr-1 rounded-lg bg-emerald-50 px-2 py-1.5 text-xs font-bold text-emerald-700" onClick={() => void collect(inv)}>تحصيل دفعة</button>}
-                    {canRefund && inv.status !== "cancelled" && inv.status !== "returned" && inv.paid > 0 && <button className="mr-1 rounded-lg bg-amber-50 px-2 py-1.5 text-xs font-bold text-amber-700" onClick={() => void refund(inv)}>استرداد مبلغ</button>}
+                    {canCollect && inv.status !== "cancelled" && inv.status !== "returned" && inv.remaining > 0 && <button data-testid="invoice-collect" className="mr-1 rounded-lg bg-emerald-50 px-2 py-1.5 text-xs font-bold text-emerald-700" onClick={() => collect(inv)}>تحصيل دفعة</button>}
+                    {canRefund && inv.status !== "cancelled" && inv.status !== "returned" && inv.paid > 0 && <button data-testid="invoice-refund" className="mr-1 rounded-lg bg-amber-50 px-2 py-1.5 text-xs font-bold text-amber-700" onClick={() => refund(inv)}>استرداد مبلغ</button>}
                     <p className="font-medium text-slate-800">{inv.customerName}</p>
                     {inv.customerPhone && <p className="text-xs text-slate-400">{inv.customerPhone}</p>}
                   </td>
@@ -236,6 +319,42 @@ export function InvoicesPage({ onNavigate }: InvoicesPageProps) {
               <div className="flex gap-3"><button className="btn-primary flex-1" disabled={isCancelling || !cancelReason.trim()}>{isCancelling ? "جارٍ الإلغاء..." : "تأكيد إلغاء الفاتورة"}</button><button type="button" className="btn-secondary" disabled={isCancelling} onClick={() => setCancelTarget(null)}>تراجع</button></div>
             </form>
           </div>
+        </div>
+      )}
+      {collectTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" dir="rtl">
+          <form data-testid="invoice-collection-form" onSubmit={submitCollection} className="w-full max-w-md space-y-4 rounded-2xl bg-white p-6 shadow-2xl">
+            <h2 className="text-lg font-black">تحصيل دفعة للفاتورة {collectTarget.invoiceNumber}</h2>
+            <input data-testid="invoice-collection-amount" className="form-input" type="number" min="0.01" max={collectTarget.remaining} step="0.01" required value={collectionAmount} onChange={event => setCollectionAmount(event.target.value)} placeholder="المبلغ" />
+            <select data-testid="invoice-collection-account" className="form-input" required value={collectionAccountId} onChange={event => setCollectionAccountId(event.target.value)}>
+              <option value="">اختر حساب التحصيل</option>
+              {collectionAccounts.map(account => <option key={account._id} value={account._id}>{account.name}</option>)}
+            </select>
+            <input data-testid="invoice-collection-date" className="form-input" type="date" required value={collectionDate} onChange={event => setCollectionDate(event.target.value)} />
+            <textarea data-testid="invoice-collection-notes" className="form-input" value={collectionNotes} onChange={event => setCollectionNotes(event.target.value)} placeholder="ملاحظات" />
+            <div className="flex gap-3">
+              <button data-testid="invoice-collection-submit" className="btn-primary flex-1" disabled={isCollecting}>{isCollecting ? "جارٍ التحصيل..." : "تأكيد التحصيل"}</button>
+              <button type="button" className="btn-secondary" disabled={isCollecting} onClick={() => setCollectTarget(null)}>إلغاء</button>
+            </div>
+          </form>
+        </div>
+      )}
+      {refundTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" dir="rtl">
+          <form data-testid="invoice-refund-form" onSubmit={submitRefund} className="w-full max-w-md space-y-4 rounded-2xl bg-white p-6 shadow-2xl">
+            <h2 className="text-lg font-black">استرداد مبلغ من الفاتورة {refundTarget.invoiceNumber}</h2>
+            <input data-testid="invoice-refund-amount" className="form-input" type="number" min="0.01" max={refundTarget.paid} step="0.01" required value={refundAmount} onChange={event => setRefundAmount(event.target.value)} placeholder="المبلغ" />
+            <select data-testid="invoice-refund-account" className="form-input" required value={refundAccountId} onChange={event => setRefundAccountId(event.target.value)}>
+              <option value="">اختر حساب الاسترداد</option>
+              {refundAccounts.map(account => <option key={account._id} value={account._id}>{account.name}</option>)}
+            </select>
+            <input data-testid="invoice-refund-date" className="form-input" type="date" required value={refundDate} onChange={event => setRefundDate(event.target.value)} />
+            <textarea data-testid="invoice-refund-reason" className="form-input" required value={refundReason} onChange={event => setRefundReason(event.target.value)} placeholder="سبب الاسترداد" />
+            <div className="flex gap-3">
+              <button data-testid="invoice-refund-submit" className="btn-primary flex-1" disabled={isRefunding}>{isRefunding ? "جارٍ الاسترداد..." : "تأكيد الاسترداد"}</button>
+              <button type="button" className="btn-secondary" disabled={isRefunding} onClick={() => setRefundTarget(null)}>إلغاء</button>
+            </div>
+          </form>
         </div>
       )}
     </div>
