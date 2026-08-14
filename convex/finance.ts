@@ -5,7 +5,7 @@ import { assertBranchAccess, requireAdmin, requirePermission, resolveWriteBranch
 import { assertFinancialAccountBranch, calculateAvailableBalance, findFinancialTransactionByRequest, postFinancialTransaction, requireActiveFinancialAccount } from "./lib/finance";
 import { isValidIsoDate, roundMoney } from "../shared/businessRules";
 
-const accountType = v.union(v.literal("cash"), v.literal("instapay"), v.literal("vodafone_cash"), v.literal("fawry_clearing"), v.literal("paymob_clearing"), v.literal("card_clearing"), v.literal("bank"), v.literal("other"));
+const accountType = v.union(v.literal("cash"), v.literal("instapay"), v.literal("vodafone_cash"), v.literal("fawry_clearing"), v.literal("paymob_clearing"), v.literal("card_clearing"), v.literal("cod_clearing"), v.literal("bank"), v.literal("other"));
 const clearingTypes = ["paymob_clearing", "fawry_clearing", "card_clearing"] as const;
 
 export const createAccount = mutation({ args: { name: v.string(), code: v.string(), type: accountType, branchId: v.optional(v.id("branches")), allowNegative: v.optional(v.boolean()), settlementDelayDays: v.optional(v.number()) }, handler: async (ctx, args) => {
