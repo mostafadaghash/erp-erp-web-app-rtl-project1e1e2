@@ -1,7 +1,7 @@
 import test, { after, before } from "node:test";
 import assert from "node:assert/strict";
 import { existsSync } from "node:fs";
-import { symlink, unlink } from "node:fs/promises";
+import { symlink, unlink } from "./moduleLinkTestUtils.ts";
 import { resolve } from "node:path";
 import { convexTest } from "convex-test";
 import schema from "../convex/schema.ts";
@@ -125,3 +125,4 @@ test("OST-04 rebuild cursor is durable and operational writes fail closed while 
   const done = await e.raw.run(ctx => rebuildOrderStatsBatch(ctx, e.admin, { cursor: first.continueCursor, numItems: 10, restart: false }));
   assert.equal(done.isDone, true);
 });
+

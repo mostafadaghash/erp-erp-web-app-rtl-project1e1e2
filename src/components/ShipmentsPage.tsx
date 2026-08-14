@@ -78,7 +78,7 @@ export function ShipmentsPage() {
   };
 
   return (
-    <div className="p-4 lg:p-6 space-y-6">
+    <div className="p-4 lg:p-6 space-y-6" data-testid="shipments-page">
       {/* Header */}
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
@@ -88,7 +88,7 @@ export function ShipmentsPage() {
           </h1>
           <p className="text-slate-500 text-sm mt-0.5">تتبع طلبات الشراء من الموردين</p>
         </div>
-        {canCreate && <button onClick={() => setShowForm(true)} className="btn-primary flex items-center gap-2">
+        {canCreate && <button data-testid="shipment-create-open" onClick={() => setShowForm(true)} className="btn-primary flex items-center gap-2">
           <Plus className="w-4 h-4" />
           شحنة جديدة
         </button>}
@@ -195,7 +195,7 @@ export function ShipmentsPage() {
                   const nextStatus = currentIdx >= 0 && currentIdx < statusFlow.length - 1
                     ? statusFlow[currentIdx + 1] : null;
                   return (
-                    <tr key={shipment._id}>
+                    <tr key={shipment._id} data-testid="shipment-row" data-shipment-number={shipment.shipmentNumber} data-supplier-name={shipment.supplierName} data-status={shipment.status}>
                       <td>
                         <span className="font-mono font-bold text-indigo-600 text-xs">{shipment.shipmentNumber}</span>
                       </td>
@@ -226,6 +226,8 @@ export function ShipmentsPage() {
                         <div className="flex items-center gap-1.5">
                           {canEdit && nextStatus && shipment.status !== "cancelled" && (nextStatus !== "arrived" || canPostPurchaseReceipts) && (
                             <button
+                              data-testid="shipment-status-next"
+                              data-next-status={nextStatus}
                               onClick={() => nextStatus === "arrived" ? setReceiving(shipment) : void handleStatusChange(shipment._id, nextStatus)}
                               className={`px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors whitespace-nowrap ${
                                 nextStatus === "arrived"
@@ -361,13 +363,13 @@ function NewShipmentForm({ onClose }: { onClose: () => void }) {
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-5">
+        <form data-testid="shipment-create-form" onSubmit={handleSubmit} className="p-6 space-y-5">
           {/* Supplier */}
           <div className="bg-slate-50 rounded-xl p-4 space-y-3">
             <p className="text-sm font-semibold text-slate-700">بيانات المورد</p>
             <div>
               <label className="form-label">اختر مورداً</label>
-              <select className="form-input" value={form.supplierId} onChange={handleSupplierSelect}>
+              <select data-testid="shipment-supplier-select" className="form-input" value={form.supplierId} onChange={handleSupplierSelect}>
                 <option value="">— اختر المورد —</option>
                 {(suppliers ?? []).map(s => (
                   <option key={s._id} value={s._id}>{s.name}</option>
@@ -391,7 +393,7 @@ function NewShipmentForm({ onClose }: { onClose: () => void }) {
               </button>
             </div>
             {items.map((item, idx) => (
-              <div key={idx} className="bg-slate-50 rounded-xl p-3 space-y-2">
+              <div key={idx} data-testid="shipment-item-row" data-item-index={idx} className="bg-slate-50 rounded-xl p-3 space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-medium text-slate-500">صنف {idx + 1}</span>
                   {items.length > 1 && (
@@ -403,7 +405,7 @@ function NewShipmentForm({ onClose }: { onClose: () => void }) {
                 </div>
                 <div>
                   <label className="form-label text-xs">اختر من المنتجات الموجودة (اختياري)</label>
-                  <select className="form-input text-sm"
+                  <select data-testid="shipment-product-select" className="form-input text-sm"
                     value={item.productId ?? ""}
                     onChange={e => handleProductSelect(idx, e.target.value)}>
                     <option value="">— منتج جديد —</option>
@@ -418,11 +420,11 @@ function NewShipmentForm({ onClose }: { onClose: () => void }) {
                       onChange={e => updateItem(idx, "productName", e.target.value)} />
                   </div>
                   <div>
-                    <input className="form-input text-center" type="number" placeholder="الكمية" min="1"
+                    <input data-testid="shipment-item-quantity" className="form-input text-center" type="number" placeholder="الكمية" min="1"
                       value={item.quantity} onChange={e => updateItem(idx, "quantity", Number(e.target.value))} />
                   </div>
                   <div>
-                    <input className="form-input text-center" type="number" placeholder="تكلفة الوحدة" min="0"
+                    <input data-testid="shipment-item-unit-cost" className="form-input text-center" type="number" placeholder="تكلفة الوحدة" min="0"
                       value={item.unitCost || ""} onChange={e => updateItem(idx, "unitCost", Number(e.target.value))} />
                   </div>
                 </div>
@@ -441,7 +443,7 @@ function NewShipmentForm({ onClose }: { onClose: () => void }) {
             </div>
             <div>
               <label className="form-label">تكلفة الشحن (ج.م)</label>
-              <input className="form-input" type="number" placeholder="0" min="0"
+              <input data-testid="shipment-shipping-cost" className="form-input" type="number" placeholder="0" min="0"
                 value={form.shippingCost} onChange={e => setForm({ ...form, shippingCost: e.target.value })} />
             </div>
             <div className="flex items-center justify-between border-t border-indigo-200 pt-3">
@@ -459,14 +461,14 @@ function NewShipmentForm({ onClose }: { onClose: () => void }) {
             </div>
             <div>
               <label className="form-label">ملاحظات</label>
-              <input className="form-input" placeholder="ملاحظات" value={form.notes}
+              <input data-testid="shipment-notes" className="form-input" placeholder="ملاحظات" value={form.notes}
                 onChange={e => setForm({ ...form, notes: e.target.value })} />
             </div>
           </div>
 
           <div className="flex gap-3 pt-2">
             <button type="button" onClick={onClose} className="btn-secondary flex-1">إلغاء</button>
-            <button type="submit" className="btn-primary flex-1">حفظ الشحنة</button>
+            <button data-testid="shipment-submit" type="submit" className="btn-primary flex-1">حفظ الشحنة</button>
           </div>
         </form>
       </div>
@@ -499,7 +501,7 @@ function ReceiveShipmentModal({ shipment, onClose }: { shipment: { _id: Id<"ship
     } finally { setSubmitting(false); }
   };
   return <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" dir="rtl">
-    <form onSubmit={submit} className="w-full max-w-xl space-y-4 rounded-2xl bg-white p-6 shadow-2xl">
+    <form data-testid="shipment-receive-form" data-shipment-number={shipment.shipmentNumber} onSubmit={submit} className="w-full max-w-xl space-y-4 rounded-2xl bg-white p-6 shadow-2xl">
       <div className="flex justify-between"><div><h2 className="font-black text-lg">استلام شحنة شراء</h2><p className="font-mono text-indigo-600">{shipment.shipmentNumber}</p><p>{shipment.supplierName}</p></div><button type="button" onClick={onClose}><X /></button></div>
       <div className="grid grid-cols-2 gap-2 rounded-xl bg-slate-50 p-3 text-sm">
         <span>إجمالي البضاعة</span><b>{shipment.totalCost.toLocaleString("ar-EG")} ج.م</b>
@@ -510,13 +512,14 @@ function ReceiveShipmentModal({ shipment, onClose }: { shipment: { _id: Id<"ship
         <span>مديونية المورد</span><b>{payable.toLocaleString("ar-EG")} ج.م</b>
       </div>
       <div className="grid grid-cols-2 gap-3">
-        <label className="form-label">تاريخ الاستلام *<input required type="date" className="form-input" value={receiptDate} onChange={e => setReceiptDate(e.target.value)} /></label>
-        <label className="form-label">رقم فاتورة المورد<input className="form-input" value={externalInvoiceNumber} onChange={e => setExternalInvoiceNumber(e.target.value)} /></label>
+        <label className="form-label">تاريخ الاستلام *<input data-testid="shipment-receive-date" required type="date" className="form-input" value={receiptDate} onChange={e => setReceiptDate(e.target.value)} /></label>
+        <label className="form-label">رقم فاتورة المورد<input data-testid="shipment-external-invoice" className="form-input" value={externalInvoiceNumber} onChange={e => setExternalInvoiceNumber(e.target.value)} /></label>
         <label className="form-label">تاريخ الفاتورة<input type="date" className="form-input" value={invoiceDate} onChange={e => setInvoiceDate(e.target.value)} /></label>
         <label className="form-label">تاريخ الاستحقاق<input type="date" className="form-input" value={dueDate} onChange={e => setDueDate(e.target.value)} /></label>
         <label className="form-label col-span-2">قيمة الشحن المستحقة للمورد<input required type="number" min="0" max={shipment.shippingCost} step="0.01" className="form-input" value={supplierFreightAmount} onChange={e => setSupplierFreightAmount(e.target.value)} /></label>
       </div>
-      <div className="flex gap-3"><button type="button" className="btn-secondary flex-1" onClick={onClose}>إلغاء</button><button disabled={submitting} className="btn-primary flex-1">{submitting ? "جارٍ الترحيل..." : "استلام وترحيل المديونية"}</button></div>
+      <div className="flex gap-3"><button type="button" className="btn-secondary flex-1" onClick={onClose}>إلغاء</button><button data-testid="shipment-receive-submit" disabled={submitting} className="btn-primary flex-1">{submitting ? "جارٍ الترحيل..." : "استلام وترحيل المديونية"}</button></div>
     </form>
   </div>;
 }
+

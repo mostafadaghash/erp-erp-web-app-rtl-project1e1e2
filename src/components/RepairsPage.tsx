@@ -680,7 +680,7 @@ export function RepairsPage() {
   };
 
   return (
-    <div className="p-4 lg:p-6 space-y-5">
+    <div className="p-4 lg:p-6 space-y-5" data-testid="repairs-page">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-black text-slate-800 flex items-center gap-2">
@@ -698,6 +698,7 @@ export function RepairsPage() {
         <div className="flex items-center gap-2">
           {canViewBranches && branches.length > 0 && (
             <select
+              data-testid="repair-branch-select"
               className="form-input min-w-40"
               value={selectedBranchId}
               onChange={(event) => handleBranchChange(event.target.value)}
@@ -709,7 +710,7 @@ export function RepairsPage() {
               ))}
             </select>
           )}
-          {canCreate && <button onClick={openNewRepair} className="btn-primary flex items-center gap-2">
+          {canCreate && <button data-testid="repair-create-open" onClick={openNewRepair} className="btn-primary flex items-center gap-2">
             <Plus className="w-4 h-4" />
             طلب صيانة جديد
           </button>}
@@ -754,7 +755,7 @@ export function RepairsPage() {
           const status = statusConfig[currentStatus];
           const StatusIcon = status.icon;
           return (
-            <div key={r._id} className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 hover:shadow-md transition-all">
+            <div key={r._id} data-testid="repair-card" data-repair-number={r.repairNumber} data-customer-name={r.customerName} data-status={r.status} className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 hover:shadow-md transition-all">
               <div className="flex items-start justify-between mb-3">
                 <div>
                   <p className="font-mono text-xs text-indigo-600 font-bold">{r.repairNumber}</p><FinancialHistory referenceType="repair" referenceId={String(r._id)} />
@@ -864,6 +865,7 @@ export function RepairsPage() {
                   r.status !== "delivered" &&
                   r.status !== "cancelled" && (
                     <button
+                      data-testid="repair-collect-open"
                       className="btn-secondary text-xs"
                       onClick={() => openCollection(r)}
                     >
@@ -947,10 +949,11 @@ export function RepairsPage() {
                 <p className="font-bold text-amber-700">{collectionTarget.remaining.toLocaleString("ar-EG")} ج.م</p>
               </div>
             </div>
-            <form className="mt-4 space-y-4" onSubmit={submitCollection}>
+            <form data-testid="repair-collection-form" className="mt-4 space-y-4" onSubmit={submitCollection}>
               <div>
                 <label className="form-label">المبلغ *</label>
                 <input
+                  data-testid="repair-collection-amount"
                   required
                   type="number"
                   min="0.01"
@@ -967,6 +970,7 @@ export function RepairsPage() {
               <div>
                 <label className="form-label">حساب التحصيل *</label>
                 <select
+                  data-testid="repair-collection-account"
                   required
                   className="form-input"
                   value={collectionForm.accountId}
@@ -991,6 +995,7 @@ export function RepairsPage() {
               <div>
                 <label className="form-label">تاريخ التحصيل *</label>
                 <input
+                  data-testid="repair-collection-date"
                   required
                   type="date"
                   className="form-input"
@@ -1016,6 +1021,7 @@ export function RepairsPage() {
               {collectionValidationReason && <p role="alert" className="rounded-lg bg-amber-50 p-3 text-sm font-medium text-amber-800">{collectionValidationReason}</p>}
               <div className="flex gap-3">
                 <button
+                  data-testid="repair-collection-submit"
                   className="btn-primary flex-1"
                   title={collectionValidationReason ?? undefined}
                   disabled={financialBusy !== null || Boolean(collectionValidationReason)}
@@ -1366,11 +1372,11 @@ export function RepairsPage() {
                 </svg>
               </button>
             </div>
-            <form onSubmit={handleSubmit} className="p-6 space-y-4">
+            <form data-testid="repair-create-form" onSubmit={handleSubmit} className="p-6 space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="form-label">اختر عميل</label>
-                  <select className="form-input" value={form.customerId} onChange={e => handleSelectCustomer(e.target.value)}>
+                  <select data-testid="repair-customer-select" className="form-input" value={form.customerId} onChange={e => handleSelectCustomer(e.target.value)}>
                     <option value="">عميل جديد</option>
                     {customers.map(c => <option key={c._id} value={c._id}>{c.name}</option>)}
                   </select>
@@ -1395,11 +1401,11 @@ export function RepairsPage() {
                 </div>
                 <div>
                   <label className="form-label">الماركة *</label>
-                  <input className="form-input" required value={form.deviceBrand} onChange={e => setForm({...form, deviceBrand: e.target.value})} placeholder="مثال: Samsung, Apple" />
+                  <input data-testid="repair-device-brand" className="form-input" required value={form.deviceBrand} onChange={e => setForm({...form, deviceBrand: e.target.value})} placeholder="مثال: Samsung, Apple" />
                 </div>
                 <div>
                   <label className="form-label">الموديل *</label>
-                  <input className="form-input" required value={form.deviceModel} onChange={e => setForm({...form, deviceModel: e.target.value})} placeholder="مثال: Galaxy S23" />
+                  <input data-testid="repair-device-model" className="form-input" required value={form.deviceModel} onChange={e => setForm({...form, deviceModel: e.target.value})} placeholder="مثال: Galaxy S23" />
                 </div>
                 <div>
                   <label className="form-label">الرقم المسلسل</label>
@@ -1415,7 +1421,7 @@ export function RepairsPage() {
                 </div>
                 <div className="sm:col-span-2">
                   <label className="form-label">وصف المشكلة *</label>
-                  <textarea className="form-input" required rows={2} value={form.problem} onChange={e => setForm({...form, problem: e.target.value})} placeholder="اشرح المشكلة بالتفصيل..." />
+                  <textarea data-testid="repair-problem" className="form-input" required rows={2} value={form.problem} onChange={e => setForm({...form, problem: e.target.value})} placeholder="اشرح المشكلة بالتفصيل..." />
                 </div>
                 <div className="sm:col-span-2 rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-3">
                   <div className="flex items-center justify-between gap-3">
@@ -1509,7 +1515,7 @@ export function RepairsPage() {
                 </div>
                 <div>
                   <label className="form-label">تكلفة العمالة (ج.م)</label>
-                  <input className="form-input" type="number" min="0" step="0.01" value={form.laborCost} onChange={e => setForm({...form, laborCost: e.target.value})} placeholder="0" />
+                  <input data-testid="repair-labor-cost" className="form-input" type="number" min="0" step="0.01" value={form.laborCost} onChange={e => setForm({...form, laborCost: e.target.value})} placeholder="0" />
                 </div>
                 <div>
                   <label className="form-label">العربون (ج.م)</label>
@@ -1532,12 +1538,12 @@ export function RepairsPage() {
                 </div>
                 <div className="sm:col-span-2">
                   <label className="form-label">ملاحظات</label>
-                  <textarea className="form-input" rows={2} value={form.notes} onChange={e => setForm({...form, notes: e.target.value})} />
+                  <textarea data-testid="repair-notes" className="form-input" rows={2} value={form.notes} onChange={e => setForm({...form, notes: e.target.value})} />
                 </div>
               </div>
               {createValidationReason && <p role="alert" className="rounded-lg bg-amber-50 p-3 text-sm font-medium text-amber-800">{createValidationReason}</p>}
               <div className="flex gap-3 pt-2">
-                <button type="submit" title={createValidationReason ?? undefined} disabled={saving || Boolean(createValidationReason)} className="btn-primary flex-1 disabled:opacity-50">حفظ طلب الصيانة</button>
+                <button data-testid="repair-submit" type="submit" title={createValidationReason ?? undefined} disabled={saving || Boolean(createValidationReason)} className="btn-primary flex-1 disabled:opacity-50">حفظ طلب الصيانة</button>
                 <button type="button" onClick={closeCreateForm} className="btn-secondary">إلغاء</button>
               </div>
             </form>
@@ -1547,3 +1553,4 @@ export function RepairsPage() {
     </div>
   );
 }
+

@@ -1,7 +1,7 @@
 import test, { after, before } from "node:test";
 import assert from "node:assert/strict";
 import { existsSync } from "node:fs";
-import { symlink, unlink } from "node:fs/promises";
+import { symlink, unlink } from "./moduleLinkTestUtils.ts";
 import { resolve } from "node:path";
 import { convexTest } from "convex-test";
 import schema from "../convex/schema.ts";
@@ -48,3 +48,4 @@ test("insufficient refund balance rejects atomically", async () => { const e = a
 test("expense creator without disbursement cannot pick or create", async () => { const e = await setup(), t = await user(e, "creator", "employee", ["create_expenses", "view_expenses"]), a = await account(e, "C", 50); await assert.rejects(t.query(api.finance.disbursementAccountPicker, {}), /صلاحية/); await assert.rejects(t.mutation(api.expenses.create, { title: "إيجار", category: "تشغيل", amount: 10, date, accountId: a, requestId: "r" }), /الصرف/); assert.equal((await state(e)).expenses.length, 0); });
 test("disbursement user without create expense cannot create", async () => { const e = await setup(), t = await user(e, "payer", "employee", ["record_disbursements", "view_expenses"]), a = await account(e, "C", 50); await assert.rejects(t.mutation(api.expenses.create, { title: "إيجار", category: "تشغيل", amount: 10, date, accountId: a, requestId: "r" }), /صلاحية/); assert.equal((await state(e)).expenses.length, 0); });
 test("print_orders is assigned only to required default roles", () => { assert.ok(PERMISSIONS.includes("print_orders")); for (const role of ["admin", "manager", "sales", "customer_service", "shipping"]) assert.ok(ROLE_PERMISSIONS[role]?.includes("print_orders"), role); for (const role of ["technician", "accountant", "viewer"]) assert.equal(ROLE_PERMISSIONS[role]?.includes("print_orders"), false, role); });
+

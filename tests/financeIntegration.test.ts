@@ -1,7 +1,7 @@
 import test, { after, before } from "node:test";
 import assert from "node:assert/strict";
 import { existsSync } from "node:fs";
-import { symlink, unlink } from "node:fs/promises";
+import { symlink, unlink } from "./moduleLinkTestUtils.ts";
 import { resolve } from "node:path";
 import { convexTest } from "convex-test";
 import schema from "../convex/schema.ts";
@@ -170,3 +170,4 @@ test("FIN-46 generic reversal rejects every document collection type", async () 
   const e = await setup({ initialized: true }), a = await account(e, "CASH");
   for (const kind of ["invoice", "order", "repair"] as const) { const id = await seedDocument(e, kind, 0); const tx = kind === "invoice" ? await e.t.mutation(api.invoices.recordPayment, { invoiceId: id, amount: 10, accountId: a, paymentDate: date, requestId: `pay-${kind}` }) : kind === "order" ? await e.t.mutation(api.orders.addPayment, { id, amount: 10, accountId: a, paymentDate: date, requestId: `pay-${kind}` }) : await e.t.mutation(api.repairs.recordPayment, { repairId: id, amount: 10, accountId: a, paymentDate: date, requestId: `pay-${kind}` }); await assert.rejects(e.t.mutation(api.finance.reverseTransaction, { transactionId: tx, reason: "خطأ", date, requestId: `reverse-${kind}` }), /مسار الاسترداد/); }
 });
+

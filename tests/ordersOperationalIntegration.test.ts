@@ -1,7 +1,7 @@
 import test, { after, before } from "node:test";
 import assert from "node:assert/strict";
 import { existsSync } from "node:fs";
-import { symlink, unlink } from "node:fs/promises";
+import { symlink, unlink } from "./moduleLinkTestUtils.ts";
 import { resolve } from "node:path";
 import { convexTest } from "convex-test";
 import schema from "../convex/schema.ts";
@@ -201,3 +201,4 @@ test("ORD-12 successful cancellation records an auditable reason", async () => {
   assert.equal(state.row?.cancellationReason, "طلب العميل");
   assert.ok(state.logs.some((log) => log.recordId === id && log.action === "cancel" && log.details?.includes("طلب العميل")));
 });
+

@@ -192,6 +192,7 @@ export function ERPApp() {
           <button
             className="lg:hidden p-2 rounded-lg hover:bg-slate-100 transition-colors"
             onClick={() => setSidebarOpen(true)}
+            aria-label="فتح القائمة الرئيسية"
           >
             <Menu className="w-5 h-5 text-slate-600" />
           </button>
@@ -274,3 +275,4 @@ export function ERPApp() {
     </PermissionProvider>
   );
 }
+

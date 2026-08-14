@@ -134,7 +134,7 @@ export function NewInvoicePage({ onNavigate }: NewInvoicePageProps) {
   };
 
   return (
-    <div className="p-4 lg:p-6">
+    <div className="p-4 lg:p-6" data-testid="new-invoice-page">
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-black text-slate-800 flex items-center gap-2">
@@ -156,7 +156,7 @@ export function NewInvoicePage({ onNavigate }: NewInvoicePageProps) {
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
                 <label className="form-label">اختر عميل</label>
-                <select className="form-input" value={customerId} onChange={e => handleSelectCustomer(e.target.value)}>
+                <select data-testid="invoice-customer-select" className="form-input" value={customerId} onChange={e => handleSelectCustomer(e.target.value)}>
                   <option value="">عميل جديد</option>
                   {customers.map(c => <option key={c._id} value={c._id}>{c.name}</option>)}
                 </select>
@@ -178,6 +178,7 @@ export function NewInvoicePage({ onNavigate }: NewInvoicePageProps) {
             <div className="relative mb-4">
               <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
               <input
+                data-testid="invoice-product-search"
                 className="form-input pr-10"
                 placeholder="ابحث عن منتج..."
                 value={productSearch}
@@ -189,6 +190,8 @@ export function NewInvoicePage({ onNavigate }: NewInvoicePageProps) {
                 {filteredProducts.slice(0, 8).map(p => (
                   <button
                     key={p._id}
+                    data-testid="invoice-product-result"
+                    data-product-name={p.name}
                     onClick={() => addToCart(p)}
                     className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-indigo-50 transition-colors border-b border-slate-100 last:border-0"
                   >
@@ -278,7 +281,7 @@ export function NewInvoicePage({ onNavigate }: NewInvoicePageProps) {
               </div>
               <div className="border-t border-slate-200 pt-3 flex justify-between">
                 <span className="font-bold text-slate-800">الإجمالي</span>
-                <span className="font-black text-xl text-indigo-600">{total.toLocaleString("ar-EG")} ج.م</span>
+                <span data-testid="new-invoice-total" data-value={total} className="font-black text-xl text-indigo-600">{total.toLocaleString("ar-EG")} ج.م</span>
               </div>
             </div>
 
@@ -309,11 +312,12 @@ export function NewInvoicePage({ onNavigate }: NewInvoicePageProps) {
               )}
               <div>
                 <label className="form-label">ملاحظات</label>
-                <textarea className="form-input" rows={2} value={notes} onChange={e => setNotes(e.target.value)} placeholder="ملاحظات..." />
+                <textarea data-testid="invoice-notes" className="form-input" rows={2} value={notes} onChange={e => setNotes(e.target.value)} placeholder="ملاحظات..." />
               </div>
             </div>
 
             <button
+              data-testid="invoice-submit"
               onClick={handleSubmit}
               disabled={saving || cart.length === 0}
               className="w-full py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl font-bold hover:from-indigo-700 hover:to-purple-700 transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed active:scale-95"
@@ -326,3 +330,4 @@ export function NewInvoicePage({ onNavigate }: NewInvoicePageProps) {
     </div>
   );
 }
+
