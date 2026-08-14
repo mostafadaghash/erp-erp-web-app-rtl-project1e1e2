@@ -223,7 +223,7 @@ async function addInvoiceProduct(page, productName) {
 
 async function createInvoice(page, fixtures, marker, quantity) {
   const before = await attributeSet(page.getByTestId("invoice-row"), "data-invoice-number");
-  await page.getByRole("button", { name: "فاتورة جديدة", exact: true }).click();
+  await page.getByTestId("invoices-page").getByRole("button", { name: "فاتورة جديدة", exact: true }).click();
   await page.getByTestId("new-invoice-page").waitFor();
   await selectContaining(page.getByTestId("invoice-customer-select"), fixtures.customerName);
   for (let index = 0; index < quantity; index += 1) await addInvoiceProduct(page, fixtures.productName);
