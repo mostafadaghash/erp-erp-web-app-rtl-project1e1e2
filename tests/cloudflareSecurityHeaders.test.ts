@@ -6,6 +6,7 @@ const headers = readFileSync(
   new URL("../public/_headers", import.meta.url),
   "utf8",
 );
+const app = readFileSync(new URL("../src/App.tsx", import.meta.url), "utf8");
 
 test("Cloudflare Pages applies the security policy to every route", () => {
   assert.match(headers, /^\/\*$/m);
@@ -37,4 +38,9 @@ test("Cloudflare Pages sends the required defense-in-depth headers", () => {
   assert.match(headers, /Permissions-Policy:/i);
   assert.match(headers, /Cross-Origin-Opener-Policy:\s*same-origin/i);
   assert.match(headers, /Cross-Origin-Resource-Policy:\s*same-origin/i);
+});
+
+test("login page does not load third-party media blocked by CSP", () => {
+  assert.match(headers, /media-src\s+'self'\s+blob:/i);
+  assert.doesNotMatch(app, /<video|<audio|videos\.pexels\.com|https?:\/\/[^"'\s]+\.(?:mp4|webm|mp3|wav|ogg)/i);
 });
