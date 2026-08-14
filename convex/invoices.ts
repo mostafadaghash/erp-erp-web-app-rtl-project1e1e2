@@ -12,6 +12,7 @@ import { nextDocumentNumber } from "./lib/documentNumbers";
 import { requireActiveBranch, requireActiveCustomer } from "./lib/references";
 import { postCustomerLedgerEntry } from "./lib/customerLedger.ts";
 import { assertInvoiceNotLockedByActiveDelivery } from "./lib/deliveryLocks.ts";
+import { businessDate } from "../shared/businessDate.ts";
 
 type InvoiceItemInput = {
   productId: Id<"products">;
@@ -153,7 +154,7 @@ export const create = mutation({
     tax: v.number(),
     total: v.number(),
     creationRequestId: v.string(),
-    initialPayment: v.optional(v.object({ amount: v.number(), accountId: v.id("financialAccounts"), paymentDate: v.string(), requestId: v.string(), notes: v.optional(v.string()) })),
+    initialPayment: v.optional(v.object({ amount: v.number(), accountId: v.id("financialAccounts"), paymentDate: v.optional(v.string()), requestId: v.string(), notes: v.optional(v.string()) })),
     notes: v.optional(v.string()),
     branchId: v.optional(v.id("branches")),
   },
@@ -177,6 +178,7 @@ export const create = mutation({
     const prepared = await prepareInvoice(ctx, user, args.items, args.discount, args.initialPayment?.amount ?? 0, new Map(), branchId);
     if (args.initialPayment && args.initialPayment.amount <= 0) throw new ConvexError("مبلغ الدفعة الأولية يجب أن يكون أكبر من صفر");
     if (prepared.remaining > 0 && !args.customerId) throw new ConvexError("الفاتورة الآجلة تتطلب عميلاً مسجلاً");
+    const transactionDate = args.initialPayment?.paymentDate ?? businessDate();
     let paymentAccount;
     if (args.initialPayment) { await requirePermission(ctx, "record_collections"); paymentAccount = await requireActiveFinancialAccount(ctx, args.initialPayment.accountId); assertFinancialAccountBranch(paymentAccount, branchId!); }
 
@@ -218,13 +220,13 @@ export const create = mutation({
     }
 
     if (args.customerId) {
-      const ledgerDate = args.initialPayment?.paymentDate ?? new Date().toISOString().slice(0, 10);
+      const ledgerDate = transactionDate;
       await postCustomerLedgerEntry(ctx, user, { type: "invoice_charge", requestId: `${args.creationRequestId}:charge`, customerId: args.customerId, branchId: branchId!, date: ledgerDate, receivableDelta: prepared.total, advanceDelta: 0, purchasesDelta: prepared.total, description: `استحقاق الفاتورة ${invoiceNumber}`, referenceType: "invoice", referenceId: String(id), referenceNumber: invoiceNumber });
-      if (args.initialPayment) await postCustomerLedgerEntry(ctx, user, { type: "invoice_payment", requestId: `${args.initialPayment.requestId}:ledger`, customerId: args.customerId, branchId: branchId!, date: args.initialPayment.paymentDate, receivableDelta: -args.initialPayment.amount, advanceDelta: 0, purchasesDelta: 0, description: `دفعة الفاتورة ${invoiceNumber}`, referenceType: "invoice", referenceId: String(id), referenceNumber: invoiceNumber });
+      if (args.initialPayment) await postCustomerLedgerEntry(ctx, user, { type: "invoice_payment", requestId: `${args.initialPayment.requestId}:ledger`, customerId: args.customerId, branchId: branchId!, date: transactionDate, receivableDelta: -args.initialPayment.amount, advanceDelta: 0, purchasesDelta: 0, description: `دفعة الفاتورة ${invoiceNumber}`, referenceType: "invoice", referenceId: String(id), referenceNumber: invoiceNumber });
     }
 
     if (args.initialPayment && paymentAccount) {
-      await postFinancialTransaction(ctx, user, { type: "invoice_payment", requestId: args.initialPayment.requestId, date: args.initialPayment.paymentDate, amount: args.initialPayment.amount, description: args.initialPayment.notes?.trim() || `تحصيل أولي للفاتورة ${invoiceNumber}`, branchId: branchId!, referenceType: "invoice", referenceId: String(id), referenceNumber: invoiceNumber, customerId: args.customerId, movements: [{ accountId: paymentAccount._id, signedAmount: args.initialPayment.amount }] });
+      await postFinancialTransaction(ctx, user, { type: "invoice_payment", requestId: args.initialPayment.requestId, date: transactionDate, amount: args.initialPayment.amount, description: args.initialPayment.notes?.trim() || `تحصيل أولي للفاتورة ${invoiceNumber}`, branchId: branchId!, referenceType: "invoice", referenceId: String(id), referenceNumber: invoiceNumber, customerId: args.customerId, movements: [{ accountId: paymentAccount._id, signedAmount: args.initialPayment.amount }] });
     }
 
     await logAction(ctx, user, {

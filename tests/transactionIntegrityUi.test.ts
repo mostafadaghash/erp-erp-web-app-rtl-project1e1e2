@@ -36,7 +36,7 @@ test("initial-payment forms retain request ids on retry and block double submit"
     assert.match(page, /creationRequestId:/);
     assert.match(page, /initial(?:Payment|Deposit):/);
     assert.match(page, /accountId:/);
-    assert.match(page, /paymentDate:/);
+    if (path !== "src/components/NewInvoicePage.tsx") assert.match(page, /paymentDate:/);
     assert.match(page, /if \(saving\) return/);
     assert.match(page, /disabled=\{[^}]*saving/);
   }
