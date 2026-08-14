@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Package, Users, FileText, Wrench,
   DollarSign, Truck, BarChart3, Settings, X,
   ShoppingCart, Ship, Building2, UserCog, ChevronDown, ChevronUp,
-  Target, Shield, BookOpen
+  Target, Shield, BookOpen, DatabaseBackup
 } from "lucide-react";
 import { useState } from "react";
 import { useQuery } from "convex/react";
@@ -83,6 +83,7 @@ const ALL_NAV_GROUPS: NavGroup[] = [
       { id: "branches",   label: "الفروع",              icon: Building2, moduleKey: "branches", permission: "view_branches" },
       { id: "employees",  label: "الموظفون والصلاحيات", icon: UserCog,   moduleKey: "employees", permission: "view_employees" },
       { id: "audit-logs", label: "سجل العمليات",        icon: Shield, permission: "view_audit_logs" },
+      { id: "data-export", label: "تصدير البيانات",       icon: DatabaseBackup, permission: "export_data" },
       { id: "settings",   label: "الإعدادات",           icon: Settings, permission: "manage_settings" },
     ],
   },
@@ -185,6 +186,7 @@ export function Sidebar({ currentPage, onNavigate, storeName, onClose, permissio
                       <button
                         key={item.id}
                         onClick={() => onNavigate(item.id as Page)}
+                        aria-current={isActive ? "page" : undefined}
                         className={`sidebar-item w-full ${isActive ? "active" : ""}`}
                       >
                         <Icon className="w-4 h-4 flex-shrink-0" />
