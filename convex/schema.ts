@@ -418,7 +418,7 @@ const applicationTables = {
     branchId: v.optional(v.id("branches")),
     purchaseReceiptId: v.optional(v.id("purchaseReceipts")), arrivalRequestId: v.optional(v.string()),
     cancelledAt: v.optional(v.number()), cancelledBy: v.optional(v.string()), cancellationReason: v.optional(v.string()),
-  }).index("by_status", ["status"]).index("by_shipment_number", ["shipmentNumber"]),
+  }).index("by_status", ["status"]).index("by_shipment_number", ["shipmentNumber"]).index("by_branch", ["branchId"]),
 
   // المصروفات
   expenses: defineTable({
