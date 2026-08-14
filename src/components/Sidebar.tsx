@@ -210,7 +210,9 @@ export function Sidebar({ currentPage, onNavigate, storeName, onClose, permissio
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-white text-xs font-medium truncate">{userName}</p>
-            <p className="text-slate-500 text-xs">{role}</p>
+            <p data-testid="current-user-role" className="text-slate-500 text-xs">
+              {role}
+            </p>
           </div>
         </div>
         <SignOutButton />
@@ -218,4 +220,3 @@ export function Sidebar({ currentPage, onNavigate, storeName, onClose, permissio
     </div>
   );
 }
-
