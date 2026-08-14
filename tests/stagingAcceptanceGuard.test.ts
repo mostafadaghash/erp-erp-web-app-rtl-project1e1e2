@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
+import { runtimeConvexCloudOrigins } from "../scripts/staging-preflight.mjs";
 
 const read = (path: string) =>
   readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
@@ -102,6 +103,24 @@ test("STG-06 acceptance checks published headers wildcard CORS and backend bindi
   assert.match(preflight, /not bound to STAGING_CONVEX_URL/);
   assert.match(preflight, /unexpected Convex cloud origin/);
   assert.match(preflight, /openid-configuration/);
+});
+
+test("Staging binding ignores only the Convex SDK validation example", () => {
+  const sdkDiagnostic =
+    "ConvexReactClient requires a URL like 'https://happy-otter-123.convex.cloud', received something of type string instead.";
+  const stagingOrigin = "https://erp-stage.convex.cloud";
+  const unexpectedOrigin = "https://unexpected-deployment.convex.cloud";
+
+  assert.deepEqual(
+    runtimeConvexCloudOrigins(`${sdkDiagnostic}\nconst url = "${stagingOrigin}";`),
+    [stagingOrigin],
+  );
+  assert.deepEqual(
+    runtimeConvexCloudOrigins(
+      `${sdkDiagnostic}\nconst first = "${stagingOrigin}"; const second = "${unexpectedOrigin}";`,
+    ),
+    [stagingOrigin, unexpectedOrigin],
+  );
 });
 
 test("STG-07 target validation refuses production and unsafe origins", () => {

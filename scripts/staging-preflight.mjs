@@ -62,6 +62,20 @@ function moduleAssetUrls(html, frontend) {
   return [...new Map(urls.map((url) => [url.href, url])).values()];
 }
 
+export function runtimeConvexCloudOrigins(bundle) {
+  const withoutSdkValidationExamples = bundle.replace(
+    /ConvexReactClient requires a URL like\s+(['"])https:\/\/[a-z0-9-]+\.convex\.cloud\1,\s*received something of type/gi,
+    "ConvexReactClient requires a URL, received something of type",
+  );
+  return [
+    ...new Set(
+      withoutSdkValidationExamples.match(
+        /https:\/\/[a-z0-9-]+\.convex\.cloud/gi,
+      ) ?? [],
+    ),
+  ];
+}
+
 async function verifyFrontendBinding(origins, html) {
   const modules = moduleAssetUrls(html, origins.frontend);
   let combined = "";
@@ -76,11 +90,9 @@ async function verifyFrontendBinding(origins, html) {
     combined.includes(origins.convexCloud.origin),
     "Published frontend is not bound to STAGING_CONVEX_URL",
   );
-  const convexOrigins = new Set(
-    combined.match(/https:\/\/[a-z0-9-]+\.convex\.cloud/gi) ?? [],
-  );
+  const convexOrigins = runtimeConvexCloudOrigins(combined);
   assert.deepEqual(
-    [...convexOrigins],
+    convexOrigins,
     [origins.convexCloud.origin],
     "Published bundle contains an unexpected Convex cloud origin",
   );
