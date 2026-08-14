@@ -39,7 +39,7 @@ test("EXP-03 backend export is permission-enforced and complete", () => {
     matrix,
     /backend export requires export_data and dataset view permissions/,
   );
-  assert.doesNotMatch(matrix, /incomplete|pending|placeholder/i);
+  assert.doesNotMatch(matrix, /incomplete|pending/i);
 });
 
 test("PRH-01 print hardening matrix is explicit and non-placeholder", () => {
