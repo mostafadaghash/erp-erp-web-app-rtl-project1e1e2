@@ -12,6 +12,7 @@ const productsPage = read("src/components/ProductsPage.tsx");
 const customersPage = read("src/components/CustomersPage.tsx");
 const suppliersPage = read("src/components/SuppliersPage.tsx");
 const treasuryPage = read("src/components/TreasuryPage.tsx");
+const erpApp = read("src/components/ERPApp.tsx");
 const finance = read("convex/finance.ts");
 const packageJson = read("package.json");
 
@@ -66,7 +67,16 @@ test("fixture-facing pages expose stable non-secret automation selectors", () =>
   for (const id of ["treasury-page", "finance-initialization", "finance-account-row", "finance-account-type", "finance-opening-balance"]) {
     assert.match(treasuryPage, new RegExp(`data-testid="${id}"`));
   }
-  assert.doesNotMatch(`${productsPage}\n${customersPage}\n${suppliersPage}\n${treasuryPage}`, /data-(?:password|secret|token)=/);
+  assert.match(erpApp, /data-testid="working-branch-select"/);
+  assert.doesNotMatch(`${productsPage}\n${customersPage}\n${suppliersPage}\n${treasuryPage}\n${erpApp}`, /data-(?:password|secret|token)=/);
+});
+
+test("initialized finance is rejected before creating an unusable zero-balance fixture", () => {
+  const preflight = fixtureScript.indexOf("Finance is already initialized and the named E2E cash account is missing");
+  const createCash = fixtureScript.indexOf("const targetCash = await ensureAccount");
+  assert.ok(preflight > 0 && createCash > preflight);
+  assert.match(fixtureScript, /working-branch-select/);
+  assert.match(fixtureScript, /Admin working branch does not match the fixture branch/);
 });
 
 test("COD clearing can be created through the same validated finance path", () => {
