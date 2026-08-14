@@ -165,6 +165,13 @@ async function ensureSupplier(page, fixtures) {
 }
 
 async function ensureProduct(page, fixtures, targetBranchId) {
+  const workingBranch = page.getByTestId("working-branch-select");
+  await workingBranch.waitFor({ state: "visible", timeout: 30_000 });
+  if ((await workingBranch.inputValue()) !== targetBranchId) {
+    await selectExact(workingBranch, fixtures.branchName);
+    await waitForToast(page, "تم تغيير فرع العمل");
+  }
+  assert.equal(await workingBranch.inputValue(), targetBranchId, "Admin working branch does not match the fixture branch");
   await navigate(page, "المنتجات والمخزون", "products-page");
   await page.getByTestId("product-search").fill(fixtures.productName);
   let row = await exactRow(page, "product-row", "data-product-name", fixtures.productName);
@@ -261,15 +268,21 @@ async function ensureFinance(page, fixtures) {
     state = "configuring";
   }
 
+  if (state === "initialized") {
+    const existingCash = await accountRow(page, fixtures.cashAccountName, targetBranch.value);
+    assert.ok(existingCash, "Finance is already initialized and the named E2E cash account is missing; reset this disposable Staging dataset before fixture setup");
+    const existingBalance = Number(await existingCash.getAttribute("data-account-balance"));
+    assert.ok(existingBalance >= 100, "Finance is already initialized and the named E2E cash account is not funded; reset this disposable Staging dataset before fixture setup");
+  }
+
   const targetCash = await ensureAccount(page, targetBranch, fixtures.cashAccountName, "E2E-CASH", "cash");
   await ensureAccount(page, targetBranch, fixtures.codAccountName, "E2E-COD", "cod_clearing");
   await ensureAccount(page, targetBranch, fixtures.settlementAccountName, "E2E-BANK", "bank");
-  for (const branch of options) {
-    const hasCash = await page.locator(`[data-testid="finance-account-row"][data-account-branch-id="${branch.value}"][data-account-type="cash"][data-account-active="true"]`).count();
-    if (!hasCash) await ensureAccount(page, branch, `E2E Cash - ${branch.label}`, `E2E-CASH-${branch.value.slice(-8)}`, "cash");
-  }
-
   if (state !== "initialized") {
+    for (const branch of options) {
+      const hasCash = await page.locator(`[data-testid="finance-account-row"][data-account-branch-id="${branch.value}"][data-account-type="cash"][data-account-active="true"]`).count();
+      if (!hasCash) await ensureAccount(page, branch, `E2E Cash - ${branch.label}`, `E2E-CASH-${branch.value.slice(-8)}`, "cash");
+    }
     const rows = page.getByTestId("finance-account-row");
     const count = await rows.count();
     for (let index = 0; index < count; index += 1) {
