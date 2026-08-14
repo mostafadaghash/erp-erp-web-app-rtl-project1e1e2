@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { businessDate } from "../shared/businessDate";
+import { businessDate } from "../shared/businessDate.ts";
 
 test("Cairo business date advances after local midnight while UTC is still previous day", () => {
   const instant = new Date("2026-08-14T23:14:00.000Z");
