@@ -231,7 +231,7 @@ export function SuppliersPage() {
   };
 
   return (
-    <div className="p-4 lg:p-6 space-y-5">
+    <div data-testid="suppliers-page" className="p-4 lg:p-6 space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-black text-slate-800 flex items-center gap-2">
@@ -246,6 +246,7 @@ export function SuppliersPage() {
         </div>
         {canCreate && (
           <button
+            data-testid="supplier-create-open"
             onClick={openCreate}
             className="btn-primary flex items-center gap-2"
           >
@@ -259,6 +260,7 @@ export function SuppliersPage() {
         <div className="relative flex-1">
           <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <input
+            data-testid="supplier-search"
             className="form-input pr-10"
             placeholder="بحث بالاسم أو الهاتف..."
             value={search}
@@ -297,6 +299,9 @@ export function SuppliersPage() {
         {filtered.map((supplier) => (
           <article
             key={supplier._id}
+            data-testid="supplier-card"
+            data-supplier-name={supplier.name}
+            data-supplier-active={String(supplier.isActive !== false)}
             className={`rounded-2xl border border-slate-100 bg-white p-5 shadow-sm transition-all hover:shadow-md ${
               supplier.isActive === false ? "opacity-70 grayscale-[25%]" : ""
             }`}
