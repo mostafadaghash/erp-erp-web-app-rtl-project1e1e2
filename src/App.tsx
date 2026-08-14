@@ -87,17 +87,6 @@ function LoginPage() {
 
   return (
     <div className="min-h-screen relative flex items-center justify-center overflow-hidden bg-slate-900">
-      {/* Background Video */}
-      <video
-        autoPlay
-        loop
-        muted
-        playsInline
-        className="absolute inset-0 w-full h-full object-cover opacity-20"
-      >
-        <source src="https://videos.pexels.com/video-files/6755158/6755158-hd_1920_1080_25fps.mp4" type="video/mp4" />
-      </video>
-
       {/* Gradient overlay */}
       <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-indigo-950/80 to-purple-950/60" />
 
