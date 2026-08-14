@@ -120,7 +120,7 @@ export function NewInvoicePage({ onNavigate }: NewInvoicePageProps) {
         tax: taxAmount,
         total,
         creationRequestId: requestId.current,
-        initialPayment: paid > 0 ? { amount: paid, accountId: accountId as Id<"financialAccounts">, paymentDate: new Date().toISOString().slice(0, 10), requestId: requestId.current } : undefined,
+        initialPayment: paid > 0 ? { amount: paid, accountId: accountId as Id<"financialAccounts">, requestId: requestId.current } : undefined,
         notes: notes || undefined,
       });
       toast.success("تم إنشاء الفاتورة بنجاح");
