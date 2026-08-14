@@ -156,7 +156,21 @@ Admin جديدًا ولا يكتب مباشرة في جداول Auth. تُحفظ
 }
 ```
 
-افحص إعداد الـFixtures دون اتصال أو تغيير بيانات، ثم نفّذ التجهيز الآلي:\n\n```bat\nnpm.cmd run staging:fixtures:setup -- --validate-config\nnpm.cmd run staging:fixtures:setup\n```\n\nينشئ الأمر العميل والمورد والمنتج عند غيابهم، ويعيد تعبئة مخزون المنتج عند\nانخفاضه، وينشئ حسابات `cash` و`cod_clearing` و`bank`. وإذا لم تكن المالية\nمهيأة، ينشئ خزينة نقدية صفرية لكل فرع نشط، يسجل الأرصدة الافتتاحية، ثم يؤكد\nالتهيئة. إعادة التشغيل لا تكرر Fixtures الموجودة. كل ذلك يتطلب\n`E2E_MUTATIONS_CONFIRMED=isolated-staging-only` ويستخدم نطاق Staging المثبت فقط.\n\nيجب أن يكون حسابا `manager` و`accountant` في `E2E_ROLE_ACCOUNTS_JSON` مرتبطين\nبالفرع نفسه؛ ينفّذ المدير العمليات التشغيلية وينفّذ المحاسب الاسترداد والمصروف.
+افحص إعداد الـFixtures دون اتصال أو تغيير بيانات، ثم نفّذ التجهيز الآلي:
+
+```bat
+npm.cmd run staging:fixtures:setup -- --validate-config
+npm.cmd run staging:fixtures:setup
+```
+
+ينشئ الأمر العميل والمورد والمنتج عند غيابهم، ويعيد تعبئة مخزون المنتج عند
+انخفاضه، وينشئ حسابات `cash` و`cod_clearing` و`bank`. وإذا لم تكن المالية
+مهيأة، ينشئ خزينة نقدية صفرية لكل فرع نشط، يسجل الأرصدة الافتتاحية، ثم يؤكد
+التهيئة. إعادة التشغيل لا تكرر Fixtures الموجودة. كل ذلك يتطلب
+`E2E_MUTATIONS_CONFIRMED=isolated-staging-only` ويستخدم نطاق Staging المثبت فقط.
+
+يجب أن يكون حسابا `manager` و`accountant` في `E2E_ROLE_ACCOUNTS_JSON` مرتبطين
+بالفرع نفسه؛ ينفّذ المدير العمليات التشغيلية وينفّذ المحاسب الاسترداد والمصروف.
 لا يطبع التقرير كلمات المرور أو البريد، وتُوسم المستندات الجديدة بعلامة `E2E-*`.
 امسح بيانات الفرع التجريبي أو أعد Seed موثوقًا قبل إعادة الجولة، ولا تستخدم
 نسخة من بيانات العملاء الحقيقية.
@@ -254,7 +268,8 @@ npm.cmd run test:staging:all -- --validate-config
 
 - `test-results/staging-e2e/acceptance.json`
 - `test-results/staging-preflight/acceptance.json`
-- `test-results/staging-fixtures/acceptance.json` وصورة تثبت جاهزية البيانات.\n- `test-results/staging-business-e2e/acceptance.json` وصورة لكل نقطة دورة.
+- `test-results/staging-fixtures/acceptance.json` وصورة تثبت جاهزية البيانات.
+- `test-results/staging-business-e2e/acceptance.json` وصورة لكل نقطة دورة.
 - Screenshot لكل دور دون بيانات اعتماد.
 - Screenshot لقائمة الهاتف.
 - Artifact نتيجة Load Test.
