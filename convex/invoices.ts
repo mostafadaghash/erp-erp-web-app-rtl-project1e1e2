@@ -12,7 +12,7 @@ import { nextDocumentNumber } from "./lib/documentNumbers";
 import { requireActiveBranch, requireActiveCustomer } from "./lib/references";
 import { postCustomerLedgerEntry } from "./lib/customerLedger.ts";
 import { assertInvoiceNotLockedByActiveDelivery } from "./lib/deliveryLocks.ts";
-import { businessDate } from "../shared/businessDate";
+import { businessDate } from "../shared/businessDate.ts";
 
 type InvoiceItemInput = {
   productId: Id<"products">;
