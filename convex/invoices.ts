@@ -222,7 +222,7 @@ export const create = mutation({
     if (args.customerId) {
       const ledgerDate = transactionDate;
       await postCustomerLedgerEntry(ctx, user, { type: "invoice_charge", requestId: `${args.creationRequestId}:charge`, customerId: args.customerId, branchId: branchId!, date: ledgerDate, receivableDelta: prepared.total, advanceDelta: 0, purchasesDelta: prepared.total, description: `استحقاق الفاتورة ${invoiceNumber}`, referenceType: "invoice", referenceId: String(id), referenceNumber: invoiceNumber });
-      if (args.initialPayment) await postCustomerLedgerEntry(ctx, user, { type: "invoice_payment", requestId: `${args.initialPayment.requestId}:ledger`, customerId: args.customerId, branchId: branchId!, date: args.initialPayment.paymentDate, receivableDelta: -args.initialPayment.amount, advanceDelta: 0, purchasesDelta: 0, description: `دفعة الفاتورة ${invoiceNumber}`, referenceType: "invoice", referenceId: String(id), referenceNumber: invoiceNumber });
+      if (args.initialPayment) await postCustomerLedgerEntry(ctx, user, { type: "invoice_payment", requestId: `${args.initialPayment.requestId}:ledger`, customerId: args.customerId, branchId: branchId!, date: transactionDate, receivableDelta: -args.initialPayment.amount, advanceDelta: 0, purchasesDelta: 0, description: `دفعة الفاتورة ${invoiceNumber}`, referenceType: "invoice", referenceId: String(id), referenceNumber: invoiceNumber });
     }
 
     if (args.initialPayment && paymentAccount) {
