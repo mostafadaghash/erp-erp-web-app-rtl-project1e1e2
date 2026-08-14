@@ -93,6 +93,37 @@ Production أضف `PRODUCTION_BASE_URL` و`PRODUCTION_CONVEX_URL` و
 
 لا تضع الملف أو السر في Git، ولا تطبعه داخل سجل الأوامر أو Artifacts.
 
+### إنشاء حسابات الأدوار دفعة واحدة من Windows CMD
+
+إذا كان حساب `admin` فقط موجودًا، ضع بريده وكلمة مروره واسم فرع الاختبار داخل
+`.env.staging.local`، وأضف تأكيد Staging الحرفي التالي:
+
+```text
+E2E_ADMIN_EMAIL=admin@example.invalid
+E2E_ADMIN_PASSWORD=REPLACE_LOCALLY
+E2E_ACCOUNT_BRANCH_NAME=E2E Branch
+STAGING_ACCOUNT_SETUP_CONFIRMED=isolated-staging-only
+```
+
+افحص الإعداد أولًا دون إنشاء حسابات أو كتابة كلمات مرور:
+
+```bat
+npm.cmd run staging:accounts:setup -- --validate-config
+```
+
+ثم نفّذ الإنشاء الكامل بأمر واحد:
+
+```bat
+npm.cmd run staging:accounts:setup
+```
+
+يسجّل الأمر دخول الـAdmin، وينشئ الأدوار السبعة الناقصة عبر دعوات الموظفين
+الحقيقية، ويطالب كل دعوة بكلمة مرور مولّدة، ثم يختبر الدخول والدور. لا ينشئ
+Admin جديدًا ولا يكتب مباشرة في جداول Auth. تُحفظ بيانات الحسابات في
+`.staging-role-accounts.json.local` المتجاهَل من Git، ويستخدمها أمر القبول
+الكامل تلقائيًا. إعادة تشغيل الأمر لا تكرر الحسابات؛ بل تتحقق من الحسابات
+النشطة أو تستكمل الدعوات المعلقة.
+
 ### بيانات دورات الأعمال المتغيرة
 
 دورات البيع والشراء والصيانة وCOD تنشئ مستندات حقيقية؛ لذلك لا تشغّلها إلا

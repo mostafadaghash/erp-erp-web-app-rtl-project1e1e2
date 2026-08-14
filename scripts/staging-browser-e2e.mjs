@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { createReadStream, createWriteStream } from "node:fs";
+import { createReadStream, createWriteStream, readFileSync } from "node:fs";
 import { access, mkdir, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -215,9 +215,15 @@ export function stagingConfig() {
 
   let accounts;
   try {
-    accounts = JSON.parse(process.env.E2E_ROLE_ACCOUNTS_JSON ?? "");
+    const environmentAccounts = process.env.E2E_ROLE_ACCOUNTS_JSON?.trim();
+    const localAccounts = environmentAccounts
+      ? environmentAccounts
+      : readFileSync(resolve(".staging-role-accounts.json.local"), "utf8");
+    accounts = JSON.parse(localAccounts);
   } catch {
-    throw new Error("E2E_ROLE_ACCOUNTS_JSON must be valid JSON");
+    throw new Error(
+      "E2E_ROLE_ACCOUNTS_JSON or .staging-role-accounts.json.local must be valid JSON",
+    );
   }
   if (!Array.isArray(accounts) || accounts.length === 0) {
     throw new Error("E2E_ROLE_ACCOUNTS_JSON must contain at least one account");
