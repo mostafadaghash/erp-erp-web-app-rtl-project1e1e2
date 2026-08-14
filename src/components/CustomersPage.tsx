@@ -262,7 +262,7 @@ export function CustomersPage({
             <button
               data-testid="customer-create-open"
               onClick={openCreate}
-              disabled={!effectiveBranchId>
+              disabled={!effectiveBranchId}
               className="btn-primary flex items-center gap-2"
               title={!effectiveBranchId ? "اختر فرع العميل أولًا" : undefined}
             >
