@@ -22,6 +22,7 @@ test("Cloudflare Pages permits only secure Convex browser transports", () => {
   assert.match(headers, /connect-src[^;]*https:\/\/\*\.convex\.cloud/i);
   assert.match(headers, /connect-src[^;]*wss:\/\/\*\.convex\.cloud/i);
   assert.match(headers, /connect-src[^;]*https:\/\/\*\.convex\.site/i);
+  assert.match(headers, /^\s*! Access-Control-Allow-Origin\s*$/m);
   assert.doesNotMatch(headers, /Access-Control-Allow-Origin:\s*\*/i);
 });
 
