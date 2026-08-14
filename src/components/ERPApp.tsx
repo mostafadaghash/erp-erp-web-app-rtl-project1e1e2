@@ -236,7 +236,7 @@ export function ERPApp() {
 
         {/* Page content */}
         <main className="flex-1 overflow-y-auto">
-          <div className="animate-fade-in-up">
+          <div>
             {!authorized && (
               <div className="min-h-[70vh] flex items-center justify-center p-6">
                 <div className="text-center">
@@ -275,4 +275,3 @@ export function ERPApp() {
     </PermissionProvider>
   );
 }
-
