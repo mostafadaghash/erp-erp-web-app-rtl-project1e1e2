@@ -3,7 +3,7 @@ import { spawn } from "node:child_process";
 import { createReadStream, createWriteStream, readFileSync } from "node:fs";
 import { access, mkdir, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { join, resolve, win32 } from "node:path";
 import { once } from "node:events";
 import { pipeline } from "node:stream/promises";
 import { createBrotliDecompress } from "node:zlib";
@@ -145,6 +145,23 @@ const packageRoot = resolve("node_modules/@sparticuz/chromium/bin");
 const runtimeRoot = join(tmpdir(), "erp-staging-browser-runtime");
 const browserPath = join(runtimeRoot, "chromium");
 
+export function windowsBrowserCandidates(environment = process.env) {
+  const configured = environment.E2E_BROWSER_EXECUTABLE?.trim();
+  const roots = [
+    environment.PROGRAMFILES,
+    environment["PROGRAMFILES(X86)"],
+    environment.LOCALAPPDATA,
+  ].filter((value) => typeof value === "string" && value.trim());
+  const candidates = configured ? [configured] : [];
+  for (const root of roots) {
+    candidates.push(
+      win32.join(root, "Google", "Chrome", "Application", "chrome.exe"),
+      win32.join(root, "Microsoft", "Edge", "Application", "msedge.exe"),
+    );
+  }
+  return [...new Set(candidates)];
+}
+
 async function exists(path) {
   try {
     await access(path);
@@ -183,7 +200,18 @@ async function inflateTar(source, destination) {
   if (code !== 0) throw new Error(`تعذر فك حزمة Chromium: ${stderr.trim()}`);
 }
 
+async function prepareWindowsBrowser() {
+  for (const candidate of windowsBrowserCandidates()) {
+    if (await exists(candidate)) return candidate;
+  }
+  throw new Error(
+    "No supported browser was found on Windows. Install Chrome or Edge, or set E2E_BROWSER_EXECUTABLE to its full path.",
+  );
+}
+
 async function prepareBrowser() {
+  if (process.platform === "win32") return prepareWindowsBrowser();
+
   await mkdir(runtimeRoot, { recursive: true });
   await mkdir(join(runtimeRoot, "font-cache"), { recursive: true });
   await writeFile(
@@ -410,6 +438,10 @@ export async function safeScreenshot(page, path) {
 
 export async function launchStagingBrowser() {
   const executablePath = await prepareBrowser();
+  if (process.platform === "win32") {
+    return chromium.launch({ executablePath, headless: true });
+  }
+
   chromiumPackage.setGraphicsMode = false;
   return chromium.launch({
     executablePath,
