@@ -81,6 +81,7 @@ async function main() {
   const validationSteps = [
     ["target-config", ["run", "test:staging-preflight", "--", "--validate-config"]],
     ["browser-config", ["run", "test:e2e-staging", "--", "--validate-config"]],
+    ["fixtures-config", ["run", "staging:fixtures:setup", "--", "--validate-config"]],
     ["business-config", ["run", "test:e2e-business-staging", "--", "--validate-config"]],
     ["load-config", ["run", "test:load-staging", "--", "--validate-config"]],
   ];
@@ -95,6 +96,7 @@ async function main() {
   for (const [name, args] of validationSteps) await runStep(name, args);
   await runStep("live-preflight", ["run", "test:staging-preflight"]);
   await runStep("all-role-browser", ["run", "test:e2e-staging"]);
+  await runStep("business-fixture-setup", ["run", "staging:fixtures:setup"]);
   await runStep("mutable-business-cycles", ["run", "test:e2e-business-staging"]);
   await runStep("maximum-bounded-load", ["run", "test:load-staging"]);
   await writeReport("passed");
