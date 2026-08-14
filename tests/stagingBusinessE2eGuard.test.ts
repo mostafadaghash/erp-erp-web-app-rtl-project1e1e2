@@ -92,6 +92,8 @@ test("business browser script executes all required public UI cycles and stores 
     "observeRuntimeFailures",
   ]) assert.match(script, new RegExp(marker.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   assert.doesNotMatch(script, /console\.log\([^\n]*(password|email)|documents?\.write/);
+  assert.match(script, /getByTestId\("invoices-page"\)\.getByRole\("button", \{ name: "فاتورة جديدة", exact: true \}\)/);
+  assert.doesNotMatch(script, /page\.getByRole\("button", \{ name: "فاتورة جديدة", exact: true \}\)/);
 });
 
 test("mutable UI selectors cover sales, purchase, repair, and COD forms", () => {
