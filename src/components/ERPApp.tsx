@@ -208,6 +208,7 @@ export function ERPApp() {
           <div className="flex items-center gap-3">
             {canSelectWorkingBranch && (
               <select
+                data-testid="working-branch-select"
                 className={`hidden md:block text-xs rounded-lg border px-2.5 py-2 bg-white ${me.branchId ? "border-slate-200 text-slate-600" : "border-amber-300 text-amber-700"}`}
                 value={me.branchId ?? ""}
                 onChange={(event) => void handleWorkingBranchChange(event.target.value)}
