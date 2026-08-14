@@ -111,6 +111,18 @@ async function exactRow(page, testId, attribute, value) {
   return null;
 }
 
+async function waitForExactRow(page, testId, attribute, value) {
+  await page.waitForFunction(
+    ({ testId: id, attribute: field, value: expected }) =>
+      [...document.querySelectorAll(`[data-testid="${id}"]`)].some(
+        (element) => element.getAttribute(field) === expected,
+      ),
+    { testId, attribute, value },
+    { timeout: 45_000 },
+  );
+  return exactRow(page, testId, attribute, value);
+}
+
 async function ensureCustomer(page, fixtures, targetBranchId) {
   await navigate(page, "العملاء", "customers-page");
   const branchSelect = page.getByTestId("customer-branch-select");
@@ -126,7 +138,7 @@ async function ensureCustomer(page, fixtures, targetBranchId) {
     await page.locator("#contact-address").fill("E2E fixture - disposable Staging only");
     await page.getByRole("button", { name: "حفظ", exact: true }).click();
     await waitForToast(page, "تمت إضافة العميل");
-    row = await exactRow(page, "customer-card", "data-customer-name", fixtures.customerName);
+    row = await waitForExactRow(page, "customer-card", "data-customer-name", fixtures.customerName);
   }
   assert.ok(row, "Customer fixture did not appear after setup");
   assert.equal(await row.getAttribute("data-customer-active"), "true", "Customer fixture must be active");
@@ -145,7 +157,7 @@ async function ensureSupplier(page, fixtures) {
     await page.locator("#contact-address").fill("E2E fixture - disposable Staging only");
     await page.getByRole("button", { name: "حفظ", exact: true }).click();
     await waitForToast(page, "تمت إضافة المورد");
-    row = await exactRow(page, "supplier-card", "data-supplier-name", fixtures.supplierName);
+    row = await waitForExactRow(page, "supplier-card", "data-supplier-name", fixtures.supplierName);
   }
   assert.ok(row, "Supplier fixture did not appear after setup");
   assert.equal(await row.getAttribute("data-supplier-active"), "true", "Supplier fixture must be active");
@@ -164,10 +176,10 @@ async function ensureProduct(page, fixtures, targetBranchId) {
     await page.getByTestId("product-sell-price").fill("100");
     await page.getByTestId("product-opening-stock").fill(String(fixtures.productOpeningStock));
     await page.getByTestId("product-min-stock").fill("2");
-    await page.getByTestId("product-supplier").selectOption({ label: fixtures.supplierName });
+    await selectExact(page.getByTestId("product-supplier"), fixtures.supplierName);
     await page.getByTestId("product-submit").click();
     await waitForToast(page, "تمت إضافة المنتج بنجاح");
-    row = await exactRow(page, "product-row", "data-product-name", fixtures.productName);
+    row = await waitForExactRow(page, "product-row", "data-product-name", fixtures.productName);
   }
   assert.ok(row, "Product fixture did not appear after setup");
   assert.equal(await row.getAttribute("data-product-active"), "true", "Product fixture must be active");
@@ -203,6 +215,14 @@ async function ensureAccount(page, branch, name, code, type) {
     await page.getByTestId("finance-account-type").selectOption(type);
     await page.getByTestId("finance-account-create").click();
     await waitForToast(page, "تم إنشاء الحساب برصيد صفر");
+    await page.waitForFunction(
+      ({ name: expectedName, branchId }) =>
+        [...document.querySelectorAll('[data-testid="finance-account-row"]')].some(
+          (element) => element.getAttribute("data-account-name") === expectedName && element.getAttribute("data-account-branch-id") === branchId,
+        ),
+      { name, branchId: branch.value },
+      { timeout: 45_000 },
+    );
     row = await accountRow(page, name, branch.value);
   }
   assert.ok(row, `Financial account fixture did not appear: ${name}`);
@@ -228,6 +248,11 @@ async function ensureFinance(page, fixtures) {
   const options = (await branchSelect.locator("option").evaluateAll((rows) => rows.map((row) => ({ value: row.value, label: row.textContent?.trim() ?? "" })))).filter((option) => option.value);
   const targetBranch = options.find((option) => option.label === fixtures.branchName);
   assert.ok(targetBranch, `Missing active branch: ${fixtures.branchName}`);
+  await page.waitForFunction(
+    () => ![null, "loading"].includes(document.querySelector('[data-testid="finance-initialization"]')?.getAttribute("data-state") ?? null),
+    undefined,
+    { timeout: 30_000 },
+  );
   let state = await page.getByTestId("finance-initialization").getAttribute("data-state");
   if (state !== "initialized") {
     await page.getByTestId("finance-cutover-date").fill(fixtures.operationDate ?? new Date().toISOString().slice(0, 10));
