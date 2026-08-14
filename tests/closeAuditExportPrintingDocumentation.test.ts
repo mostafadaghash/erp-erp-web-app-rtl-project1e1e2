@@ -33,9 +33,13 @@ test("EXP-02 CSV exports must neutralize formula prefixes", () => {
   assert.match(matrix, /neutralize formula prefixes/);
 });
 
-test("EXP-03 backend export requirement is documented as incomplete", () => {
+test("EXP-03 backend export is permission-enforced and complete", () => {
   const matrix = read("tests/EXPORT_COVERAGE_MATRIX.md");
-  assert.match(matrix, /backend export requirement is documented as incomplete/);
+  assert.match(
+    matrix,
+    /backend export requires export_data and dataset view permissions/,
+  );
+  assert.doesNotMatch(matrix, /incomplete|pending|placeholder/i);
 });
 
 test("PRH-01 print hardening matrix is explicit and non-placeholder", () => {
