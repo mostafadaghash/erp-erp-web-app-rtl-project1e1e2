@@ -1,5 +1,5 @@
 import { mutation } from "./_generated/server";
-import type { Doc, Id } from "./_generated/dataModel";
+import type { Id } from "./_generated/dataModel";
 import type { MutationCtx } from "./_generated/server";
 import { ConvexError, v } from "convex/values";
 import {
@@ -484,6 +484,8 @@ async function buildExport(
       return expenseExport(ctx, user);
     case "deliveries":
       return deliveryExport(ctx, user);
+    default:
+      throw new ConvexError("مجموعة بيانات التصدير غير مدعومة");
   }
 }
 
