@@ -223,7 +223,7 @@ export function CustomersPage({
   };
 
   return (
-    <div className="p-4 lg:p-6 space-y-5">
+    <div data-testid="customers-page" className="p-4 lg:p-6 space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-black text-slate-800 flex items-center gap-2">
@@ -245,6 +245,7 @@ export function CustomersPage({
         <div className="flex items-center gap-2">
           {canViewBranches && !me?.branchId && branches.length > 0 && (
             <select
+              data-testid="customer-branch-select"
               className="form-input min-w-40"
               aria-label="فرع العملاء"
               value={selectedBranchId}
@@ -259,8 +260,9 @@ export function CustomersPage({
           )}
           {canCreate && (
             <button
+              data-testid="customer-create-open"
               onClick={openCreate}
-              disabled={!effectiveBranchId}
+              disabled={!effectiveBranchId>
               className="btn-primary flex items-center gap-2"
               title={!effectiveBranchId ? "اختر فرع العميل أولًا" : undefined}
             >
@@ -312,6 +314,7 @@ export function CustomersPage({
       <div className="relative">
         <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
         <input
+          data-testid="customer-search"
           className="form-input pr-10"
           placeholder="بحث بالاسم أو رقم الهاتف..."
           value={search}
@@ -327,6 +330,10 @@ export function CustomersPage({
           return (
             <article
               key={customer._id}
+              data-testid="customer-card"
+              data-customer-name={customer.name}
+              data-customer-active={String(customer.isActive !== false)}
+              data-customer-branch-id={customer.branchId ?? ""}
               className={`rounded-2xl border border-slate-100 bg-white p-5 shadow-sm transition-all hover:shadow-md ${
                 customer.isActive === false ? "opacity-70 grayscale-[25%]" : ""
               }`}
