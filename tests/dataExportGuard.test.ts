@@ -58,7 +58,7 @@ test("EXP-09 export columns exclude authentication and request internals", () =>
 
 test("EXP-10 CSV cells neutralize spreadsheet formula prefixes", () => {
   assert.match(page, /\^\[\\u0000-\\u0020\]\*\[=\+\\-@\]/);
-  assert.match(page, /protectedValue\\.replace\\(\\/"\\/g, '""'\\)/);
+  assert.match(page, /protectedValue\.replace\(\/"\/g, '""'\)/);
   assert.match(page, /text\/csv;charset=utf-8/);
   assert.match(page, /\\uFEFF/);
 });
