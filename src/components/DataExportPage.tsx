@@ -122,7 +122,7 @@ export function csvCell(value: ExportCell): string {
   const protectedValue = /^[\u0000-\u0020]*[=+\-@]/.test(original)
     ? `'${original}`
     : original;
-  return `"${protectedValue.replaceAll('"', '""')}"`;
+  return `"${protectedValue.replace(/"/g, '""')}"`;
 }
 
 export function buildCsv(payload: ExportPayload): string {
