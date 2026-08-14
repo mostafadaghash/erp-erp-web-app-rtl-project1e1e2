@@ -24,6 +24,7 @@ import { SupplierPaymentsPage } from "./SupplierPaymentsPage";
 import { PurchaseReturnsPage } from "./PurchaseReturnsPage";
 import { CustomerLedgerPage } from "./CustomerLedgerPage";
 import { GeneralLedgerPage } from "./GeneralLedgerPage";
+import { DataExportPage } from "./DataExportPage";
 import { Menu } from "lucide-react";
 import { ShieldX } from "lucide-react";
 import type { Permission } from "../../convex/lib/permissions";
@@ -53,7 +54,8 @@ export type Page =
   | "supplier-payments"
   | "purchase-returns"
   | "customer-ledger"
-  | "general-ledger";
+  | "general-ledger"
+  | "data-export";
 
 const PAGE_PERMISSIONS: Partial<Record<Page, Permission>> = {
   products: "view_products",
@@ -77,6 +79,7 @@ const PAGE_PERMISSIONS: Partial<Record<Page, Permission>> = {
   "purchase-returns": "view_purchase_returns",
   "customer-ledger": "view_customer_ledger",
   "general-ledger": "view_general_ledger",
+  "data-export": "export_data",
 };
 
 const PAGE_MODULES: Partial<Record<Page, string>> = {
@@ -268,6 +271,7 @@ export function ERPApp() {
             {authorized && currentPage === "purchase-returns" && <PurchaseReturnsPage />}
             {authorized && currentPage === "customer-ledger" && <CustomerLedgerPage initialCustomerId={customerLedgerTarget?.customerId} initialBranchId={customerLedgerTarget?.branchId} />}
             {authorized && currentPage === "general-ledger" && <GeneralLedgerPage />}
+            {authorized && currentPage === "data-export" && <DataExportPage permissions={permissions} />}
           </div>
         </main>
       </div>
