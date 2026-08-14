@@ -1,4 +1,4 @@
-import { mutation } from "./_generated/server";
+import { mutation } from "./_generated/server.js";
 import type { Id } from "./_generated/dataModel";
 import type { MutationCtx } from "./_generated/server";
 import { ConvexError, v } from "convex/values";
@@ -8,8 +8,8 @@ import {
   requireModuleEnabled,
   requirePermission,
   type AuthUser,
-} from "./lib/auth";
-import type { Permission } from "./lib/permissions";
+} from "./lib/auth.ts";
+import type { Permission } from "./lib/permissions.ts";
 
 const MAX_EXPORT_ROWS = 5_000;
 
