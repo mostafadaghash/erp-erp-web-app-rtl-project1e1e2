@@ -251,7 +251,11 @@ export function EmployeesPage() {
           </h1>
           <p className="text-slate-500 text-sm mt-0.5">إدارة فريق العمل وتحديد الصلاحيات</p>
         </div>
-        <button onClick={openCreate} className="btn-primary flex items-center gap-2">
+        <button
+          data-testid="employee-create-open"
+          onClick={openCreate}
+          className="btn-primary flex items-center gap-2"
+        >
           <Plus className="w-4 h-4" />
           موظف جديد
         </button>
@@ -357,7 +361,15 @@ export function EmployeesPage() {
                 {filtered.map(emp => {
                   const roleInfo = getRoleInfo(emp.role);
                   return (
-                    <tr key={emp._id}>
+                    <tr
+                      key={emp._id}
+                      data-testid="employee-row"
+                      data-employee-role={emp.role}
+                      data-employee-active={String(emp.isActive)}
+                      data-invitation-pending={String(
+                        !emp.tokenIdentifier && Boolean(emp.email),
+                      )}
+                    >
                       <td>
                         <div className="flex items-center gap-3">
                           <div className="w-9 h-9 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full flex items-center justify-center flex-shrink-0">
@@ -456,7 +468,7 @@ export function EmployeesPage() {
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="form-label">الاسم *</label>
-                    <input className="form-input" placeholder="اسم الموظف" value={form.name}
+                    <input data-testid="employee-name" className="form-input" placeholder="اسم الموظف" value={form.name}
                       onChange={e => setForm({ ...form, name: e.target.value })} />
                   </div>
                   <div>
@@ -472,6 +484,7 @@ export function EmployeesPage() {
                     <input
                       type="email"
                       dir="ltr"
+                      data-testid="employee-email"
                       className="form-input pr-10"
                       placeholder="employee@example.com"
                       value={form.email}
@@ -485,7 +498,7 @@ export function EmployeesPage() {
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="form-label">الدور الوظيفي *</label>
-                    <select className="form-input" value={form.role} onChange={e => handleRoleChange(e.target.value)}>
+                    <select data-testid="employee-role" className="form-input" value={form.role} onChange={e => handleRoleChange(e.target.value)}>
                       {ROLES.map(r => (
                         <option key={r.value} value={r.value}>{r.label}</option>
                       ))}
@@ -493,7 +506,7 @@ export function EmployeesPage() {
                   </div>
                   <div>
                     <label className="form-label">الفرع</label>
-                    <select className="form-input" value={form.branchId} onChange={e => setForm({ ...form, branchId: e.target.value })}>
+                    <select data-testid="employee-branch" className="form-input" value={form.branchId} onChange={e => setForm({ ...form, branchId: e.target.value })}>
                       <option value="">— بدون فرع —</option>
                       {(branches ?? []).map(b => (
                         <option key={b._id} value={b._id}>{b.name}</option>
@@ -579,7 +592,7 @@ export function EmployeesPage() {
 
               <div className="flex gap-3 pt-2">
                 <button type="button" onClick={() => setShowForm(false)} className="btn-secondary flex-1">إلغاء</button>
-                <button type="submit" className="btn-primary flex-1">{editId ? "حفظ التعديلات" : "إضافة الموظف"}</button>
+                <button data-testid="employee-create-submit" type="submit" className="btn-primary flex-1">{editId ? "حفظ التعديلات" : "إضافة الموظف"}</button>
               </div>
             </form>
           </div>
@@ -594,7 +607,11 @@ export function EmployeesPage() {
                 <Link className="w-5 h-5 text-indigo-600" />
                 رابط دعوة الموظف
               </h2>
-              <button onClick={() => setInviteLink("")} className="p-1.5 hover:bg-slate-100 rounded-lg">
+              <button
+                data-testid="employee-invite-close"
+                onClick={() => setInviteLink("")}
+                className="p-1.5 hover:bg-slate-100 rounded-lg"
+              >
                 <X className="w-4 h-4" />
               </button>
             </div>
@@ -602,7 +619,13 @@ export function EmployeesPage() {
               أرسل هذا الرابط للموظف ليُنشئ كلمة المرور ويربط حسابه. الرابط صالح لمدة 7 أيام.
             </p>
             <div className="flex gap-2">
-              <input className="form-input flex-1" dir="ltr" readOnly value={inviteLink} />
+              <input
+                data-testid="employee-invite-link"
+                className="form-input flex-1"
+                dir="ltr"
+                readOnly
+                value={inviteLink}
+              />
               <button
                 type="button"
                 className="btn-primary flex items-center gap-2"
