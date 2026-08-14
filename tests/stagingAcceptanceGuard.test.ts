@@ -189,6 +189,23 @@ test("STG-11 one command runs every gate in a fail-fast safe order", () => {
   assert.doesNotMatch(allScript, /Promise\.all\([\s\S]{0,200}(?:business|load)/i);
 });
 
+test("Windows staging runs use an installed Chrome or Edge executable", () => {
+  assert.match(script, /windowsBrowserCandidates/);
+  assert.match(script, /process\.platform === "win32"/);
+  assert.match(script, /E2E_BROWSER_EXECUTABLE/);
+  assert.match(script, /"chrome\.exe"/);
+  assert.match(script, /"msedge\.exe"/);
+  assert.match(
+    script,
+    /return chromium\.launch\(\{ executablePath, headless: true \}\)/,
+  );
+  const windowsBranch = script.slice(
+    script.indexOf('process.platform === "win32"'),
+    script.indexOf("chromiumPackage.setGraphicsMode"),
+  );
+  assert.doesNotMatch(windowsBranch, /chromiumPackage\.args|FONTCONFIG_PATH/);
+});
+
 test("staging config validation runs without contacting an external host", () => {
   const result = spawnSync(
     process.execPath,
