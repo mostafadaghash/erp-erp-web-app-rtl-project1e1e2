@@ -276,6 +276,7 @@ async function refundInvoice(page, fixtures, invoice, marker) {
 }
 
 async function createSalesReturn(page, fixtures, invoice, marker) {
+  await navigate(page, "مرتجعات المبيعات", "sales-returns-page");
   const start = page.getByTestId("sales-return-start");
   await page.waitForFunction(
     (number) => [...document.querySelectorAll('[data-testid="sales-return-start"]')].some((element) => element.getAttribute("data-invoice-number") === number),
