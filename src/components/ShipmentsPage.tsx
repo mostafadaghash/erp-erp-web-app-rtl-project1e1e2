@@ -57,13 +57,13 @@ export function ShipmentsPage({ createRequestToken }: { createRequestToken?: num
 
   const handleStatusChange = async (id: Id<"shipments">, status: string) => {
     try {
-      const reason = status === "cancelled" ? prompt("أدخل سبب إلغاء العملية شراء") : undefined;
+      const reason = status === "cancelled" ? prompt("أدخل سبب إلغاء عملية الشراء") : undefined;
       if (status === "cancelled" && !reason?.trim()) return;
       await updateStatus({ id, status, reason });
       toast.success(
         status === "arrived"
-          ? "تم استلام العملية شراء وتحديث المخزون تلقائياً"
-          : "تم تحديث حالة العملية شراء"
+          ? "تم استلام عملية الشراء وتحديث المخزون تلقائياً"
+          : "تم تحديث حالة عملية الشراء"
       );
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "حدث خطأ");
@@ -71,8 +71,8 @@ export function ShipmentsPage({ createRequestToken }: { createRequestToken?: num
   };
 
   const handleDelete = async (id: Id<"shipments">) => {
-    const reason = prompt("أدخل سبب إلغاء العملية شراء");
-    if (!reason?.trim() || !confirm("هل أنت متأكد من إلغاء هذه العملية شراء؟")) return;
+    const reason = prompt("أدخل سبب إلغاء عملية الشراء");
+    if (!reason?.trim() || !confirm("هل أنت متأكد من إلغاء عملية الشراء؟")) return;
     try {
       await updateStatus({ id, status: "cancelled", reason });
       toast.success("تم إلغاء عملية الشراء");
@@ -138,7 +138,7 @@ export function ShipmentsPage({ createRequestToken }: { createRequestToken?: num
           <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <input
             className="form-input pr-9"
-            placeholder="بحث بالمورد أو رقم العملية شراء..."
+            placeholder="بحث بالمورد أو رقم عملية الشراء..."
             value={search}
             onChange={e => setSearch(e.target.value)}
           />
@@ -180,7 +180,7 @@ export function ShipmentsPage({ createRequestToken }: { createRequestToken?: num
             <table className="data-table">
               <thead>
                 <tr>
-                  <th>رقم العملية شراء</th>
+                  <th>رقم عملية الشراء</th>
                   <th>المورد</th>
                   <th>الأصناف</th>
                   <th>تكلفة البضاعة</th>
@@ -239,7 +239,7 @@ export function ShipmentsPage({ createRequestToken }: { createRequestToken?: num
                                   : "bg-indigo-50 text-indigo-600 hover:bg-indigo-100"
                               }`}
                             >
-                              {nextStatus === "arrived" ? "استلام العملية شراء" : statusConfig[nextStatus].label}
+                              {nextStatus === "arrived" ? "استلام عملية الشراء" : statusConfig[nextStatus].label}
                             </button>
                           )}
                           {canEdit && shipment.status !== "arrived" && shipment.status !== "cancelled" && (
@@ -472,7 +472,7 @@ function NewShipmentForm({ onClose }: { onClose: () => void }) {
 
           <div className="flex gap-3 pt-2">
             <button type="button" onClick={onClose} className="btn-secondary flex-1">إلغاء</button>
-            <button data-testid="shipment-submit" type="submit" className="btn-primary flex-1">حفظ العملية شراء</button>
+            <button data-testid="shipment-submit" type="submit" className="btn-primary flex-1">حفظ عملية الشراء</button>
           </div>
         </form>
       </div>
@@ -506,7 +506,7 @@ function ReceiveShipmentModal({ shipment, onClose }: { shipment: { _id: Id<"ship
   };
   return <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" dir="rtl">
     <form data-testid="shipment-receive-form" data-shipment-number={shipment.shipmentNumber} onSubmit={submit} className="w-full max-w-xl space-y-4 rounded-2xl bg-white p-6 shadow-2xl">
-      <div className="flex justify-between"><div><h2 className="font-black text-lg">استلام عملية شراء شراء</h2><p className="font-mono text-indigo-600">{shipment.shipmentNumber}</p><p>{shipment.supplierName}</p></div><button type="button" onClick={onClose}><X /></button></div>
+      <div className="flex justify-between"><div><h2 className="font-black text-lg">استلام عملية الشراء</h2><p className="font-mono text-indigo-600">{shipment.shipmentNumber}</p><p>{shipment.supplierName}</p></div><button type="button" onClick={onClose}><X /></button></div>
       <div className="grid grid-cols-2 gap-2 rounded-xl bg-slate-50 p-3 text-sm">
         <span>إجمالي البضاعة</span><b>{shipment.totalCost.toLocaleString("ar-EG")} ج.م</b>
         <span>إجمالي الشحن</span><b>{shipment.shippingCost.toLocaleString("ar-EG")} ج.م</b>
