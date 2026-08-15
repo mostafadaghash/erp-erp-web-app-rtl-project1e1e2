@@ -139,7 +139,7 @@ export function NewInvoicePage({ onNavigate }: NewInvoicePageProps) {
         <div>
           <h1 className="text-2xl font-black text-slate-800 flex items-center gap-2">
             <ShoppingCart className="w-6 h-6 text-indigo-600" />
-            فاتورة جديدة
+            فاتورة بيع جديدة
           </h1>
         </div>
         <button onClick={() => onNavigate("invoices")} className="btn-secondary">
@@ -174,7 +174,7 @@ export function NewInvoicePage({ onNavigate }: NewInvoicePageProps) {
 
           {/* Product Search */}
           <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
-            <h2 className="font-bold text-slate-800 mb-4">إضافة منتجات</h2>
+            <h2 className="font-bold text-slate-800 mb-4">إضافة أصناف</h2>
             <div className="relative mb-4">
               <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
               <input
@@ -330,4 +330,3 @@ export function NewInvoicePage({ onNavigate }: NewInvoicePageProps) {
     </div>
   );
 }
-

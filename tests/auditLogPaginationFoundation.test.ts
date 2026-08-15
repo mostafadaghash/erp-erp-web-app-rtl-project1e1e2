@@ -45,7 +45,7 @@ test("AUD-05 branch, module, action, user, and date filters are accepted", () =>
   ]) {
     assert.ok(backend.includes(token), `missing ${token}`);
   }
-  assert.ok(backend.includes("نطاق تاريخ سجل العمليات غير صالح"));
+  assert.ok(backend.includes("نطاق تاريخ سجل المراجعة غير صالح"));
 });
 
 test("AUD-06 audit indexes cover primary and common combined filters", () => {
@@ -77,7 +77,7 @@ test("AUD-08 UI paginates and never restores the fixed 200-row query", () => {
 });
 
 test("AUD-09 UI distinguishes loading, filtered empty, local-search empty, and exhaustion", () => {
-  assert.ok(page.includes("جارٍ تحميل سجل العمليات"));
+  assert.ok(page.includes("جارٍ تحميل سجل المراجعة"));
   assert.ok(page.includes("لا توجد سجلات تطابق الفلاتر المحددة"));
   assert.ok(page.includes("لا توجد نتائج بحث داخل السجلات المحملة"));
   assert.ok(page.includes("تم تحميل كل السجلات المطابقة"));

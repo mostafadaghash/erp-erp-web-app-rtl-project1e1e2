@@ -68,23 +68,23 @@ const ACTION_CONFIG: Record<
 
 const MODULE_LABELS: Record<string, string> = {
   invoices: "الفواتير",
-  orders: "الأوردرات",
-  deliveries: "التوصيلات",
+  orders: "أوامر البيع",
+  deliveries: "عمليات الشحن",
   repairs: "الصيانة",
   expenses: "المصروفات",
   suppliers: "الموردون",
   shipments: "الشحنات",
-  crm: "CRM",
+  crm: "إدارة علاقات العملاء",
   branches: "الفروع",
-  employees: "الموظفون",
+  employees: "المستخدمون",
   products: "المنتجات",
   customers: "العملاء",
   settings: "الإعدادات",
-  finance: "المالية",
+  finance: "الحسابات",
   general_ledger: "الأستاذ العام",
-  customer_ledger: "دفتر العملاء",
-  supplier_ledger: "دفتر الموردين",
-  supplier_payments: "مدفوعات الموردين",
+  customer_ledger: "حسابات العملاء",
+  supplier_ledger: "حسابات الموردين",
+  supplier_payments: "حسابات الموردين",
   sales_returns: "مرتجعات المبيعات",
   purchase_returns: "مرتجعات المشتريات",
   cod_settlements: "تسويات COD",
@@ -96,7 +96,7 @@ const FIELD_LABELS: Record<string, string> = {
   branchId: "الفرع",
   isActive: "نشط",
   permissionsCount: "عدد الصلاحيات",
-  storeName: "اسم المتجر",
+  storeName: "اسم النظام",
   storeType: "نوع المتجر",
   currency: "العملة",
   taxRate: "الضريبة",
@@ -134,7 +134,7 @@ const FIELD_LABELS: Record<string, string> = {
   prepaidAmount: "المدفوع مقدمًا",
   expectedCarrierFee: "رسوم الناقل المتوقعة",
   attemptNumber: "رقم المحاولة",
-  deliveriesCount: "عدد التوصيلات",
+  deliveriesCount: "عدد عمليات الشحن",
   grossAmount: "الإجمالي المحصل",
   feeAmount: "الرسوم",
   netAmount: "الصافي",
@@ -347,7 +347,7 @@ export function AuditLogsPage() {
         <div>
           <h1 className="text-2xl font-black text-slate-800 flex items-center gap-2">
             <Shield className="w-6 h-6 text-indigo-600" />
-            سجل العمليات
+            سجل المراجعة
           </h1>
           <p className="text-slate-500 text-sm mt-0.5">
             تتبع الإجراءات المسجلة على النظام بتحميل متدرج
@@ -495,7 +495,7 @@ export function AuditLogsPage() {
       <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
         {isLoadingFirstPage ? (
           <div className="text-center py-16 text-slate-500 font-medium">
-            جارٍ تحميل سجل العمليات...
+            جارٍ تحميل سجل المراجعة...
           </div>
         ) : trueEmpty ? (
           <div className="text-center py-16">

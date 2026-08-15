@@ -369,7 +369,7 @@ export function SuppliersPage() {
                   className="btn-secondary text-xs flex items-center justify-center gap-1"
                 >
                   <BookOpen className="w-3.5 h-3.5" />
-                  دفتر المورد
+                  حساب المورد
                 </button>
               )}
             </div>
@@ -437,7 +437,7 @@ export function SuppliersPage() {
             <header className="p-5 border-b flex items-center justify-between">
               <div>
                 <h2 className="text-lg font-bold">
-                  دفتر المورد — {ledgerTarget.name}
+                  حساب المورد — {ledgerTarget.name}
                 </h2>
                 <p className="text-sm text-slate-500">
                   الرصيد الحالي:{" "}
@@ -447,14 +447,14 @@ export function SuppliersPage() {
               <button
                 onClick={() => setLedgerTarget(null)}
                 className="p-2 hover:bg-slate-100 rounded-lg"
-                aria-label="إغلاق دفتر المورد"
+                aria-label="إغلاق حساب المورد"
               >
                 <X className="w-5 h-5" />
               </button>
             </header>
             <div className="overflow-y-auto divide-y">
               {ledgerStatus === "LoadingFirstPage" && (
-                <p className="p-8 text-center text-slate-400">جارٍ تحميل دفتر المورد</p>
+                <p className="p-8 text-center text-slate-400">جارٍ تحميل حساب المورد</p>
               )}
               {ledgerEntries.map((entry) => (
                 <article key={entry._id} className="p-4 text-sm">
@@ -530,4 +530,3 @@ export function SuppliersPage() {
     </div>
   );
 }
-

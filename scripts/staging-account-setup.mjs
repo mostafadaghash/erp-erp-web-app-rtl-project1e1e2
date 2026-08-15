@@ -284,7 +284,7 @@ async function verifyRoleLogin(browser, baseUrl, account, invitationUrl) {
         .getByRole("heading", { name: "لوحة التحكم", exact: true })
         .waitFor({ timeout: 30_000 });
     }
-    await page.getByRole("button", { name: "Sign Out", exact: true }).click();
+    await page.getByRole("button", { name: "تسجيل الخروج", exact: true }).click();
     await page
       .getByRole("heading", { name: "تسجيل الدخول", exact: true })
       .waitFor({ timeout: 30_000 });
@@ -392,10 +392,10 @@ async function main() {
     assert.ok(admin);
     await signIn(adminPage, config.baseUrl, admin);
     await adminPage
-      .getByRole("button", { name: "الموظفون والصلاحيات", exact: true })
+      .getByRole("button", { name: "المستخدمون والصلاحيات", exact: true })
       .click();
     await adminPage
-      .getByRole("heading", { name: "الموظفون والصلاحيات", exact: true })
+      .getByRole("heading", { name: "المستخدمون والصلاحيات", exact: true })
       .waitFor({ timeout: 30_000 });
 
     for (const role of provisionedRoles) {

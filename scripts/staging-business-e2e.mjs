@@ -223,7 +223,7 @@ async function addInvoiceProduct(page, productName) {
 
 async function createInvoice(page, fixtures, marker, quantity) {
   const before = await attributeSet(page.getByTestId("invoice-row"), "data-invoice-number");
-  await page.getByTestId("invoices-page").getByRole("button", { name: "فاتورة جديدة", exact: true }).click();
+  await page.getByTestId("invoices-page").getByRole("button", { name: "فاتورة بيع جديدة", exact: true }).click();
   await page.getByTestId("new-invoice-page").waitFor();
   await selectContaining(page.getByTestId("invoice-customer-select"), fixtures.customerName);
   for (let index = 0; index < quantity; index += 1) await addInvoiceProduct(page, fixtures.productName);
@@ -299,7 +299,7 @@ async function createSalesReturn(page, fixtures, invoice, marker) {
 }
 
 async function createOrder(page, fixtures, marker, total) {
-  await navigate(page, "الأوردرات", "orders-page");
+  await navigate(page, "أوامر البيع", "orders-page");
   const before = await attributeSet(page.getByTestId("order-row"), "data-order-number");
   await page.getByTestId("order-create-open").click();
   const form = page.getByTestId("order-create-form");
@@ -325,7 +325,7 @@ async function createOrder(page, fixtures, marker, total) {
 }
 
 async function createDeliveryCycle(page, fixtures, marker, orderNumber, invoiceNumber) {
-  await navigate(page, "التوصيلات", "deliveries-page");
+  await navigate(page, "عمليات الشحن", "deliveries-page");
   const branch = page.getByTestId("delivery-branch-select");
   if (await branch.count()) await selectContaining(branch, fixtures.branchName);
   const before = await attributeSet(page.getByTestId("delivery-row"), "data-delivery-number");
@@ -369,7 +369,7 @@ async function createDeliveryCycle(page, fixtures, marker, orderNumber, invoiceN
 }
 
 async function createPurchaseCycle(page, fixtures, marker) {
-  await navigate(page, "الشحنات الواردة", "shipments-page");
+  await navigate(page, "المشتريات", "shipments-page");
   const before = await attributeSet(page.getByTestId("shipment-row"), "data-shipment-number");
   await page.getByTestId("shipment-create-open").click();
   await page.getByTestId("shipment-create-form").waitFor();
@@ -409,7 +409,7 @@ async function createPurchaseCycle(page, fixtures, marker) {
   await page.getByTestId("purchase-return-submit").click();
   await waitForToast(page, "تم ترحيل مرتجع الشراء");
 
-  await navigate(page, "مدفوعات الموردين", "supplier-payments-page");
+  await navigate(page, "حسابات الموردين", "supplier-payments-page");
   await selectContaining(page.getByTestId("supplier-payment-supplier"), fixtures.supplierName);
   await selectContaining(page.getByTestId("supplier-payment-account"), fixtures.cashAccountName);
   const receipt = page.locator(`[data-testid="supplier-payment-receipt"][data-receipt-number="${receiptNumber}"]`);
@@ -425,7 +425,7 @@ async function createPurchaseCycle(page, fixtures, marker) {
 }
 
 async function createRepairCycle(page, fixtures, marker) {
-  await navigate(page, "الصيانة", "repairs-page");
+  await navigate(page, "أوامر الصيانة", "repairs-page");
   const branch = page.getByTestId("repair-branch-select");
   if (await branch.count()) await selectContaining(branch, fixtures.branchName);
   const before = await attributeSet(page.getByTestId("repair-card"), "data-repair-number");
@@ -509,18 +509,18 @@ async function main() {
 
   try {
     await signIn(page, config.baseUrl, config.operator);
-    await navigate(page, "المبيعات والفواتير", "invoices-page");
+    await navigate(page, "المبيعات", "invoices-page");
     const salesInvoice = await runStep("invoice-create", () => createInvoice(page, config.fixtures, `${marker}-SALE`, 2));
     documents.salesInvoice = salesInvoice.number;
     await runStep("invoice-collection", () => collectInvoice(page, config.fixtures, salesInvoice, `${marker}-COLLECTION`));
     await runStep("sales-return", () => createSalesReturn(page, config.fixtures, salesInvoice, `${marker}-SALES-RETURN`));
 
-    await navigate(page, "المبيعات والفواتير", "invoices-page");
+    await navigate(page, "المبيعات", "invoices-page");
     const refundInvoiceRecord = await runStep("refund-invoice-create", () => createInvoice(page, config.fixtures, `${marker}-REFUND-INVOICE`, 1));
     documents.refundInvoice = refundInvoiceRecord.number;
     await runStep("refund-invoice-collection", () => collectInvoice(page, config.fixtures, refundInvoiceRecord, `${marker}-REFUND-COLLECTION`));
 
-    await navigate(page, "المبيعات والفواتير", "invoices-page");
+    await navigate(page, "المبيعات", "invoices-page");
     const deliveryInvoice = await runStep("delivery-invoice-create", () => createInvoice(page, config.fixtures, `${marker}-DELIVERY-INVOICE`, 1));
     documents.deliveryInvoice = deliveryInvoice.number;
     documents.order = await runStep("order-ready", () => createOrder(page, config.fixtures, marker, deliveryInvoice.total));
@@ -529,9 +529,9 @@ async function main() {
     Object.assign(documents, await runStep("purchase-return-payment", () => createPurchaseCycle(page, config.fixtures, `${marker}-PURCHASE`)));
     documents.repair = await runStep("repair-collection", () => createRepairCycle(page, config.fixtures, `${marker}-REPAIR`));
 
-    await page.getByRole("button", { name: "Sign Out", exact: true }).click();
+    await page.getByRole("button", { name: "تسجيل الخروج", exact: true }).click();
     await signIn(page, config.baseUrl, config.financialOperator);
-    await navigate(page, "المبيعات والفواتير", "invoices-page");
+    await navigate(page, "المبيعات", "invoices-page");
     await runStep("invoice-refund", () => refundInvoice(page, config.fixtures, refundInvoiceRecord, `${marker}-REFUND`));
     documents.expense = await runStep("expense-disbursement", () => createExpenseCycle(page, config.fixtures, marker));
 

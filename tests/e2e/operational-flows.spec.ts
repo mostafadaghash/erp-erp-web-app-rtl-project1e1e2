@@ -20,8 +20,8 @@ test.describe("critical operational flow readiness", () => {
     const productQuery = process.env.E2E_PRODUCT_QUERY?.trim();
     expect(productQuery, "E2E_PRODUCT_QUERY must identify a seeded staging product").toBeTruthy();
 
-    await page.getByRole("button", { name: "فاتورة جديدة", exact: true }).first().click();
-    await expect(page.getByRole("heading", { name: "فاتورة جديدة", exact: true })).toBeVisible();
+    await page.getByRole("button", { name: "فاتورة بيع جديدة", exact: true }).first().click();
+    await expect(page.getByRole("heading", { name: "فاتورة بيع جديدة", exact: true })).toBeVisible();
 
     await inputNextToLabel(page, "اسم العميل *").fill(`E2E Invoice ${Date.now()}`);
     const search = page.getByPlaceholder("ابحث عن منتج...");
@@ -38,28 +38,28 @@ test.describe("critical operational flow readiness", () => {
 
   test("@flows purchase shipment form resolves staging supplier and costs", async ({ page }) => {
     await login(page, "admin");
-    await navigateTo(page, "الشحنات الواردة");
-    await page.getByRole("button", { name: "شحنة جديدة", exact: true }).click();
-    await expect(page.getByRole("heading", { name: "شحنة جديدة", exact: true })).toBeVisible();
+    await navigateTo(page, "المشتريات");
+    await page.getByRole("button", { name: "عملية شراء جديدة", exact: true }).click();
+    await expect(page.getByRole("heading", { name: "عملية شراء جديدة", exact: true })).toBeVisible();
 
     const supplierSelect = page.getByText("اختر مورداً", { exact: true }).locator("..").locator("select");
     await selectFirstRealOption(supplierSelect);
-    await page.getByPlaceholder("اسم المنتج *").fill(`E2E Purchase Item ${Date.now()}`);
+    await page.getByPlaceholder("اسم الصنف *").fill(`E2E Purchase Item ${Date.now()}`);
     await page.getByPlaceholder("تكلفة الوحدة").fill("100");
 
     await expect(page.getByText("الإجمالي الكلي", { exact: true })).toBeVisible();
-    await expect(page.getByRole("button", { name: "حفظ الشحنة", exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "حفظ عملية الشراء", exact: true })).toBeVisible();
   });
 
   test("@flows repair intake reaches a valid pre-submit state", async ({ page }) => {
     await login(page, "admin");
-    await navigateTo(page, "الصيانة");
+    await navigateTo(page, "أوامر الصيانة");
 
     const branch = page.getByLabel("فرع أمر الصيانة");
     if (await branch.isVisible().catch(() => false)) await selectFirstRealOption(branch);
 
-    await page.getByRole("button", { name: "طلب صيانة جديد", exact: true }).click();
-    await expect(page.getByRole("heading", { name: "طلب صيانة جديد", exact: true })).toBeVisible();
+    await page.getByRole("button", { name: "أمر صيانة جديد", exact: true }).click();
+    await expect(page.getByRole("heading", { name: "أمر صيانة جديد", exact: true })).toBeVisible();
 
     const suffix = Date.now().toString().slice(-7);
     await inputNextToLabel(page, "اسم العميل *").fill(`E2E Repair ${suffix}`);
@@ -69,13 +69,13 @@ test.describe("critical operational flow readiness", () => {
     await page.getByPlaceholder("اشرح المشكلة بالتفصيل...").fill("E2E staging intake validation");
     await inputNextToLabel(page, "تكلفة العمالة (ج.م)").fill("100");
 
-    await expect(page.getByRole("button", { name: "حفظ طلب الصيانة", exact: true })).toBeEnabled();
+    await expect(page.getByRole("button", { name: "حفظ أمر الصيانة", exact: true })).toBeEnabled();
   });
 
   test("@flows COD delivery surface is bound to a staging branch and creation flow", async ({ page }) => {
     await login(page, "admin");
-    await navigateTo(page, "التوصيلات");
-    await expect(page.getByRole("heading", { name: "التوصيل والتحصيل COD", exact: true })).toBeVisible();
+    await navigateTo(page, "عمليات الشحن");
+    await expect(page.getByRole("heading", { name: "عمليات الشحن والتحصيل عند التسليم", exact: true })).toBeVisible();
 
     const branch = page.locator("select.form-input.max-w-xs");
     if (await branch.isVisible().catch(() => false)) {
@@ -90,7 +90,7 @@ test.describe("critical operational flow readiness", () => {
     const create = page.getByRole("button", { name: "إنشاء من طلب وفاتورة", exact: true });
     await expect(create).toBeEnabled();
     await create.click();
-    await expect(page.getByRole("heading", { name: "إنشاء سند توصيل", exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "إنشاء سند شحن", exact: true })).toBeVisible();
     await expect(page.getByRole("option", { name: "اختر طلباً جاهزاً", exact: true })).toBeAttached();
     await expect(page.getByRole("option", { name: "اختر الفاتورة المؤهلة", exact: true })).toBeAttached();
   });

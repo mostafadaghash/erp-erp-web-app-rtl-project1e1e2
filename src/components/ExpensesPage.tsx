@@ -1,5 +1,5 @@
 import { FinancialHistory } from "./FinancialHistory";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { usePermission } from "../lib/access";
@@ -11,7 +11,7 @@ import { getErrorMessage } from "../lib/errors";
 
 const expenseCategories = ["إيجار", "رواتب", "مرافق", "تسويق", "صيانة", "مشتريات", "نقل", "أخرى"];
 
-export function ExpensesPage() {
+export function ExpensesPage({ createRequestToken }: { createRequestToken?: number }) {
   const canCreate = usePermission("create_expenses");
   const canDisburse = usePermission("record_disbursements");
   const canViewFinance = usePermission("view_finance");
@@ -34,6 +34,12 @@ export function ExpensesPage() {
     date: new Date().toISOString().split("T")[0],
     accountId: "", notes: "",
   });
+
+  useEffect(() => {
+    if (createRequestToken && canCreate && canDisburse && (!canViewFinance || financeStatus?.state === "initialized")) {
+      setShowForm(true);
+    }
+  }, [createRequestToken, canCreate, canDisburse, canViewFinance, financeStatus?.state]);
 
   const filtered = expenses.filter(e =>
     e.title.toLowerCase().includes(search.toLowerCase())
@@ -209,7 +215,7 @@ export function ExpensesPage() {
             <form data-testid="expense-create-form" onSubmit={handleSubmit} className="p-6 space-y-4">
               <div>
                 <label className="form-label">العنوان *</label>
-                <input data-testid="expense-title" className="form-input" required value={form.title} onChange={e => setForm({...form, title: e.target.value})} placeholder="مثال: إيجار المحل" />
+                <input data-testid="expense-title" className="form-input" required value={form.title} onChange={e => setForm({...form, title: e.target.value})} placeholder="مثال: إيجار المنشأة" />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>

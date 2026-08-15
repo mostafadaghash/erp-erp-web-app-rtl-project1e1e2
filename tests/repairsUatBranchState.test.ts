@@ -45,8 +45,8 @@ test("RBR-07 closing the create modal also discards stale creation data", () => 
 });
 
 test("RBR-08 UI distinguishes branch selection, loading, and true empty results", () => {
-  assert.ok(page.includes("اختر الفرع لعرض طلبات الصيانة"));
-  assert.ok(page.includes("جارٍ تحميل طلبات الصيانة"));
+  assert.ok(page.includes("اختر الفرع لعرض أوامر الصيانة"));
+  assert.ok(page.includes("جارٍ تحميل أوامر الصيانة"));
   assert.match(page, /repairsQuery === undefined/);
   assert.match(page, /requiresBranchSelection/);
 });

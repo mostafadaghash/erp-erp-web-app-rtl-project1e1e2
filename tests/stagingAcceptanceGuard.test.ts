@@ -80,7 +80,7 @@ test("STG-04 role checks open pages and assert forbidden navigation", () => {
 test("STG-05 authentication is runtime and evidence never serializes credentials", () => {
   assert.match(script, /input\[name="email"\]/);
   assert.match(script, /input\[name="password"\]/);
-  assert.match(script, /name: "Sign Out"/);
+  assert.match(script, /name: "تسجيل الخروج"/);
   assert.doesNotMatch(
     script,
     /JSON\.stringify\([^\n]*(?:account\.email|account\.password)/,

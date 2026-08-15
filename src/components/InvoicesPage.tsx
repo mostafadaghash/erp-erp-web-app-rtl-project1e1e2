@@ -5,7 +5,7 @@ import { useMutation, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { usePermission } from "../lib/access";
 import type { Page } from "./ERPApp";
-import { FileText, Plus, Search, Printer } from "lucide-react";
+import { FileText, Plus, Search, Printer, RotateCcw } from "lucide-react";
 import { PrintModal } from "./PrintTemplate";
 import { useCurrency } from "../lib/utils";
 import type { Doc, Id } from "../../convex/_generated/dataModel";
@@ -14,9 +14,10 @@ import { getErrorMessage } from "../lib/errors";
 
 interface InvoicesPageProps {
   onNavigate: (page: Page) => void;
+  view?: "sales" | "returns";
 }
 
-export function InvoicesPage({ onNavigate }: InvoicesPageProps) {
+export function InvoicesPage({ onNavigate, view = "sales" }: InvoicesPageProps) {
   const canCreate = usePermission("create_invoices");
   const canPrint = usePermission("print_invoices");
   const canCancel = usePermission("delete_invoices");
@@ -150,23 +151,36 @@ export function InvoicesPage({ onNavigate }: InvoicesPageProps) {
 
   const { formatCurrency } = useCurrency();
 
+  if (view === "returns") {
+    return (
+      <div className="space-y-5 p-4 lg:p-6" data-testid="sales-returns-page">
+        <div>
+          <h1 className="flex items-center gap-2 text-2xl font-black text-slate-800">
+            <RotateCcw className="h-6 w-6 text-[var(--brand-primary)]" />
+            مرتجعات المبيعات
+          </h1>
+          <p className="mt-1 text-sm text-slate-500">إدارة إشعارات الخصم ومرتجعات فواتير البيع</p>
+        </div>
+        <SalesReturnsPanel />
+      </div>
+    );
+  }
+
   return (
     <div className="p-4 lg:p-6 space-y-5" data-testid="invoices-page">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-black text-slate-800 flex items-center gap-2">
             <FileText className="w-6 h-6 text-indigo-600" />
-            المبيعات والفواتير
+            المبيعات
           </h1>
           <p className="text-slate-500 text-sm mt-0.5">{invoices.length} فاتورة</p>
         </div>
         {canCreate && <button onClick={() => onNavigate("new-invoice")} className="btn-primary flex items-center gap-2">
           <Plus className="w-4 h-4" />
-          فاتورة جديدة
+          فاتورة بيع جديدة
         </button>}
       </div>
-
-      <SalesReturnsPanel />
 
       {/* Stats */}
       <div className="grid grid-cols-3 gap-3">

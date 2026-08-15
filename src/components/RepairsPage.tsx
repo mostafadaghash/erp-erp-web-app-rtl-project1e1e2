@@ -37,7 +37,7 @@ const emptyRepairForm = () => ({
   serialNumber: "", accessories: "", intakeCondition: "",
 });
 
-export function RepairsPage() {
+export function RepairsPage({ createRequestToken }: { createRequestToken?: number }) {
   const canCreate = usePermission("create_repairs");
   const canEdit = usePermission("edit_repairs");
   const canPrint = usePermission("print_repairs");
@@ -679,20 +679,24 @@ export function RepairsPage() {
     setShowForm(true);
   };
 
+  useEffect(() => {
+    if (createRequestToken && canCreate) openNewRepair();
+  }, [createRequestToken, canCreate]);
+
   return (
     <div className="p-4 lg:p-6 space-y-5" data-testid="repairs-page">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-black text-slate-800 flex items-center gap-2">
             <Wrench className="w-6 h-6 text-indigo-600" />
-            الصيانة
+            أوامر الصيانة
           </h1>
           <p className="text-slate-500 text-sm mt-0.5">
             {requiresBranchSelection
-              ? "اختر الفرع لعرض طلبات الصيانة"
+              ? "اختر الفرع لعرض أوامر الصيانة"
               : repairsQuery === undefined
-                ? "جارٍ تحميل طلبات الصيانة"
-                : `${repairs.length} طلب صيانة`}
+                ? "جارٍ تحميل أوامر الصيانة"
+                : `${repairs.length} أمر صيانة`}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -712,7 +716,7 @@ export function RepairsPage() {
           )}
           {canCreate && <button data-testid="repair-create-open" onClick={openNewRepair} className="btn-primary flex items-center gap-2">
             <Plus className="w-4 h-4" />
-            طلب صيانة جديد
+            أمر صيانة جديد
           </button>}
         </div>
       </div>
@@ -914,20 +918,20 @@ export function RepairsPage() {
         {requiresBranchSelection && (
           <div className="col-span-full text-center py-12 text-slate-400">
             <Wrench className="w-10 h-10 mx-auto mb-2 opacity-30" />
-            اختر الفرع لعرض طلبات الصيانة
+            اختر الفرع لعرض أوامر الصيانة
           </div>
         )}
         {!requiresBranchSelection && repairsQuery === undefined && (
           <div className="col-span-full text-center py-12 text-slate-400">
             <Wrench className="w-10 h-10 mx-auto mb-2 opacity-30" />
-            جارٍ تحميل طلبات الصيانة
+            جارٍ تحميل أوامر الصيانة
           </div>
         )}
         {!requiresBranchSelection && repairsQuery !== undefined && filtered.length === 0 && (
           <div className="col-span-full text-center py-12 text-slate-400">
             <Wrench className="w-10 h-10 mx-auto mb-2 opacity-30" />
             {repairs.length === 0
-              ? "لا توجد طلبات صيانة في هذا الفرع"
+              ? "لا توجد أوامر صيانة في هذا الفرع"
               : "لا توجد نتائج مطابقة للبحث أو الفلتر"}
           </div>
         )}
@@ -1365,7 +1369,7 @@ export function RepairsPage() {
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto animate-fade-in-up">
             <div className="p-6 border-b border-slate-100 flex items-center justify-between">
-              <h2 className="text-lg font-bold text-slate-800">طلب صيانة جديد</h2>
+              <h2 className="text-lg font-bold text-slate-800">أمر صيانة جديد</h2>
               <button onClick={closeCreateForm} className="p-2 hover:bg-slate-100 rounded-lg">
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -1543,7 +1547,7 @@ export function RepairsPage() {
               </div>
               {createValidationReason && <p role="alert" className="rounded-lg bg-amber-50 p-3 text-sm font-medium text-amber-800">{createValidationReason}</p>}
               <div className="flex gap-3 pt-2">
-                <button data-testid="repair-submit" type="submit" title={createValidationReason ?? undefined} disabled={saving || Boolean(createValidationReason)} className="btn-primary flex-1 disabled:opacity-50">حفظ طلب الصيانة</button>
+                <button data-testid="repair-submit" type="submit" title={createValidationReason ?? undefined} disabled={saving || Boolean(createValidationReason)} className="btn-primary flex-1 disabled:opacity-50">حفظ أمر الصيانة</button>
                 <button type="button" onClick={closeCreateForm} className="btn-secondary">إلغاء</button>
               </div>
             </form>
@@ -1553,4 +1557,3 @@ export function RepairsPage() {
     </div>
   );
 }
-

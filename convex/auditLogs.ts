@@ -53,7 +53,7 @@ export const listPaginated = query({
       args.toTimestamp !== undefined &&
       args.fromTimestamp > args.toTimestamp
     ) {
-      throw new ConvexError("نطاق تاريخ سجل العمليات غير صالح");
+      throw new ConvexError("نطاق تاريخ سجل المراجعة غير صالح");
     }
 
     if (user.role !== "admin") {

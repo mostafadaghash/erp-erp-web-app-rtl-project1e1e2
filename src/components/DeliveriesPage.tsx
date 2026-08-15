@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useConvex, useMutation, usePaginatedQuery, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
@@ -56,17 +56,17 @@ type Selected = {
 
 const operationSuccessMessage = (modal: Exclude<Modal, "details" | null>) =>
   ({
-    create: "تم إنشاء سند التوصيل بنجاح",
-    ship: "تم تأكيد شحن التوصيل",
+    create: "تم إنشاء عملية الشحن بنجاح",
+    ship: "تم تأكيد إرسال الشحنة",
     deliver: "تم تأكيد التسليم وتسجيل تحصيل COD",
-    return: "تم تسجيل إرجاع التوصيل",
-    cancel: "تم إلغاء التوصيل",
+    return: "تم تسجيل مرتجع الشحنة",
+    cancel: "تم إلغاء عملية الشحن",
     "reverse-confirmation": "تم عكس تأكيد التسليم",
     settle: "تم إنشاء تسوية COD بنجاح",
     "reverse-settlement": "تم عكس تسوية COD",
   })[modal];
 
-export function DeliveriesPage() {
+export function DeliveriesPage({ createRequestToken }: { createRequestToken?: number }) {
   const convex = useConvex();
   const canCreate = usePermission("create_deliveries");
   const canEdit = usePermission("edit_deliveries");
@@ -182,6 +182,10 @@ export function DeliveriesPage() {
     setModal(kind);
   };
 
+  useEffect(() => {
+    if (createRequestToken && canCreate && activeBranch) open("create");
+  }, [createRequestToken, canCreate, activeBranch]);
+
   const openSettlementReversal = (settlementId: Id<"codSettlements">) => {
     resetOperationState();
     setSelectedSettlementId(settlementId);
@@ -227,7 +231,7 @@ export function DeliveriesPage() {
       if (!chosenOrder) return "اختر طلبًا جاهزًا";
       if (!chosenInvoice) return "اختر الفاتورة المؤهلة";
       if (!city.trim()) return "أدخل المدينة";
-      if (!address.trim()) return "أدخل عنوان التوصيل";
+      if (!address.trim()) return "أدخل عنوان الشحن";
       if (!company.trim()) return "أدخل شركة الشحن";
       if (!Number.isFinite(feeAmount) || feeAmount < 0) return "أدخل رسوم ناقل صحيحة";
       if (!isIsoDate(date)) return "اختر تاريخًا صالحًا";
@@ -235,7 +239,7 @@ export function DeliveriesPage() {
     }
 
     if (!selected && modal !== "settle" && modal !== "reverse-settlement") {
-      return "اختر سجل التوصيل";
+      return "اختر سجل الشحن";
     }
 
     if (modal === "deliver") {
@@ -255,7 +259,7 @@ export function DeliveriesPage() {
       if (!accountId) return "اختر حساب مصدر التسوية";
       if (!destinationId) return "اختر حساب وجهة التسوية";
       if (accountId === destinationId) return "يجب اختلاف حساب المصدر عن الوجهة";
-      if (checked.size === 0) return "اختر شحنة COD واحدة على الأقل";
+      if (checked.size === 0) return "اختر عملية شحن COD واحدة على الأقل";
       if (gross <= 0) return "إجمالي COD المحدد يجب أن يكون أكبر من صفر";
       if (!Number.isFinite(feeAmount) || feeAmount < 0) return "أدخل رسوم تسوية صحيحة";
       if (feeAmount > gross) return "لا يمكن أن تتجاوز الرسوم إجمالي COD";
@@ -294,7 +298,7 @@ export function DeliveriesPage() {
         )
         .join("");
       openPrintWindow(
-        `سند توصيل ${dto.deliveryNumber}`,
+        `سند شحن ${dto.deliveryNumber}`,
         `<p>الطلب: ${escapeHtml(dto.orderNumber ?? "—")} | الفاتورة: ${escapeHtml(dto.invoiceNumber ?? "—")}</p><p>العميل: ${escapeHtml(dto.customerName)} — ${escapeHtml(dto.city)}</p><p>العنوان: ${escapeHtml(dto.address)}</p><p>شركة الشحن: ${escapeHtml(dto.shippingCompany)} | رقم التتبع: ${escapeHtml(dto.trackingNumber ?? "—")}</p><table><thead><tr><th>الصنف</th><th>الكمية</th><th>السعر</th></tr></thead><tbody>${itemRows}</tbody></table><p>الإجمالي: ${escapeHtml(money.format(dto.totalAmount))} | المدفوع: ${escapeHtml(money.format(dto.prepaidAmount ?? 0))} | COD: ${escapeHtml(money.format(dto.codAmount ?? 0))}</p><p>الحالة: ${escapeHtml(statusLabel(dto.status))}</p>`,
       );
     } catch (error) {
@@ -317,7 +321,7 @@ export function DeliveriesPage() {
         .join("");
       openPrintWindow(
         `سند تسوية ${dto.settlementNumber}`,
-        `<p>التاريخ: ${escapeHtml(dto.date)} | الحالة: ${escapeHtml(statusLabel(dto.status))}</p><p>المصدر: ${escapeHtml(dto.sourceAccountName)} | الوجهة: ${escapeHtml(dto.destinationAccountName)}</p><table><thead><tr><th>التوصيل</th><th>الفاتورة</th><th>COD</th></tr></thead><tbody>${itemRows}</tbody></table><p>الإجمالي: ${escapeHtml(money.format(dto.grossAmount))} | الرسوم: ${escapeHtml(money.format(dto.feeAmount))} | الصافي: ${escapeHtml(money.format(dto.netAmount))}</p>${dto.reversalReason ? `<p>سبب العكس: ${escapeHtml(dto.reversalReason)}</p>` : ""}`,
+        `<p>التاريخ: ${escapeHtml(dto.date)} | الحالة: ${escapeHtml(statusLabel(dto.status))}</p><p>المصدر: ${escapeHtml(dto.sourceAccountName)} | الوجهة: ${escapeHtml(dto.destinationAccountName)}</p><table><thead><tr><th>الشحن</th><th>الفاتورة</th><th>COD</th></tr></thead><tbody>${itemRows}</tbody></table><p>الإجمالي: ${escapeHtml(money.format(dto.grossAmount))} | الرسوم: ${escapeHtml(money.format(dto.feeAmount))} | الصافي: ${escapeHtml(money.format(dto.netAmount))}</p>${dto.reversalReason ? `<p>سبب العكس: ${escapeHtml(dto.reversalReason)}</p>` : ""}`,
       );
     } catch (error) {
       toast.error(getErrorMessage(error, "تعذرت طباعة التسوية"));
@@ -338,7 +342,7 @@ export function DeliveriesPage() {
         <div>
           <h1 className="text-2xl font-black flex gap-2">
             <Truck />
-            التوصيل والتحصيل COD
+            عمليات الشحن والتحصيل عند التسليم
           </h1>
           <p className="text-slate-500">دورة موثقة من الطلب والفاتورة حتى التسوية</p>
         </div>
@@ -369,7 +373,7 @@ export function DeliveriesPage() {
 
       {!activeBranch && (
         <p role="status" className="rounded-xl bg-amber-50 p-4 text-amber-800">
-          اختر الفرع لعرض التوصيلات والتسويات.
+          اختر الفرع لعرض عمليات الشحن والتسويات.
         </p>
       )}
 
@@ -401,12 +405,12 @@ export function DeliveriesPage() {
           <tbody>
             {deliveryLoading && (
               <tr>
-                <td colSpan={5} className="p-5 text-center text-slate-500">جارٍ تحميل التوصيلات…</td>
+                <td colSpan={5} className="p-5 text-center text-slate-500">جارٍ تحميل عمليات الشحن…</td>
               </tr>
             )}
             {deliveryEmpty && (
               <tr>
-                <td colSpan={5} className="p-5 text-center text-slate-500">لا توجد توصيلات في هذا الفرع.</td>
+                <td colSpan={5} className="p-5 text-center text-slate-500">لا توجد عمليات شحن في هذا الفرع.</td>
               </tr>
             )}
             {rows.map((delivery) => (
@@ -416,7 +420,7 @@ export function DeliveriesPage() {
                 <td>{statusLabel(delivery.status)}</td>
                 <td>{money.format(delivery.codAmount ?? 0)}</td>
                 <td className="flex gap-1 flex-wrap">
-                  <button onClick={() => open("details", delivery)} title="تفاصيل التوصيل">
+                  <button onClick={() => open("details", delivery)} title="تفاصيل الشحن">
                     <Eye size={16} />
                   </button>
                   {canEdit && delivery.status === "pending" && (
@@ -435,7 +439,7 @@ export function DeliveriesPage() {
                     <button onClick={() => open("reverse-confirmation", delivery)}>عكس التأكيد</button>
                   )}
                   {canPrint && (
-                    <button onClick={() => void printDelivery(delivery)} title="طباعة سند التوصيل">
+                    <button onClick={() => void printDelivery(delivery)} title="طباعة سند الشحن">
                       <Printer size={16} />
                     </button>
                   )}
@@ -500,23 +504,23 @@ export function DeliveriesPage() {
             </button>
             <h2 className="text-xl font-black">
               {{
-                create: "إنشاء سند توصيل",
+                create: "إنشاء سند شحن",
                 ship: "تأكيد الشحن",
                 deliver: "تأكيد التسليم والتحصيل",
                 return: "إرجاع قبل التسليم",
-                cancel: "إلغاء التوصيل",
+                cancel: "إلغاء الشحن",
                 "reverse-confirmation": "عكس تأكيد التسليم",
                 settle: "تسوية COD مجمعة",
                 "reverse-settlement": "عكس تسوية COD",
-                details: "تفاصيل التوصيل",
+                details: "تفاصيل الشحن",
               }[modal]}
             </h2>
 
             {modal === "details" && deliveryDetails === undefined && (
-              <p role="status" className="text-slate-500">جارٍ تحميل تفاصيل التوصيل…</p>
+              <p role="status" className="text-slate-500">جارٍ تحميل تفاصيل الشحن…</p>
             )}
             {modal === "details" && deliveryDetails === null && (
-              <p role="alert" className="text-red-700">تعذر العثور على سجل التوصيل.</p>
+              <p role="alert" className="text-red-700">تعذر العثور على سجل الشحن.</p>
             )}
             {modal === "details" && deliveryDetails && (
               <div className="space-y-3">
@@ -551,7 +555,7 @@ export function DeliveriesPage() {
                 {deliveryDetails.notes && <p><strong>ملاحظات:</strong> {deliveryDetails.notes}</p>}
                 {canPrint && selected && (
                   <button className="btn-primary" onClick={() => void printDelivery(selected)} disabled={busy}>
-                    <Printer size={16} /> طباعة سند التوصيل
+                    <Printer size={16} /> طباعة سند الشحن
                   </button>
                 )}
               </div>
@@ -560,7 +564,7 @@ export function DeliveriesPage() {
             {modal === "create" && (
               <>
                 {options === undefined && <p role="status" className="text-slate-500">جارٍ تحميل الطلبات الجاهزة…</p>}
-                {options?.length === 0 && <p className="text-slate-500">لا توجد طلبات جاهزة مؤهلة للتوصيل.</p>}
+                {options?.length === 0 && <p className="text-slate-500">لا توجد طلبات جاهزة مؤهلة للشحن.</p>}
                 <select
                   data-testid="delivery-order-select"
                   className="form-input"
@@ -652,8 +656,8 @@ export function DeliveriesPage() {
                   ))}
                 </select>
 
-                {accountId && unsettled === undefined && <p role="status" className="text-slate-500">جارٍ تحميل شحنات COD غير المسواة…</p>}
-                {accountId && unsettled?.length === 0 && <p className="text-slate-500">لا توجد شحنات COD غير مسواة لهذا الحساب.</p>}
+                {accountId && unsettled === undefined && <p role="status" className="text-slate-500">جارٍ تحميل عمليات شحن COD غير المسواة…</p>}
+                {accountId && unsettled?.length === 0 && <p className="text-slate-500">لا توجد عمليات شحن COD غير مسواة لهذا الحساب.</p>}
                 <div>
                   {unsettled?.map((delivery) => (
                     <label key={delivery._id} className="block">
@@ -784,4 +788,3 @@ export function DeliveriesPage() {
     </div>
   );
 }
-

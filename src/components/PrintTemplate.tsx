@@ -122,6 +122,8 @@ function formatDate(ts: number | string) {
 // ─── قالب الفاتورة ─────────────────────────────────────────────────────────────
 function InvoiceTemplate({ data, settings }: { data: InvoiceData; settings: any }) {
   const storeName = settings?.storeName ?? "المتجر";
+  const legalName = settings?.legalName ?? "";
+  const invoiceFooter = settings?.invoiceFooter ?? "";
   const storePhone = settings?.phone ?? "";
   const storeAddress = settings?.address ?? "";
   const taxRate = settings?.taxRate ?? 0;
@@ -131,10 +133,11 @@ function InvoiceTemplate({ data, settings }: { data: InvoiceData; settings: any 
       {/* رأس الفاتورة */}
       <div className="print-header">
         {settings?.logoUrl && (
-          <img src={settings.logoUrl} alt="شعار المتجر" className="print-logo" />
+          <img src={settings.logoUrl} alt={`شعار ${storeName}`} className="print-logo" />
         )}
         <div className="print-store-info">
           <h1 className="print-store-name">{storeName}</h1>
+          {legalName && legalName !== storeName && <p className="print-store-detail">{legalName}</p>}
           {storePhone && <p className="print-store-detail">هاتف: {storePhone}</p>}
           {storeAddress && <p className="print-store-detail">{storeAddress}</p>}
         </div>
@@ -245,16 +248,18 @@ function InvoiceTemplate({ data, settings }: { data: InvoiceData; settings: any 
 
       {/* التذييل */}
       <div className="print-footer">
-        <p>شكراً لتعاملكم مع {storeName}</p>
+        <p>{invoiceFooter || `شكرًا لتعاملكم مع ${storeName}`}</p>
         {storePhone && <p>للاستفسار: {storePhone}</p>}
       </div>
     </div>
   );
 }
 
-// ─── قالب الأوردر ──────────────────────────────────────────────────────────────
+// ─── قالب أمر البيع ──────────────────────────────────────────────────────────────
 function OrderTemplate({ data, settings }: { data: OrderData; settings: any }) {
   const storeName = settings?.storeName ?? "المتجر";
+  const legalName = settings?.legalName ?? "";
+  const invoiceFooter = settings?.invoiceFooter ?? "";
   const storePhone = settings?.phone ?? "";
   const storeAddress = settings?.address ?? "";
 
@@ -263,15 +268,16 @@ function OrderTemplate({ data, settings }: { data: OrderData; settings: any }) {
       {/* رأس */}
       <div className="print-header">
         {settings?.logoUrl && (
-          <img src={settings.logoUrl} alt="شعار المتجر" className="print-logo" />
+          <img src={settings.logoUrl} alt={`شعار ${storeName}`} className="print-logo" />
         )}
         <div className="print-store-info">
           <h1 className="print-store-name">{storeName}</h1>
+          {legalName && legalName !== storeName && <p className="print-store-detail">{legalName}</p>}
           {storePhone && <p className="print-store-detail">هاتف: {storePhone}</p>}
           {storeAddress && <p className="print-store-detail">{storeAddress}</p>}
         </div>
         <div className="print-doc-info">
-          <div className="print-doc-badge" style={{ background: "#7c3aed" }}>إيصال أوردر</div>
+          <div className="print-doc-badge" style={{ background: "#7c3aed" }}>أمر بيع</div>
           <p className="print-doc-number">{data.orderNumber}</p>
           <p className="print-doc-date">{formatDate(data._creationTime)}</p>
           <span className={`print-status-badge ${
@@ -369,13 +375,13 @@ function OrderTemplate({ data, settings }: { data: OrderData; settings: any }) {
         </div>
         <div className="print-signature-box">
           <div className="print-signature-line"></div>
-          <p>توقيع الموظف</p>
+          <p>توقيع المسؤول</p>
         </div>
       </div>
 
       {/* التذييل */}
       <div className="print-footer">
-        <p>هذا الإيصال يُثبت استلام العربون — {storeName}</p>
+        <p>{invoiceFooter || `هذا المستند يُثبت استلام الدفعة — ${storeName}`}</p>
         {storePhone && <p>للاستفسار: {storePhone}</p>}
       </div>
     </div>
@@ -385,6 +391,8 @@ function OrderTemplate({ data, settings }: { data: OrderData; settings: any }) {
 // ─── قالب الصيانة ──────────────────────────────────────────────────────────────
 function RepairTemplate({ data, settings }: { data: RepairData; settings: any }) {
   const storeName = settings?.storeName ?? "المتجر";
+  const legalName = settings?.legalName ?? "";
+  const invoiceFooter = settings?.invoiceFooter ?? "";
   const storePhone = settings?.phone ?? "";
   const storeAddress = settings?.address ?? "";
 
@@ -393,10 +401,11 @@ function RepairTemplate({ data, settings }: { data: RepairData; settings: any })
       {/* رأس */}
       <div className="print-header">
         {settings?.logoUrl && (
-          <img src={settings.logoUrl} alt="شعار المتجر" className="print-logo" />
+          <img src={settings.logoUrl} alt={`شعار ${storeName}`} className="print-logo" />
         )}
         <div className="print-store-info">
           <h1 className="print-store-name">{storeName}</h1>
+          {legalName && legalName !== storeName && <p className="print-store-detail">{legalName}</p>}
           {storePhone && <p className="print-store-detail">هاتف: {storePhone}</p>}
           {storeAddress && <p className="print-store-detail">{storeAddress}</p>}
         </div>
@@ -627,7 +636,7 @@ function RepairTemplate({ data, settings }: { data: RepairData; settings: any })
 
       {/* التذييل */}
       <div className="print-footer">
-        <p>يُرجى الاحتفاظ بهذا الإيصال لاستلام الجهاز — {storeName}</p>
+        <p>{invoiceFooter || `يُرجى الاحتفاظ بهذا المستند لاستلام الجهاز — ${storeName}`}</p>
         {storePhone && <p>للاستفسار: {storePhone}</p>}
       </div>
     </div>
@@ -662,7 +671,7 @@ export function PrintModal({ type, data, onClose }: PrintTemplateProps) {
               <div>
                 <p className="font-bold text-slate-800 text-sm">معاينة الطباعة</p>
                 <p className="text-xs text-slate-500">
-                  {type === "invoice" ? "فاتورة مبيعات" : type === "order" ? "إيصال أوردر" : "أمر صيانة"}
+                  {type === "invoice" ? "فاتورة مبيعات" : type === "order" ? "أمر بيع" : "أمر صيانة"}
                 </p>
               </div>
             </div>

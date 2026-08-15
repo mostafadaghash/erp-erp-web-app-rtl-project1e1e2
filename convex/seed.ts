@@ -13,7 +13,9 @@ export const seedDemo = mutation({
 
     // Settings
     await ctx.db.insert("settings", {
-      storeName: "تك ستور",
+      storeName: "DAGHASH ERP",
+      shortName: "DAGHASH",
+      tagline: "إدارة أعمالك بوضوح",
       storeType: "electronics",
       primaryColor: "#6366f1",
       secondaryColor: "#8b5cf6",

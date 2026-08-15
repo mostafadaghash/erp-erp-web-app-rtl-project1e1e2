@@ -61,7 +61,7 @@ test("CSU-06 customer balances are skipped without ledger permission or effectiv
 
 test("CSU-07 customer card exposes direct ledger navigation with both IDs", () => {
   assert.match(customers, /onOpenLedger\(customer\._id, branchId\)/);
-  assert.match(customers, /دفتر العميل/);
+  assert.match(customers, /حساب العميل/);
 });
 
 test("CSU-08 application shell carries the selected customer into ledger page", () => {

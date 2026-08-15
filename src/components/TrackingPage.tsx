@@ -48,7 +48,7 @@ export function TrackingPage() {
     searchToken ? { token: searchToken } : "skip"
   );
 
-  const storeName = settings?.storeName ?? "تك ستور";
+  const storeName = settings?.storeName ?? "DAGHASH ERP";
   const whatsapp = settings?.whatsappNumber
     ? normalizeEgyptPhoneForWhatsApp(settings.whatsappNumber)
     : undefined;
@@ -180,7 +180,7 @@ export function TrackingPage() {
                 className="inline-flex items-center gap-2 px-5 py-2.5 bg-emerald-500 text-white rounded-xl font-medium hover:bg-emerald-600 transition-colors text-sm"
               >
                 <MessageCircle className="w-4 h-4" />
-                تواصل مع المحل
+                تواصل مع المنشأة
               </a>
             )}
           </div>
@@ -350,7 +350,7 @@ export function TrackingPage() {
               <div className="bg-red-500/10 border border-red-500/20 rounded-3xl p-6 text-center">
                 <AlertCircle className="w-10 h-10 text-red-400 mx-auto mb-3" />
                 <p className="text-red-300 font-bold mb-1">تم إلغاء الطلب</p>
-                <p className="text-slate-400 text-sm">للاستفسار يرجى التواصل مع المحل مباشرة</p>
+                <p className="text-slate-400 text-sm">للاستفسار يرجى التواصل مع المنشأة مباشرة</p>
               </div>
             )}
 
@@ -371,7 +371,7 @@ export function TrackingPage() {
                 </div>
                 <p className="text-white font-black text-xl mb-1">جهازك جاهز للاستلام!</p>
                 <p className="text-slate-400 text-sm mb-5">
-                  يمكنك زيارة المحل لاستلام جهازك
+                  يمكنك زيارة المنشأة لاستلام جهازك
                   {repair.remaining > 0 && (
                     <span className="text-amber-400 font-bold">
                       {" "}والمبلغ المتبقي {repair.remaining.toLocaleString("ar-EG")} ج.م
@@ -428,7 +428,7 @@ export function TrackingPage() {
 
         {/* Footer */}
         <div className="text-center mt-12 pt-6 border-t border-white/10">
-          <p className="text-slate-600 text-xs">{storeName} • نظام إدارة الإلكترونيات</p>
+          <p className="text-slate-600 text-xs">{storeName} • نظام إدارة الأعمال</p>
         </div>
       </main>
     </div>

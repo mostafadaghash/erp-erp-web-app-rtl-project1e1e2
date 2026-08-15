@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { usePermission } from "../lib/access";
@@ -32,7 +32,7 @@ interface ShipItem {
 
 const emptyItem = (): ShipItem => ({ productName: "", quantity: 1, unitCost: 0, total: 0 });
 
-export function ShipmentsPage() {
+export function ShipmentsPage({ createRequestToken }: { createRequestToken?: number }) {
   const canCreate = usePermission("create_shipments");
   const canEdit = usePermission("edit_shipments");
   const canDelete = usePermission("delete_shipments");
@@ -40,6 +40,10 @@ export function ShipmentsPage() {
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [search, setSearch] = useState("");
   const [showForm, setShowForm] = useState(false);
+
+  useEffect(() => {
+    if (createRequestToken && canCreate) setShowForm(true);
+  }, [createRequestToken, canCreate]);
 
   const shipments = useQuery(api.shipments.list, filterStatus !== "all" ? { status: filterStatus } : {});
   const [receiving, setReceiving] = useState<NonNullable<typeof shipments>[number] | null>(null);
@@ -53,13 +57,13 @@ export function ShipmentsPage() {
 
   const handleStatusChange = async (id: Id<"shipments">, status: string) => {
     try {
-      const reason = status === "cancelled" ? prompt("أدخل سبب إلغاء الشحنة") : undefined;
+      const reason = status === "cancelled" ? prompt("أدخل سبب إلغاء العملية شراء") : undefined;
       if (status === "cancelled" && !reason?.trim()) return;
       await updateStatus({ id, status, reason });
       toast.success(
         status === "arrived"
-          ? "تم استلام الشحنة وتحديث المخزون تلقائياً"
-          : "تم تحديث حالة الشحنة"
+          ? "تم استلام العملية شراء وتحديث المخزون تلقائياً"
+          : "تم تحديث حالة العملية شراء"
       );
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "حدث خطأ");
@@ -67,11 +71,11 @@ export function ShipmentsPage() {
   };
 
   const handleDelete = async (id: Id<"shipments">) => {
-    const reason = prompt("أدخل سبب إلغاء الشحنة");
-    if (!reason?.trim() || !confirm("هل أنت متأكد من إلغاء هذه الشحنة؟")) return;
+    const reason = prompt("أدخل سبب إلغاء العملية شراء");
+    if (!reason?.trim() || !confirm("هل أنت متأكد من إلغاء هذه العملية شراء؟")) return;
     try {
       await updateStatus({ id, status: "cancelled", reason });
-      toast.success("تم إلغاء الشحنة");
+      toast.success("تم إلغاء عملية الشراء");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "حدث خطأ");
     }
@@ -84,13 +88,13 @@ export function ShipmentsPage() {
         <div>
           <h1 className="text-2xl font-black text-slate-800 flex items-center gap-2">
             <Ship className="w-6 h-6 text-indigo-600" />
-            الشحنات الواردة
+            المشتريات
           </h1>
           <p className="text-slate-500 text-sm mt-0.5">تتبع طلبات الشراء من الموردين</p>
         </div>
         {canCreate && <button data-testid="shipment-create-open" onClick={() => setShowForm(true)} className="btn-primary flex items-center gap-2">
           <Plus className="w-4 h-4" />
-          شحنة جديدة
+          عملية شراء جديدة
         </button>}
       </div>
 
@@ -123,7 +127,7 @@ export function ShipmentsPage() {
         <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-center gap-3">
           <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0" />
           <p className="text-amber-800 text-sm font-medium">
-            لديك <span className="font-black">{stats?.inTransit}</span> شحنة في الطريق — تأكد من متابعة وصولها وتحديث المخزون
+            لديك <span className="font-black">{stats?.inTransit}</span> عملية شراء في الطريق — تأكد من متابعة وصولها وتحديث المخزون
           </p>
         </div>
       )}
@@ -134,7 +138,7 @@ export function ShipmentsPage() {
           <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <input
             className="form-input pr-9"
-            placeholder="بحث بالمورد أو رقم الشحنة..."
+            placeholder="بحث بالمورد أو رقم العملية شراء..."
             value={search}
             onChange={e => setSearch(e.target.value)}
           />
@@ -168,17 +172,17 @@ export function ShipmentsPage() {
             <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
               <Ship className="w-7 h-7 text-slate-400" />
             </div>
-            <p className="text-slate-500 font-medium">لا توجد شحنات</p>
-            <p className="text-slate-400 text-sm mt-1">أضف شحنة جديدة لتتبع مشترياتك</p>
+            <p className="text-slate-500 font-medium">لا توجد عمليات شراء</p>
+            <p className="text-slate-400 text-sm mt-1">أضف عملية شراء جديدة لتتبع مشترياتك</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="data-table">
               <thead>
                 <tr>
-                  <th>رقم الشحنة</th>
+                  <th>رقم العملية شراء</th>
                   <th>المورد</th>
-                  <th>المنتجات</th>
+                  <th>الأصناف</th>
                   <th>تكلفة البضاعة</th>
                   <th>الشحن</th>
                   <th>الإجمالي</th>
@@ -235,7 +239,7 @@ export function ShipmentsPage() {
                                   : "bg-indigo-50 text-indigo-600 hover:bg-indigo-100"
                               }`}
                             >
-                              {nextStatus === "arrived" ? "استلام الشحنة" : statusConfig[nextStatus].label}
+                              {nextStatus === "arrived" ? "استلام العملية شراء" : statusConfig[nextStatus].label}
                             </button>
                           )}
                           {canEdit && shipment.status !== "arrived" && shipment.status !== "cancelled" && (
@@ -324,8 +328,8 @@ function NewShipmentForm({ onClose }: { onClose: () => void }) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.supplierId) { toast.error("اختر مورداً نشطاً"); return; }
-    if (items.some(i => !i.productName.trim())) { toast.error("أدخل اسم المنتج لكل عنصر"); return; }
-    if (totalCost === 0) { toast.error("أضف منتجاً واحداً على الأقل بتكلفة"); return; }
+    if (items.some(i => !i.productName.trim())) { toast.error("أدخل اسم الصنف لكل عنصر"); return; }
+    if (totalCost === 0) { toast.error("أضف صنفًا واحداً على الأقل بتكلفة"); return; }
     try {
       await createShipment({
         supplierName: form.supplierName,
@@ -343,7 +347,7 @@ function NewShipmentForm({ onClose }: { onClose: () => void }) {
         expectedDate: form.expectedDate || undefined,
         notes: form.notes || undefined,
       });
-      toast.success("تم إنشاء الشحنة بنجاح");
+      toast.success("تم إنشاء عملية الشراء بنجاح");
       onClose();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "حدث خطأ");
@@ -356,7 +360,7 @@ function NewShipmentForm({ onClose }: { onClose: () => void }) {
         <div className="sticky top-0 bg-white border-b border-slate-100 px-6 py-4 flex items-center justify-between rounded-t-3xl sm:rounded-t-2xl z-10">
           <h2 className="font-bold text-slate-800 flex items-center gap-2">
             <Ship className="w-5 h-5 text-indigo-600" />
-            شحنة جديدة
+            عملية شراء جديدة
           </h2>
           <button onClick={onClose} className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors">
             <X className="w-4 h-4" />
@@ -385,11 +389,11 @@ function NewShipmentForm({ onClose }: { onClose: () => void }) {
           {/* Items */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <p className="text-sm font-semibold text-slate-700">المنتجات</p>
+              <p className="text-sm font-semibold text-slate-700">الأصناف</p>
               <button type="button" onClick={addItem}
                 className="flex items-center gap-1.5 text-indigo-600 text-sm font-medium hover:text-indigo-700">
                 <Plus className="w-4 h-4" />
-                إضافة منتج
+                إضافة صنف
               </button>
             </div>
             {items.map((item, idx) => (
@@ -404,11 +408,11 @@ function NewShipmentForm({ onClose }: { onClose: () => void }) {
                   )}
                 </div>
                 <div>
-                  <label className="form-label text-xs">اختر من المنتجات الموجودة (اختياري)</label>
+                  <label className="form-label text-xs">اختر من الأصناف الموجودة (اختياري)</label>
                   <select data-testid="shipment-product-select" className="form-input text-sm"
                     value={item.productId ?? ""}
                     onChange={e => handleProductSelect(idx, e.target.value)}>
-                    <option value="">— منتج جديد —</option>
+                    <option value="">— صنف جديد —</option>
                     {(products ?? []).map(p => (
                       <option key={p._id} value={p._id}>{p.name} (مخزون: {p.stock})</option>
                     ))}
@@ -416,7 +420,7 @@ function NewShipmentForm({ onClose }: { onClose: () => void }) {
                 </div>
                 <div className="grid grid-cols-3 gap-2">
                   <div className="col-span-3 sm:col-span-1">
-                    <input className="form-input" placeholder="اسم المنتج *" value={item.productName}
+                    <input className="form-input" placeholder="اسم الصنف *" value={item.productName}
                       onChange={e => updateItem(idx, "productName", e.target.value)} />
                   </div>
                   <div>
@@ -468,7 +472,7 @@ function NewShipmentForm({ onClose }: { onClose: () => void }) {
 
           <div className="flex gap-3 pt-2">
             <button type="button" onClick={onClose} className="btn-secondary flex-1">إلغاء</button>
-            <button data-testid="shipment-submit" type="submit" className="btn-primary flex-1">حفظ الشحنة</button>
+            <button data-testid="shipment-submit" type="submit" className="btn-primary flex-1">حفظ العملية شراء</button>
           </div>
         </form>
       </div>
@@ -497,12 +501,12 @@ function ReceiveShipmentModal({ shipment, onClose }: { shipment: { _id: Id<"ship
       toast.success(`تم الاستلام بمستند ${result.receiptNumber ?? "PUR"}`);
       onClose();
     } catch (error) {
-      toast.error(getErrorMessage(error, "تعذر استلام الشحنة"));
+      toast.error(getErrorMessage(error, "تعذر استلام عملية الشراء"));
     } finally { setSubmitting(false); }
   };
   return <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" dir="rtl">
     <form data-testid="shipment-receive-form" data-shipment-number={shipment.shipmentNumber} onSubmit={submit} className="w-full max-w-xl space-y-4 rounded-2xl bg-white p-6 shadow-2xl">
-      <div className="flex justify-between"><div><h2 className="font-black text-lg">استلام شحنة شراء</h2><p className="font-mono text-indigo-600">{shipment.shipmentNumber}</p><p>{shipment.supplierName}</p></div><button type="button" onClick={onClose}><X /></button></div>
+      <div className="flex justify-between"><div><h2 className="font-black text-lg">استلام عملية شراء شراء</h2><p className="font-mono text-indigo-600">{shipment.shipmentNumber}</p><p>{shipment.supplierName}</p></div><button type="button" onClick={onClose}><X /></button></div>
       <div className="grid grid-cols-2 gap-2 rounded-xl bg-slate-50 p-3 text-sm">
         <span>إجمالي البضاعة</span><b>{shipment.totalCost.toLocaleString("ar-EG")} ج.م</b>
         <span>إجمالي الشحن</span><b>{shipment.shippingCost.toLocaleString("ar-EG")} ج.م</b>
@@ -522,4 +526,3 @@ function ReceiveShipmentModal({ shipment, onClose }: { shipment: { _id: Id<"ship
     </form>
   </div>;
 }
-

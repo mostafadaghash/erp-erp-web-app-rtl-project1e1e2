@@ -63,8 +63,11 @@ test("branch administration writes target-branch snapshots", () => {
 });
 
 test("global settings never inherit an actor working branch", () => {
-  assert.equal((settings.match(/branchId: null/g) ?? []).length, 2);
-  assert.match(settings, /before: existing \? \{ storeName:/);
+  assert.equal(
+    (settings.match(/branchId: null/g) ?? []).length,
+    (settings.match(/await logAction/g) ?? []).length,
+  );
+  assert.match(settings, /before: existing\s*\?\s*\{[\s\S]*?storeName:/);
   assert.match(settings, /before: existing\?\.modules/);
   assert.match(settings, /after: args\.modules/);
 });

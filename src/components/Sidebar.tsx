@@ -1,224 +1,273 @@
-import { SignOutButton } from "../SignOutButton";
+import { useState } from "react";
 import type { Page } from "./ERPApp";
 import {
-  LayoutDashboard, Package, Users, FileText, Wrench,
-  DollarSign, Truck, BarChart3, Settings, X,
-  ShoppingCart, Ship, Building2, UserCog, ChevronDown, ChevronUp,
-  Target, Shield, BookOpen, DatabaseBackup
+  BarChart3,
+  BookOpen,
+  Boxes,
+  Building2,
+  ChevronDown,
+  ChevronUp,
+  CircleDollarSign,
+  ClipboardList,
+  DatabaseBackup,
+  FileText,
+  Landmark,
+  LayoutDashboard,
+  Package,
+  ReceiptText,
+  RotateCcw,
+  Settings,
+  ShieldCheck,
+  ShoppingBag,
+  Target,
+  Truck,
+  UserCog,
+  Users,
+  WalletCards,
+  Wrench,
+  X,
 } from "lucide-react";
-import { useState } from "react";
-import { useQuery } from "convex/react";
-import { api } from "../../convex/_generated/api";
 import type { Permission } from "../../convex/lib/permissions";
+import { SignOutButton } from "../SignOutButton";
+import { BrandMark } from "./BrandMark";
 
 interface SidebarProps {
   currentPage: Page;
   onNavigate: (page: Page) => void;
-  storeName: string;
   onClose: () => void;
   permissions: Permission[];
   userName: string;
   role: string;
+  modules: Record<string, boolean | undefined>;
+  brand: {
+    storeName: string;
+    shortName: string;
+    tagline: string;
+    logoUrl?: string;
+    primaryColor: string;
+    secondaryColor: string;
+  };
 }
 
 interface NavItem {
   id: Page;
   label: string;
   icon: React.ElementType;
-  moduleKey?: string; // if set, hidden when module is disabled
+  moduleKey?: string;
   permission?: Permission;
 }
 
 interface NavGroup {
+  key: string;
   label: string;
+  icon: React.ElementType;
   items: NavItem[];
 }
 
-const ALL_NAV_GROUPS: NavGroup[] = [
+const NAV_GROUPS: NavGroup[] = [
   {
+    key: "home",
     label: "الرئيسية",
-    items: [
-      { id: "dashboard", label: "لوحة التحكم", icon: LayoutDashboard },
-    ],
+    icon: LayoutDashboard,
+    items: [{ id: "dashboard", label: "لوحة التحكم", icon: LayoutDashboard }],
   },
   {
+    key: "sales",
     label: "المبيعات",
+    icon: ShoppingBag,
     items: [
-      { id: "invoices",    label: "المبيعات والفواتير", icon: FileText,      moduleKey: "invoices", permission: "view_invoices" },
-      { id: "orders",      label: "الأوردرات",           icon: ShoppingCart,  moduleKey: "orders", permission: "view_orders" },
-      { id: "deliveries",  label: "التوصيلات",           icon: Truck,         moduleKey: "deliveries", permission: "view_deliveries" },
+      { id: "invoices", label: "المبيعات", icon: ReceiptText, moduleKey: "invoices", permission: "view_invoices" },
+      { id: "sales-returns", label: "مرتجعات المبيعات", icon: RotateCcw, moduleKey: "invoices", permission: "view_sales_returns" },
+      { id: "orders", label: "أوامر البيع", icon: ClipboardList, moduleKey: "orders", permission: "view_orders" },
+      { id: "customers", label: "العملاء", icon: Users, permission: "view_customers" },
+      { id: "crm", label: "إدارة علاقات العملاء", icon: Target, moduleKey: "crm", permission: "view_leads" },
     ],
   },
   {
-    label: "المخزون والموردين",
+    key: "purchases",
+    label: "المشتريات",
+    icon: ShoppingBag,
     items: [
-      { id: "products",  label: "المنتجات والمخزون",  icon: Package, permission: "view_products" },
-      { id: "shipments", label: "الشحنات الواردة",    icon: Ship,   moduleKey: "shipments", permission: "view_shipments" },
-      { id: "suppliers", label: "الموردين",            icon: Truck,  moduleKey: "suppliers", permission: "view_suppliers" },
-      { id: "purchase-returns", label: "مرتجعات المشتريات", icon: ShoppingCart, permission: "view_purchase_returns" },
+      { id: "shipments", label: "المشتريات", icon: ShoppingBag, moduleKey: "shipments", permission: "view_shipments" },
+      { id: "purchase-returns", label: "مرتجعات المشتريات", icon: RotateCcw, permission: "view_purchase_returns" },
+      { id: "suppliers", label: "الموردون", icon: Truck, moduleKey: "suppliers", permission: "view_suppliers" },
     ],
   },
   {
-    label: "العملاء والخدمات",
-    items: [
-      { id: "customers", label: "العملاء",              icon: Users, permission: "view_customers" },
-      { id: "repairs",   label: "الصيانة",              icon: Wrench,  moduleKey: "repairs", permission: "view_repairs" },
-      { id: "crm",       label: "العملاء المحتملين",    icon: Target,  moduleKey: "crm", permission: "view_leads" },
-    ],
+    key: "inventory",
+    label: "المخزون",
+    icon: Boxes,
+    items: [{ id: "products", label: "الأصناف", icon: Package, permission: "view_products" }],
   },
   {
-    label: "المالية",
+    key: "shipping",
+    label: "الشحن",
+    icon: Truck,
+    items: [{ id: "deliveries", label: "عمليات الشحن", icon: Truck, moduleKey: "deliveries", permission: "view_deliveries" }],
+  },
+  {
+    key: "service",
+    label: "الصيانة",
+    icon: Wrench,
+    items: [{ id: "repairs", label: "أوامر الصيانة", icon: Wrench, moduleKey: "repairs", permission: "view_repairs" }],
+  },
+  {
+    key: "accounting",
+    label: "الحسابات",
+    icon: Landmark,
     items: [
-      { id: "expenses", label: "المصروفات", icon: DollarSign, moduleKey: "expenses", permission: "view_expenses" },
-      { id: "treasury", label: "الخزائن والحسابات", icon: DollarSign, permission: "view_finance" },
-      { id: "customer-ledger", label: "دفتر العملاء", icon: BookOpen, permission: "view_customer_ledger" },
+      { id: "treasury", label: "الخزائن والبنوك", icon: Landmark, permission: "view_finance" },
+      { id: "customer-ledger", label: "حسابات العملاء", icon: BookOpen, permission: "view_customer_ledger" },
+      { id: "supplier-payments", label: "حسابات الموردين", icon: WalletCards, permission: "view_supplier_ledger" },
+      { id: "expenses", label: "المصروفات", icon: CircleDollarSign, moduleKey: "expenses", permission: "view_expenses" },
       { id: "general-ledger", label: "الأستاذ العام", icon: BookOpen, permission: "view_general_ledger" },
-      { id: "supplier-payments", label: "مدفوعات الموردين", icon: DollarSign, permission: "view_supplier_ledger" },
-      { id: "reports",  label: "التقارير",  icon: BarChart3,  moduleKey: "reports", permission: "view_reports" },
     ],
   },
   {
+    key: "reports",
+    label: "التقارير",
+    icon: BarChart3,
+    items: [{ id: "reports", label: "مركز التقارير", icon: BarChart3, moduleKey: "reports", permission: "view_reports" }],
+  },
+  {
+    key: "administration",
     label: "الإدارة",
+    icon: Settings,
     items: [
-      { id: "branches",   label: "الفروع",              icon: Building2, moduleKey: "branches", permission: "view_branches" },
-      { id: "employees",  label: "الموظفون والصلاحيات", icon: UserCog,   moduleKey: "employees", permission: "view_employees" },
-      { id: "audit-logs", label: "سجل العمليات",        icon: Shield, permission: "view_audit_logs" },
-      { id: "data-export", label: "تصدير البيانات",       icon: DatabaseBackup, permission: "export_data" },
-      { id: "settings",   label: "الإعدادات",           icon: Settings, permission: "manage_settings" },
+      { id: "branches", label: "الفروع", icon: Building2, moduleKey: "branches", permission: "view_branches" },
+      { id: "employees", label: "المستخدمون والصلاحيات", icon: UserCog, moduleKey: "employees", permission: "view_employees" },
+      { id: "audit-logs", label: "سجل المراجعة", icon: ShieldCheck, permission: "view_audit_logs" },
+      { id: "data-export", label: "تصدير البيانات", icon: DatabaseBackup, permission: "export_data" },
+      { id: "settings", label: "إعدادات النظام", icon: Settings, permission: "manage_settings" },
     ],
   },
 ];
 
-export function Sidebar({ currentPage, onNavigate, storeName, onClose, permissions, userName, role }: SidebarProps) {
+const ROLE_LABELS: Record<string, string> = {
+  admin: "مدير النظام",
+  manager: "مدير",
+  accountant: "محاسب",
+  sales: "مسؤول مبيعات",
+  customer_service: "خدمة العملاء",
+  technician: "فني صيانة",
+  shipping: "مسؤول الشحن",
+  viewer: "مشاهدة فقط",
+};
+
+export function Sidebar({
+  currentPage,
+  onNavigate,
+  onClose,
+  permissions,
+  userName,
+  role,
+  modules,
+  brand,
+}: SidebarProps) {
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
-  const settings = useQuery(api.settings.getPublic);
 
-  const modules = settings?.modules ?? {};
+  const isModuleEnabled = (moduleKey?: string) =>
+    !moduleKey || modules[moduleKey] !== false;
 
-  const isModuleEnabled = (moduleKey?: string): boolean => {
-    if (!moduleKey) return true; // no module key = always visible
-    const val = (modules as Record<string, boolean | undefined>)[moduleKey];
-    return val === undefined ? true : val; // default to enabled if not set
-  };
-
-  const toggleGroup = (label: string) => {
-    setCollapsed(prev => ({ ...prev, [label]: !prev[label] }));
-  };
-
-  const isGroupActive = (group: NavGroup) =>
-    group.items.some(i => i.id === currentPage);
-
-  // Filter groups to only show enabled modules
-  const navGroups = ALL_NAV_GROUPS.map(group => ({
+  const groups = NAV_GROUPS.map(group => ({
     ...group,
-    items: group.items.filter(
-      item =>
-        isModuleEnabled(item.moduleKey) &&
-        (!item.permission || permissions.includes(item.permission)),
-    ),
+    items: group.items.filter(item =>
+      isModuleEnabled(item.moduleKey) &&
+      (!item.permission || permissions.includes(item.permission))),
   })).filter(group => group.items.length > 0);
 
   return (
-    <div className="h-full bg-slate-900 flex flex-col">
-      {/* Logo */}
-      <div className="p-5 border-b border-white/10">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-500/30">
-              <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-              </svg>
-            </div>
-            <div>
-              <p className="text-white font-bold text-sm leading-tight truncate max-w-32">{storeName}</p>
-              <p className="text-slate-500 text-xs">نظام ERP</p>
-            </div>
+    <aside className="erp-sidebar h-full flex flex-col" aria-label="القائمة الرئيسية">
+      <div className="border-b border-white/10 px-4 py-4">
+        <div className="flex items-center gap-3">
+          <BrandMark
+            name={brand.storeName}
+            logoUrl={brand.logoUrl}
+            primaryColor={brand.primaryColor}
+            secondaryColor={brand.secondaryColor}
+            size="md"
+            inverse
+          />
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-black text-white">{brand.shortName}</p>
+            <p className="mt-0.5 truncate text-[11px] text-slate-400">{brand.tagline}</p>
           </div>
           <button
             onClick={onClose}
-            className="lg:hidden p-1.5 rounded-lg hover:bg-white/10 text-slate-400 hover:text-white transition-colors"
+            className="rounded-xl p-2 text-slate-400 transition hover:bg-white/10 hover:text-white lg:hidden"
             aria-label="إغلاق القائمة الرئيسية"
           >
-            <X className="w-4 h-4" />
+            <X className="h-4 w-4" />
           </button>
         </div>
       </div>
 
-      {/* Quick action */}
-      {permissions.includes("create_invoices") && <div className="p-4">
-        <button
-          onClick={() => onNavigate("new-invoice")}
-          className="w-full flex items-center justify-center gap-2 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl font-medium text-sm hover:from-indigo-700 hover:to-purple-700 transition-all shadow-lg shadow-indigo-500/20 active:scale-95"
-        >
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-          </svg>
-          فاتورة جديدة
-        </button>
-      </div>}
-
-      {/* Navigation Groups */}
-      <nav className="flex-1 px-3 pb-4 space-y-1 overflow-y-auto">
-        {navGroups.map(group => {
-          const isOpen = !collapsed[group.label];
-          const hasActive = isGroupActive(group);
+      <nav className="erp-sidebar-scroll flex-1 overflow-y-auto px-3 py-3">
+        {groups.map(group => {
+          const isOpen = !collapsed[group.key];
+          const hasActive = group.items.some(item => item.id === currentPage);
+          const GroupIcon = group.icon;
           return (
-            <div key={group.label}>
+            <section key={group.key} className="mb-1">
               <button
-                onClick={() => toggleGroup(group.label)}
-                className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-colors ${
-                  hasActive ? "text-indigo-400" : "text-slate-500 hover:text-slate-400"
-                }`}
+                type="button"
+                data-testid={`nav-group-${group.key}`}
+                onClick={() => setCollapsed(value => ({ ...value, [group.key]: !value[group.key] }))}
+                className={`nav-group-button ${hasActive ? "active" : ""}`}
+                aria-expanded={isOpen}
+                aria-label={`قسم ${group.label}`}
               >
-                <span>{group.label}</span>
-                {isOpen
-                  ? <ChevronUp className="w-3 h-3" />
-                  : <ChevronDown className="w-3 h-3" />
-                }
+                <span className="flex items-center gap-2">
+                  <GroupIcon className="h-3.5 w-3.5" />
+                  {group.label}
+                </span>
+                {isOpen ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
               </button>
 
               {isOpen && (
-                <div className="space-y-0.5 mb-1">
+                <div className="mt-1 space-y-0.5">
                   {group.items.map(item => {
                     const Icon = item.icon;
                     const isActive = currentPage === item.id;
                     return (
                       <button
                         key={item.id}
-                        onClick={() => onNavigate(item.id as Page)}
+                        type="button"
+                        data-testid={`nav-${item.id}`}
+                        onClick={() => onNavigate(item.id)}
                         aria-current={isActive ? "page" : undefined}
                         className={`sidebar-item w-full ${isActive ? "active" : ""}`}
                       >
-                        <Icon className="w-4 h-4 flex-shrink-0" />
-                        <span>{item.label}</span>
-                        {isActive && (
-                          <div className="mr-auto w-1.5 h-1.5 bg-indigo-400 rounded-full" />
-                        )}
+                        <Icon className="h-4 w-4 shrink-0" />
+                        <span className="truncate">{item.label}</span>
+                        {isActive && <span className="mr-auto h-1.5 w-1.5 rounded-full bg-current" />}
                       </button>
                     );
                   })}
                 </div>
               )}
-            </div>
+            </section>
           );
         })}
       </nav>
 
-      {/* Bottom */}
-      <div className="p-4 border-t border-white/10">
-        <div className="flex items-center gap-3 px-3 py-2 rounded-xl bg-white/5 mb-3">
-          <div className="w-8 h-8 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full flex items-center justify-center flex-shrink-0">
-            <span className="text-white text-xs font-bold">م</span>
+      <div className="border-t border-white/10 p-3">
+        <div className="mb-2 flex items-center gap-3 rounded-2xl bg-white/[0.06] px-3 py-2.5">
+          <div
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-sm font-black text-white"
+            style={{ background: `linear-gradient(135deg, ${brand.primaryColor}, ${brand.secondaryColor})` }}
+          >
+            {userName.trim().charAt(0) || "م"}
           </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-white text-xs font-medium truncate">{userName}</p>
-            <p data-testid="current-user-role" className="text-slate-500 text-xs">
-              {role}
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-xs font-bold text-white">{userName}</p>
+            <p data-testid="current-user-role" className="mt-0.5 truncate text-[11px] text-slate-400">
+              {ROLE_LABELS[role] ?? role}
             </p>
           </div>
         </div>
         <SignOutButton />
       </div>
-    </div>
+    </aside>
   );
 }
