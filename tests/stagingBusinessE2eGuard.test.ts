@@ -115,6 +115,21 @@ test("sales return cycle opens the standalone returns page", () => {
   );
 });
 
+test("business cycles wait for the professional ERP success copy", () => {
+  for (const message of [
+    "تم إنشاء أمر البيع بنجاح",
+    "تم إنشاء عملية الشحن بنجاح",
+    "تم تأكيد إرسال الشحنة",
+    "تم إنشاء عملية الشراء بنجاح",
+    "تم تحديث حالة عملية الشراء",
+  ]) assert.match(script, new RegExp(message));
+
+  assert.doesNotMatch(
+    script,
+    /تم إنشاء الأوردر بنجاح|تم إنشاء سند التوصيل|تم تأكيد الشحن|تم إنشاء الشحنة بنجاح|تم تحديث حالة الشحنة/,
+  );
+});
+
 test("mutable UI selectors cover sales, purchase, repair, and COD forms", () => {
   const sources = [
     "src/components/NewInvoicePage.tsx",
