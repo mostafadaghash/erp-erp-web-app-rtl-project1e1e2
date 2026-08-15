@@ -108,6 +108,13 @@ test("shared staging sign-in scopes the dashboard heading to main content", () =
   );
 });
 
+test("sales return cycle opens the standalone returns page", () => {
+  assert.match(
+    script,
+    /async function createSalesReturn[\s\S]{0,200}navigate\(page, "مرتجعات المبيعات", "sales-returns-page"\)/,
+  );
+});
+
 test("mutable UI selectors cover sales, purchase, repair, and COD forms", () => {
   const sources = [
     "src/components/NewInvoicePage.tsx",
