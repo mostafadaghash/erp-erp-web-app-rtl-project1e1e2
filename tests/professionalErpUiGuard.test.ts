@@ -11,6 +11,7 @@ const settingsApi = read("convex/settings.ts");
 const schema = read("convex/schema.ts");
 const styles = read("src/index.css");
 const signOut = read("src/SignOutButton.tsx");
+const purchases = read("src/components/ShipmentsPage.tsx");
 
 test("professional ERP navigation uses conventional Arabic information architecture", () => {
   for (const label of [
@@ -73,4 +74,15 @@ test("authentication and session controls use professional Arabic copy", () => {
   assert.doesNotMatch(signOut, /Sign Out/);
   assert.match(read("index.html"), /DAGHASH ERP \| إدارة أعمالك بوضوح/);
   assert.doesNotMatch(read("index.html"), /نظام إدارة الإلكترونيات|تك ستور/);
+});
+
+test("purchase workflows use grammatically correct professional terminology", () => {
+  for (const label of [
+    "رقم عملية الشراء",
+    "حفظ عملية الشراء",
+    "استلام عملية الشراء",
+    "تم تحديث حالة عملية الشراء",
+  ]) assert.match(purchases, new RegExp(label));
+
+  assert.doesNotMatch(purchases, /العملية شراء|عملية شراء شراء/);
 });
