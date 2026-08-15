@@ -5,6 +5,7 @@ import { spawnSync } from "node:child_process";
 
 const read = (path: string) => readFileSync(path, "utf8");
 const script = read("scripts/staging-business-e2e.mjs");
+const browserScript = read("scripts/staging-browser-e2e.mjs");
 const workflow = read(".github/workflows/staging-acceptance.yml");
 const runbook = read("docs/STAGING_ACCEPTANCE_RUNBOOK.md");
 const matrix = read("tests/STAGING_BUSINESS_E2E_MATRIX.md");
@@ -94,6 +95,17 @@ test("business browser script executes all required public UI cycles and stores 
   assert.doesNotMatch(script, /console\.log\([^\n]*(password|email)|documents?\.write/);
   assert.match(script, /getByTestId\("invoices-page"\)\.getByRole\("button", \{ name: "فاتورة بيع جديدة", exact: true \}\)/);
   assert.doesNotMatch(script, /page\.getByRole\("button", \{ name: "فاتورة بيع جديدة", exact: true \}\)/);
+});
+
+test("shared staging sign-in scopes the dashboard heading to main content", () => {
+  assert.match(
+    browserScript,
+    /getByRole\("main"\)\s*\.getByRole\("heading", \{ name: "لوحة التحكم", exact: true \}\)/,
+  );
+  assert.doesNotMatch(
+    browserScript,
+    /page\s*\.getByRole\("heading", \{ name: "لوحة التحكم", exact: true \}\)/,
+  );
 });
 
 test("mutable UI selectors cover sales, purchase, repair, and COD forms", () => {

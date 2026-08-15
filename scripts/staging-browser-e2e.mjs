@@ -341,6 +341,7 @@ export async function signIn(page, baseUrl, account) {
   await page.locator('input[name="password"]').fill(account.password);
   await page.getByRole("button", { name: "تسجيل الدخول", exact: true }).click();
   await page
+    .getByRole("main")
     .getByRole("heading", { name: "لوحة التحكم", exact: true })
     .waitFor({ timeout: 45_000 });
 }
