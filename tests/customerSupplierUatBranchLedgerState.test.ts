@@ -37,7 +37,7 @@ test("CSU-04 supplier branch context is explicit without making suppliers branch
 
 test("CSU-05 customer ledger never silently selects the first admin branch", () => {
   assert.doesNotMatch(ledger, /branches\?\.\[0\]/);
-  assert.ok(ledger.includes("اختر الفرع لعرض دفتر العملاء"));
+  assert.ok(ledger.includes("اختر الفرع لعرض حسابات العملاء"));
   assert.match(ledger, /<option value="">اختر الفرع<\/option>/);
 });
 

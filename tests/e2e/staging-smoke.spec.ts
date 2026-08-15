@@ -7,12 +7,12 @@ test.describe("staging browser smoke", () => {
     await expectRtlAndNoHorizontalOverflow(page);
 
     for (const label of [
-      "المبيعات والفواتير",
-      "المنتجات والمخزون",
-      "الصيانة",
-      "التوصيلات",
-      "الخزائن والحسابات",
-      "التقارير",
+      "المبيعات",
+      "الأصناف",
+      "أوامر الصيانة",
+      "عمليات الشحن",
+      "الخزائن والبنوك",
+      "مركز التقارير",
     ]) {
       await navigateTo(page, label);
       await expectRtlAndNoHorizontalOverflow(page);

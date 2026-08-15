@@ -185,7 +185,7 @@ export function CustomerLedgerPage({
   if (!canView) {
     return (
       <div className="p-8 text-center text-slate-500">
-        لا تملك صلاحية عرض دفتر العملاء
+        لا تملك صلاحية عرض حسابات العملاء
       </div>
     );
   }
@@ -194,7 +194,7 @@ export function CustomerLedgerPage({
     <div className="p-4 lg:p-6 space-y-5" dir="rtl">
       <div className="print:hidden flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-black flex gap-2">
-          <BookOpen /> دفتر العملاء
+          <BookOpen /> حسابات العملاء
         </h1>
         {canPrint && customerId && (
           <button
@@ -225,17 +225,17 @@ export function CustomerLedgerPage({
 
       {branchContextLoading && (
         <p role="status" className="print:hidden rounded-xl bg-slate-100 p-4 text-sm text-slate-600">
-          جارٍ تحميل فروع دفتر العملاء
+          جارٍ تحميل فروع حسابات العملاء
         </p>
       )}
       {!branchContextLoading && !effectiveBranch && (branches?.length ?? 0) > 0 && (
         <p role="status" className="print:hidden rounded-xl bg-amber-50 p-4 text-sm font-medium text-amber-800">
-          اختر الفرع لعرض دفتر العملاء
+          اختر الفرع لعرض حسابات العملاء
         </p>
       )}
       {!branchContextLoading && !effectiveBranch && (branches?.length ?? 0) === 0 && (
         <p role="status" className="print:hidden rounded-xl bg-amber-50 p-4 text-sm font-medium text-amber-800">
-          لا توجد فروع نشطة متاحة لدفتر العملاء
+          لا توجد فروع نشطة متاحة لحسابات العملاء
         </p>
       )}
 

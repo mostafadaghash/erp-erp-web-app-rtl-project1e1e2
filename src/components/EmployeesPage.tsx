@@ -13,35 +13,35 @@ import {
 const ROLES = [
   { value: "admin",            label: "مدير النظام",    color: "bg-purple-100 text-purple-700" },
   { value: "manager",          label: "مدير فرع",       color: "bg-indigo-100 text-indigo-700" },
-  { value: "sales",            label: "موظف مبيعات",    color: "bg-blue-100 text-blue-700" },
+  { value: "sales",            label: "مستخدم مبيعات",    color: "bg-blue-100 text-blue-700" },
   { value: "customer_service", label: "خدمة العملاء",   color: "bg-cyan-100 text-cyan-700" },
   { value: "technician",       label: "فني صيانة",      color: "bg-amber-100 text-amber-700" },
   { value: "accountant",       label: "محاسب",          color: "bg-emerald-100 text-emerald-700" },
-  { value: "shipping",         label: "موظف شحن",       color: "bg-orange-100 text-orange-700" },
+  { value: "shipping",         label: "مستخدم شحن",       color: "bg-orange-100 text-orange-700" },
   { value: "viewer",           label: "مشاهد فقط",      color: "bg-slate-100 text-slate-600" },
 ];
 
 const PERMISSION_LABELS_SOURCE = [
   { key: "view_products",   label: "عرض المنتجات",           group: "عرض" },
   { key: "view_customers",  label: "عرض العملاء",            group: "عرض" },
-  { key: "view_orders",     label: "عرض الأوردرات",          group: "عرض" },
+  { key: "view_orders",     label: "عرض أوامر البيع",          group: "عرض" },
   { key: "view_invoices",   label: "عرض الفواتير",           group: "عرض" },
   { key: "view_repairs",    label: "عرض الصيانة",            group: "عرض" },
-  { key: "view_shipments",  label: "عرض الشحنات",            group: "عرض" },
+  { key: "view_shipments",  label: "عرض عمليات الشراء",            group: "عرض" },
   { key: "view_reports",    label: "عرض التقارير",           group: "عرض" },
   { key: "view_prices",     label: "عرض الأسعار",            group: "عرض" },
   { key: "view_profits",    label: "عرض الأرباح",            group: "عرض" },
-  { key: "create_orders",   label: "إنشاء أوردرات",          group: "إضافة" },
+  { key: "create_orders",   label: "إنشاء أوامر بيع",          group: "إضافة" },
   { key: "create_invoices", label: "إنشاء فواتير",           group: "إضافة" },
   { key: "create_repairs",  label: "إنشاء أوامر صيانة",      group: "إضافة" },
   { key: "create_customers",label: "إضافة عملاء",            group: "إضافة" },
   { key: "create_expenses", label: "إضافة مصروفات",          group: "إضافة" },
-  { key: "create_shipments",label: "إنشاء شحنات",            group: "إضافة" },
-  { key: "edit_orders",     label: "تعديل الأوردرات",        group: "تعديل" },
+  { key: "create_shipments",label: "إنشاء عمليات شراء",            group: "إضافة" },
+  { key: "edit_orders",     label: "تعديل أوامر البيع",        group: "تعديل" },
   { key: "edit_repairs",    label: "تعديل الصيانة",          group: "تعديل" },
   { key: "edit_customers",  label: "تعديل العملاء",          group: "تعديل" },
   { key: "edit_expenses",   label: "تعديل المصروفات",        group: "تعديل" },
-  { key: "edit_shipments",  label: "تعديل الشحنات",          group: "تعديل" },
+  { key: "edit_shipments",  label: "تعديل عمليات الشراء",          group: "تعديل" },
   { key: "export_data",     label: "تصدير البيانات",         group: "أخرى" },
   { key: "print_invoices",  label: "طباعة الفواتير",         group: "أخرى" },
   { key: "print_repairs",   label: "طباعة الصيانة",          group: "أخرى" },
@@ -154,7 +154,7 @@ export function EmployeesPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.name.trim()) { toast.error("أدخل اسم الموظف"); return; }
+    if (!form.name.trim()) { toast.error("أدخل اسم المستخدم"); return; }
     if (!editId && !form.email.trim()) { toast.error("أدخل البريد الإلكتروني"); return; }
     try {
       if (editId) {
@@ -168,7 +168,7 @@ export function EmployeesPage() {
           permissions: form.permissions,
           isActive: form.isActive,
         });
-        toast.success("تم تحديث بيانات الموظف");
+        toast.success("تم تحديث بيانات المستخدم");
       } else {
         const invitation = await createEmployee({
           name: form.name,
@@ -185,9 +185,9 @@ export function EmployeesPage() {
         setInviteLink(url.toString());
         try {
           await navigator.clipboard.writeText(url.toString());
-          toast.success("تم إنشاء الموظف ونسخ رابط الدعوة");
+          toast.success("تم إنشاء المستخدم ونسخ رابط الدعوة");
         } catch {
-          toast.success("تم إنشاء الموظف. انسخ رابط الدعوة من النافذة");
+          toast.success("تم إنشاء المستخدم. انسخ رابط الدعوة من النافذة");
         }
       }
       setShowForm(false);
@@ -197,10 +197,10 @@ export function EmployeesPage() {
   };
 
   const handleDelete = async (id: Id<"userProfiles">) => {
-    if (!confirm("هل أنت متأكد من إيقاف هذا الموظف؟ سيظل سجل الحساب محفوظاً.")) return;
+    if (!confirm("هل أنت متأكد من إيقاف هذا المستخدم؟ سيظل سجل الحساب محفوظاً.")) return;
     try {
       await removeEmployee({ id });
-      toast.success("تم إيقاف الموظف مع الاحتفاظ بسجله");
+      toast.success("تم إيقاف المستخدم مع الاحتفاظ بسجله");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "حدث خطأ");
     }
@@ -227,7 +227,7 @@ export function EmployeesPage() {
   const handleToggle = async (id: Id<"userProfiles">) => {
     try {
       await toggleActive({ id });
-      toast.success("تم تغيير حالة الموظف");
+      toast.success("تم تغيير حالة المستخدم");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "حدث خطأ");
     }
@@ -247,7 +247,7 @@ export function EmployeesPage() {
         <div>
           <h1 className="text-2xl font-black text-slate-800 flex items-center gap-2">
             <Users className="w-6 h-6 text-indigo-600" />
-            الموظفون والصلاحيات
+            المستخدمون والصلاحيات
           </h1>
           <p className="text-slate-500 text-sm mt-0.5">إدارة فريق العمل وتحديد الصلاحيات</p>
         </div>
@@ -257,14 +257,14 @@ export function EmployeesPage() {
           className="btn-primary flex items-center gap-2"
         >
           <Plus className="w-4 h-4" />
-          موظف جديد
+          مستخدم جديد
         </button>
       </div>
 
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-          { label: "إجمالي الموظفين", value: stats?.total ?? 0,    color: "text-indigo-600",  bg: "bg-indigo-50",  icon: Users },
+          { label: "إجمالي المستخدمين", value: stats?.total ?? 0,    color: "text-indigo-600",  bg: "bg-indigo-50",  icon: Users },
           { label: "نشطون",           value: stats?.active ?? 0,   color: "text-emerald-600", bg: "bg-emerald-50", icon: CheckCircle },
           { label: "موقوفون",         value: stats?.inactive ?? 0, color: "text-red-600",     bg: "bg-red-50",     icon: XCircle },
           { label: "الأدوار",         value: Object.keys(stats?.byRole ?? {}).length, color: "text-purple-600", bg: "bg-purple-50", icon: Shield },
@@ -341,15 +341,15 @@ export function EmployeesPage() {
             <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
               <Users className="w-7 h-7 text-slate-400" />
             </div>
-            <p className="text-slate-500 font-medium">لا يوجد موظفون</p>
-            <p className="text-slate-400 text-sm mt-1">أضف موظفاً جديداً للبدء</p>
+            <p className="text-slate-500 font-medium">لا يوجد مستخدمون</p>
+            <p className="text-slate-400 text-sm mt-1">أضف مستخدماً جديداً للبدء</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="data-table">
               <thead>
                 <tr>
-                  <th>الموظف</th>
+                  <th>المستخدم</th>
                   <th>الدور</th>
                   <th>الفرع</th>
                   <th>الصلاحيات</th>
@@ -454,7 +454,7 @@ export function EmployeesPage() {
             <div className="sticky top-0 bg-white border-b border-slate-100 px-6 py-4 flex items-center justify-between z-10 rounded-t-3xl sm:rounded-t-2xl">
               <h2 className="font-bold text-slate-800 flex items-center gap-2">
                 <Users className="w-5 h-5 text-indigo-600" />
-                {editId ? "تعديل الموظف" : "موظف جديد"}
+                {editId ? "تعديل المستخدم" : "مستخدم جديد"}
               </h2>
               <button onClick={() => setShowForm(false)} className="p-1.5 hover:bg-slate-100 rounded-lg">
                 <X className="w-4 h-4" />
@@ -468,7 +468,7 @@ export function EmployeesPage() {
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="form-label">الاسم *</label>
-                    <input data-testid="employee-name" className="form-input" placeholder="اسم الموظف" value={form.name}
+                    <input data-testid="employee-name" className="form-input" placeholder="اسم المستخدم" value={form.name}
                       onChange={e => setForm({ ...form, name: e.target.value })} />
                   </div>
                   <div>
@@ -515,7 +515,7 @@ export function EmployeesPage() {
                   </div>
                 </div>
                 <div className="flex items-center justify-between bg-white rounded-lg p-3 border border-slate-200">
-                  <span className="text-sm font-medium text-slate-700">حالة الموظف</span>
+                  <span className="text-sm font-medium text-slate-700">حالة المستخدم</span>
                   <button
                     type="button"
                     onClick={() => setForm({ ...form, isActive: !form.isActive })}
@@ -592,7 +592,7 @@ export function EmployeesPage() {
 
               <div className="flex gap-3 pt-2">
                 <button type="button" onClick={() => setShowForm(false)} className="btn-secondary flex-1">إلغاء</button>
-                <button data-testid="employee-create-submit" type="submit" className="btn-primary flex-1">{editId ? "حفظ التعديلات" : "إضافة الموظف"}</button>
+                <button data-testid="employee-create-submit" type="submit" className="btn-primary flex-1">{editId ? "حفظ التعديلات" : "إضافة المستخدم"}</button>
               </div>
             </form>
           </div>
@@ -605,7 +605,7 @@ export function EmployeesPage() {
             <div className="flex items-center justify-between mb-4">
               <h2 className="font-bold text-slate-800 flex items-center gap-2">
                 <Link className="w-5 h-5 text-indigo-600" />
-                رابط دعوة الموظف
+                رابط دعوة المستخدم
               </h2>
               <button
                 data-testid="employee-invite-close"
@@ -616,7 +616,7 @@ export function EmployeesPage() {
               </button>
             </div>
             <p className="text-sm text-slate-500 mb-3">
-              أرسل هذا الرابط للموظف ليُنشئ كلمة المرور ويربط حسابه. الرابط صالح لمدة 7 أيام.
+              أرسل هذا الرابط للمستخدم ليُنشئ كلمة المرور ويربط حسابه. الرابط صالح لمدة 7 أيام.
             </p>
             <div className="flex gap-2">
               <input

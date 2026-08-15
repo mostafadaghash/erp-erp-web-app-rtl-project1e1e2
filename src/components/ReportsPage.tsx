@@ -202,7 +202,7 @@ export function ReportsPage() {
         <div>
           <h1 className="flex items-center gap-2 text-2xl font-black text-slate-800">
             <BarChart3 className="h-6 w-6 text-indigo-600" />
-            التقارير المالية والتشغيلية
+            مركز التقارير
           </h1>
           <p className="mt-1 text-sm text-slate-500">
             مبنية على تاريخ العملية وصافي الحركات المثبتة في الدفاتر.

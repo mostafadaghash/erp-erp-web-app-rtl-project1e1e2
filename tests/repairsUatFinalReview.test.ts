@@ -6,7 +6,7 @@ const page = await readFile("src/components/RepairsPage.tsx", "utf8");
 const printTemplate = await readFile("src/components/PrintTemplate.tsx", "utf8");
 
 test("RFU-01 distinguishes true empty repairs from filtered no-results", () => {
-  assert.ok(page.includes("لا توجد طلبات صيانة في هذا الفرع"));
+  assert.ok(page.includes("لا توجد أوامر صيانة في هذا الفرع"));
   assert.ok(page.includes("لا توجد نتائج مطابقة للبحث أو الفلتر"));
   assert.match(page, /repairs\.length === 0/);
 });

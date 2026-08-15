@@ -1,322 +1,307 @@
-import { useState, useEffect } from "react";
-import { useQuery, useMutation } from "convex/react";
-import { api } from "../../convex/_generated/api";
-import { toast } from "sonner";
-import { normalizeEgyptPhoneForWhatsApp } from "../lib/utils";
+import { useEffect, useState } from "react";
+import { useMutation, useQuery } from "convex/react";
 import {
-  Settings, Save, Palette, Store, Phone, MessageCircle,
-  ToggleLeft, ToggleRight, Shield
+  Building2,
+  Image,
+  MessageCircle,
+  Palette,
+  Save,
+  Settings,
+  Shield,
+  ToggleLeft,
+  ToggleRight,
+  Trash2,
+  Upload,
 } from "lucide-react";
+import { toast } from "sonner";
+import { api } from "../../convex/_generated/api";
+import type { Id } from "../../convex/_generated/dataModel";
+import { getErrorMessage } from "../lib/errors";
+import { normalizeEgyptPhoneForWhatsApp } from "../lib/utils";
+import { BrandMark } from "./BrandMark";
 
 const MODULE_LIST = [
-  { key: "invoices",   label: "المبيعات والفواتير",    desc: "إنشاء وإدارة الفواتير" },
-  { key: "orders",     label: "الأوردرات",              desc: "إدارة طلبات العملاء" },
-  { key: "deliveries", label: "التوصيلات",              desc: "تتبع شحنات العملاء" },
-  { key: "repairs",    label: "الصيانة",                desc: "إدارة طلبات الإصلاح" },
-  { key: "expenses",   label: "المصروفات",              desc: "تتبع مصروفات المحل" },
-  { key: "suppliers",  label: "الموردين",               desc: "إدارة الموردين والمشتريات" },
-  { key: "shipments",  label: "الشحنات الواردة",        desc: "استقبال البضاعة من الموردين" },
-  { key: "crm",        label: "العملاء المحتملين (CRM)", desc: "تتبع الليدز والفرص" },
-  { key: "branches",   label: "الفروع",                 desc: "إدارة فروع المحل" },
-  { key: "employees",  label: "الموظفون والصلاحيات",   desc: "إدارة الفريق والأدوار" },
-  { key: "reports",    label: "التقارير",               desc: "تقارير المبيعات والأداء" },
+  { key: "invoices", label: "المبيعات", desc: "فواتير البيع ومرتجعاتها" },
+  { key: "orders", label: "أوامر البيع", desc: "إدارة طلبات وأوامر العملاء" },
+  { key: "deliveries", label: "عمليات الشحن", desc: "الشحن والتحصيل عند التسليم" },
+  { key: "repairs", label: "أوامر الصيانة", desc: "استلام ومتابعة أعمال الصيانة" },
+  { key: "expenses", label: "المصروفات", desc: "إثبات ومتابعة المصروفات" },
+  { key: "suppliers", label: "الموردون", desc: "بيانات الموردين وحساباتهم" },
+  { key: "shipments", label: "المشتريات", desc: "عمليات الشراء واستلام الأصناف" },
+  { key: "crm", label: "إدارة علاقات العملاء", desc: "متابعة العملاء المحتملين والفرص" },
+  { key: "branches", label: "الفروع", desc: "إدارة الفروع ونطاقات العمل" },
+  { key: "employees", label: "المستخدمون والصلاحيات", desc: "الحسابات والأدوار وصلاحيات الوصول" },
+  { key: "reports", label: "التقارير", desc: "تقارير الأداء والمبيعات والحسابات" },
 ] as const;
 
 type ModuleKey = typeof MODULE_LIST[number]["key"];
+type AssetKind = "logo" | "favicon";
 
 const defaultModules: Record<ModuleKey, boolean> = {
-  invoices: true, orders: true, deliveries: true, repairs: true,
-  expenses: true, suppliers: true, shipments: true, crm: true,
-  branches: true, employees: true, reports: true,
+  invoices: true,
+  orders: true,
+  deliveries: true,
+  repairs: true,
+  expenses: true,
+  suppliers: true,
+  shipments: true,
+  crm: true,
+  branches: true,
+  employees: true,
+  reports: true,
+};
+
+const emptyForm = {
+  storeName: "DAGHASH ERP",
+  shortName: "DAGHASH",
+  tagline: "إدارة أعمالك بوضوح",
+  legalName: "",
+  storeType: "mixed",
+  primaryColor: "#4f46e5",
+  secondaryColor: "#7c3aed",
+  logoUrl: "",
+  faviconUrl: "",
+  invoiceFooter: "",
+  phone: "",
+  address: "",
+  currency: "EGP",
+  taxRate: 14,
+  whatsappNumber: "",
 };
 
 export function SettingsPage() {
   const settings = useQuery(api.settings.get);
   const upsertSettings = useMutation(api.settings.upsert);
   const updateModules = useMutation(api.settings.updateModules);
-
-  const [form, setForm] = useState({
-    storeName: "تك ستور",
-    storeType: "electronics",
-    primaryColor: "#6366f1",
-    secondaryColor: "#8b5cf6",
-    phone: "",
-    address: "",
-    currency: "EGP",
-    taxRate: 14,
-    whatsappNumber: "",
-  });
-
+  const generateUploadUrl = useMutation(api.settings.generateBrandAssetUploadUrl);
+  const setBrandAsset = useMutation(api.settings.setBrandAsset);
+  const removeBrandAsset = useMutation(api.settings.removeBrandAsset);
+  const [form, setForm] = useState(emptyForm);
   const [modules, setModules] = useState<Record<ModuleKey, boolean>>(defaultModules);
-  const [savingModules, setSavingModules] = useState(false);
   const [initialized, setInitialized] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [savingModules, setSavingModules] = useState(false);
+  const [assetBusy, setAssetBusy] = useState<AssetKind | null>(null);
 
   useEffect(() => {
-    if (settings && !initialized) {
-      setForm({
-        storeName: settings.storeName,
-        storeType: settings.storeType,
-        primaryColor: settings.primaryColor,
-        secondaryColor: settings.secondaryColor,
-        phone: settings.phone ?? "",
-        address: settings.address ?? "",
-        currency: "EGP",
-        taxRate: settings.taxRate,
-        whatsappNumber: settings.whatsappNumber ?? "",
-      });
-      if (settings.modules) {
-        setModules({
-          ...defaultModules,
-          ...Object.fromEntries(
-            Object.entries(settings.modules).map(([k, v]) => [k, v ?? true])
-          ),
-        } as Record<ModuleKey, boolean>);
-      }
-      setInitialized(true);
+    if (!settings || initialized) return;
+    setForm({
+      storeName: settings.storeName,
+      shortName: settings.shortName ?? "",
+      tagline: settings.tagline ?? "",
+      legalName: settings.legalName ?? "",
+      storeType: settings.storeType,
+      primaryColor: settings.primaryColor,
+      secondaryColor: settings.secondaryColor,
+      logoUrl: settings.logoUrl ?? "",
+      faviconUrl: settings.faviconUrl ?? "",
+      invoiceFooter: settings.invoiceFooter ?? "",
+      phone: settings.phone ?? "",
+      address: settings.address ?? "",
+      currency: "EGP",
+      taxRate: settings.taxRate,
+      whatsappNumber: settings.whatsappNumber ?? "",
+    });
+    if (settings.modules) {
+      setModules({
+        ...defaultModules,
+        ...Object.fromEntries(Object.entries(settings.modules).map(([key, value]) => [key, value ?? true])),
+      } as Record<ModuleKey, boolean>);
     }
+    setInitialized(true);
   }, [settings, initialized]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (saving) return;
+    setSaving(true);
     try {
       await upsertSettings({
         storeName: form.storeName,
+        shortName: form.shortName || undefined,
+        tagline: form.tagline || undefined,
+        legalName: form.legalName || undefined,
         storeType: form.storeType,
         primaryColor: form.primaryColor,
         secondaryColor: form.secondaryColor,
+        logoUrl: form.logoUrl || undefined,
+        faviconUrl: form.faviconUrl || undefined,
+        invoiceFooter: form.invoiceFooter || undefined,
         phone: form.phone || undefined,
         address: form.address || undefined,
-        currency: form.currency,
+        currency: "EGP",
         taxRate: Number(form.taxRate),
         whatsappNumber: form.whatsappNumber || undefined,
       });
-      toast.success("تم حفظ الإعدادات بنجاح ✅");
-    } catch {
-      toast.error("حدث خطأ أثناء الحفظ");
+      toast.success("تم حفظ إعدادات النظام والهوية");
+    } catch (error) {
+      toast.error(getErrorMessage(error, "تعذر حفظ إعدادات النظام"));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const uploadAsset = async (kind: AssetKind, file?: File) => {
+    if (!file) return;
+    const maxSize = kind === "logo" ? 2 * 1024 * 1024 : 1024 * 1024;
+    if (!file.type.startsWith("image/")) return toast.error("اختر ملف صورة صالحًا");
+    if (file.size > maxSize) return toast.error(kind === "logo" ? "حجم الشعار يجب ألا يتجاوز 2 ميجابايت" : "حجم الأيقونة يجب ألا يتجاوز 1 ميجابايت");
+    setAssetBusy(kind);
+    try {
+      const uploadUrl = await generateUploadUrl({});
+      const response = await fetch(uploadUrl, {
+        method: "POST",
+        headers: { "Content-Type": file.type },
+        body: file,
+      });
+      if (!response.ok) throw new Error("تعذر رفع الصورة");
+      const payload = await response.json() as { storageId: string };
+      await setBrandAsset({ kind, storageId: payload.storageId as Id<"_storage"> });
+      toast.success(kind === "logo" ? "تم تحديث شعار النظام" : "تم تحديث أيقونة المتصفح");
+    } catch (error) {
+      toast.error(getErrorMessage(error, "تعذر رفع الصورة"));
+    } finally {
+      setAssetBusy(null);
+    }
+  };
+
+  const deleteAsset = async (kind: AssetKind) => {
+    if (assetBusy) return;
+    setAssetBusy(kind);
+    try {
+      await removeBrandAsset({ kind });
+      toast.success(kind === "logo" ? "تمت إزالة الشعار" : "تمت إزالة الأيقونة");
+    } catch (error) {
+      toast.error(getErrorMessage(error, "تعذر إزالة الصورة"));
+    } finally {
+      setAssetBusy(null);
     }
   };
 
   const handleSaveModules = async () => {
+    if (savingModules) return;
     setSavingModules(true);
     try {
       await updateModules({ modules });
-      toast.success("تم حفظ إعدادات الوحدات ✅");
-    } catch {
-      toast.error("حدث خطأ أثناء الحفظ");
+      toast.success("تم حفظ إعدادات الوحدات");
+    } catch (error) {
+      toast.error(getErrorMessage(error, "تعذر حفظ إعدادات الوحدات"));
     } finally {
       setSavingModules(false);
     }
   };
 
-  const toggleModule = (key: ModuleKey) => {
-    setModules(prev => ({ ...prev, [key]: !prev[key] }));
-  };
-
-  const storeTypes = [
-    { value: "electronics", label: "إلكترونيات عامة" },
-    { value: "mobile",      label: "موبايل وإكسسوارات" },
-    { value: "laptop",      label: "لابتوب وكمبيوتر" },
-    { value: "gaming",      label: "ألعاب وبلايستيشن" },
-    { value: "mixed",       label: "متعدد التخصصات" },
-  ];
-
+  const logoPreview = settings?.logoPreviewUrl ?? form.logoUrl;
+  const faviconPreview = settings?.faviconPreviewUrl ?? form.faviconUrl;
   const enabledCount = Object.values(modules).filter(Boolean).length;
 
   return (
-    <div className="p-4 lg:p-6 space-y-6">
+    <div className="space-y-6 p-4 lg:p-6" data-testid="settings-page">
       <div>
-        <h1 className="text-2xl font-black text-slate-800 flex items-center gap-2">
-          <Settings className="w-6 h-6 text-indigo-600" />
-          الإعدادات
+        <h1 className="flex items-center gap-2 text-2xl font-black text-slate-800">
+          <Settings className="h-6 w-6 text-[var(--brand-primary)]" />
+          إعدادات النظام
         </h1>
-        <p className="text-slate-500 text-sm mt-0.5">تخصيص النظام وإعدادات White Label</p>
+        <p className="mt-1 text-sm text-slate-500">غيّر الاسم والشعار والألوان في أي وقت بدون تعديل الكود</p>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Store Info */}
-        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
-          <div className="flex items-center gap-2 mb-5">
-            <Store className="w-5 h-5 text-indigo-600" />
-            <h2 className="font-bold text-slate-800">معلومات المحل</h2>
+        <section className="settings-section">
+          <div className="mb-5 flex items-center gap-2">
+            <Palette className="h-5 w-5 text-[var(--brand-primary)]" />
+            <div><h2 className="font-black text-slate-800">الهوية والعلامة التجارية</h2><p className="text-xs text-slate-500">تظهر هذه البيانات في تسجيل الدخول والقائمة والمتصفح والمطبوعات</p></div>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="form-label">اسم المحل / العلامة التجارية</label>
-              <input className="form-input" value={form.storeName} onChange={e => setForm({...form, storeName: e.target.value})} placeholder="تك ستور" />
-            </div>
-            <div>
-              <label className="form-label">نوع النشاط</label>
-              <select className="form-input" value={form.storeType} onChange={e => setForm({...form, storeType: e.target.value})}>
-                {storeTypes.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="form-label">رقم الهاتف</label>
-              <input className="form-input" value={form.phone} onChange={e => setForm({...form, phone: e.target.value})} placeholder="01xxxxxxxxx" />
-            </div>
-            <div>
-              <label className="form-label">العنوان</label>
-              <input className="form-input" value={form.address} onChange={e => setForm({...form, address: e.target.value})} placeholder="المدينة، الحي" />
-            </div>
-          </div>
-        </div>
 
-        {/* White Label Colors */}
-        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
-          <div className="flex items-center gap-2 mb-5">
-            <Palette className="w-5 h-5 text-indigo-600" />
-            <h2 className="font-bold text-slate-800">تخصيص الألوان (White Label)</h2>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+          <div className="mb-6 grid gap-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 lg:grid-cols-[auto_1fr] lg:items-center">
+            <BrandMark name={form.storeName} logoUrl={logoPreview || undefined} primaryColor={form.primaryColor} secondaryColor={form.secondaryColor} size="lg" />
             <div>
-              <label className="form-label">اللون الرئيسي</label>
-              <div className="flex items-center gap-3">
-                <input type="color" className="w-12 h-10 rounded-lg border border-slate-200 cursor-pointer" value={form.primaryColor} onChange={e => setForm({...form, primaryColor: e.target.value})} />
-                <input className="form-input flex-1" value={form.primaryColor} onChange={e => setForm({...form, primaryColor: e.target.value})} placeholder="#6366f1" />
-              </div>
-            </div>
-            <div>
-              <label className="form-label">اللون الثانوي</label>
-              <div className="flex items-center gap-3">
-                <input type="color" className="w-12 h-10 rounded-lg border border-slate-200 cursor-pointer" value={form.secondaryColor} onChange={e => setForm({...form, secondaryColor: e.target.value})} />
-                <input className="form-input flex-1" value={form.secondaryColor} onChange={e => setForm({...form, secondaryColor: e.target.value})} placeholder="#8b5cf6" />
-              </div>
+              <p className="text-lg font-black text-slate-900">{form.shortName || form.storeName || "اسم النظام"}</p>
+              <p className="mt-1 text-sm text-slate-500">{form.tagline || "وصف مختصر للنظام"}</p>
+              <div className="mt-3 h-2 w-full max-w-md overflow-hidden rounded-full bg-slate-200"><div className="h-full w-3/5 rounded-full" style={{ background: `linear-gradient(90deg, ${form.primaryColor}, ${form.secondaryColor})` }} /></div>
             </div>
           </div>
-          <div className="mt-4 p-4 rounded-xl border border-slate-200 bg-slate-50">
-            <p className="text-xs text-slate-500 mb-3">معاينة الألوان</p>
-            <div className="flex gap-3">
-              <div
-                className="flex-1 h-12 rounded-xl flex items-center justify-center text-white text-sm font-bold shadow-sm"
-                style={{ background: `linear-gradient(135deg, ${form.primaryColor}, ${form.secondaryColor})` }}
-              >
-                {form.storeName}
-              </div>
-              <div className="w-12 h-12 rounded-xl shadow-sm" style={{ background: form.primaryColor }} />
-              <div className="w-12 h-12 rounded-xl shadow-sm" style={{ background: form.secondaryColor }} />
-            </div>
-          </div>
-        </div>
 
-        {/* Financial Settings */}
-        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
-          <div className="flex items-center gap-2 mb-5">
-            <svg className="w-5 h-5 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <h2 className="font-bold text-slate-800">الإعدادات المالية</h2>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label className="form-label">اسم النظام الكامل *<input data-testid="settings-store-name" className="form-input" required maxLength={100} value={form.storeName} onChange={event => setForm({ ...form, storeName: event.target.value })} placeholder="DAGHASH ERP" /></label>
+            <label className="form-label">الاسم المختصر<input className="form-input" maxLength={30} value={form.shortName} onChange={event => setForm({ ...form, shortName: event.target.value })} placeholder="DAGHASH" /></label>
+            <label className="form-label sm:col-span-2">العبارة التعريفية<input className="form-input" maxLength={120} value={form.tagline} onChange={event => setForm({ ...form, tagline: event.target.value })} placeholder="إدارة أعمالك بوضوح" /></label>
+            <label className="form-label sm:col-span-2">الاسم القانوني للمنشأة<input className="form-input" maxLength={160} value={form.legalName} onChange={event => setForm({ ...form, legalName: event.target.value })} placeholder="الاسم المسجل في الفواتير والمستندات" /></label>
+            <ColorField label="اللون الرئيسي" value={form.primaryColor} onChange={value => setForm({ ...form, primaryColor: value })} />
+            <ColorField label="اللون الثانوي" value={form.secondaryColor} onChange={value => setForm({ ...form, secondaryColor: value })} />
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="form-label">العملة</label>
-              <select className="form-input" value={form.currency} onChange={e => setForm({...form, currency: e.target.value})}>
-                <option value="EGP">جنيه مصري (EGP)</option>
-              </select>
-            </div>
-            <div>
-              <label className="form-label">نسبة ضريبة القيمة المضافة (%)</label>
-              <input className="form-input" type="number" value={form.taxRate} onChange={e => setForm({...form, taxRate: Number(e.target.value)})} min="0" max="100" />
-            </div>
-          </div>
-        </div>
 
-        {/* WhatsApp */}
-        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
-          <div className="flex items-center gap-2 mb-5">
-            <MessageCircle className="w-5 h-5 text-emerald-600" />
-            <h2 className="font-bold text-slate-800">إعدادات واتساب</h2>
+          <div className="mt-5 grid gap-4 lg:grid-cols-2">
+            <AssetCard title="شعار النظام" description="PNG أو JPG أو SVG، بحد أقصى 2 ميجابايت" preview={logoPreview} busy={assetBusy === "logo"} onUpload={file => void uploadAsset("logo", file)} onRemove={() => void deleteAsset("logo")} />
+            <AssetCard title="أيقونة المتصفح" description="صورة مربعة، بحد أقصى 1 ميجابايت" preview={faviconPreview} busy={assetBusy === "favicon"} onUpload={file => void uploadAsset("favicon", file)} onRemove={() => void deleteAsset("favicon")} compact />
           </div>
-          <div>
-            <label className="form-label">رقم واتساب للإشعارات (مع رمز الدولة)</label>
-            <input className="form-input" value={form.whatsappNumber} onChange={e => setForm({...form, whatsappNumber: e.target.value})} placeholder="201012345678" dir="ltr" />
-            <p className="text-xs text-slate-400 mt-1.5">مثال: 201012345678 (بدون + أو 00)</p>
-          </div>
-          {form.whatsappNumber && (
-            <div className="mt-3">
-              <a
-                href={`https://wa.me/${normalizeEgyptPhoneForWhatsApp(form.whatsappNumber)}?text=${encodeURIComponent("مرحباً، أريد الاستفسار")}`}
-                target="_blank" rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-500 text-white rounded-xl text-sm font-medium hover:bg-emerald-600 transition-colors"
-              >
-                <MessageCircle className="w-4 h-4" />
-                اختبار واتساب
-              </a>
-            </div>
-          )}
-        </div>
 
-        <button type="submit" className="btn-primary flex items-center gap-2 w-full sm:w-auto justify-center">
-          <Save className="w-4 h-4" />
-          حفظ الإعدادات
-        </button>
+          <details className="mt-4 rounded-2xl border border-slate-200 bg-white p-4">
+            <summary className="cursor-pointer text-sm font-bold text-slate-700">استخدام روابط صور خارجية بدل الرفع</summary>
+            <div className="mt-4 grid gap-4 sm:grid-cols-2">
+              <label className="form-label">رابط الشعار<input className="form-input" dir="ltr" value={form.logoUrl} onChange={event => setForm({ ...form, logoUrl: event.target.value })} placeholder="https://..." /></label>
+              <label className="form-label">رابط أيقونة المتصفح<input className="form-input" dir="ltr" value={form.faviconUrl} onChange={event => setForm({ ...form, faviconUrl: event.target.value })} placeholder="https://..." /></label>
+            </div>
+          </details>
+        </section>
+
+        <section className="settings-section">
+          <div className="mb-5 flex items-center gap-2"><Building2 className="h-5 w-5 text-[var(--brand-primary)]" /><h2 className="font-black text-slate-800">بيانات المنشأة والفواتير</h2></div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label className="form-label">نوع النشاط<select className="form-input" value={form.storeType} onChange={event => setForm({ ...form, storeType: event.target.value })}><option value="retail">تجزئة</option><option value="wholesale">جملة</option><option value="services">خدمات</option><option value="mixed">تجارة وخدمات</option><option value="electronics">إلكترونيات</option></select></label>
+            <label className="form-label">رقم الهاتف<input className="form-input" value={form.phone} onChange={event => setForm({ ...form, phone: event.target.value })} placeholder="01xxxxxxxxx" /></label>
+            <label className="form-label sm:col-span-2">العنوان<input className="form-input" value={form.address} onChange={event => setForm({ ...form, address: event.target.value })} placeholder="المحافظة، المدينة، العنوان" /></label>
+            <label className="form-label">العملة<select className="form-input" value="EGP" disabled><option value="EGP">جنيه مصري (EGP)</option></select></label>
+            <label className="form-label">ضريبة القيمة المضافة (%)<input className="form-input" type="number" min="0" max="100" step="0.01" value={form.taxRate} onChange={event => setForm({ ...form, taxRate: Number(event.target.value) })} /></label>
+            <label className="form-label sm:col-span-2">تذييل الفاتورة<textarea className="form-input min-h-24" maxLength={500} value={form.invoiceFooter} onChange={event => setForm({ ...form, invoiceFooter: event.target.value })} placeholder="شكرًا لتعاملكم معنا" /></label>
+          </div>
+        </section>
+
+        <section className="settings-section">
+          <div className="mb-5 flex items-center gap-2"><MessageCircle className="h-5 w-5 text-emerald-600" /><h2 className="font-black text-slate-800">التواصل وواتساب</h2></div>
+          <label className="form-label">رقم واتساب للإشعارات<input className="form-input" dir="ltr" value={form.whatsappNumber} onChange={event => setForm({ ...form, whatsappNumber: event.target.value })} placeholder="201012345678" /><span className="mt-1 block text-xs font-normal text-slate-400">اكتب رمز الدولة بدون + أو 00</span></label>
+          {form.whatsappNumber && <a href={`https://wa.me/${normalizeEgyptPhoneForWhatsApp(form.whatsappNumber)}?text=${encodeURIComponent("مرحبًا، هذه رسالة اختبار من نظام الإدارة")}`} target="_blank" rel="noopener noreferrer" className="mt-3 inline-flex items-center gap-2 rounded-xl bg-emerald-500 px-4 py-2 text-sm font-bold text-white transition hover:bg-emerald-600"><MessageCircle className="h-4 w-4" />اختبار واتساب</a>}
+        </section>
+
+        <button data-testid="settings-save" type="submit" disabled={saving} className="btn-primary flex w-full items-center justify-center gap-2 sm:w-auto"><Save className="h-4 w-4" />{saving ? "جارٍ الحفظ..." : "حفظ إعدادات النظام"}</button>
       </form>
 
-      {/* Modules Management */}
-      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
-        <div className="flex items-center justify-between mb-5">
-          <div className="flex items-center gap-2">
-            <Shield className="w-5 h-5 text-indigo-600" />
-            <div>
-              <h2 className="font-bold text-slate-800">إدارة الوحدات</h2>
-              <p className="text-xs text-slate-500 mt-0.5">تفعيل أو إيقاف أقسام النظام</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <span className="text-xs text-slate-500 bg-slate-100 px-3 py-1.5 rounded-lg font-medium">
-              {enabledCount} / {MODULE_LIST.length} مفعّل
-            </span>
-            <button
-              onClick={handleSaveModules}
-              disabled={savingModules}
-              className="btn-primary flex items-center gap-2 text-sm py-2"
-            >
-              {savingModules
-                ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                : <Save className="w-4 h-4" />
-              }
-              حفظ الوحدات
-            </button>
-          </div>
+      <section className="settings-section">
+        <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2"><Shield className="h-5 w-5 text-[var(--brand-primary)]" /><div><h2 className="font-black text-slate-800">وحدات النظام</h2><p className="text-xs text-slate-500">فعّل فقط الوحدات التي تحتاجها المنشأة</p></div></div>
+          <div className="flex items-center gap-2"><span className="rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-600">{enabledCount} / {MODULE_LIST.length} مفعّل</span><button type="button" onClick={() => void handleSaveModules()} disabled={savingModules} className="btn-primary flex items-center gap-2 py-2 text-sm"><Save className="h-4 w-4" />{savingModules ? "جارٍ الحفظ..." : "حفظ الوحدات"}</button></div>
         </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          {MODULE_LIST.map(mod => {
-            const isEnabled = modules[mod.key];
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {MODULE_LIST.map(module => {
+            const enabled = modules[module.key];
             return (
-              <button
-                key={mod.key}
-                onClick={() => toggleModule(mod.key)}
-                className={`flex items-center gap-3 p-4 rounded-xl border-2 text-right transition-all ${
-                  isEnabled
-                    ? "border-indigo-200 bg-indigo-50 hover:bg-indigo-100"
-                    : "border-slate-200 bg-slate-50 hover:bg-slate-100"
-                }`}
-              >
-                <div className={`flex-shrink-0 transition-colors ${isEnabled ? "text-indigo-600" : "text-slate-400"}`}>
-                  {isEnabled
-                    ? <ToggleRight className="w-7 h-7" />
-                    : <ToggleLeft className="w-7 h-7" />
-                  }
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className={`font-bold text-sm ${isEnabled ? "text-indigo-800" : "text-slate-600"}`}>
-                    {mod.label}
-                  </p>
-                  <p className={`text-xs mt-0.5 ${isEnabled ? "text-indigo-600" : "text-slate-400"}`}>
-                    {mod.desc}
-                  </p>
-                </div>
-                <div className={`w-2 h-2 rounded-full flex-shrink-0 ${isEnabled ? "bg-indigo-500" : "bg-slate-300"}`} />
+              <button key={module.key} type="button" onClick={() => setModules(value => ({ ...value, [module.key]: !value[module.key] }))} className={`flex items-center gap-3 rounded-2xl border p-4 text-right transition ${enabled ? "border-[color:var(--brand-primary)] bg-[color-mix(in_srgb,var(--brand-primary)_6%,white)]" : "border-slate-200 bg-slate-50"}`}>
+                {enabled ? <ToggleRight className="h-7 w-7 shrink-0 text-[var(--brand-primary)]" /> : <ToggleLeft className="h-7 w-7 shrink-0 text-slate-400" />}
+                <div className="min-w-0 flex-1"><p className="text-sm font-black text-slate-800">{module.label}</p><p className="mt-0.5 text-xs text-slate-500">{module.desc}</p></div>
               </button>
             );
           })}
         </div>
+      </section>
+    </div>
+  );
+}
 
-        <div className="mt-4 p-3 bg-amber-50 rounded-xl border border-amber-200">
-          <p className="text-xs text-amber-700 font-medium">
-            💡 تأكد من حفظ الوحدات بعد التعديل. سيتم إخفاء الأقسام المعطلة من القائمة الجانبية فوراً.
-          </p>
+function ColorField({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
+  return <label className="form-label">{label}<div className="flex items-center gap-3"><input type="color" className="h-11 w-14 cursor-pointer rounded-xl border border-slate-200 bg-white p-1" value={value} onChange={event => onChange(event.target.value)} /><input className="form-input flex-1" dir="ltr" required pattern="#[0-9a-fA-F]{6}" value={value} onChange={event => onChange(event.target.value)} /></div></label>;
+}
+
+function AssetCard({ title, description, preview, busy, compact, onUpload, onRemove }: { title: string; description: string; preview?: string | null; busy: boolean; compact?: boolean; onUpload: (file?: File) => void; onRemove: () => void }) {
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white p-4">
+      <div className="flex items-center gap-3">
+        <div className={`${compact ? "h-12 w-12" : "h-16 w-16"} flex shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-slate-100`}>
+          {preview ? <img src={preview} alt={title} className="h-full w-full object-contain p-1" /> : <Image className="h-5 w-5 text-slate-400" />}
         </div>
+        <div className="min-w-0 flex-1"><p className="font-black text-slate-800">{title}</p><p className="mt-0.5 text-xs text-slate-500">{description}</p></div>
+      </div>
+      <div className="mt-4 flex gap-2">
+        <label className="btn-secondary flex cursor-pointer items-center gap-2 text-sm"><Upload className="h-4 w-4" />{busy ? "جارٍ التنفيذ..." : "رفع صورة"}<input type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml,image/x-icon" className="hidden" disabled={busy} onChange={event => onUpload(event.target.files?.[0])} /></label>
+        {preview && <button type="button" disabled={busy} onClick={onRemove} className="flex items-center gap-2 rounded-xl border border-red-200 px-3 py-2 text-sm font-bold text-red-600 transition hover:bg-red-50"><Trash2 className="h-4 w-4" />إزالة</button>}
       </div>
     </div>
   );

@@ -192,7 +192,7 @@ export function CRMPage() {
         <div>
           <h1 className="text-2xl font-black text-slate-800 flex items-center gap-2">
             <Target className="w-6 h-6 text-indigo-600" />
-            إدارة العملاء المحتملين (CRM)
+            إدارة علاقات العملاء
           </h1>
           <p className="text-slate-500 text-sm mt-0.5">تتبع العملاء من أول تواصل حتى إتمام البيع</p>
         </div>
@@ -577,7 +577,7 @@ export function CRMPage() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="form-label">المسؤول</label>
-                  <input className="form-input" placeholder="اسم الموظف" value={form.assignedTo} onChange={e => setForm({ ...form, assignedTo: e.target.value })} />
+                  <input className="form-input" placeholder="اسم المسؤول" value={form.assignedTo} onChange={e => setForm({ ...form, assignedTo: e.target.value })} />
                 </div>
                 <div>
                   <label className="form-label">تاريخ المتابعة</label>

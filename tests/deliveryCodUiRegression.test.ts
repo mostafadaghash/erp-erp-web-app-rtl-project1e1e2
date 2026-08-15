@@ -47,7 +47,7 @@ test("UI-14 exposes a delivery confirmation modal", () =>
   assert.match(source, /deliver:\s*"تأكيد التسليم والتحصيل"/));
 test("UI-15 exposes cancellation and return modals", () => {
   assert.match(source, /return:\s*"إرجاع قبل التسليم"/);
-  assert.match(source, /cancel:\s*"إلغاء التوصيل"/);
+  assert.match(source, /cancel:\s*"إلغاء الشحن"/);
 });
 test("UI-16 settlement and reversal collect date and reason", () => {
   assert.match(source, /settle:\s*"تسوية COD مجمعة"/);
@@ -89,7 +89,7 @@ test("UI-25 real Convex delivery print query is awaited", () =>
 test("UI-26 real Convex settlement print query is awaited", () =>
   assert.match(source, /const dto\s*=\s*await convex\.query\(api\.deliveries\.printCodSettlement/));
 test("UI-27 delivery and settlement print structured Arabic vouchers", () => {
-  assert.match(source, /سند توصيل/);
+  assert.match(source, /سند شحن/);
   assert.match(source, /سند تسوية/);
   assert.match(source, /توقيع الناقل/);
   assert.match(source, /الإجمالي/);
@@ -128,7 +128,7 @@ test("UI-35 central validation covers create delivery required inputs", () => {
     "اختر طلبًا جاهزًا",
     "اختر الفاتورة المؤهلة",
     "أدخل المدينة",
-    "أدخل عنوان التوصيل",
+    "أدخل عنوان الشحن",
     "أدخل شركة الشحن",
     "أدخل رسوم ناقل صحيحة",
   ]) {
@@ -144,7 +144,7 @@ test("UI-37 settlement validates accounts selection gross fee and date", () => {
     "اختر حساب مصدر التسوية",
     "اختر حساب وجهة التسوية",
     "يجب اختلاف حساب المصدر عن الوجهة",
-    "اختر شحنة COD واحدة على الأقل",
+    "اختر عملية شحن COD واحدة على الأقل",
     "إجمالي COD المحدد يجب أن يكون أكبر من صفر",
     "لا يمكن أن تتجاوز الرسوم إجمالي COD",
     "اختر تاريخ التسوية",

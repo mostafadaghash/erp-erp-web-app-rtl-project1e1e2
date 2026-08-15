@@ -121,7 +121,7 @@ export function BranchesPage() {
           { label: "إجمالي الفروع",   value: stats?.total ?? 0,         color: "text-indigo-600",  bg: "bg-indigo-50",  icon: Building2 },
           { label: "فروع نشطة",       value: stats?.active ?? 0,        color: "text-emerald-600", bg: "bg-emerald-50", icon: CheckCircle },
           { label: "فروع متوقفة",     value: stats?.inactive ?? 0,      color: "text-red-600",     bg: "bg-red-50",     icon: XCircle },
-          ...(canViewEmployees ? [{ label: "إجمالي الموظفين", value: stats?.totalEmployees ?? 0, color: "text-blue-600", bg: "bg-blue-50", icon: Users }] : []),
+          ...(canViewEmployees ? [{ label: "إجمالي المستخدمين", value: stats?.totalEmployees ?? 0, color: "text-blue-600", bg: "bg-blue-50", icon: Users }] : []),
         ].map(s => {
           const Icon = s.icon;
           return (

@@ -39,7 +39,7 @@ test("supplier UI never displays legacy supplier balance", () => {
 });
 
 test("receipt UI displays the real Convex error", () => {
-  assert.match(shipments, /getErrorMessage\(error, "تعذر استلام الشحنة"\)/);
+  assert.match(shipments, /getErrorMessage\(error, "تعذر استلام عملية الشراء"\)/);
 });
 
 test("purchase UI modified files have no unsafe TypeScript escapes", () => {

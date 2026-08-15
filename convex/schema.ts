@@ -53,10 +53,17 @@ const applicationTables = {
   // إعدادات النظام
   settings: defineTable({
     storeName: v.string(),
+    shortName: v.optional(v.string()),
+    tagline: v.optional(v.string()),
+    legalName: v.optional(v.string()),
     storeType: v.string(),
     primaryColor: v.string(),
     secondaryColor: v.string(),
     logoUrl: v.optional(v.string()),
+    faviconUrl: v.optional(v.string()),
+    logoStorageId: v.optional(v.id("_storage")),
+    faviconStorageId: v.optional(v.id("_storage")),
+    invoiceFooter: v.optional(v.string()),
     phone: v.optional(v.string()),
     address: v.optional(v.string()),
     currency: v.string(),
@@ -541,7 +548,7 @@ const applicationTables = {
     deliveryId:v.id("deliveries"),deliveryNumber:v.string(),attemptNumber:v.number(),branchId:v.id("branches"),invoiceId:v.id("invoices"),orderId:v.id("orders"),customerId:v.id("customers"),codAmount:v.number(),codClearingAccountId:v.optional(v.id("financialAccounts")),status:v.union(v.literal("posted"),v.literal("reversed")),date:v.string(),requestId:v.string(),idempotencyKey:v.string(),requestFingerprint:v.string(),financialTransactionId:v.optional(v.id("financialTransactions")),customerLedgerEntryId:v.optional(v.id("customerLedgerEntries")),reversalRequestId:v.optional(v.string()),reversalFingerprint:v.optional(v.string()),reversalFinancialTransactionId:v.optional(v.id("financialTransactions")),reversalCustomerLedgerEntryId:v.optional(v.id("customerLedgerEntries")),reversalReason:v.optional(v.string()),reversalDate:v.optional(v.string()),reversedAt:v.optional(v.number()),reversedBy:v.optional(v.string()),createdBy:v.string(),createdAt:v.number()
   }).index("by_delivery_status",["deliveryId","status"]).index("by_delivery",["deliveryId"]).index("by_idempotency",["idempotencyKey"]).index("by_branch_date",["branchId","date"]).index("by_branch_reversal_date",["branchId","reversalDate"]).index("by_financial_transaction",["financialTransactionId"]),
 
-  // سجل العمليات
+  // سجل المراجعة
   auditLogs: defineTable({
     userId: v.optional(v.string()),
     userName: v.optional(v.string()),

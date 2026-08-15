@@ -54,7 +54,7 @@ type DatasetConfig = {
 const DATASETS: DatasetConfig[] = [
   {
     id: "products",
-    label: "المنتجات والمخزون",
+    label: "الأصناف",
     description: "الأسعار والأرصدة وحدود إعادة الطلب",
     permission: "view_products",
     icon: Package,
@@ -75,7 +75,7 @@ const DATASETS: DatasetConfig[] = [
   },
   {
     id: "orders",
-    label: "الأوردرات",
+    label: "أوامر البيع",
     description: "البنود والعربون والمتبقي وحالة التنفيذ",
     permission: "view_orders",
     icon: ShoppingCart,
@@ -89,7 +89,7 @@ const DATASETS: DatasetConfig[] = [
   },
   {
     id: "shipments",
-    label: "الشحنات الواردة",
+    label: "المشتريات",
     description: "الموردون والبنود والتكلفة وحالة الوصول",
     permission: "view_shipments",
     icon: Boxes,
@@ -110,7 +110,7 @@ const DATASETS: DatasetConfig[] = [
   },
   {
     id: "deliveries",
-    label: "التوصيلات",
+    label: "عمليات الشحن",
     description: "الشحن والعملاء والتحصيل عند الاستلام",
     permission: "view_deliveries",
     icon: UserRound,

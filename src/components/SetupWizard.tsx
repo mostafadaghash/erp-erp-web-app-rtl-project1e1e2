@@ -120,7 +120,7 @@ export function SetupWizard() {
         </div>
 
         <p className="text-center text-slate-500 text-xs mt-6">
-          سيكون لهذا الحساب صلاحيات كاملة لإدارة النظام والموظفين
+          سيكون لهذا الحساب صلاحيات كاملة لإدارة النظام والمستخدمين
         </p>
       </div>
     </div>

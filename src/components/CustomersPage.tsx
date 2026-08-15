@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
@@ -42,11 +42,13 @@ const emptyForm: CustomerForm = {
 
 export function CustomersPage({
   onOpenLedger,
+  createRequestToken,
 }: {
   onOpenLedger?: (
     customerId: Id<"customers">,
     branchId: Id<"branches">,
   ) => void;
+  createRequestToken?: number;
 }) {
   const canCreate = usePermission("create_customers");
   const canEdit = usePermission("edit_customers");
@@ -138,6 +140,10 @@ export function CustomersPage({
     setShowForm(true);
   };
 
+  useEffect(() => {
+    if (createRequestToken && canCreate) openCreate();
+  }, [createRequestToken, canCreate]);
+
   const openEdit = (customer: CustomerCard) => {
     setEditingId(customer._id);
     setForm({
@@ -216,7 +222,7 @@ export function CustomersPage({
   const openLedger = (customer: CustomerCard) => {
     const branchId = customer.branchId ?? effectiveBranchId;
     if (!onOpenLedger || !branchId) {
-      toast.error("اختر فرع العمل قبل فتح دفتر العميل");
+      toast.error("اختر فرع العمل قبل فتح حساب العميل");
       return;
     }
     onOpenLedger(customer._id, branchId);
@@ -416,7 +422,7 @@ export function CustomersPage({
                     className="btn-secondary text-xs flex items-center justify-center gap-1"
                   >
                     <BookOpen className="w-3.5 h-3.5" />
-                    دفتر العميل
+                    حساب العميل
                   </button>
                 )}
               </div>
@@ -515,4 +521,3 @@ function StatCard({
     </div>
   );
 }
-
