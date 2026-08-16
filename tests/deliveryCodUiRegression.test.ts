@@ -125,7 +125,7 @@ test("UI-34 opening a fresh operation rotates the idempotency request", () =>
 test("UI-35 central validation covers create delivery required inputs", () => {
   for (const message of [
     "اختر الفرع",
-    "اختر طلبًا جاهزًا",
+    "اختر أمر بيع جاهزًا",
     "اختر الفاتورة المؤهلة",
     "أدخل المدينة",
     "أدخل عنوان الشحن",
