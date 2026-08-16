@@ -228,7 +228,7 @@ export function DeliveriesPage({ createRequestToken }: { createRequestToken?: nu
 
     if (modal === "create") {
       if (!activeBranch) return "اختر الفرع";
-      if (!chosenOrder) return "اختر طلبًا جاهزًا";
+      if (!chosenOrder) return "اختر أمر بيع جاهزًا";
       if (!chosenInvoice) return "اختر الفاتورة المؤهلة";
       if (!city.trim()) return "أدخل المدينة";
       if (!address.trim()) return "أدخل عنوان الشحن";
@@ -299,7 +299,7 @@ export function DeliveriesPage({ createRequestToken }: { createRequestToken?: nu
         .join("");
       openPrintWindow(
         `سند شحن ${dto.deliveryNumber}`,
-        `<p>الطلب: ${escapeHtml(dto.orderNumber ?? "—")} | الفاتورة: ${escapeHtml(dto.invoiceNumber ?? "—")}</p><p>العميل: ${escapeHtml(dto.customerName)} — ${escapeHtml(dto.city)}</p><p>العنوان: ${escapeHtml(dto.address)}</p><p>شركة الشحن: ${escapeHtml(dto.shippingCompany)} | رقم التتبع: ${escapeHtml(dto.trackingNumber ?? "—")}</p><table><thead><tr><th>الصنف</th><th>الكمية</th><th>السعر</th></tr></thead><tbody>${itemRows}</tbody></table><p>الإجمالي: ${escapeHtml(money.format(dto.totalAmount))} | المدفوع: ${escapeHtml(money.format(dto.prepaidAmount ?? 0))} | COD: ${escapeHtml(money.format(dto.codAmount ?? 0))}</p><p>الحالة: ${escapeHtml(statusLabel(dto.status))}</p>`,
+        `<p>أمر البيع: ${escapeHtml(dto.orderNumber ?? "—")} | الفاتورة: ${escapeHtml(dto.invoiceNumber ?? "—")}</p><p>العميل: ${escapeHtml(dto.customerName)} — ${escapeHtml(dto.city)}</p><p>العنوان: ${escapeHtml(dto.address)}</p><p>شركة الشحن: ${escapeHtml(dto.shippingCompany)} | رقم التتبع: ${escapeHtml(dto.trackingNumber ?? "—")}</p><table><thead><tr><th>الصنف</th><th>الكمية</th><th>السعر</th></tr></thead><tbody>${itemRows}</tbody></table><p>الإجمالي: ${escapeHtml(money.format(dto.totalAmount))} | المدفوع: ${escapeHtml(money.format(dto.prepaidAmount ?? 0))} | COD: ${escapeHtml(money.format(dto.codAmount ?? 0))}</p><p>الحالة: ${escapeHtml(statusLabel(dto.status))}</p>`,
       );
     } catch (error) {
       toast.error(getErrorMessage(error, "تعذرت الطباعة"));
@@ -344,11 +344,11 @@ export function DeliveriesPage({ createRequestToken }: { createRequestToken?: nu
             <Truck />
             عمليات الشحن والتحصيل عند التسليم
           </h1>
-          <p className="text-slate-500">دورة موثقة من الطلب والفاتورة حتى التسوية</p>
+          <p className="text-slate-500">دورة موثقة من أمر البيع والفاتورة حتى التسوية</p>
         </div>
         {canCreate && (
           <button data-testid="delivery-create-open" className="btn-primary" onClick={() => open("create")} disabled={!activeBranch}>
-            إنشاء من طلب وفاتورة
+            إنشاء من أمر بيع وفاتورة
           </button>
         )}
       </header>
@@ -527,7 +527,7 @@ export function DeliveriesPage({ createRequestToken }: { createRequestToken?: nu
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 rounded-xl bg-slate-50 p-4">
                   <p><strong>السند:</strong> {deliveryDetails.deliveryNumber}</p>
                   <p><strong>الحالة:</strong> {statusLabel(deliveryDetails.status)}</p>
-                  <p><strong>الطلب:</strong> {deliveryDetails.orderNumber ?? "—"}</p>
+                  <p><strong>أمر البيع:</strong> {deliveryDetails.orderNumber ?? "—"}</p>
                   <p><strong>الفاتورة:</strong> {deliveryDetails.invoiceNumber ?? "—"}</p>
                   <p><strong>العميل:</strong> {deliveryDetails.customerName}</p>
                   <p><strong>الهاتف:</strong> {deliveryDetails.customerPhone}</p>
@@ -563,8 +563,8 @@ export function DeliveriesPage({ createRequestToken }: { createRequestToken?: nu
 
             {modal === "create" && (
               <>
-                {options === undefined && <p role="status" className="text-slate-500">جارٍ تحميل الطلبات الجاهزة…</p>}
-                {options?.length === 0 && <p className="text-slate-500">لا توجد طلبات جاهزة مؤهلة للشحن.</p>}
+                {options === undefined && <p role="status" className="text-slate-500">جارٍ تحميل أوامر البيع الجاهزة…</p>}
+                {options?.length === 0 && <p className="text-slate-500">لا توجد أوامر بيع جاهزة مؤهلة للشحن.</p>}
                 <select
                   data-testid="delivery-order-select"
                   className="form-input"
@@ -574,7 +574,7 @@ export function DeliveriesPage({ createRequestToken }: { createRequestToken?: nu
                     setInvoiceId("");
                   }}
                 >
-                  <option value="">اختر طلباً جاهزاً</option>
+                  <option value="">اختر أمر بيع جاهزًا</option>
                   {options?.map((order) => (
                     <option key={order.orderId} value={order.orderId}>
                       {order.orderNumber} — {order.customerName}
