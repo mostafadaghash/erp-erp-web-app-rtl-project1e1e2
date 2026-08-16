@@ -389,11 +389,11 @@ export function RepairsPage({ createRequestToken }: { createRequestToken?: numbe
           ? selectedBranchId as Id<"branches">
           : undefined,
       });
-      toast.success("تم إضافة طلب الصيانة بنجاح");
+      toast.success("تم إنشاء أمر الصيانة بنجاح");
       resetCreateState();
       setShowForm(false);
     } catch (error) {
-      toast.error(getErrorMessage(error, "تعذر إضافة طلب الصيانة"));
+      toast.error(getErrorMessage(error, "تعذر إنشاء أمر الصيانة"));
     } finally {
       setSaving(false);
     }
@@ -453,7 +453,7 @@ export function RepairsPage({ createRequestToken }: { createRequestToken?: numbe
       setTransitionNext(null);
       setTransitionRequestId(crypto.randomUUID());
     } catch (error) {
-      toast.error(getErrorMessage(error, "تعذر تحديث حالة الصيانة"));
+      toast.error(getErrorMessage(error, "تعذر تحديث حالة أمر الصيانة"));
     } finally {
       setUpdatingId(null);
     }
@@ -492,10 +492,10 @@ export function RepairsPage({ createRequestToken }: { createRequestToken?: numbe
         expectedDate: editForm.expectedDate,
         notes: editForm.notes,
       });
-      toast.success("تم تحديث بيانات الصيانة");
+      toast.success("تم تحديث بيانات أمر الصيانة");
       setEditTarget(null);
     } catch (error) {
-      toast.error(getErrorMessage(error, "تعذر تحديث بيانات الصيانة"));
+      toast.error(getErrorMessage(error, "تعذر تحديث بيانات أمر الصيانة"));
     } finally {
       setUpdatingId(null);
     }
@@ -746,7 +746,7 @@ export function RepairsPage({ createRequestToken }: { createRequestToken?: numbe
         <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
         <input
           className="form-input pr-10"
-          placeholder="بحث بالاسم أو رقم الطلب أو الجهاز..."
+          placeholder="بحث بالاسم أو رقم أمر الصيانة أو الجهاز..."
           value={search}
           onChange={e => setSearch(e.target.value)}
         />
@@ -850,7 +850,7 @@ export function RepairsPage({ createRequestToken }: { createRequestToken?: numbe
                         </button>
                       )}
                       <a
-                        href={buildEgyptWhatsAppUrl(r.customerPhone, `مرحباً ${r.customerName}،\nرابط متابعة طلب الصيانة الخاص بك:\n${window.location.origin}${window.location.pathname}#track=${r.trackingToken}\n\nرقم الطلب: ${r.repairNumber}`)}
+                        href={buildEgyptWhatsAppUrl(r.customerPhone, `مرحباً ${r.customerName}،\nرابط متابعة أمر الصيانة الخاص بك:\n${window.location.origin}${window.location.pathname}#track=${r.trackingToken}\n\nرقم أمر الصيانة: ${r.repairNumber}`)}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="p-1.5 bg-emerald-100 hover:bg-emerald-200 rounded-lg transition-colors text-emerald-600"
@@ -1274,7 +1274,7 @@ export function RepairsPage({ createRequestToken }: { createRequestToken?: numbe
       {editTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" dir="rtl">
           <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl">
-            <h2 className="text-lg font-black">بيانات الصيانة {editTarget.repairNumber}</h2>
+            <h2 className="text-lg font-black">بيانات أمر الصيانة {editTarget.repairNumber}</h2>
             <form className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2" onSubmit={saveDetails}>
               <div>
                 <label className="form-label">الفني المسؤول</label>
