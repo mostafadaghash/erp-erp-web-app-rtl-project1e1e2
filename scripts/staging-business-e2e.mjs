@@ -408,7 +408,7 @@ async function createPurchaseCycle(page, fixtures, marker) {
   await returnItem.getByTestId("purchase-return-quantity").fill("1");
   await page.getByTestId("purchase-return-reason").fill(marker);
   await page.getByTestId("purchase-return-submit").click();
-  await waitForToast(page, "تم ترحيل مرتجع الشراء");
+  await waitForToast(page, "تم ترحيل مرتجع المشتريات");
 
   await navigate(page, "حسابات الموردين", "supplier-payments-page");
   await selectContaining(page.getByTestId("supplier-payment-supplier"), fixtures.supplierName);
@@ -439,7 +439,7 @@ async function createRepairCycle(page, fixtures, marker) {
   await page.getByTestId("repair-labor-cost").fill(String(fixtures.repairLaborCost));
   await page.getByTestId("repair-notes").fill(marker);
   await page.getByTestId("repair-submit").click();
-  await waitForToast(page, "تم إضافة طلب الصيانة بنجاح");
+  await waitForToast(page, "تم إنشاء أمر الصيانة بنجاح");
   await page.getByTestId("repair-create-form").waitFor({ state: "detached" });
   const created = await waitForNewEntity(page, "repair-card", "data-repair-number", before);
   await created.locator.getByTestId("repair-collect-open").click();
