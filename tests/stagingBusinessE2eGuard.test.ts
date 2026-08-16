@@ -9,6 +9,14 @@ const browserScript = read("scripts/staging-browser-e2e.mjs");
 const workflow = read(".github/workflows/staging-acceptance.yml");
 const runbook = read("docs/STAGING_ACCEPTANCE_RUNBOOK.md");
 const matrix = read("tests/STAGING_BUSINESS_E2E_MATRIX.md");
+const executableAcceptanceCopy = [
+  script,
+  browserScript,
+  read("tests/e2e/operational-flows.spec.ts"),
+  read("tests/e2e/roles-branches.spec.ts"),
+  read("tests/e2e/staging-smoke.spec.ts"),
+  matrix,
+].join("\n");
 
 const fixtures = {
   dataset: "disposable-staging",
@@ -122,11 +130,34 @@ test("business cycles wait for the professional ERP success copy", () => {
     "تم تأكيد إرسال الشحنة",
     "تم إنشاء عملية الشراء بنجاح",
     "تم تحديث حالة عملية الشراء",
+    "تم ترحيل مرتجع المشتريات",
+    "تم إنشاء أمر الصيانة بنجاح",
   ]) assert.match(script, new RegExp(message));
 
   assert.doesNotMatch(
     script,
-    /تم إنشاء الأوردر بنجاح|تم إنشاء سند التوصيل|تم تأكيد الشحن|تم إنشاء الشحنة بنجاح|تم تحديث حالة الشحنة/,
+    /تم إنشاء الأوردر بنجاح|تم إنشاء سند التوصيل|تم تأكيد الشحن|تم إنشاء الشحنة بنجاح|تم تحديث حالة الشحنة|تم ترحيل مرتجع الشراء|تم إضافة طلب الصيانة بنجاح/,
+  );
+});
+
+test("all executable browser acceptance paths use the professional module names", () => {
+  for (const label of [
+    "المبيعات",
+    "مرتجعات المبيعات",
+    "أوامر البيع",
+    "المشتريات",
+    "مرتجعات المشتريات",
+    "عمليات الشحن",
+    "أوامر الصيانة",
+    "حسابات الموردين",
+    "الخزائن والبنوك",
+    "المستخدمون والصلاحيات",
+    "سجل المراجعة",
+  ]) assert.match(executableAcceptanceCopy, new RegExp(label));
+
+  assert.doesNotMatch(
+    executableAcceptanceCopy,
+    /المبيعات والفواتير|الأوردرات|الشحنات الواردة|التوصيلات|مدفوعات الموردين|الموظفون والصلاحيات|سجل العمليات|Sign Out/,
   );
 });
 
@@ -188,6 +219,10 @@ test("staging business matrix contains fourteen honest not-yet-run acceptance ro
   assert.equal(rows.length, 14);
   assert.deepEqual(rows.map((row) => row.match(/SBE-\d{2}/)?.[0]), Array.from({ length: 14 }, (_, index) => `SBE-${String(index + 1).padStart(2, "0")}`));
   assert.doesNotMatch(matrix, /PASSED|COMPLETE|EXECUTED/);
+  for (const label of ["فاتورة مبيعات", "مرتجع مبيعات", "أمر بيع", "عملية شحن", "مشتريات", "مرتجع مشتريات", "أمر صيانة"]) {
+    assert.match(matrix, new RegExp(label));
+  }
+  assert.doesNotMatch(matrix, /سند توصيل|إنشاء شحنة|رقما الشحنة|رقم الصيانة/);
 });
 
 test("runbook requires disposable data, reset discipline, and forbids production mutation", () => {
