@@ -312,7 +312,7 @@ async function createOrder(page, fixtures, marker, total) {
   await item.getByTestId("order-item-price").fill(total.toFixed(2));
   assert.equal(Number(await page.getByTestId("order-total").getAttribute("data-value")), total);
   await page.getByTestId("order-submit").click();
-  await waitForToast(page, "تم إنشاء الأوردر بنجاح");
+  await waitForToast(page, "تم إنشاء أمر البيع بنجاح");
   await form.waitFor({ state: "detached" });
   const created = await waitForNewEntity(page, "order-row", "data-order-number", before);
   for (const state of ["confirmed", "ready"]) {
@@ -341,14 +341,14 @@ async function createDeliveryCycle(page, fixtures, marker, orderNumber, invoiceN
   await page.getByTestId("delivery-carrier-fee").fill("0");
   await page.getByTestId("delivery-action-date").fill(fixtures.operationDate);
   await page.getByTestId("delivery-action-submit").click();
-  await waitForToast(page, "تم إنشاء سند التوصيل");
+  await waitForToast(page, "تم إنشاء عملية الشحن بنجاح");
   await page.getByTestId("delivery-action-modal").waitFor({ state: "detached" });
   const created = await waitForNewEntity(page, "delivery-row", "data-delivery-number", before);
 
   let row = created.locator;
   await row.getByTestId("delivery-ship-open").click();
   await page.getByTestId("delivery-action-submit").click();
-  await waitForToast(page, "تم تأكيد الشحن");
+  await waitForToast(page, "تم تأكيد إرسال الشحنة");
   row = await waitForEntityState(page, "delivery-row", "data-delivery-number", created.value, "data-status", "shipped");
   await row.getByTestId("delivery-confirm-open").click();
   await selectContaining(page.getByTestId("delivery-confirmation-account"), fixtures.codAccountName);
@@ -382,12 +382,12 @@ async function createPurchaseCycle(page, fixtures, marker) {
   await page.getByTestId("shipment-shipping-cost").fill("0");
   await page.getByTestId("shipment-notes").fill(marker);
   await page.getByTestId("shipment-submit").click();
-  await waitForToast(page, "تم إنشاء الشحنة بنجاح");
+  await waitForToast(page, "تم إنشاء عملية الشراء بنجاح");
   await page.getByTestId("shipment-create-form").waitFor({ state: "detached" });
   const created = await waitForNewEntity(page, "shipment-row", "data-shipment-number", before);
   let row = created.locator;
   await row.locator('[data-testid="shipment-status-next"][data-next-status="in_transit"]').click();
-  await waitForToast(page, "تم تحديث حالة الشحنة");
+  await waitForToast(page, "تم تحديث حالة عملية الشراء");
   row = await waitForEntityState(page, "shipment-row", "data-shipment-number", created.value, "data-status", "in_transit");
   await row.locator('[data-testid="shipment-status-next"][data-next-status="arrived"]').click();
   const receive = page.getByTestId("shipment-receive-form");
