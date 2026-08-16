@@ -34,14 +34,14 @@ test("ORU-05 cancellation action is permission-aligned to delete_orders", () => 
 
 test("ORU-06 cancellation modal explains deposit and invoice blockers", () => {
   assert.match(page, /يوجد عربون بقيمة/);
-  assert.match(page, /الطلب مرتبط بفاتورة/);
+  assert.match(page, /أمر البيع مرتبط بفاتورة/);
   assert.match(page, /cancelTarget\.deposit > 0/);
   assert.match(page, /Boolean\(cancelTarget\.linkedInvoiceId\)/);
 });
 
 test("ORU-07 linked delivery orders do not offer direct delivered transition", () => {
   assert.match(page, /candidate === "delivered" && order\.linkedInvoiceId \? null : candidate/);
-  assert.match(page, /التسليم من التوصيل/);
+  assert.match(page, /التسليم من عملية الشحن/);
 });
 
 test("ORU-08 details modal uses the server-owned order details read model", () => {
@@ -80,8 +80,8 @@ test("ORU-13 customer is visibly locked after a deposit", () => {
 });
 
 test("ORU-14 status failures surface real Convex errors", () => {
-  assert.match(page, /getErrorMessage\(error, "تعذر تحديث حالة الطلب"\)/);
-  assert.match(page, /getErrorMessage\(error, "تعذر إلغاء الطلب"\)/);
+  assert.match(page, /getErrorMessage\(error, "تعذر تحديث حالة أمر البيع"\)/);
+  assert.match(page, /getErrorMessage\(error, "تعذر إلغاء أمر البيع"\)/);
 });
 
 test("ORU-15 order UI has no unsafe TypeScript escapes", () => {
