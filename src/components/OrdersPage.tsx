@@ -20,7 +20,7 @@ function buildWhatsAppLink(phone: string, message: string) {
 function getWhatsAppMessage(status: string, orderNumber: string, customerName: string, storeName: string, remaining: number): string {
   const greeting = `السلام عليكم ${customerName} 👋`;
   const store = `*${storeName}*`;
-  const ordNum = `رقم الطلب: *${orderNumber}*`;
+  const ordNum = `رقم أمر البيع: *${orderNumber}*`;
   switch (status) {
     case "confirmed": return `${greeting}\n\nنود إعلامكم بأن طلبكم لدى ${store} قد تم تأكيده ✅\n${ordNum}\n\nسنقوم بإشعاركم فور جاهزية الطلب. شكراً لثقتكم 🙏`;
     case "ready": return `${greeting}\n\nيسعدنا إعلامكم بأن طلبكم لدى ${store} أصبح جاهزاً للاستلام 🎉\n${ordNum}\n${remaining > 0 ? `\nالمبلغ المتبقي: *${remaining.toLocaleString("ar-EG")} ج.م*\n` : ""}\nيمكنكم التفضل باستلامه في أي وقت خلال أوقات الدوام. شكراً لكم 😊`;
@@ -118,9 +118,9 @@ export function OrdersPage({ createRequestToken }: { createRequestToken?: number
     setStatusBusyId(id);
     try {
       await updateStatus({ id, status });
-      toast.success("تم تحديث حالة الطلب");
+      toast.success("تم تحديث حالة أمر البيع");
     } catch (error) {
-      toast.error(getErrorMessage(error, "تعذر تحديث حالة الطلب"));
+      toast.error(getErrorMessage(error, "تعذر تحديث حالة أمر البيع"));
     } finally {
       setStatusBusyId(null);
     }
@@ -188,11 +188,11 @@ export function OrdersPage({ createRequestToken }: { createRequestToken?: number
     setBusy(true);
     try {
       await cancelOrder({ id: cancelTarget._id, reason });
-      toast.success("تم إلغاء الطلب");
+      toast.success("تم إلغاء أمر البيع");
       setCancelTarget(null);
       setCancelReason("");
     } catch (error) {
-      toast.error(getErrorMessage(error, "تعذر إلغاء الطلب"));
+      toast.error(getErrorMessage(error, "تعذر إلغاء أمر البيع"));
     } finally {
       setBusy(false);
     }
@@ -203,12 +203,12 @@ export function OrdersPage({ createRequestToken }: { createRequestToken?: number
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-2xl font-black text-slate-800 flex items-center gap-2"><ShoppingCart className="w-6 h-6 text-indigo-600" />أوامر البيع</h1>
-          <p className="text-slate-500 text-sm mt-0.5">دورة الطلب من الإنشاء حتى الفاتورة والتوصيل والتسليم</p>
+          <p className="text-slate-500 text-sm mt-0.5">دورة أمر البيع من الإنشاء حتى الفاتورة والشحن والتسليم</p>
         </div>
         {canCreate && <button data-testid="order-create-open" onClick={() => setShowForm(true)} className="btn-primary flex items-center gap-2"><Plus className="w-4 h-4" />أمر بيع جديد</button>}
       </div>
 
-      {stats && !stats.isReady && <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">إحصائيات الطلبات قيد التهيئة أو إعادة البناء. قائمة الطلبات تعمل بصورة طبيعية، لكن بطاقات الملخص لن تُعتمد حتى اكتمال التهيئة.</div>}
+      {stats && !stats.isReady && <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">إحصائيات أوامر البيع قيد التهيئة أو إعادة البناء. قائمة أوامر البيع تعمل بصورة طبيعية، لكن بطاقات الملخص لن تُعتمد حتى اكتمال التهيئة.</div>}
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
@@ -223,14 +223,14 @@ export function OrdersPage({ createRequestToken }: { createRequestToken?: number
       </div>
 
       <div className="flex gap-3 flex-wrap">
-        <div className="relative flex-1 min-w-48"><Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" /><input data-testid="order-search" className="form-input pr-9" placeholder="بحث بالاسم أو رقم الطلب أو الهاتف..." value={search} onChange={(event) => setSearch(event.target.value)} /></div>
+        <div className="relative flex-1 min-w-48"><Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" /><input data-testid="order-search" className="form-input pr-9" placeholder="بحث بالاسم أو رقم أمر البيع أو الهاتف..." value={search} onChange={(event) => setSearch(event.target.value)} /></div>
         <div className="flex gap-2 flex-wrap">
           {orderFilters.map((filter) => <button key={filter.v} onClick={() => setFilterStatus(filter.v)} className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${filterStatus === filter.v ? "bg-indigo-600 text-white shadow-sm" : "bg-white text-slate-600 border border-slate-200 hover:border-indigo-300"}`}>{filter.l}</button>)}
         </div>
       </div>
 
       <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-        {isLoadingOrders ? <div className="text-center py-16 text-slate-400">جارٍ تحميل أوامر البيع...</div> : filtered.length === 0 ? <div className="text-center py-16"><div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-4"><ShoppingCart className="w-7 h-7 text-slate-400" /></div><p className="text-slate-500 font-medium">{needle ? "لا توجد نتائج ضمن أوامر البيع المحمّلة" : "لا توجد أمر بيعات"}</p></div> : <div className="overflow-x-auto"><table className="data-table"><thead><tr><th>رقم الطلب</th><th>العميل</th><th>المنتجات</th><th>الإجمالي</th><th>المدفوع</th><th>المتبقي</th><th>الحالة</th><th>المتوقع</th><th>إجراءات</th></tr></thead><tbody>{filtered.map((order) => {
+        {isLoadingOrders ? <div className="text-center py-16 text-slate-400">جارٍ تحميل أوامر البيع...</div> : filtered.length === 0 ? <div className="text-center py-16"><div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-4"><ShoppingCart className="w-7 h-7 text-slate-400" /></div><p className="text-slate-500 font-medium">{needle ? "لا توجد نتائج ضمن أوامر البيع المحمّلة" : "لا توجد أوامر بيع"}</p></div> : <div className="overflow-x-auto"><table className="data-table"><thead><tr><th>رقم أمر البيع</th><th>العميل</th><th>الأصناف</th><th>الإجمالي</th><th>المدفوع</th><th>المتبقي</th><th>الحالة</th><th>المتوقع</th><th>إجراءات</th></tr></thead><tbody>{filtered.map((order) => {
           const cfg = statusConfig[order.status as OrderStatus] ?? statusConfig.pending;
           const Icon = cfg.icon;
           const currentIdx = statusFlow.indexOf(order.status as OrderStatus);
@@ -244,7 +244,7 @@ export function OrdersPage({ createRequestToken }: { createRequestToken?: number
           return <tr key={order._id} data-testid="order-row" data-order-number={order.orderNumber} data-customer-name={order.customerName} data-status={order.status}>
             <td><span className="font-mono font-bold text-indigo-600 text-xs">{order.orderNumber}</span>{order.linkedInvoiceId && <span className="mr-2 inline-flex items-center gap-1 text-[11px] text-violet-600"><Link2 className="w-3 h-3" />فاتورة</span>}</td>
             <td><p className="font-medium text-slate-800">{order.customerName}</p>{order.customerPhone && <p className="text-xs text-slate-400">{order.customerPhone}</p>}</td>
-            <td><p className="text-slate-700">{order.items.length} منتج</p><p className="text-xs text-slate-400 truncate max-w-32">{order.items.map((item) => item.productName).join("، ")}</p></td>
+            <td><p className="text-slate-700">{order.items.length} صنف</p><p className="text-xs text-slate-400 truncate max-w-32">{order.items.map((item) => item.productName).join("، ")}</p></td>
             <td className="font-bold text-slate-800">{money(order.total)}</td>
             <td className="text-emerald-600 font-medium">{money(order.deposit)}</td>
             <td><span className={`font-bold ${order.remaining > 0 ? "text-amber-600" : "text-emerald-600"}`}>{money(order.remaining)}</span></td>
@@ -252,14 +252,14 @@ export function OrdersPage({ createRequestToken }: { createRequestToken?: number
             <td className="text-slate-500 text-xs">{order.expectedDate ?? "—"}</td>
             <td><div className="flex items-center gap-1.5">
               <button onClick={() => setDetailsTarget(order._id)} className="p-1.5 bg-slate-50 text-slate-500 rounded-lg hover:bg-indigo-50 hover:text-indigo-600" title="التفاصيل والـTimeline"><Eye className="w-3.5 h-3.5" /></button>
-              {canModifyBody && <button onClick={() => setEditTarget(order)} className="p-1.5 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100" title="تعديل الطلب"><Pencil className="w-3.5 h-3.5" /></button>}
+              {canModifyBody && <button onClick={() => setEditTarget(order)} className="p-1.5 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100" title="تعديل أمر البيع"><Pencil className="w-3.5 h-3.5" /></button>}
               {canEdit && nextStatus && order.status !== "cancelled" && <button data-testid="order-status-next" data-next-status={nextStatus} disabled={statusBusyId === order._id} onClick={() => handleStatusChange(order._id, nextStatus)} className="px-2.5 py-1.5 bg-indigo-50 text-indigo-600 rounded-lg text-xs font-medium hover:bg-indigo-100 disabled:opacity-50 whitespace-nowrap">{statusConfig[nextStatus].label}</button>}
-              {canEdit && order.status === "ready" && order.linkedInvoiceId && <span className="text-[11px] text-violet-600 px-2 py-1 bg-violet-50 rounded-lg">التسليم من التوصيل</span>}
+              {canEdit && order.status === "ready" && order.linkedInvoiceId && <span className="text-[11px] text-violet-600 px-2 py-1 bg-violet-50 rounded-lg">التسليم من عملية الشحن</span>}
               {canCollect && financialEditable && order.remaining > 0 && <button onClick={() => { setShowPayment(order._id); setPaymentAmount(""); setPaymentAccountId(""); setPaymentNotes(""); setPaymentRequestId(crypto.randomUUID()); }} className="p-1.5 bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-100" title="تسجيل دفعة"><CreditCard className="w-3.5 h-3.5" /></button>}
               {canRefund && financialEditable && order.deposit > 0 && <button onClick={() => openRefund(order)} className="p-1.5 bg-amber-50 text-amber-700 rounded-lg" title="استرداد عربون"><CreditCard className="w-3.5 h-3.5" /></button>}
               {showWA && waLink && <a href={waLink} target="_blank" rel="noopener noreferrer" className="p-1.5 bg-green-50 text-green-600 rounded-lg hover:bg-green-100" title={`إرسال إشعار واتساب — ${cfg.label}`}><MessageCircle className="w-3.5 h-3.5" /></a>}
               {canPrint && <button onClick={() => setPrintOrder(order)} className="p-1.5 bg-slate-50 text-slate-400 rounded-lg hover:bg-indigo-50 hover:text-indigo-600" title="طباعة"><Printer className="w-3.5 h-3.5" /></button>}
-              {canDelete && !["cancelled", "delivered"].includes(order.status) && <button onClick={() => openCancel(order)} className="p-1.5 bg-red-50 text-red-500 rounded-lg hover:bg-red-100" title="إلغاء الطلب"><Trash2 className="w-3.5 h-3.5" /></button>}
+              {canDelete && !["cancelled", "delivered"].includes(order.status) && <button onClick={() => openCancel(order)} className="p-1.5 bg-red-50 text-red-500 rounded-lg hover:bg-red-100" title="إلغاء أمر البيع"><Trash2 className="w-3.5 h-3.5" /></button>}
             </div></td>
           </tr>;
         })}</tbody></table></div>}
@@ -270,9 +270,9 @@ export function OrdersPage({ createRequestToken }: { createRequestToken?: number
 
       {refundTarget && <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"><form onSubmit={handleRefund} className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 space-y-4"><h2 className="font-bold text-slate-800">استرداد عربون {refundTarget.orderNumber}</h2><div><label className="form-label">المبلغ *</label><input required min="0.01" max={refundTarget.deposit} step="0.01" type="number" className="form-input" value={refundAmount} onChange={(event) => setRefundAmount(event.target.value)} /></div><div><label className="form-label">حساب الاسترداد *</label><select required className="form-input" value={refundAccountId} onChange={(event) => setRefundAccountId(event.target.value)}><option value="">اختر الحساب</option>{refundAccounts.map((account) => <option key={account._id} value={account._id}>{account.name}</option>)}</select></div><div><label className="form-label">التاريخ *</label><input required type="date" className="form-input" value={refundDate} onChange={(event) => setRefundDate(event.target.value)} /></div><div><label className="form-label">السبب *</label><textarea required className="form-input" value={refundReason} onChange={(event) => setRefundReason(event.target.value)} /></div><div className="flex gap-3"><button type="submit" disabled={busy || !refundReason.trim()} className="btn-primary flex-1">{busy ? "جارٍ الاسترداد..." : "استرداد"}</button><button type="button" disabled={busy} className="btn-secondary" onClick={() => setRefundTarget(null)}>إلغاء</button></div></form></div>}
 
-      {cancelTarget && <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"><form onSubmit={handleCancel} className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-4"><div className="flex items-center justify-between"><h2 className="font-bold text-red-700 flex items-center gap-2"><XCircle className="w-5 h-5" />إلغاء الطلب {cancelTarget.orderNumber}</h2><button type="button" disabled={busy} onClick={() => setCancelTarget(null)}><X className="w-4 h-4" /></button></div>{cancelTarget.deposit > 0 && <p className="text-sm bg-amber-50 text-amber-800 rounded-xl p-3">يوجد عربون بقيمة {money(cancelTarget.deposit)}. يجب استرداده أولًا قبل الإلغاء.</p>}{cancelTarget.linkedInvoiceId && <p className="text-sm bg-violet-50 text-violet-800 rounded-xl p-3">الطلب مرتبط بفاتورة؛ يجب معالجة الفاتورة/التوصيل أولًا.</p>}<div><label className="form-label">سبب الإلغاء *</label><textarea className="form-input" required value={cancelReason} onChange={(event) => setCancelReason(event.target.value)} placeholder="اكتب سببًا واضحًا قابلًا للمراجعة" /></div><div className="flex gap-3"><button type="submit" disabled={busy || !cancelReason.trim() || cancelTarget.deposit > 0 || Boolean(cancelTarget.linkedInvoiceId)} className="btn-danger flex-1 disabled:opacity-50">{busy ? "جارٍ الإلغاء..." : "تأكيد الإلغاء"}</button><button type="button" disabled={busy} className="btn-secondary" onClick={() => setCancelTarget(null)}>رجوع</button></div></form></div>}
+      {cancelTarget && <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"><form onSubmit={handleCancel} className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-4"><div className="flex items-center justify-between"><h2 className="font-bold text-red-700 flex items-center gap-2"><XCircle className="w-5 h-5" />إلغاء أمر البيع {cancelTarget.orderNumber}</h2><button type="button" disabled={busy} onClick={() => setCancelTarget(null)}><X className="w-4 h-4" /></button></div>{cancelTarget.deposit > 0 && <p className="text-sm bg-amber-50 text-amber-800 rounded-xl p-3">يوجد عربون بقيمة {money(cancelTarget.deposit)}. يجب استرداده أولًا قبل الإلغاء.</p>}{cancelTarget.linkedInvoiceId && <p className="text-sm bg-violet-50 text-violet-800 rounded-xl p-3">أمر البيع مرتبط بفاتورة؛ يجب معالجة الفاتورة/عملية الشحن أولًا.</p>}<div><label className="form-label">سبب الإلغاء *</label><textarea className="form-input" required value={cancelReason} onChange={(event) => setCancelReason(event.target.value)} placeholder="اكتب سببًا واضحًا قابلًا للمراجعة" /></div><div className="flex gap-3"><button type="submit" disabled={busy || !cancelReason.trim() || cancelTarget.deposit > 0 || Boolean(cancelTarget.linkedInvoiceId)} className="btn-danger flex-1 disabled:opacity-50">{busy ? "جارٍ الإلغاء..." : "تأكيد الإلغاء"}</button><button type="button" disabled={busy} className="btn-secondary" onClick={() => setCancelTarget(null)}>رجوع</button></div></form></div>}
 
-      {detailsTarget && <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"><div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto"><div className="sticky top-0 bg-white border-b p-5 flex items-center justify-between z-10"><h2 className="font-bold text-slate-800 flex items-center gap-2"><Eye className="w-5 h-5 text-indigo-600" />تفاصيل الطلب</h2><button onClick={() => setDetailsTarget(null)} className="p-1.5 hover:bg-slate-100 rounded-lg"><X className="w-4 h-4" /></button></div>{!details ? <div className="p-8 text-center text-slate-400">جارٍ تحميل التفاصيل...</div> : <div className="p-6 space-y-6"><div className="grid sm:grid-cols-4 gap-3"><Info label="رقم الطلب" value={details.order.orderNumber} /><Info label="العميل" value={details.order.customerName} /><Info label="الإجمالي" value={money(details.order.total)} /><Info label="المتبقي" value={money(details.order.remaining)} /></div><div className="grid md:grid-cols-2 gap-4"><div className="border rounded-2xl p-4"><h3 className="font-bold text-slate-700 flex items-center gap-2 mb-3"><FileText className="w-4 h-4" />الفاتورة المرتبطة</h3>{details.invoice ? <div className="space-y-2 text-sm"><p className="font-mono text-indigo-600">{details.invoice.invoiceNumber}</p><p>الحالة: {details.invoice.status}</p><p>الإجمالي: {money(details.invoice.total)}</p><p>المدفوع: {money(details.invoice.paid)} — المتبقي: {money(details.invoice.remaining)}</p></div> : <p className="text-sm text-slate-400">لم يتم ربط فاتورة بعد.</p>}</div><div className="border rounded-2xl p-4"><h3 className="font-bold text-slate-700 flex items-center gap-2 mb-3"><Truck className="w-4 h-4" />عمليات الشحن</h3>{details.deliveries.length ? <div className="space-y-2">{details.deliveries.map((delivery) => <div key={delivery._id} className="text-sm bg-slate-50 rounded-xl p-3"><p className="font-mono font-bold text-violet-600">{delivery.deliveryNumber}</p><p>{delivery.shippingCompany} — {delivery.status}</p>{delivery.trackingNumber && <p className="text-xs text-slate-500">تتبع: {delivery.trackingNumber}</p>}</div>)}</div> : <p className="text-sm text-slate-400">لا توجد عملية شحن مرتبطة.</p>}</div></div><div className="border rounded-2xl p-4"><h3 className="font-bold text-slate-700 mb-3">الحركات المالية</h3><FinancialHistory referenceType="order" referenceId={String(details.order._id)} /></div><div className="border rounded-2xl p-4"><h3 className="font-bold text-slate-700 mb-3">التسلسل الزمني لأمر البيع</h3><div className="space-y-3">{details.timeline.map((event) => <div key={event.key} className="flex gap-3"><div className="w-2 h-2 rounded-full bg-indigo-500 mt-2 flex-shrink-0" /><div className="flex-1"><div className="flex justify-between gap-3"><p className="font-medium text-sm text-slate-800">{event.title}</p><span className="text-xs text-slate-400">{event.date}</span></div><p className="text-xs text-slate-500">{event.description}</p>{"amount" in event && typeof event.amount === "number" && <p className={`text-xs font-bold ${event.amount < 0 ? "text-red-600" : "text-emerald-600"}`}>{money(event.amount)}</p>}</div></div>)}</div></div></div>}</div></div>}
+      {detailsTarget && <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"><div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto"><div className="sticky top-0 bg-white border-b p-5 flex items-center justify-between z-10"><h2 className="font-bold text-slate-800 flex items-center gap-2"><Eye className="w-5 h-5 text-indigo-600" />تفاصيل أمر البيع</h2><button onClick={() => setDetailsTarget(null)} className="p-1.5 hover:bg-slate-100 rounded-lg"><X className="w-4 h-4" /></button></div>{!details ? <div className="p-8 text-center text-slate-400">جارٍ تحميل التفاصيل...</div> : <div className="p-6 space-y-6"><div className="grid sm:grid-cols-4 gap-3"><Info label="رقم أمر البيع" value={details.order.orderNumber} /><Info label="العميل" value={details.order.customerName} /><Info label="الإجمالي" value={money(details.order.total)} /><Info label="المتبقي" value={money(details.order.remaining)} /></div><div className="grid md:grid-cols-2 gap-4"><div className="border rounded-2xl p-4"><h3 className="font-bold text-slate-700 flex items-center gap-2 mb-3"><FileText className="w-4 h-4" />الفاتورة المرتبطة</h3>{details.invoice ? <div className="space-y-2 text-sm"><p className="font-mono text-indigo-600">{details.invoice.invoiceNumber}</p><p>الحالة: {details.invoice.status}</p><p>الإجمالي: {money(details.invoice.total)}</p><p>المدفوع: {money(details.invoice.paid)} — المتبقي: {money(details.invoice.remaining)}</p></div> : <p className="text-sm text-slate-400">لم يتم ربط فاتورة بعد.</p>}</div><div className="border rounded-2xl p-4"><h3 className="font-bold text-slate-700 flex items-center gap-2 mb-3"><Truck className="w-4 h-4" />عمليات الشحن</h3>{details.deliveries.length ? <div className="space-y-2">{details.deliveries.map((delivery) => <div key={delivery._id} className="text-sm bg-slate-50 rounded-xl p-3"><p className="font-mono font-bold text-violet-600">{delivery.deliveryNumber}</p><p>{delivery.shippingCompany} — {delivery.status}</p>{delivery.trackingNumber && <p className="text-xs text-slate-500">تتبع: {delivery.trackingNumber}</p>}</div>)}</div> : <p className="text-sm text-slate-400">لا توجد عملية شحن مرتبطة.</p>}</div></div><div className="border rounded-2xl p-4"><h3 className="font-bold text-slate-700 mb-3">الحركات المالية</h3><FinancialHistory referenceType="order" referenceId={String(details.order._id)} /></div><div className="border rounded-2xl p-4"><h3 className="font-bold text-slate-700 mb-3">التسلسل الزمني لأمر البيع</h3><div className="space-y-3">{details.timeline.map((event) => <div key={event.key} className="flex gap-3"><div className="w-2 h-2 rounded-full bg-indigo-500 mt-2 flex-shrink-0" /><div className="flex-1"><div className="flex justify-between gap-3"><p className="font-medium text-sm text-slate-800">{event.title}</p><span className="text-xs text-slate-400">{event.date}</span></div><p className="text-xs text-slate-500">{event.description}</p>{"amount" in event && typeof event.amount === "number" && <p className={`text-xs font-bold ${event.amount < 0 ? "text-red-600" : "text-emerald-600"}`}>{money(event.amount)}</p>}</div></div>)}</div></div></div>}</div></div>}
 
       {showForm && <NewOrderForm onClose={() => setShowForm(false)} />}
       {editTarget && <EditOrderForm order={editTarget} onClose={() => setEditTarget(null)} />}
@@ -315,7 +315,7 @@ function NewOrderForm({ onClose }: { onClose: () => void }) {
     event.preventDefault();
     if (saving) return;
     if (!form.customerName.trim()) return toast.error("أدخل اسم العميل");
-    if (items.some((item) => !item.productName.trim() || !Number.isInteger(item.quantity) || item.quantity <= 0 || item.unitPrice < 0)) return toast.error("راجع بيانات المنتجات والكميات والأسعار");
+    if (items.some((item) => !item.productName.trim() || !Number.isInteger(item.quantity) || item.quantity <= 0 || item.unitPrice < 0)) return toast.error("راجع بيانات الأصناف والكميات والأسعار");
     const deposit = Number(form.deposit) || 0;
     if (deposit > total) return toast.error("العربون أكبر من الإجمالي");
     if (deposit > 0 && !form.customerId) return toast.error("العربون يتطلب عميلاً مسجلاً");
@@ -327,7 +327,7 @@ function NewOrderForm({ onClose }: { onClose: () => void }) {
       setRequestId(crypto.randomUUID());
       onClose();
     } catch (error) {
-      toast.error(getErrorMessage(error, "تعذر إنشاء الطلب"));
+      toast.error(getErrorMessage(error, "تعذر إنشاء أمر البيع"));
     } finally {
       setSaving(false);
     }
@@ -356,15 +356,15 @@ function EditOrderForm({ order, onClose }: { order: Doc<"orders">; onClose: () =
     event.preventDefault();
     if (saving) return;
     if (!form.customerName.trim()) return toast.error("اسم العميل مطلوب");
-    if (items.some((item) => !item.productName.trim() || !Number.isInteger(item.quantity) || item.quantity <= 0 || item.unitPrice < 0)) return toast.error("راجع بيانات المنتجات والكميات والأسعار");
+    if (items.some((item) => !item.productName.trim() || !Number.isInteger(item.quantity) || item.quantity <= 0 || item.unitPrice < 0)) return toast.error("راجع بيانات الأصناف والكميات والأسعار");
     if (total < order.deposit) return toast.error("الإجمالي الجديد أقل من العربون المسجل");
     setSaving(true);
     try {
       await updateOrder({ id: order._id, customerId: form.customerId ? form.customerId as Id<"customers"> : undefined, customerName: form.customerName, customerPhone: form.customerPhone || undefined, items: items.map((item) => ({ ...item, notes: item.notes?.trim() || undefined })), expectedDate: form.expectedDate || undefined, notes: form.notes || undefined });
-      toast.success("تم تحديث الطلب");
+      toast.success("تم تحديث أمر البيع");
       onClose();
     } catch (error) {
-      toast.error(getErrorMessage(error, "تعذر تحديث الطلب"));
+      toast.error(getErrorMessage(error, "تعذر تحديث أمر البيع"));
     } finally {
       setSaving(false);
     }

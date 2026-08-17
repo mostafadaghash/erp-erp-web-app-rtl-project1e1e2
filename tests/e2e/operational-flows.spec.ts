@@ -36,7 +36,7 @@ test.describe("critical operational flow readiness", () => {
     await expect(page.getByText("ملخص الفاتورة", { exact: true })).toBeVisible();
   });
 
-  test("@flows purchase shipment form resolves staging supplier and costs", async ({ page }) => {
+  test("@flows purchase form resolves staging supplier and costs", async ({ page }) => {
     await login(page, "admin");
     await navigateTo(page, "المشتريات");
     await page.getByRole("button", { name: "عملية شراء جديدة", exact: true }).click();
@@ -72,7 +72,7 @@ test.describe("critical operational flow readiness", () => {
     await expect(page.getByRole("button", { name: "حفظ أمر الصيانة", exact: true })).toBeEnabled();
   });
 
-  test("@flows COD delivery surface is bound to a staging branch and creation flow", async ({ page }) => {
+  test("@flows shipping COD surface is bound to a staging branch and creation flow", async ({ page }) => {
     await login(page, "admin");
     await navigateTo(page, "عمليات الشحن");
     await expect(page.getByRole("heading", { name: "عمليات الشحن والتحصيل عند التسليم", exact: true })).toBeVisible();
@@ -87,11 +87,11 @@ test.describe("critical operational flow readiness", () => {
       await expect(page.getByText(label, { exact: true })).toBeVisible();
     }
 
-    const create = page.getByRole("button", { name: "إنشاء من طلب وفاتورة", exact: true });
+    const create = page.getByRole("button", { name: "إنشاء من أمر بيع وفاتورة", exact: true });
     await expect(create).toBeEnabled();
     await create.click();
     await expect(page.getByRole("heading", { name: "إنشاء سند شحن", exact: true })).toBeVisible();
-    await expect(page.getByRole("option", { name: "اختر طلباً جاهزاً", exact: true })).toBeAttached();
+    await expect(page.getByRole("option", { name: "اختر أمر بيع جاهزًا", exact: true })).toBeAttached();
     await expect(page.getByRole("option", { name: "اختر الفاتورة المؤهلة", exact: true })).toBeAttached();
   });
 });

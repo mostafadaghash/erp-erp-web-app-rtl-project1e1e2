@@ -50,8 +50,8 @@ test("UAT-FINAL-05 escapes every dynamic print value and detaches the opener", (
 
 test("UAT-FINAL-06 shows loading and empty feedback for creation and COD pickers", () => {
   for (const message of [
-    "جارٍ تحميل الطلبات الجاهزة",
-    "لا توجد طلبات جاهزة مؤهلة للشحن",
+    "جارٍ تحميل أوامر البيع الجاهزة",
+    "لا توجد أوامر بيع جاهزة مؤهلة للشحن",
     "جارٍ تحميل حسابات تأكيد COD",
     "لا توجد حسابات مؤهلة لتأكيد COD",
     "جارٍ تحميل عمليات شحن COD غير المسواة",

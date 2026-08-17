@@ -12,6 +12,10 @@ const schema = read("convex/schema.ts");
 const styles = read("src/index.css");
 const signOut = read("src/SignOutButton.tsx");
 const purchases = read("src/components/ShipmentsPage.tsx");
+const orders = read("src/components/OrdersPage.tsx");
+const deliveries = read("src/components/DeliveriesPage.tsx");
+const repairs = read("src/components/RepairsPage.tsx");
+const purchaseReturns = read("src/components/PurchaseReturnsPage.tsx");
 
 test("professional ERP navigation uses conventional Arabic information architecture", () => {
   for (const label of [
@@ -85,4 +89,38 @@ test("purchase workflows use grammatically correct professional terminology", ()
   ]) assert.match(purchases, new RegExp(label));
 
   assert.doesNotMatch(purchases, /العملية شراء|عملية شراء شراء/);
+});
+
+test("sales orders use one professional document name and item terminology", () => {
+  for (const label of [
+    "رقم أمر البيع",
+    "لا توجد أوامر بيع",
+    "<th>الأصناف</th>",
+    "تعديل أمر البيع",
+    "إلغاء أمر البيع",
+    "تفاصيل أمر البيع",
+    "التسليم من عملية الشحن",
+  ]) assert.match(orders, new RegExp(label));
+
+  assert.doesNotMatch(orders, /لا توجد أمر بيعات|<th>المنتجات<\/th>|التسليم من التوصيل|تفاصيل الطلب/);
+});
+
+test("shipping creation refers to sales orders consistently", () => {
+  for (const label of [
+    "إنشاء من أمر بيع وفاتورة",
+    "اختر أمر بيع جاهزًا",
+    "جارٍ تحميل أوامر البيع الجاهزة",
+    "لا توجد أوامر بيع جاهزة مؤهلة للشحن",
+  ]) assert.match(deliveries, new RegExp(label));
+
+  assert.doesNotMatch(deliveries, /إنشاء من طلب وفاتورة|اختر طلب[ًااً]+ جاهز[ًااً]+|الطلبات الجاهزة/);
+});
+
+test("repair and purchase-return success messages match their module names", () => {
+  assert.match(repairs, /تم إنشاء أمر الصيانة بنجاح/);
+  assert.match(repairs, /رقم أمر الصيانة/);
+  assert.match(repairs, /بيانات أمر الصيانة/);
+  assert.match(purchaseReturns, /تم ترحيل مرتجع المشتريات/);
+  assert.doesNotMatch(repairs, /تم إضافة طلب الصيانة بنجاح|رقم الطلب|رابط متابعة طلب الصيانة/);
+  assert.doesNotMatch(purchaseReturns, /تم ترحيل مرتجع الشراء/);
 });
