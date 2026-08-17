@@ -318,7 +318,7 @@ async function createOrder(page, fixtures, marker, total) {
   for (const state of ["confirmed", "ready"]) {
     let row = await entityByAttribute(page, "order-row", "data-order-number", created.value);
     await row.locator(`[data-testid="order-status-next"][data-next-status="${state}"]`).click();
-    await waitForToast(page, "تم تحديث حالة الطلب");
+    await waitForToast(page, "تم تحديث حالة أمر البيع");
     row = await waitForEntityState(page, "order-row", "data-order-number", created.value, "data-status", state);
     assert.equal(await row.getAttribute("data-status"), state);
   }
