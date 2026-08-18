@@ -1,4 +1,5 @@
 import { Authenticated, Unauthenticated, useQuery } from "convex/react";
+import { ShieldCheck, Sparkles } from "lucide-react";
 import { api } from "../convex/_generated/api";
 import { CustomSignInForm } from "./CustomSignInForm";
 import { Toaster } from "sonner";
@@ -40,10 +41,10 @@ function AuthedRouter() {
 
   if (accessState === undefined) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-950">
+      <div className="flex min-h-screen items-center justify-center bg-slate-50">
         <div className="text-center">
           <div className="brand-spinner mb-4" />
-          <p className="text-slate-400 text-sm">جاري التحقق من صلاحية الحساب...</p>
+          <p className="text-sm text-slate-500">جارٍ تجهيز مساحة العمل...</p>
         </div>
       </div>
     );
@@ -77,58 +78,95 @@ function LoginPage({
   const allowSignUp = needsSetup || Boolean(inviteCode);
 
   return (
-    <div className="auth-shell min-h-screen relative flex items-center justify-center overflow-hidden">
+    <div className="auth-shell relative min-h-screen overflow-hidden p-4 sm:p-6 lg:p-10">
       <div className="auth-grid absolute inset-0" />
-      <div
-        className="absolute -top-24 right-[12%] h-96 w-96 rounded-full blur-3xl opacity-20"
-        style={{ background: brand.primaryColor }}
-      />
-      <div
-        className="absolute -bottom-40 left-[8%] h-[30rem] w-[30rem] rounded-full blur-3xl opacity-15"
-        style={{ background: brand.secondaryColor }}
-      />
-
-      <div className="relative z-10 w-full max-w-md px-5 py-10 animate-fade-in-up">
-        <div className="mb-7 text-center">
-          <div className="mb-5 flex justify-center">
+      <div className="relative z-10 mx-auto grid min-h-[calc(100vh-5rem)] w-full max-w-6xl items-center gap-8 lg:grid-cols-[1.15fr_0.85fr]">
+        <section className="hidden rounded-3xl border border-slate-200/80 bg-white/70 p-10 shadow-sm backdrop-blur-sm lg:block">
+          <div className="mb-8 flex items-center gap-4">
             <BrandMark
               name={brand.storeName}
               logoUrl={brand.logoUrl}
               primaryColor={brand.primaryColor}
               secondaryColor={brand.secondaryColor}
               size="lg"
-              inverse
             />
+            <div>
+              <h1 className="text-2xl font-black text-slate-900">{brand.storeName}</h1>
+              <p className="mt-1 text-sm text-slate-500">{brand.tagline}</p>
+            </div>
           </div>
-          <h1 className="mb-1 text-3xl font-black text-white">{brand.storeName}</h1>
-          <p className="text-sm text-slate-300">{brand.tagline}</p>
-        </div>
 
-        {needsSetup && (
-          <div className="mb-4 rounded-2xl border border-amber-300/25 bg-amber-300/10 p-4">
-            <p className="text-center text-sm text-amber-100">
-              هذا أول استخدام للنظام. أنشئ الحساب الأول ثم أكمل إعداد مدير النظام.
+          <div className="max-w-xl">
+            <span className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700">
+              <Sparkles className="h-3.5 w-3.5" /> إدارة أبسط وأوضح
+            </span>
+            <h2 className="mt-5 text-4xl font-black leading-[1.35] text-slate-900">
+              كل عمليات نشاطك في مكان واحد
+            </h2>
+            <p className="mt-4 text-base leading-8 text-slate-600">
+              المبيعات والمشتريات والمخزون والحسابات والشحن والصيانة بواجهة عربية عملية وسهلة الاستخدام.
             </p>
           </div>
-        )}
 
-        <div className="auth-card rounded-3xl p-7 sm:p-8">
-          <div className="mb-6 text-center">
-            <p className="text-xs font-bold tracking-[0.18em] text-slate-400">بوابة النظام</p>
-            <h2 className="mt-2 text-xl font-black text-white">
-              {allowSignUp ? "إنشاء الحساب" : "تسجيل الدخول"}
-            </h2>
+          <div className="mt-10 grid grid-cols-2 gap-3 text-sm text-slate-600">
+            {[
+              "صلاحيات واضحة لكل مستخدم",
+              "متابعة مالية ومخزنية مترابطة",
+              "تقارير جاهزة لاتخاذ القرار",
+              "سجل مراجعة وحماية للعمليات",
+            ].map((item) => (
+              <div key={item} className="flex items-center gap-2 rounded-xl bg-slate-50 px-3 py-3">
+                <ShieldCheck className="h-4 w-4 shrink-0 text-emerald-600" />
+                <span>{item}</span>
+              </div>
+            ))}
           </div>
-          <CustomSignInForm
-            allowSignUp={allowSignUp}
-            inviteCode={inviteCode}
-            invitedEmail={invitedEmail}
-          />
-        </div>
+        </section>
 
-        <p className="mt-6 text-center text-xs text-slate-500">
-          نظام متكامل لإدارة المبيعات والمشتريات والمخزون والحسابات
-        </p>
+        <section className="mx-auto w-full max-w-md">
+          <div className="mb-6 text-center lg:hidden">
+            <div className="mb-4 flex justify-center">
+              <BrandMark
+                name={brand.storeName}
+                logoUrl={brand.logoUrl}
+                primaryColor={brand.primaryColor}
+                secondaryColor={brand.secondaryColor}
+                size="lg"
+              />
+            </div>
+            <h1 className="text-2xl font-black text-slate-900">{brand.storeName}</h1>
+            <p className="mt-1 text-sm text-slate-500">{brand.tagline}</p>
+          </div>
+
+          {needsSetup && (
+            <div className="mb-4 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+              <p className="text-center text-sm leading-6 text-amber-800">
+                مرحبًا بك. أنشئ حساب مدير النظام لإكمال الإعداد الأولي.
+              </p>
+            </div>
+          )}
+
+          <div className="auth-card rounded-3xl p-7 sm:p-8">
+            <div className="mb-6">
+              <p className="text-xs font-bold text-emerald-700">بوابة النظام</p>
+              <h2 className="mt-2 text-2xl font-black text-slate-900">
+                {allowSignUp ? "إنشاء الحساب" : "تسجيل الدخول"}
+              </h2>
+              <p className="mt-2 text-sm text-slate-500">
+                أدخل بيانات حسابك للوصول إلى مساحة العمل.
+              </p>
+            </div>
+            <CustomSignInForm
+              allowSignUp={allowSignUp}
+              inviteCode={inviteCode}
+              invitedEmail={invitedEmail}
+            />
+          </div>
+
+          <p className="mt-5 text-center text-xs text-slate-400">
+            دخول آمن ومخصص للمستخدمين المصرح لهم
+          </p>
+        </section>
       </div>
     </div>
   );
