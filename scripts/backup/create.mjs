@@ -49,8 +49,11 @@ function usage() {
   ].join("\n");
 }
 
-function commandName() {
-  return process.platform === "win32" ? "npx.cmd" : "npx";
+function runConvexCli(args) {
+  if (process.platform === "win32") {
+    return spawnSync(process.env.ComSpec ?? "cmd.exe", ["/d", "/s", "/c", "npx.cmd", ...args], { stdio: "inherit" });
+  }
+  return spawnSync("npx", args, { stdio: "inherit" });
 }
 
 let args;
@@ -101,7 +104,7 @@ try {
 }
 
 await mkdir(dirname(args.output), { recursive: true });
-const result = spawnSync(commandName(), exportArgs, { stdio: "inherit" });
+const result = runConvexCli(exportArgs);
 if (result.status !== 0) {
   console.error(`Convex export failed with status ${result.status ?? "unknown"}.`);
   process.exit(result.status || 1);

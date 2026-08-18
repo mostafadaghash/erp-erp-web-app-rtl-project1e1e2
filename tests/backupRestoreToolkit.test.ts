@@ -114,5 +114,5 @@ test("restore script is plan-only by default and execution requires pre-restore 
   const source = await readFile("scripts/backup/restore.mjs", "utf8");
   assert.match(source, /PLAN ONLY: no restore command was executed/);
   assert.match(source, /--pre-restore-manifest is required before executing a destructive restore/);
-  assert.match(source, /spawnSync\(commandName\(\), restoreArgs/);
+  assert.match(source, /runConvexCli\(restoreArgs\)/);
 });

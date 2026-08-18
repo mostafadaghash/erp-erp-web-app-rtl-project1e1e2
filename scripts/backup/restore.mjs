@@ -46,8 +46,11 @@ function usage() {
   ].join("\n");
 }
 
-function commandName() {
-  return process.platform === "win32" ? "npx.cmd" : "npx";
+function runConvexCli(args) {
+  if (process.platform === "win32") {
+    return spawnSync(process.env.ComSpec ?? "cmd.exe", ["/d", "/s", "/c", "npx.cmd", ...args], { stdio: "inherit" });
+  }
+  return spawnSync("npx", args, { stdio: "inherit" });
 }
 
 async function readVerified(manifestArg) {
@@ -122,7 +125,7 @@ try {
   process.exit(4);
 }
 
-const result = spawnSync(commandName(), restoreArgs, { stdio: "inherit" });
+const result = runConvexCli(restoreArgs);
 if (result.status !== 0) {
   console.error(`Convex restore failed with status ${result.status ?? "unknown"}.`);
   process.exit(result.status || 1);
