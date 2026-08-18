@@ -127,6 +127,7 @@ test("bulk setup validation is offline and does not print credentials", () => {
         STAGING_BASE_URL: "https://staging.example.com",
         STAGING_CONVEX_URL: "https://erp-stage.convex.cloud",
         STAGING_CONVEX_SITE_URL: "https://erp-stage.convex.site",
+        VITE_CONVEX_URL: "https://erp-stage.convex.cloud",
         STAGING_TARGET_CONFIRMATION: "staging.example.com|erp-stage",
         E2E_ENVIRONMENT: "staging",
         E2E_ADMIN_EMAIL: "admin@example.invalid",
