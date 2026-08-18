@@ -5,6 +5,7 @@ import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import dotenv from "dotenv";
 import {
+  gotoStagingPage,
   launchStagingBrowser,
   observeRuntimeFailures,
   redactEvidence,
@@ -40,10 +41,29 @@ const roleNames = {
   viewer: "اختبار Staging - مشاهد فقط",
 };
 
-function requiredEnvironment(name) {
-  const value = process.env[name]?.trim();
-  if (!value) throw new Error(`${name} is required`);
-  return value;
+function configuredBranchName() {
+  const explicit = process.env.E2E_ACCOUNT_BRANCH_NAME?.trim();
+  if (explicit) return explicit;
+
+  const fixtureJson = process.env.E2E_BUSINESS_FIXTURES_JSON?.trim();
+  if (fixtureJson) {
+    let fixtures;
+    try {
+      fixtures = JSON.parse(fixtureJson);
+    } catch {
+      throw new Error(
+        "E2E_BUSINESS_FIXTURES_JSON must be valid JSON when used to derive the account branch",
+      );
+    }
+    const fixtureBranch = fixtures?.branchName;
+    if (typeof fixtureBranch === "string" && fixtureBranch.trim()) {
+      return fixtureBranch.trim();
+    }
+  }
+
+  throw new Error(
+    "E2E_ACCOUNT_BRANCH_NAME or E2E_BUSINESS_FIXTURES_JSON.branchName is required",
+  );
 }
 
 function validAccount(account, expectedRole) {
@@ -166,7 +186,7 @@ async function setupConfig() {
   return {
     baseUrl: origins.frontend.origin,
     frontendHost: origins.frontend.host,
-    branchName: requiredEnvironment("E2E_ACCOUNT_BRANCH_NAME"),
+    branchName: configuredBranchName(),
     accounts,
   };
 }
@@ -198,9 +218,9 @@ async function writeReport(status, results, errorMessage) {
   );
 }
 
-async function selectBranch(page, branchName) {
-  const select = page.getByTestId("employee-branch");
-  await page.waitForFunction(
+async function resolveBranchOption(select, branchName) {
+  await select.waitFor({ state: "visible", timeout: 30_000 });
+  await select.page().waitForFunction(
     ({ testId, expected }) => {
       const element = document.querySelector(`[data-testid="${testId}"]`);
       return (
@@ -219,14 +239,22 @@ async function selectBranch(page, branchName) {
       label: row.textContent?.trim() ?? "",
     })),
   );
-  const exact = options.find(
+  const matches = options.filter(
     (option) => option.value && option.label === branchName,
   );
-  assert.ok(
-    exact,
-    "E2E_ACCOUNT_BRANCH_NAME does not match an available active branch",
+  assert.equal(
+    matches.length,
+    1,
+    `E2E account branch must match exactly one active branch: ${branchName}`,
   );
+  return matches[0];
+}
+
+async function selectBranch(page, branchName) {
+  const select = page.getByTestId("employee-branch");
+  const exact = await resolveBranchOption(select, branchName);
   await select.selectOption(exact.value);
+  return exact;
 }
 
 async function captureInvitation(page) {
@@ -256,33 +284,35 @@ async function verifyRoleLogin(browser, baseUrl, account, invitationUrl) {
     if (invitationUrl) {
       assert.equal(invitationUrl.origin, baseUrl);
       assert.equal(invitationUrl.searchParams.get("email"), account.email);
-      await page.goto(invitationUrl.toString(), {
-        waitUntil: "domcontentloaded",
-      });
+      await gotoStagingPage(page, invitationUrl.toString());
       await page
         .getByRole("heading", { name: "إنشاء حساب", exact: true })
-        .waitFor({ timeout: 30_000 });
+        .waitFor({ timeout: 45_000 });
       await page.locator('input[name="email"]').fill(account.email);
       await page.locator('input[name="password"]').fill(account.password);
       await page
         .getByRole("button", { name: "إنشاء حساب", exact: true })
         .click();
       await page
+        .getByRole("main")
         .getByRole("heading", { name: "لوحة التحكم", exact: true })
         .waitFor({ timeout: 45_000 });
     } else {
       await signIn(page, baseUrl, account);
     }
-    await page.getByTestId("current-user-role").waitFor({ timeout: 30_000 });
+    const currentRole = page.getByTestId("current-user-role");
+    await currentRole.waitFor({ timeout: 30_000 });
     assert.equal(
-      (await page.getByTestId("current-user-role").innerText()).trim(),
+      await currentRole.getAttribute("data-user-role"),
       account.role,
+      `Authenticated role does not match configured account: ${account.role}`,
     );
     if (invitationUrl) {
-      await page.goto(baseUrl, { waitUntil: "domcontentloaded" });
+      await gotoStagingPage(page, baseUrl);
       await page
+        .getByRole("main")
         .getByRole("heading", { name: "لوحة التحكم", exact: true })
-        .waitFor({ timeout: 30_000 });
+        .waitFor({ timeout: 45_000 });
     }
     await page.getByRole("button", { name: "تسجيل الخروج", exact: true }).click();
     await page
@@ -293,33 +323,67 @@ async function verifyRoleLogin(browser, baseUrl, account, invitationUrl) {
   }
 }
 
+function employeeRow(page, email) {
+  return page
+    .getByTestId("employee-row")
+    .filter({ hasText: email })
+    .first();
+}
+
+async function reconcileExistingBranch(page, row, branchName) {
+  await row.getByTitle("تعديل").click();
+  const branch = page.getByTestId("employee-branch");
+  const target = await resolveBranchOption(branch, branchName);
+  const current = await branch.inputValue();
+  if (current === target.value) {
+    await page.getByRole("button", { name: "إلغاء", exact: true }).click();
+    await branch.waitFor({ state: "detached", timeout: 30_000 });
+    return false;
+  }
+
+  await branch.selectOption(target.value);
+  await page.getByTestId("employee-create-submit").click();
+  await page
+    .getByText("تم تحديث بيانات المستخدم", { exact: false })
+    .last()
+    .waitFor({ state: "visible", timeout: 30_000 });
+  await branch.waitFor({ state: "detached", timeout: 30_000 });
+  return true;
+}
+
 async function ensureRoleAccount(browser, adminPage, config, account) {
   const search = adminPage.locator(
     'input[placeholder="بحث بالاسم أو الهاتف..."]',
   );
   await search.fill(account.email);
   await adminPage.waitForTimeout(150);
-  const row = adminPage
-    .getByTestId("employee-row")
-    .filter({ hasText: account.email });
+  let row = employeeRow(adminPage, account.email);
 
   let invitationUrl = null;
   let result;
   if (await row.count()) {
     assert.equal(
-      await row.first().getAttribute("data-employee-role"),
+      await row.getAttribute("data-employee-role"),
       account.role,
     );
+    const branchCorrected = await reconcileExistingBranch(
+      adminPage,
+      row,
+      config.branchName,
+    );
+    row = employeeRow(adminPage, account.email);
     if (
-      (await row.first().getAttribute("data-invitation-pending")) === "true"
+      (await row.getAttribute("data-invitation-pending")) === "true"
     ) {
-      await row.first().getByTitle("تجديد رابط الدعوة").click();
+      await row.getByTitle("تجديد رابط الدعوة").click();
       invitationUrl = await captureInvitation(adminPage);
-      result = "pending-invitation-claimed-and-verified";
+      result = branchCorrected
+        ? "branch-corrected-pending-invitation-claimed-and-verified"
+        : "pending-invitation-claimed-and-verified";
     } else {
       let reactivated = false;
-      if ((await row.first().getAttribute("data-employee-active")) !== "true") {
-        await row.first().getByTitle("تفعيل").click();
+      if ((await row.getAttribute("data-employee-active")) !== "true") {
+        await row.getByTitle("تفعيل").click();
         await adminPage.waitForFunction(
           (role) =>
             [...document.querySelectorAll('[data-testid="employee-row"]')].some(
@@ -334,9 +398,13 @@ async function ensureRoleAccount(browser, adminPage, config, account) {
       await verifyRoleLogin(browser, config.baseUrl, account, null);
       return {
         role: account.role,
-        status: reactivated
-          ? "reactivated-and-verified"
-          : "already-active-verified",
+        status: branchCorrected
+          ? reactivated
+            ? "branch-corrected-reactivated-and-verified"
+            : "branch-corrected-and-verified"
+          : reactivated
+            ? "reactivated-and-verified"
+            : "already-active-verified",
       };
     }
   } else {
