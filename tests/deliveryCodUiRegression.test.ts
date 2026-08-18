@@ -41,16 +41,16 @@ test("UI-11 settlement is protected by busy and validation state", () =>
   assert.match(source, /disabled=\{busy\s*\|\|\s*Boolean\(validationReason\)\}[\s\S]*createSettlement/));
 test("UI-12 reversal is protected by busy and validation state", () =>
   assert.match(source, /disabled=\{busy\s*\|\|\s*Boolean\(validationReason\)\}[\s\S]*reverseSettlement/));
-test("UI-13 exposes a shipping modal", () =>
-  assert.match(source, /ship:\s*"تأكيد الشحن"/));
+test("UI-13 exposes a professional carrier handoff modal", () =>
+  assert.match(source, /ship:\s*"تسليم الشحنة لشركة الشحن"/));
 test("UI-14 exposes a delivery confirmation modal", () =>
   assert.match(source, /deliver:\s*"تأكيد التسليم والتحصيل"/));
 test("UI-15 exposes cancellation and return modals", () => {
-  assert.match(source, /return:\s*"إرجاع قبل التسليم"/);
-  assert.match(source, /cancel:\s*"إلغاء الشحن"/);
+  assert.match(source, /return:\s*"تسجيل إرجاع الشحنة"/);
+  assert.match(source, /cancel:\s*"إلغاء الشحنة"/);
 });
 test("UI-16 settlement and reversal collect date and reason", () => {
-  assert.match(source, /settle:\s*"تسوية COD مجمعة"/);
+  assert.match(source, /settle:\s*"تسوية مبالغ التحصيل"/);
   assert.match(source, /reverse-settlement/);
   assert.match(source, /placeholder="السبب الإلزامي"/);
   assert.match(source, /type="date"/);
@@ -91,12 +91,12 @@ test("UI-26 real Convex settlement print query is awaited", () =>
 test("UI-27 delivery and settlement print structured Arabic vouchers", () => {
   assert.match(source, /سند شحن/);
   assert.match(source, /سند تسوية/);
-  assert.match(source, /توقيع الناقل/);
+  assert.match(source, /توقيع شركة الشحن/);
   assert.match(source, /الإجمالي/);
 });
-test("UI-28 stats cards use branch-scoped getStats", () => {
+test("UI-28 stats cards use branch-scoped getStats and professional labels", () => {
   assert.match(source, /api\.deliveries\.getStats,\s*activeBranch\s*\?\s*\{\s*branchId:\s*activeBranch\s*\}/);
-  for (const label of ["COD لدى شركات الشحن", "COD تمت تسويته", "COD معكوس", "رسوم شركات الشحن"]) {
+  for (const label of ["مبالغ لدى شركات الشحن", "مبالغ تمت تسويتها", "تسويات ملغاة", "رسوم شركات الشحن"]) {
     assert.ok(source.includes(label));
   }
 });
@@ -130,23 +130,23 @@ test("UI-35 central validation covers create delivery required inputs", () => {
     "أدخل المدينة",
     "أدخل عنوان الشحن",
     "أدخل شركة الشحن",
-    "أدخل رسوم ناقل صحيحة",
+    "أدخل رسوم شحن صحيحة",
   ]) {
     assert.ok(source.includes(message), `missing ${message}`);
   }
 });
-test("UI-36 COD confirmation requires a clearing account only for positive COD", () => {
+test("UI-36 delivery confirmation requires a collection account only for positive COD", () => {
   assert.match(source, /\(selected\?\.codAmount \?\? 0\) > 0 && !accountId/);
-  assert.ok(source.includes("اختر حساب تأكيد COD"));
+  assert.ok(source.includes("اختر حساب مبالغ التحصيل"));
 });
 test("UI-37 settlement validates accounts selection gross fee and date", () => {
   for (const message of [
     "اختر حساب مصدر التسوية",
     "اختر حساب وجهة التسوية",
     "يجب اختلاف حساب المصدر عن الوجهة",
-    "اختر عملية شحن COD واحدة على الأقل",
-    "إجمالي COD المحدد يجب أن يكون أكبر من صفر",
-    "لا يمكن أن تتجاوز الرسوم إجمالي COD",
+    "اختر شحنة واحدة على الأقل للتسوية",
+    "إجمالي مبالغ التحصيل المحددة يجب أن يكون أكبر من صفر",
+    "لا يمكن أن تتجاوز الرسوم إجمالي مبالغ التحصيل",
     "اختر تاريخ التسوية",
   ]) {
     assert.ok(source.includes(message), `missing ${message}`);
