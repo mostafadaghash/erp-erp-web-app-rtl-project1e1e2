@@ -74,12 +74,16 @@ function requireConfirmation(name) {
 }
 
 async function main() {
-  if (!validateOnly) requireConfirmation("STAGING_FULL_RUN_CONFIRMED");
+  if (!validateOnly) {
+    requireConfirmation("STAGING_FULL_RUN_CONFIRMED");
+    requireConfirmation("STAGING_ACCOUNT_SETUP_CONFIRMED");
+  }
   requireConfirmation("E2E_MUTATIONS_CONFIRMED");
   requireConfirmation("E2E_LOAD_CONFIRMED");
 
   const validationSteps = [
     ["target-config", ["run", "test:staging-preflight", "--", "--validate-config"]],
+    ["account-config", ["run", "staging:accounts:setup", "--", "--validate-config"]],
     ["browser-config", ["run", "test:e2e-staging", "--", "--validate-config"]],
     ["fixtures-config", ["run", "staging:fixtures:setup", "--", "--validate-config"]],
     ["business-config", ["run", "test:e2e-business-staging", "--", "--validate-config"]],
@@ -95,6 +99,7 @@ async function main() {
   await runStep("repository-verify", ["run", "verify"]);
   for (const [name, args] of validationSteps) await runStep(name, args);
   await runStep("live-preflight", ["run", "test:staging-preflight"]);
+  await runStep("role-account-setup", ["run", "staging:accounts:setup"]);
   await runStep("all-role-browser", ["run", "test:e2e-staging"]);
   await runStep("business-fixture-setup", ["run", "staging:fixtures:setup"]);
   await runStep("mutable-business-cycles", ["run", "test:e2e-business-staging"]);
