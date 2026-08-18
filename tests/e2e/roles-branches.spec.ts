@@ -22,6 +22,21 @@ const roleCases: Array<{
     hidden: ["أوامر الصيانة", "المصروفات", "مركز التقارير", "المستخدمون والصلاحيات"],
   },
   {
+    role: "customer_service",
+    visible: ["العملاء", "أوامر البيع", "أوامر الصيانة"],
+    hidden: ["المبيعات", "الخزائن والبنوك", "مركز التقارير", "المستخدمون والصلاحيات"],
+  },
+  {
+    role: "technician",
+    visible: ["الأصناف", "أوامر الصيانة"],
+    hidden: ["المبيعات", "أوامر البيع", "الخزائن والبنوك", "المستخدمون والصلاحيات"],
+  },
+  {
+    role: "shipping",
+    visible: ["أوامر البيع", "المشتريات", "عمليات الشحن"],
+    hidden: ["المبيعات", "أوامر الصيانة", "الخزائن والبنوك", "المستخدمون والصلاحيات"],
+  },
+  {
     role: "viewer",
     visible: ["المبيعات", "أوامر البيع", "الأصناف", "العملاء", "أوامر الصيانة"],
     hidden: ["المصروفات", "مركز التقارير", "الخزائن والبنوك", "المستخدمون والصلاحيات"],
@@ -49,6 +64,11 @@ test.describe("role and branch access", () => {
 
       if (roleCase.role === "manager") {
         await expect(page.getByLabel("فرع العمل الحالي")).toHaveCount(0);
+        await page.getByRole("button", { name: "الفروع", exact: true }).click();
+        await expect(page.getByRole("heading", { name: "الفروع", exact: true })).toBeVisible();
+        const totalStat = page.getByText("إجمالي الفروع", { exact: true }).locator("..");
+        await expect(totalStat.getByText("1", { exact: true })).toBeVisible();
+        await expect(page.getByRole("button", { name: "فرع جديد", exact: true })).toHaveCount(0);
       }
     });
   }

@@ -96,7 +96,9 @@ Production أضف `PRODUCTION_BASE_URL` و`PRODUCTION_CONVEX_URL` و
 ### إنشاء حسابات الأدوار دفعة واحدة من Windows CMD
 
 إذا كان حساب `admin` فقط موجودًا، ضع بريده وكلمة مروره واسم فرع الاختبار داخل
-`.env.staging.local`، وأضف تأكيد Staging الحرفي التالي:
+`.env.staging.local`، وأضف تأكيد Staging الحرفي التالي. يمكن حذف
+`E2E_ACCOUNT_BRANCH_NAME` إذا كان `E2E_BUSINESS_FIXTURES_JSON.branchName` مضبوطًا؛
+عند وجود القيمتين يجب أن تتطابقا حرفيًا:
 
 ```text
 E2E_ADMIN_EMAIL=admin@example.invalid
@@ -122,7 +124,9 @@ npm.cmd run staging:accounts:setup
 Admin جديدًا ولا يكتب مباشرة في جداول Auth. تُحفظ بيانات الحسابات في
 `.staging-role-accounts.json.local` المتجاهَل من Git، ويستخدمها أمر القبول
 الكامل تلقائيًا. إعادة تشغيل الأمر لا تكرر الحسابات؛ بل تتحقق من الحسابات
-النشطة أو تستكمل الدعوات المعلقة.
+النشطة أو تستكمل الدعوات المعلقة، وتصحح ربط الحسابات الموجودة بفرع الاختبار
+المحدد إذا كان الربط قديمًا أو غير صحيح. اسم الفرع يجب أن يطابق فرعًا نشطًا
+واحدًا فقط؛ وجود أكثر من فرع بالاسم نفسه يوقف القبول بدل اختيار أول نتيجة.
 
 ### بيانات دورات الأعمال المتغيرة
 
@@ -130,11 +134,13 @@ Admin جديدًا ولا يكتب مباشرة في جداول Auth. تُحفظ
 على فرع Staging وهمي قابل للمسح. يجهّز أمر الـFixtures العناصر التالية آليًا
 عبر واجهة النظام الحقيقية، ويتحقق منها عند إعادة التشغيل:
 
-- عميلًا نشطًا، ومنتجًا نشطًا بمخزون لا يقل عن 5 وحدات.
+- عميلًا نشطًا، ومنتجًا نشطًا بمخزون يساوي على الأقل `productOpeningStock`
+  (الافتراضي `20` وحدة).
 - موردًا نشطًا.
-- خزينة نشطة برصيد يكفي دفعة المورد.
-- حساب `cod_clearing` نشطًا بمهلة تسوية صفر، وحساب Cash/Bank وجهة للتسوية.
+- خزينة نشطة برصيد يكفي العمليات المتغيرة.
+- حساب `cod_clearing` نشطًا، وحساب Cash/Bank وجهة للتسوية.
 - تاريخ عملية لا يسبق تواريخ القطع المالية.
+- فرع الـAdmin العامل والعميل والمنتج والحسابات المالية كلها مرتبطة بنفس Branch ID.
 
 احفظ الأسماء فقط في Secret باسم `E2E_BUSINESS_FIXTURES_JSON`:
 
@@ -178,7 +184,7 @@ npm.cmd run staging:fixtures:setup
 ## 3. GitHub
 
 1. ادفع الفرع وافتح Pull Request.
-2. اجعل Check باسم `CI required gate` إلزاميًا قبل دمج `main`.
+2. اجعل Check الخاص بـ`release-gate` في Workflow `CI` إلزاميًا قبل دمج `main`.
 3. أنشئ GitHub Environment باسم `staging`، وأضف السر السابق إليه.
 4. أضف Variables النطاقات والتأكيد المذكورة أعلاه، وSecret دورات الأعمال عند
    الحاجة، ثم فعّل Required Reviewer للبيئة.
@@ -216,6 +222,8 @@ npm run test:staging-preflight
 ```bash
 export E2E_MUTATIONS_CONFIRMED="isolated-staging-only"
 export E2E_BUSINESS_FIXTURES_JSON='{"dataset":"disposable-staging",...}'
+npm run staging:accounts:setup
+npm run staging:fixtures:setup
 npm run test:e2e-business-staging -- --validate-config
 npm run test:e2e-business-staging
 ```
@@ -234,26 +242,28 @@ npm run test:load-staging
 ### Windows CMD بعد نقل المستودع إلى اللابتوب
 
 انسخ `.env.staging.example` إلى `.env.staging.local` مرة واحدة، ثم ضع القيم
-الحقيقية داخله محليًا. لا يعمل الأمر الكامل إلا إذا كانت التأكيدات الثلاثة
+الحقيقية داخله محليًا. لا يعمل الأمر الكامل إلا إذا كانت التأكيدات الأربعة
 التالية موجودة بالقيم الحرفية نفسها داخل الملف:
 
 ```text
 STAGING_FULL_RUN_CONFIRMED=isolated-staging-only
+STAGING_ACCOUNT_SETUP_CONFIRMED=isolated-staging-only
 E2E_MUTATIONS_CONFIRMED=isolated-staging-only
 E2E_LOAD_CONFIRMED=isolated-staging-only
 ```
 
-بعد حفظ إعداد Fixtures يصبح أمر التشغيل الكامل الوحيد (ويعيد تجهيزها تلقائيًا قبل دورات الأعمال):
+بعد حفظ إعداد Fixtures يصبح أمر التشغيل الكامل الوحيد (ويعيد مراجعة حسابات
+الأدوار وتجهيز Fixtures تلقائيًا قبل دورات الأعمال):
 
 ```bat
 npm.cmd run test:staging:all
 ```
 
-هذا الأمر يشغّل `verify`، والـPreflight الحي، ومصفوفة المتصفح لكل الأدوار بلا
-Skip، ودورات البيع والمخزون والمرتجعات والتحصيل والاسترداد والخزينة والمصروفات
-والشراء والموردين والصيانة والتوصيل وCOD، ثم ضغطًا محدودًا بأقصى إعداد افتراضي
-`256` اتصالًا و`25000` طلب. يتوقف فور فشل أي Gate ويحفظ تقريرًا رئيسيًا في
-`test-results/staging-all/acceptance.json`.
+هذا الأمر يشغّل `verify`، والـPreflight الحي، ومراجعة/تصحيح حسابات الأدوار،
+ومصفوفة المتصفح لكل الأدوار بلا Skip، ودورات البيع والمخزون والمرتجعات والتحصيل
+والاسترداد والخزينة والمصروفات والشراء والموردين والصيانة والتوصيل وCOD، ثم
+ضغطًا محدودًا بأقصى إعداد افتراضي `256` اتصالًا و`25000` طلب. يتوقف فور فشل أي
+Gate ويحفظ تقريرًا رئيسيًا في `test-results/staging-all/acceptance.json`.
 
 لفحص ملف الإعداد دون اتصال أو إنشاء بيانات:
 
@@ -268,6 +278,7 @@ npm.cmd run test:staging:all -- --validate-config
 
 - `test-results/staging-e2e/acceptance.json`
 - `test-results/staging-preflight/acceptance.json`
+- `test-results/staging-account-setup/acceptance.json`
 - `test-results/staging-fixtures/acceptance.json` وصورة تثبت جاهزية البيانات.
 - `test-results/staging-business-e2e/acceptance.json` وصورة لكل نقطة دورة.
 - Screenshot لكل دور دون بيانات اعتماد.

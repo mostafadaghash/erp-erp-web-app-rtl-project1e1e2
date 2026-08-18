@@ -66,6 +66,14 @@ function businessConfig() {
     "disposable-staging",
     "Business E2E requires a disposable-staging dataset",
   );
+  const accountBranchName = process.env.E2E_ACCOUNT_BRANCH_NAME?.trim();
+  if (accountBranchName) {
+    assert.equal(
+      accountBranchName,
+      fixtures.branchName,
+      "E2E_ACCOUNT_BRANCH_NAME must match E2E_BUSINESS_FIXTURES_JSON.branchName",
+    );
+  }
   const operationDate = fixtures.operationDate ?? new Date().toISOString().slice(0, 10);
   assert.ok(isIsoDate(operationDate), "operationDate must be a real ISO date");
   const purchaseUnitCost = fixtures.purchaseUnitCost ?? 10;
@@ -122,6 +130,25 @@ async function selectContaining(select, expected) {
   assert.ok(match, `Missing option containing: ${expected}`);
   await select.selectOption(match.value);
   return match;
+}
+
+async function selectExact(select, expected) {
+  await select.waitFor({ state: "visible", timeout: 30_000 });
+  await select.page().waitForFunction(
+    ({ selector, text }) => {
+      const element = document.querySelector(selector);
+      return element instanceof HTMLSelectElement && [...element.options].some((option) => option.value && option.text.trim() === text);
+    },
+    { selector: await stableSelector(select), text: expected },
+    { timeout: 30_000 },
+  );
+  const options = await select.locator("option").evaluateAll((rows) =>
+    rows.map((row) => ({ value: row.value, label: row.textContent?.trim() ?? "" })),
+  );
+  const matches = options.filter((option) => option.value && option.label === expected);
+  assert.equal(matches.length, 1, `Expected exactly one option named: ${expected}`);
+  await select.selectOption(matches[0].value);
+  return matches[0];
 }
 
 async function stableSelector(locator) {
@@ -328,7 +355,8 @@ async function createOrder(page, fixtures, marker, total) {
 async function createDeliveryCycle(page, fixtures, marker, orderNumber, invoiceNumber) {
   await navigate(page, "عمليات الشحن", "deliveries-page");
   const branch = page.getByTestId("delivery-branch-select");
-  if (await branch.count()) await selectContaining(branch, fixtures.branchName);
+  await branch.waitFor({ state: "visible", timeout: 30_000 });
+  await selectExact(branch, fixtures.branchName);
   const before = await attributeSet(page.getByTestId("delivery-row"), "data-delivery-number");
   await page.getByTestId("delivery-create-open").click();
   await page.getByTestId("delivery-action-modal").waitFor();
@@ -428,7 +456,8 @@ async function createPurchaseCycle(page, fixtures, marker) {
 async function createRepairCycle(page, fixtures, marker) {
   await navigate(page, "أوامر الصيانة", "repairs-page");
   const branch = page.getByTestId("repair-branch-select");
-  if (await branch.count()) await selectContaining(branch, fixtures.branchName);
+  await branch.waitFor({ state: "visible", timeout: 30_000 });
+  await selectExact(branch, fixtures.branchName);
   const before = await attributeSet(page.getByTestId("repair-card"), "data-repair-number");
   await page.getByTestId("repair-create-open").click();
   await page.getByTestId("repair-create-form").waitFor();

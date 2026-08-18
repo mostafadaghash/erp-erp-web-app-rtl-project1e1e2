@@ -202,7 +202,7 @@ export function Sidebar({
         </div>
       </div>
 
-      <nav className="erp-sidebar-scroll flex-1 overflow-y-auto px-3 py-3">
+      <nav aria-label="القائمة الرئيسية" className="erp-sidebar-scroll flex-1 overflow-y-auto px-3 py-3">
         {groups.map(group => {
           const isOpen = !collapsed[group.key];
           const hasActive = group.items.some(item => item.id === currentPage);
@@ -261,7 +261,11 @@ export function Sidebar({
           </div>
           <div className="min-w-0 flex-1">
             <p className="truncate text-xs font-bold text-white">{userName}</p>
-            <p data-testid="current-user-role" className="mt-0.5 truncate text-[11px] text-slate-400">
+            <p
+              data-testid="current-user-role"
+              data-user-role={role}
+              className="mt-0.5 truncate text-[11px] text-slate-400"
+            >
               {ROLE_LABELS[role] ?? role}
             </p>
           </div>

@@ -31,7 +31,7 @@
     "backup:verify": "node scripts/backup/verify.mjs",
     "restore:plan": "node scripts/backup/restore.mjs",
     "restore:execute": "node scripts/backup/restore.mjs --execute",
-    "e2e:install": "npm install --no-save --package-lock=false @playwright/test@1.55.0",
+    "e2e:install": "npm install --no-save --package-lock=false @playwright/test@1.62.1",
     "test:e2e": "playwright test",
     "test:e2e:smoke": "playwright test --grep @smoke",
     "test:e2e:roles": "playwright test --grep @roles",
@@ -41,7 +41,7 @@
   "dependencies": {
     "@convex-dev/auth": "^0.0.95",
     "clsx": "^2.1.1",
-    "convex": "^1.24.2",
+    "convex": "^1.44.0",
     "lucide-react": "^1.11.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",

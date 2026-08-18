@@ -332,11 +332,20 @@ async function verifySecurityHeaders(baseUrl) {
   };
 }
 
+export async function gotoStagingPage(page, url) {
+  const response = await page.goto(url, {
+    waitUntil: "commit",
+    timeout: 45_000,
+  });
+  assert.ok(response, "Staging navigation did not return a document response");
+  return response;
+}
+
 export async function signIn(page, baseUrl, account) {
-  await page.goto(baseUrl, { waitUntil: "domcontentloaded" });
+  await gotoStagingPage(page, baseUrl);
   await page
     .getByRole("heading", { name: "تسجيل الدخول", exact: true })
-    .waitFor({ timeout: 30_000 });
+    .waitFor({ timeout: 45_000 });
   await page.locator('input[name="email"]').fill(account.email);
   await page.locator('input[name="password"]').fill(account.password);
   await page.getByRole("button", { name: "تسجيل الدخول", exact: true }).click();
@@ -349,16 +358,17 @@ export async function signIn(page, baseUrl, account) {
 async function assertRoleNavigation(page, role) {
   const rule = navigationByRole[role];
   assert.ok(rule, `Missing navigation rule for ${role}`);
-  await page
+  const navigation = page.getByRole("navigation", { name: "القائمة الرئيسية" });
+  await navigation
     .getByRole("button", { name: "لوحة التحكم", exact: true })
     .waitFor();
 
   for (const label of rule.visible) {
-    await page.getByRole("button", { name: label, exact: true }).waitFor();
+    await navigation.getByRole("button", { name: label, exact: true }).waitFor();
   }
   for (const label of rule.hidden) {
     assert.equal(
-      await page.getByRole("button", { name: label, exact: true }).count(),
+      await navigation.getByRole("button", { name: label, exact: true }).count(),
       0,
       `${role} unexpectedly sees ${label}`,
     );
@@ -366,17 +376,18 @@ async function assertRoleNavigation(page, role) {
 
   const pages = [];
   for (const label of rule.smoke) {
-    const button = page.getByRole("button", { name: label, exact: true });
+    const button = navigation.getByRole("button", { name: label, exact: true });
     await button.click();
     await page.locator("main h1").first().waitFor({ timeout: 30_000 });
     await page.waitForFunction(
       (text) =>
-        [...document.querySelectorAll("button")].some(
+        [...document.querySelectorAll('nav[aria-label="القائمة الرئيسية"] button')].some(
           (element) =>
             element.textContent?.trim() === text &&
-            element.classList.contains("active"),
+            element.getAttribute("aria-current") === "page",
         ),
       label,
+      { timeout: 30_000 },
     );
     assert.equal(await button.getAttribute("aria-current"), "page");
     pages.push({
@@ -476,10 +487,11 @@ async function runRole(browser, config, account) {
       join(outputRoot, `${account.role}-role-smoke.png`),
     );
     assert.deepEqual(failures, [], `${account.role} browser runtime failures`);
-    await page.getByRole("button", { name: "تسجيل الخروج", exact: true }).click();
-    await page
-      .getByRole("heading", { name: "تسجيل الدخول", exact: true })
-      .waitFor({ timeout: 30_000 });
+    const signOutButton = page.getByRole("button", { name: "تسجيل الخروج", exact: true });
+    await signOutButton.click();
+    await signOutButton.waitFor({ state: "detached", timeout: 45_000 });
+    await page.locator('input[name="email"]').waitFor({ state: "visible", timeout: 45_000 });
+    await page.locator('input[name="password"]').waitFor({ state: "visible", timeout: 45_000 });
     return { role: account.role, visitedPages, logout: true };
   } catch (error) {
     await safeScreenshot(page, join(outputRoot, `${account.role}-failure.png`));

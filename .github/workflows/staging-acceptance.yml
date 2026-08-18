@@ -154,7 +154,7 @@ jobs:
     if: ${{ inputs.run_business_cycles }}
     needs: browser-e2e
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 45
     environment: staging
     env:
       STAGING_BASE_URL: ${{ vars.STAGING_BASE_URL }}
@@ -166,6 +166,7 @@ jobs:
       PRODUCTION_CONVEX_SITE_URL: ${{ vars.PRODUCTION_CONVEX_SITE_URL }}
       E2E_ENVIRONMENT: staging
       E2E_REQUIRE_ALL_ROLES: "false"
+      STAGING_ACCOUNT_SETUP_CONFIRMED: isolated-staging-only
       E2E_MUTATIONS_CONFIRMED: isolated-staging-only
       E2E_ROLE_ACCOUNTS_JSON: ${{ secrets.E2E_ROLE_ACCOUNTS_JSON }}
       E2E_BUSINESS_FIXTURES_JSON: ${{ secrets.E2E_BUSINESS_FIXTURES_JSON }}
@@ -179,7 +180,14 @@ jobs:
           cache: npm
       - run: npm ci --ignore-scripts
       - name: Validate mutable staging configuration without opening a browser
-        run: npm run test:e2e-business-staging -- --validate-config
+        run: |
+          npm run staging:accounts:setup -- --validate-config
+          npm run staging:fixtures:setup -- --validate-config
+          npm run test:e2e-business-staging -- --validate-config
+      - name: Reconcile dedicated Staging role accounts
+        run: npm run staging:accounts:setup
+      - name: Prepare disposable business fixtures
+        run: npm run staging:fixtures:setup
       - name: Run isolated mutable business cycles
         run: npm run test:e2e-business-staging
       - name: Upload mutable business evidence
@@ -187,7 +195,10 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: staging-business-evidence
-          path: test-results/staging-business-e2e
+          path: |
+            test-results/staging-account-setup
+            test-results/staging-fixtures
+            test-results/staging-business-e2e
           if-no-files-found: error
           retention-days: 14
 

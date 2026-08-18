@@ -15,6 +15,7 @@ function run(env: Record<string, string>) {
 const base = {
   STAGING_ENVIRONMENT: "staging",
   STAGING_BASE_URL: "https://staging.example.com",
+  E2E_REQUIRE_ALL_ROLES: "false",
   E2E_PRODUCT_QUERY: "E2E-PRODUCT",
   E2E_ADMIN_EMAIL: "admin@example.test",
   E2E_ADMIN_PASSWORD: "not-a-real-secret",
