@@ -202,7 +202,7 @@ export function Sidebar({
         </div>
       </div>
 
-      <nav className="erp-sidebar-scroll flex-1 overflow-y-auto px-3 py-3">
+      <nav aria-label="القائمة الرئيسية" className="erp-sidebar-scroll flex-1 overflow-y-auto px-3 py-3">
         {groups.map(group => {
           const isOpen = !collapsed[group.key];
           const hasActive = group.items.some(item => item.id === currentPage);
