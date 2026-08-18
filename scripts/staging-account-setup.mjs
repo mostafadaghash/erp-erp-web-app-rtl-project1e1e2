@@ -259,7 +259,15 @@ async function selectBranch(page, branchName) {
 
 async function captureInvitation(page) {
   const invitation = page.getByTestId("employee-invite-link");
-  await invitation.waitFor({ state: "visible", timeout: 30_000 });
+  try {
+    await invitation.waitFor({ state: "visible", timeout: 30_000 });
+  } catch (error) {
+    const toasts = await page.locator("[data-sonner-toast]").allTextContents();
+    throw new Error(
+      `Invitation link did not appear. UI messages: ${toasts.join(" | ") || "none"}`,
+      { cause: error },
+    );
+  }
   const value = await invitation.inputValue();
   const url = new URL(value);
   assert.ok(
@@ -463,6 +471,7 @@ async function main() {
       .getByRole("button", { name: "المستخدمون والصلاحيات", exact: true })
       .click();
     await adminPage
+      .getByRole("main")
       .getByRole("heading", { name: "المستخدمون والصلاحيات", exact: true })
       .waitFor({ timeout: 30_000 });
 
