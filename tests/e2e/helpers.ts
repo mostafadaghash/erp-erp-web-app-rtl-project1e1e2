@@ -21,12 +21,41 @@ const envKeys: Record<E2ERole, [string, string]> = {
   viewer: ["E2E_VIEWER_EMAIL", "E2E_VIEWER_PASSWORD"],
 };
 
+function roleAccountsFromJson() {
+  const raw = process.env.E2E_ROLE_ACCOUNTS_JSON?.trim();
+  if (!raw) return [];
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    throw new Error("E2E_ROLE_ACCOUNTS_JSON must be valid JSON");
+  }
+  if (!Array.isArray(parsed)) {
+    throw new Error("E2E_ROLE_ACCOUNTS_JSON must be a JSON array");
+  }
+  return parsed as Array<{ role?: string; email?: string; password?: string }>;
+}
+
 export function hasCredentials(role: E2ERole) {
+  const jsonAccount = roleAccountsFromJson().find((account) => account.role === role);
+  if (jsonAccount) {
+    return Boolean(jsonAccount.email?.trim() && jsonAccount.password?.trim());
+  }
   const [emailKey, passwordKey] = envKeys[role];
   return Boolean(process.env[emailKey]?.trim() && process.env[passwordKey]?.trim());
 }
 
 function credentials(role: E2ERole) {
+  const jsonAccount = roleAccountsFromJson().find((account) => account.role === role);
+  if (jsonAccount) {
+    const email = jsonAccount.email?.trim();
+    const password = jsonAccount.password?.trim();
+    if (!email || !password) {
+      throw new Error(`Missing E2E credentials for role: ${role}`);
+    }
+    return { email, password };
+  }
+
   const [emailKey, passwordKey] = envKeys[role];
   const email = process.env[emailKey]?.trim();
   const password = process.env[passwordKey]?.trim();
