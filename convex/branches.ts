@@ -1,9 +1,11 @@
 import { query, mutation } from "./_generated/server";
+import type { QueryCtx } from "./_generated/server";
 import { v, ConvexError } from "convex/values";
 import { assertBranchAccess, hasPermission, requireModulePermission, logAction } from "./lib/auth";
+import type { AuthUser } from "./lib/auth";
 import { applyOrderStatsChange } from "./lib/orderStats.ts";
 
-async function visibleBranches(ctx: Parameters<Parameters<typeof query>[0]["handler"]>[0], user: { role: string; branchId?: any }) {
+async function visibleBranches(ctx: QueryCtx, user: AuthUser) {
   if (user.role === "admin") return await ctx.db.query("branches").collect();
   if (!user.branchId) return [];
   const branch = await ctx.db.get(user.branchId);
