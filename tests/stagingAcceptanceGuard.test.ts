@@ -73,7 +73,7 @@ test("STG-04 role checks open pages and assert forbidden navigation", () => {
   assert.match(script, /assertRoleNavigation/);
   assert.match(script, /rule\.visible/);
   assert.match(script, /rule\.hidden/);
-  assert.match(script, /classList\.contains\("active"\)/);
+  assert.match(script, /getAttribute\("aria-current"\)\s*===\s*"page"/);
   assert.match(script, /locator\("main h1"\)/);
 });
 
