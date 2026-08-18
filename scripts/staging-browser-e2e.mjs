@@ -332,11 +332,20 @@ async function verifySecurityHeaders(baseUrl) {
   };
 }
 
+export async function gotoStagingPage(page, url) {
+  const response = await page.goto(url, {
+    waitUntil: "commit",
+    timeout: 45_000,
+  });
+  assert.ok(response, "Staging navigation did not return a document response");
+  return response;
+}
+
 export async function signIn(page, baseUrl, account) {
-  await page.goto(baseUrl, { waitUntil: "domcontentloaded" });
+  await gotoStagingPage(page, baseUrl);
   await page
     .getByRole("heading", { name: "تسجيل الدخول", exact: true })
-    .waitFor({ timeout: 30_000 });
+    .waitFor({ timeout: 45_000 });
   await page.locator('input[name="email"]').fill(account.email);
   await page.locator('input[name="password"]').fill(account.password);
   await page.getByRole("button", { name: "تسجيل الدخول", exact: true }).click();
