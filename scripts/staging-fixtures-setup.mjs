@@ -85,7 +85,33 @@ async function writeReport(status, results, runtimeFailures, errorMessage) {
 }
 
 async function waitForToast(page, message) {
-  await page.getByText(message, { exact: false }).last().waitFor({ state: "visible", timeout: 45_000 });
+  const handle = await page.waitForFunction(
+    (expected) => {
+      const toasts = [...document.querySelectorAll("[data-sonner-toast]")];
+      if (toasts.some((toast) => toast.textContent?.includes(expected))) {
+        return { ok: true, text: expected };
+      }
+      const errorToast = toasts.find(
+        (toast) => toast.getAttribute("data-type") === "error",
+      );
+      if (errorToast) {
+        return {
+          ok: false,
+          text: errorToast.textContent?.trim() || "Unknown UI error",
+        };
+      }
+      return null;
+    },
+    message,
+    { timeout: 45_000 },
+  );
+  const outcome = await handle.jsonValue();
+  await handle.dispose();
+  if (!outcome?.ok) {
+    throw new Error(
+      `UI error while waiting for success message "${message}": ${outcome?.text ?? "unknown"}`,
+    );
+  }
 }
 
 async function navigate(page, label, testId) {
