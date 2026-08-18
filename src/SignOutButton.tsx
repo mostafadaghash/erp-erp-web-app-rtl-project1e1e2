@@ -9,9 +9,7 @@ export function SignOutButton() {
   const { signOut } = useAuthActions();
   const [isSigningOut, setIsSigningOut] = useState(false);
 
-  if (!isAuthenticated) {
-    return null;
-  }
+  if (!isAuthenticated) return null;
 
   const handleSignOut = async () => {
     if (isSigningOut) return;
@@ -27,13 +25,13 @@ export function SignOutButton() {
   return (
     <button
       type="button"
-      className="flex w-full items-center justify-center gap-2 rounded-xl border border-red-400/20 bg-red-500/10 px-4 py-2.5 text-xs font-bold text-red-300 transition hover:border-red-400/30 hover:bg-red-500/15 hover:text-red-200 disabled:cursor-wait disabled:opacity-70"
+      className="flex w-full items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-600 transition hover:border-red-200 hover:bg-red-50 hover:text-red-700 disabled:cursor-wait disabled:opacity-60 lg:w-auto"
       onClick={() => void handleSignOut()}
       disabled={isSigningOut}
       aria-busy={isSigningOut}
     >
       <LogOut className="h-4 w-4" />
-      {isSigningOut ? "جاري تسجيل الخروج..." : "تسجيل الخروج"}
+      {isSigningOut ? "جارٍ تسجيل الخروج..." : "تسجيل الخروج"}
     </button>
   );
 }
