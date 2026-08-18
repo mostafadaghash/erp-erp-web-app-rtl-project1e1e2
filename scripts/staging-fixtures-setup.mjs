@@ -59,6 +59,14 @@ function setupConfig() {
     throw new Error("E2E_BUSINESS_FIXTURES_JSON must be valid JSON");
   }
   const fixtures = validateFixtureDefinition(definition);
+  const accountBranchName = process.env.E2E_ACCOUNT_BRANCH_NAME?.trim();
+  if (accountBranchName) {
+    assert.equal(
+      accountBranchName,
+      fixtures.branchName,
+      "E2E_ACCOUNT_BRANCH_NAME must match E2E_BUSINESS_FIXTURES_JSON.branchName",
+    );
+  }
   const admin = staging.accounts.find((account) => account.role === "admin");
   assert.ok(admin, "Fixture setup requires the existing Staging admin account");
   return { ...staging, fixtures, admin };
@@ -87,19 +95,21 @@ async function navigate(page, label, testId) {
 
 async function selectExact(select, label) {
   await select.waitFor({ state: "visible", timeout: 30_000 });
+  const testId = await select.getAttribute("data-testid");
+  assert.ok(testId, "Fixture select requires a stable data-testid");
   await select.page().waitForFunction(
-    ({ testId, label: expected }) => {
-      const element = document.querySelector(`[data-testid="${testId}"]`);
+    ({ testId: id, label: expected }) => {
+      const element = document.querySelector(`[data-testid="${id}"]`);
       return element instanceof HTMLSelectElement && [...element.options].some((option) => option.value && option.text.trim() === expected);
     },
-    { testId: await select.getAttribute("data-testid"), label },
+    { testId, label },
     { timeout: 30_000 },
   );
   const options = await select.locator("option").evaluateAll((rows) => rows.map((row) => ({ value: row.value, label: row.textContent?.trim() ?? "" })));
-  const match = options.find((option) => option.value && option.label === label);
-  assert.ok(match, `Missing active branch: ${label}`);
-  await select.selectOption(match.value);
-  return match;
+  const matches = options.filter((option) => option.value && option.label === label);
+  assert.equal(matches.length, 1, `Expected exactly one option named: ${label}`);
+  await select.selectOption(matches[0].value);
+  return matches[0];
 }
 
 async function exactRow(page, testId, attribute, value) {
@@ -123,12 +133,28 @@ async function waitForExactRow(page, testId, attribute, value) {
   return exactRow(page, testId, attribute, value);
 }
 
+async function ensureAdminWorkingBranch(page, fixtures, targetBranchId) {
+  const workingBranch = page.getByTestId("working-branch-select");
+  await workingBranch.waitFor({ state: "visible", timeout: 30_000 });
+  if ((await workingBranch.inputValue()) !== targetBranchId) {
+    const selected = await selectExact(workingBranch, fixtures.branchName);
+    assert.equal(selected.value, targetBranchId, "Named fixture branch resolved to a different branch ID");
+    await waitForToast(page, "تم تغيير فرع العمل");
+  }
+  assert.equal(
+    await workingBranch.inputValue(),
+    targetBranchId,
+    "Admin working branch does not match the fixture branch",
+  );
+}
+
 async function ensureCustomer(page, fixtures, targetBranchId) {
   await navigate(page, "العملاء", "customers-page");
   const branchSelect = page.getByTestId("customer-branch-select");
   const branch = await branchSelect.count()
     ? await selectExact(branchSelect, fixtures.branchName)
     : { value: targetBranchId, label: fixtures.branchName };
+  assert.equal(branch.value, targetBranchId, "Customer fixture branch does not match the finance fixture branch");
   await page.getByTestId("customer-search").fill(fixtures.customerName);
   let row = await exactRow(page, "customer-card", "data-customer-name", fixtures.customerName);
   if (!row) {
@@ -142,7 +168,7 @@ async function ensureCustomer(page, fixtures, targetBranchId) {
   }
   assert.ok(row, "Customer fixture did not appear after setup");
   assert.equal(await row.getAttribute("data-customer-active"), "true", "Customer fixture must be active");
-  assert.equal(await row.getAttribute("data-customer-branch-id"), branch.value, "Customer fixture belongs to a different branch");
+  assert.equal(await row.getAttribute("data-customer-branch-id"), targetBranchId, "Customer fixture belongs to a different branch");
   return { fixture: "customer", status: "ready" };
 }
 
@@ -165,14 +191,8 @@ async function ensureSupplier(page, fixtures) {
 }
 
 async function ensureProduct(page, fixtures, targetBranchId) {
-  const workingBranch = page.getByTestId("working-branch-select");
-  await workingBranch.waitFor({ state: "visible", timeout: 30_000 });
-  if ((await workingBranch.inputValue()) !== targetBranchId) {
-    await selectExact(workingBranch, fixtures.branchName);
-    await waitForToast(page, "تم تغيير فرع العمل");
-  }
-  assert.equal(await workingBranch.inputValue(), targetBranchId, "Admin working branch does not match the fixture branch");
-  await navigate(page, "المنتجات والمخزون", "products-page");
+  await ensureAdminWorkingBranch(page, fixtures, targetBranchId);
+  await navigate(page, "الأصناف", "products-page");
   await page.getByTestId("product-search").fill(fixtures.productName);
   let row = await exactRow(page, "product-row", "data-product-name", fixtures.productName);
   if (!row) {
@@ -250,11 +270,13 @@ async function postOpeningBalance(page, row, amount) {
 }
 
 async function ensureFinance(page, fixtures) {
-  await navigate(page, "الخزائن والحسابات", "treasury-page");
+  await navigate(page, "الخزائن والبنوك", "treasury-page");
   const branchSelect = page.getByTestId("finance-account-branch");
+  await branchSelect.waitFor({ state: "visible", timeout: 30_000 });
   const options = (await branchSelect.locator("option").evaluateAll((rows) => rows.map((row) => ({ value: row.value, label: row.textContent?.trim() ?? "" })))).filter((option) => option.value);
-  const targetBranch = options.find((option) => option.label === fixtures.branchName);
-  assert.ok(targetBranch, `Missing active branch: ${fixtures.branchName}`);
+  const matches = options.filter((option) => option.label === fixtures.branchName);
+  assert.equal(matches.length, 1, `Fixture branch must match exactly one active branch: ${fixtures.branchName}`);
+  const targetBranch = matches[0];
   await page.waitForFunction(
     () => ![null, "loading"].includes(document.querySelector('[data-testid="finance-initialization"]')?.getAttribute("data-state") ?? null),
     undefined,
@@ -327,6 +349,7 @@ async function main() {
     await signIn(page, config.baseUrl, config.admin);
     const finance = await ensureFinance(page, config.fixtures);
     results.push({ fixture: finance.fixture, status: finance.status });
+    await ensureAdminWorkingBranch(page, config.fixtures, finance.branchId);
     results.push(await ensureCustomer(page, config.fixtures, finance.branchId));
     results.push(await ensureSupplier(page, config.fixtures));
     results.push(await ensureProduct(page, config.fixtures, finance.branchId));
