@@ -1,3 +1,7 @@
+import dotenv from "dotenv";
+
+dotenv.config({ path: ".env.staging.local", override: false });
+
 const required = [
   "STAGING_BASE_URL",
   "STAGING_ENVIRONMENT",
