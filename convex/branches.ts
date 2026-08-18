@@ -1,21 +1,31 @@
 import { query, mutation } from "./_generated/server";
 import { v, ConvexError } from "convex/values";
-import { hasPermission, requireModulePermission, logAction } from "./lib/auth";
+import { assertBranchAccess, hasPermission, requireModulePermission, logAction } from "./lib/auth";
 import { applyOrderStatsChange } from "./lib/orderStats.ts";
+
+async function visibleBranches(ctx: Parameters<Parameters<typeof query>[0]["handler"]>[0], user: { role: string; branchId?: any }) {
+  if (user.role === "admin") return await ctx.db.query("branches").collect();
+  if (!user.branchId) return [];
+  const branch = await ctx.db.get(user.branchId);
+  return branch ? [branch] : [];
+}
 
 export const list = query({
   args: {},
   handler: async (ctx) => {
-    await requireModulePermission(ctx, "view_branches", "branches");
-    return await ctx.db.query("branches").collect();
+    const user = await requireModulePermission(ctx, "view_branches", "branches");
+    return await visibleBranches(ctx, user);
   },
 });
 
 export const get = query({
   args: { id: v.id("branches") },
   handler: async (ctx, args) => {
-    await requireModulePermission(ctx, "view_branches", "branches");
-    return await ctx.db.get(args.id);
+    const user = await requireModulePermission(ctx, "view_branches", "branches");
+    const branch = await ctx.db.get(args.id);
+    if (!branch) return null;
+    assertBranchAccess(user, { branchId: branch._id });
+    return branch;
   },
 });
 
@@ -109,9 +119,15 @@ export const stats = query({
   args: {},
   handler: async (ctx) => {
     const user = await requireModulePermission(ctx, "view_branches", "branches");
-    const branches = await ctx.db.query("branches").collect();
+    const branches = await visibleBranches(ctx, user);
     const totalEmployees = hasPermission(user, "view_employees")
-      ? (await ctx.db.query("userProfiles").collect()).length
+      ? user.role === "admin"
+        ? (await ctx.db.query("userProfiles").collect()).length
+        : user.branchId
+          ? (await ctx.db.query("userProfiles").collect()).filter(
+              (profile) => profile.branchId === user.branchId,
+            ).length
+          : 0
       : undefined;
     return {
       total: branches.length,
