@@ -261,7 +261,11 @@ export function Sidebar({
           </div>
           <div className="min-w-0 flex-1">
             <p className="truncate text-xs font-bold text-white">{userName}</p>
-            <p data-testid="current-user-role" className="mt-0.5 truncate text-[11px] text-slate-400">
+            <p
+              data-testid="current-user-role"
+              data-user-role={role}
+              className="mt-0.5 truncate text-[11px] text-slate-400"
+            >
               {ROLE_LABELS[role] ?? role}
             </p>
           </div>
