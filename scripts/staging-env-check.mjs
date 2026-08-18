@@ -48,6 +48,7 @@ if (suspiciousProductionTokens.some((token) => normalizedHost.includes(token))) 
   process.exit(1);
 }
 
+const missingRolePairs = [];
 for (const [emailName, passwordName] of optionalRolePairs) {
   const hasEmail = Boolean(process.env[emailName]?.trim());
   const hasPassword = Boolean(process.env[passwordName]?.trim());
@@ -55,6 +56,17 @@ for (const [emailName, passwordName] of optionalRolePairs) {
     console.error(`${emailName} and ${passwordName} must be configured together.`);
     process.exit(1);
   }
+  if (!hasEmail) missingRolePairs.push(`${emailName}/${passwordName}`);
+}
+
+if (
+  process.env.E2E_REQUIRE_ALL_ROLES === "true" &&
+  missingRolePairs.length > 0
+) {
+  console.error(
+    `Full role acceptance requires every role credential pair. Missing: ${missingRolePairs.join(", ")}`,
+  );
+  process.exit(1);
 }
 
 console.log(`Staging guard passed for ${baseUrl.origin}.`);
