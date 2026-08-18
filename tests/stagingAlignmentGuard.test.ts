@@ -5,6 +5,7 @@ import { readFileSync } from "node:fs";
 const read = (path: string) => readFileSync(path, "utf8");
 
 const sidebar = read("src/components/Sidebar.tsx");
+const branches = read("convex/branches.ts");
 const accountSetup = read("scripts/staging-account-setup.mjs");
 const fixtures = read("scripts/staging-fixtures-setup.mjs");
 const business = read("scripts/staging-business-e2e.mjs");
@@ -41,6 +42,16 @@ test("role acceptance uses a stable machine identity while keeping Arabic displa
     /getByTestId\("current-user-role"\)\.innerText\(\)/,
   );
   assert.match(helpers, /toHaveAttribute\("data-user-role", role\)/);
+});
+
+test("branch metadata is scoped to the authenticated branch for non-admin users", () => {
+  assert.match(branches, /async function visibleBranches\(ctx: QueryCtx, user: AuthUser\)/);
+  assert.match(branches, /if \(user\.role === "admin"\) return await ctx\.db\.query\("branches"\)\.collect\(\)/);
+  assert.match(branches, /if \(!user\.branchId\) return \[\]/);
+  assert.match(branches, /const branch = await ctx\.db\.get\(user\.branchId\)/);
+  assert.match(branches, /return await visibleBranches\(ctx, user\)/);
+  assert.match(branches, /assertBranchAccess\(user, \{ branchId: branch\._id \}\)/);
+  assert.match(branches, /const branches = await visibleBranches\(ctx, user\)/);
 });
 
 test("existing Staging role accounts are reconciled to one unambiguous branch", () => {
