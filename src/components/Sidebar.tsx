@@ -222,7 +222,7 @@ export function Sidebar({
                   onClick={() => setOpenGroup((value) => (value === group.key ? null : group.key))}
                   className={`erp-nav-group-button ${hasActive ? "active" : ""}`}
                   aria-expanded={isOpen}
-                  aria-label={group.label}
+                  aria-label={`قسم ${group.label}`}
                 >
                   <span className="flex items-center gap-2">
                     <GroupIcon className="h-4 w-4" />
