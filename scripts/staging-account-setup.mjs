@@ -294,7 +294,7 @@ async function verifyRoleLogin(browser, baseUrl, account, invitationUrl) {
       assert.equal(invitationUrl.searchParams.get("email"), account.email);
       await gotoStagingPage(page, invitationUrl.toString());
       await page
-        .getByRole("heading", { name: "إنشاء حساب", exact: true })
+        .getByRole("heading", { name: "إنشاء الحساب", exact: true })
         .waitFor({ timeout: 45_000 });
       await page.locator('input[name="email"]').fill(account.email);
       await page.locator('input[name="password"]').fill(account.password);
