@@ -1,12 +1,23 @@
 import { expect, type Page } from "@playwright/test";
 
-export type E2ERole = "admin" | "manager" | "accountant" | "sales" | "viewer";
+export type E2ERole =
+  | "admin"
+  | "manager"
+  | "accountant"
+  | "sales"
+  | "customer_service"
+  | "technician"
+  | "shipping"
+  | "viewer";
 
 const envKeys: Record<E2ERole, [string, string]> = {
   admin: ["E2E_ADMIN_EMAIL", "E2E_ADMIN_PASSWORD"],
   manager: ["E2E_MANAGER_EMAIL", "E2E_MANAGER_PASSWORD"],
   accountant: ["E2E_ACCOUNTANT_EMAIL", "E2E_ACCOUNTANT_PASSWORD"],
   sales: ["E2E_SALES_EMAIL", "E2E_SALES_PASSWORD"],
+  customer_service: ["E2E_CUSTOMER_SERVICE_EMAIL", "E2E_CUSTOMER_SERVICE_PASSWORD"],
+  technician: ["E2E_TECHNICIAN_EMAIL", "E2E_TECHNICIAN_PASSWORD"],
+  shipping: ["E2E_SHIPPING_EMAIL", "E2E_SHIPPING_PASSWORD"],
   viewer: ["E2E_VIEWER_EMAIL", "E2E_VIEWER_PASSWORD"],
 };
 
@@ -25,11 +36,15 @@ function credentials(role: E2ERole) {
 
 export async function login(page: Page, role: E2ERole) {
   const { email, password } = credentials(role);
-  await page.goto("/");
+  await page.goto("/", { waitUntil: "commit" });
+  await expect(
+    page.getByRole("heading", { name: "تسجيل الدخول", exact: true }),
+  ).toBeVisible({ timeout: 45_000 });
   await page.locator('input[name="email"]').fill(email);
   await page.locator('input[name="password"]').fill(password);
   await page.getByRole("button", { name: "تسجيل الدخول", exact: true }).click();
-  await expect(page.getByRole("button", { name: "لوحة التحكم", exact: true })).toBeAttached();
+  await expect(page.getByRole("button", { name: "لوحة التحكم", exact: true })).toBeAttached({ timeout: 45_000 });
+  await expect(page.getByTestId("current-user-role")).toHaveAttribute("data-user-role", role);
   await expect(page.getByText("غير مصرح بالوصول", { exact: true })).toHaveCount(0);
 }
 
