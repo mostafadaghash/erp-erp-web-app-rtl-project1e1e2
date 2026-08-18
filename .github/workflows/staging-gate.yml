@@ -36,22 +36,7 @@ jobs:
       STAGING_BASE_URL: ${{ vars.STAGING_BASE_URL }}
       E2E_PRODUCT_QUERY: ${{ vars.E2E_PRODUCT_QUERY }}
       E2E_REQUIRE_ALL_ROLES: "true"
-      E2E_ADMIN_EMAIL: ${{ secrets.E2E_ADMIN_EMAIL }}
-      E2E_ADMIN_PASSWORD: ${{ secrets.E2E_ADMIN_PASSWORD }}
-      E2E_MANAGER_EMAIL: ${{ secrets.E2E_MANAGER_EMAIL }}
-      E2E_MANAGER_PASSWORD: ${{ secrets.E2E_MANAGER_PASSWORD }}
-      E2E_ACCOUNTANT_EMAIL: ${{ secrets.E2E_ACCOUNTANT_EMAIL }}
-      E2E_ACCOUNTANT_PASSWORD: ${{ secrets.E2E_ACCOUNTANT_PASSWORD }}
-      E2E_SALES_EMAIL: ${{ secrets.E2E_SALES_EMAIL }}
-      E2E_SALES_PASSWORD: ${{ secrets.E2E_SALES_PASSWORD }}
-      E2E_CUSTOMER_SERVICE_EMAIL: ${{ secrets.E2E_CUSTOMER_SERVICE_EMAIL }}
-      E2E_CUSTOMER_SERVICE_PASSWORD: ${{ secrets.E2E_CUSTOMER_SERVICE_PASSWORD }}
-      E2E_TECHNICIAN_EMAIL: ${{ secrets.E2E_TECHNICIAN_EMAIL }}
-      E2E_TECHNICIAN_PASSWORD: ${{ secrets.E2E_TECHNICIAN_PASSWORD }}
-      E2E_SHIPPING_EMAIL: ${{ secrets.E2E_SHIPPING_EMAIL }}
-      E2E_SHIPPING_PASSWORD: ${{ secrets.E2E_SHIPPING_PASSWORD }}
-      E2E_VIEWER_EMAIL: ${{ secrets.E2E_VIEWER_EMAIL }}
-      E2E_VIEWER_PASSWORD: ${{ secrets.E2E_VIEWER_PASSWORD }}
+      E2E_ROLE_ACCOUNTS_JSON: ${{ secrets.E2E_ROLE_ACCOUNTS_JSON }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -63,7 +48,7 @@ jobs:
         run: npm install --no-save --package-lock=false @playwright/test@1.62.1
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
-      - name: Validate isolated staging target
+      - name: Validate isolated staging target and role matrix
         run: npm run staging:check
       - name: Authenticated browser acceptance
         run: npm run test:e2e:staging
