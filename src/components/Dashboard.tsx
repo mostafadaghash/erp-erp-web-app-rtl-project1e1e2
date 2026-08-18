@@ -2,10 +2,24 @@ import { useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import type { Page } from "./ERPApp";
 import {
-  TrendingUp, Users, Package,
-  Wrench, AlertTriangle, ArrowUpRight,
-  Clock, CheckCircle, UserPlus, Target, PhoneCall, Star,
-  Truck, WalletCards
+  ArrowUpRight,
+  BarChart3,
+  Boxes,
+  Building2,
+  CheckCircle,
+  CircleDollarSign,
+  Clock,
+  FileText,
+  Landmark,
+  Package,
+  ReceiptText,
+  ShoppingBag,
+  Target,
+  Truck,
+  UserPlus,
+  Users,
+  WalletCards,
+  Wrench,
 } from "lucide-react";
 import { useCurrency } from "../lib/utils";
 import type { Permission } from "../../convex/lib/permissions";
@@ -17,15 +31,29 @@ interface DashboardProps {
   modules: Record<string, boolean | undefined>;
 }
 
+type ModuleCard = {
+  page: Page;
+  title: string;
+  description: string;
+  icon: React.ElementType;
+  tone: string;
+  enabled: boolean;
+};
+
 export function Dashboard({ onNavigate, permissions, modules }: DashboardProps) {
   const can = (permission: Permission) => permissions.includes(permission);
   const enabled = (moduleName: string) => modules[moduleName] !== false;
+
   const canViewInvoices = can("view_invoices") && enabled("invoices");
   const canViewRepairs = can("view_repairs") && enabled("repairs");
   const canViewProducts = can("view_products");
   const canViewLeads = can("view_leads") && enabled("crm");
   const canViewReports = can("view_reports");
   const canViewProfits = can("view_profits");
+  const canViewPurchases = can("view_shipments") && enabled("shipments");
+  const canViewSuppliers = can("view_suppliers") && enabled("suppliers");
+  const canViewCustomers = can("view_customers");
+  const canViewTreasury = can("view_finance");
 
   const now = new Date();
   const today = [
@@ -34,6 +62,7 @@ export function Dashboard({ onNavigate, permissions, modules }: DashboardProps) 
     String(now.getDate()).padStart(2, "0"),
   ].join("-");
   const monthFrom = `${today.slice(0, 7)}-01`;
+
   const report = useQuery(
     api.reporting.overview,
     canViewReports ? { from: monthFrom, to: today } : "skip",
@@ -41,323 +70,377 @@ export function Dashboard({ onNavigate, permissions, modules }: DashboardProps) 
   const repairStats = useQuery(api.repairs.getStats, canViewRepairs ? {} : "skip");
   const lowStockProducts = useQuery(api.products.list, canViewProducts ? { lowStock: true } : "skip");
   const recentInvoices = useQuery(api.invoices.list, canViewInvoices ? {} : "skip");
-  const recentRepairs = useQuery(api.repairs.list, canViewRepairs ? {} : "skip");
   const crmStats = useQuery(api.leads.stats, canViewLeads ? {} : "skip");
 
   const { formatCurrency } = useCurrency();
 
-  const statCards = report ? [{
-      title: "صافي مبيعات الشهر",
-      value: formatCurrency(report.sales.netSales),
-      sub: `${report.sales.invoiceCount.toLocaleString("ar-EG")} فاتورة بعد المرتجعات`,
-      badge: "هذا الشهر",
-      icon: TrendingUp,
-      color: "from-indigo-500 to-indigo-600",
-      bg: "bg-indigo-50",
-      text: "text-indigo-600",
+  const moduleCards: ModuleCard[] = [
+    {
+      page: "invoices",
+      title: "المبيعات",
+      description: "الفواتير والتحصيل ومرتجعات العملاء",
+      icon: ReceiptText,
+      tone: "bg-emerald-50 text-emerald-700",
+      enabled: canViewInvoices,
     },
     {
-      title: "صافي تحصيل الشهر",
-      value: formatCurrency(report.collections.netCollections),
-      sub: `رد واسترداد ${formatCurrency(report.collections.refunds)}`,
-      badge: "هذا الشهر",
-      icon: ArrowUpRight,
-      color: "from-emerald-500 to-emerald-600",
-      bg: "bg-emerald-50",
-      text: "text-emerald-600",
+      page: "shipments",
+      title: "المشتريات",
+      description: "فواتير الموردين والمشتريات والمرتجعات",
+      icon: ShoppingBag,
+      tone: "bg-blue-50 text-blue-700",
+      enabled: canViewPurchases,
     },
     {
-      title: "مستحقات العملاء",
-      value: formatCurrency(report.currentBalances.customerReceivables),
-      sub: `مقدمات ${formatCurrency(report.currentBalances.customerAdvances)}`,
-      badge: "رصيد حالي",
+      page: "products",
+      title: "المخزون",
+      description: "الأصناف والكميات والحركات والجرد",
+      icon: Boxes,
+      tone: "bg-violet-50 text-violet-700",
+      enabled: canViewProducts,
+    },
+    {
+      page: "general-ledger",
+      title: "الحسابات",
+      description: "الأستاذ العام والحسابات والحركات المالية",
+      icon: FileText,
+      tone: "bg-cyan-50 text-cyan-700",
+      enabled: can("view_general_ledger"),
+    },
+    {
+      page: "treasury",
+      title: "الخزينة والبنوك",
+      description: "الأرصدة والتحويلات والحركة النقدية",
+      icon: Landmark,
+      tone: "bg-amber-50 text-amber-700",
+      enabled: canViewTreasury,
+    },
+    {
+      page: "customers",
+      title: "العملاء",
+      description: "دليل العملاء والأرصدة والمتابعة",
       icon: Users,
-      color: "from-amber-500 to-amber-600",
-      bg: "bg-amber-50",
-      text: "text-amber-600",
+      tone: "bg-teal-50 text-teal-700",
+      enabled: canViewCustomers,
     },
     {
-      title: "مصروفات ورسوم الشهر",
-      value: formatCurrency(report.expenses.totalExpenses),
-      sub: `رسوم شحن ${formatCurrency(report.expenses.carrierFees)}`,
-      badge: "هذا الشهر",
-      icon: WalletCards,
-      color: "from-red-500 to-red-600",
-      bg: "bg-red-50",
-      text: "text-red-600",
-    },
-    {
-      title: "COD لدى شركات الشحن",
-      value: formatCurrency(report.cod.currentOutstanding),
-      sub: `المسوى ${formatCurrency(report.cod.settled)}`,
-      badge: "رصيد حالي",
+      page: "suppliers",
+      title: "الموردون",
+      description: "دليل الموردين والمستحقات والمدفوعات",
       icon: Truck,
-      color: "from-sky-500 to-sky-600",
-      bg: "bg-sky-50",
-      text: "text-sky-600",
+      tone: "bg-orange-50 text-orange-700",
+      enabled: canViewSuppliers,
     },
-    ...(canViewProfits && report.profitability ? [{
-      title: "صافي ربح الشهر",
-      value: report.profitability.netProfit === null
-        ? "بيانات COGS غير مكتملة"
-        : formatCurrency(report.profitability.netProfit),
-      sub: report.profitability.netMargin === null
-        ? `${report.profitability.incompleteCogsInvoices} فاتورة تحتاج مراجعة`
-        : `هامش ${report.profitability.netMargin.toLocaleString("ar-EG")}٪`,
-      badge: "هذا الشهر",
-      icon: TrendingUp,
-      color: "from-violet-500 to-violet-600",
-      bg: "bg-violet-50",
-      text: "text-violet-600",
-    }] : []),
-  ] : [];
+    {
+      page: "repairs",
+      title: "الصيانة",
+      description: "أوامر الصيانة وحالة الأجهزة والمتابعة",
+      icon: Wrench,
+      tone: "bg-rose-50 text-rose-700",
+      enabled: canViewRepairs,
+    },
+    {
+      page: "reports",
+      title: "التقارير",
+      description: "تقارير المبيعات والمخزون والحسابات",
+      icon: BarChart3,
+      tone: "bg-indigo-50 text-indigo-700",
+      enabled: canViewReports,
+    },
+  ].filter(card => card.enabled);
+
+  const quickActions = [
+    { page: "new-invoice" as Page, label: "فاتورة بيع", icon: ReceiptText, visible: can("create_invoices") },
+    { page: "shipments" as Page, label: "عملية شراء", icon: ShoppingBag, visible: can("create_shipments") && enabled("shipments") },
+    { page: "products" as Page, label: "إضافة صنف", icon: Package, visible: can("create_products") },
+    { page: "customers" as Page, label: "إضافة عميل", icon: UserPlus, visible: can("create_customers") },
+    { page: "treasury" as Page, label: "الخزينة والبنوك", icon: WalletCards, visible: canViewTreasury },
+  ].filter(action => action.visible);
+
+  const statCards = report
+    ? [
+        {
+          title: "صافي مبيعات الشهر",
+          value: formatCurrency(report.sales.netSales),
+          note: `${report.sales.invoiceCount.toLocaleString("ar-EG")} فاتورة`,
+          icon: ReceiptText,
+          tone: "bg-emerald-50 text-emerald-700",
+        },
+        {
+          title: "صافي التحصيل",
+          value: formatCurrency(report.collections.netCollections),
+          note: "بعد الاستردادات",
+          icon: ArrowUpRight,
+          tone: "bg-blue-50 text-blue-700",
+        },
+        {
+          title: "مستحقات العملاء",
+          value: formatCurrency(report.currentBalances.customerReceivables),
+          note: "الرصيد الحالي",
+          icon: Users,
+          tone: "bg-amber-50 text-amber-700",
+        },
+        {
+          title: "مصروفات الشهر",
+          value: formatCurrency(report.expenses.totalExpenses),
+          note: "المصروفات المسجلة",
+          icon: CircleDollarSign,
+          tone: "bg-rose-50 text-rose-700",
+        },
+      ]
+    : [];
 
   const repairStatusCards = [
-    { label: "مستلمة", value: repairStats?.received ?? 0, color: "text-blue-600", bg: "bg-blue-50", icon: Clock },
-    { label: "قيد الإصلاح", value: repairStats?.inProgress ?? 0, color: "text-amber-600", bg: "bg-amber-50", icon: Wrench },
-    { label: "جاهزة", value: repairStats?.ready ?? 0, color: "text-emerald-600", bg: "bg-emerald-50", icon: CheckCircle },
-    { label: "مسلمة", value: repairStats?.delivered ?? 0, color: "text-slate-600", bg: "bg-slate-50", icon: CheckCircle },
+    { label: "مستلمة", value: repairStats?.received ?? 0, icon: Clock },
+    { label: "قيد الإصلاح", value: repairStats?.inProgress ?? 0, icon: Wrench },
+    { label: "جاهزة للتسليم", value: repairStats?.ready ?? 0, icon: CheckCircle },
+    { label: "تم التسليم", value: repairStats?.delivered ?? 0, icon: CheckCircle },
   ];
 
   return (
-    <div className="p-4 lg:p-6 space-y-6">
-      {/* Header */}
-      <div>
+    <div className="space-y-6 p-4 lg:p-6">
+      <section className="erp-page-header">
         <div>
-          <h1 className="text-2xl font-black text-slate-800">لوحة التحكم</h1>
-          <p className="text-slate-500 text-sm mt-0.5">
-            {new Date().toLocaleDateString("ar-EG", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
+          <div className="erp-page-title">
+            <BarChart3 className="h-6 w-6 text-emerald-600" />
+            لوحة التحكم
+          </div>
+          <p className="erp-page-subtitle">
+            نظرة واضحة وسريعة على أهم أعمالك اليوم
           </p>
         </div>
-      </div>
+        <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-600 shadow-sm">
+          {new Date().toLocaleDateString("ar-EG", {
+            weekday: "long",
+            year: "numeric",
+            month: "long",
+            day: "numeric",
+          })}
+        </div>
+      </section>
 
-      {/* Accounting overview — sourced exclusively from reporting.overview */}
-      {canViewReports && report === undefined && (
-        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-          {Array.from({ length: 4 }, (_, index) => (
-            <div key={index} className="h-32 animate-pulse rounded-2xl bg-slate-100" />
-          ))}
+      <section>
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="text-base font-black text-slate-800">الوحدات الرئيسية</h2>
+          <span className="text-xs text-slate-400">اختر القسم المطلوب</span>
         </div>
-      )}
-      {statCards.length > 0 && <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {statCards.map((card, i) => {
-          const Icon = card.icon;
-          return (
-            <div
-              key={i}
-              className="stat-card"
-              style={{ animationDelay: `${i * 0.1}s` }}
-            >
-              <div className="flex items-start justify-between mb-3">
-                <div className={`w-10 h-10 ${card.bg} rounded-xl flex items-center justify-center`}>
-                  <Icon className={`w-5 h-5 ${card.text}`} />
-                </div>
-                <span className={`text-xs font-medium ${card.text} ${card.bg} px-2 py-0.5 rounded-full`}>
-                  {card.badge}
-                </span>
-              </div>
-              <p className="text-xl font-black text-slate-800 leading-tight">{card.value}</p>
-              <p className="text-xs text-slate-500 mt-1">{card.title}</p>
-              <p className="text-xs text-slate-400 mt-0.5">{card.sub}</p>
-            </div>
-          );
-        })}
-      </div>}
-      {report && canViewProfits && !report.completeness.profitabilityAvailable && (
-        <div className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-          <AlertTriangle className="h-4 w-4 shrink-0" />
-          الربحية غير معروضة لأن {report.completeness.incompleteCogsInvoices.toLocaleString("ar-EG")} فاتورة
-          لا تملك COGS تاريخيًا مكتملًا.
-        </div>
-      )}
-
-      {/* CRM Quick Stats */}
-      {canViewLeads && <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="font-bold text-slate-800 flex items-center gap-2">
-            <Target className="w-4 h-4 text-purple-500" />
-            مؤشرات العملاء المحتملين
-          </h2>
-          <button
-            onClick={() => onNavigate("crm")}
-            className="text-purple-600 text-sm font-medium hover:text-purple-700 transition-colors"
-          >
-            إدارة علاقات العملاء
-          </button>
-        </div>
-        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
-          {[
-            { label: "إجمالي", value: crmStats?.total ?? 0, color: "text-slate-700", bg: "bg-slate-50", icon: UserPlus },
-            { label: "جديد", value: crmStats?.new ?? 0, color: "text-blue-600", bg: "bg-blue-50", icon: UserPlus },
-            { label: "تم التواصل", value: crmStats?.contacted ?? 0, color: "text-indigo-600", bg: "bg-indigo-50", icon: PhoneCall },
-            { label: "مهتم", value: crmStats?.interested ?? 0, color: "text-amber-600", bg: "bg-amber-50", icon: Star },
-            { label: "تفاوض", value: crmStats?.negotiating ?? 0, color: "text-orange-600", bg: "bg-orange-50", icon: Target },
-            { label: "مكتسب ✓", value: crmStats?.won ?? 0, color: "text-emerald-600", bg: "bg-emerald-50", icon: CheckCircle },
-            { label: "خسارة", value: crmStats?.lost ?? 0, color: "text-red-600", bg: "bg-red-50", icon: AlertTriangle },
-          ].map((s, i) => {
-            const Icon = s.icon;
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          {moduleCards.map(card => {
+            const Icon = card.icon;
             return (
-              <div key={i} className={`${s.bg} rounded-xl p-3 text-center`}>
-                <Icon className={`w-4 h-4 ${s.color} mx-auto mb-1`} />
-                <p className={`text-xl font-black ${s.color}`}>{s.value}</p>
-                <p className="text-xs text-slate-500 mt-0.5">{s.label}</p>
-              </div>
+              <button
+                key={card.page}
+                onClick={() => onNavigate(card.page)}
+                className="group min-h-[170px] rounded-2xl border border-slate-200 bg-white p-5 text-right shadow-[0_8px_28px_rgba(15,23,42,.045)] transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-[0_14px_34px_rgba(15,23,42,.07)]"
+              >
+                <div className={`mb-5 flex h-12 w-12 items-center justify-center rounded-2xl ${card.tone}`}>
+                  <Icon className="h-6 w-6" />
+                </div>
+                <h3 className="text-lg font-black text-slate-900">{card.title}</h3>
+                <p className="mt-2 text-sm leading-6 text-slate-500">{card.description}</p>
+                <div className="mt-4 text-xs font-bold text-emerald-700 opacity-80 transition group-hover:opacity-100">
+                  فتح القسم ←
+                </div>
+              </button>
             );
           })}
         </div>
-        {(crmStats?.total ?? 0) > 0 && (
-          <div className="mt-4 pt-4 border-t border-slate-100 flex items-center justify-between">
-            <span className="text-sm text-slate-500">معدل التحويل</span>
-            <div className="flex items-center gap-3">
-              <div className="w-32 bg-slate-100 rounded-full h-2">
-                <div
-                  className="bg-emerald-500 h-2 rounded-full transition-all"
-                  style={{ width: `${crmStats?.conversionRate ?? 0}%` }}
-                />
-              </div>
-              <span className="text-sm font-bold text-emerald-600">{crmStats?.conversionRate ?? 0}%</span>
-            </div>
-          </div>
-        )}
-      </div>}
+      </section>
 
-      {(canViewInvoices || canViewRepairs || canViewProducts) && <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Recent Invoices */}
-        {canViewInvoices && <div className="lg:col-span-2 bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-          <div className="flex items-center justify-between p-5 border-b border-slate-100">
-            <h2 className="font-bold text-slate-800 flex items-center gap-2">
-              <FileTextIcon />
-              آخر الفواتير
-            </h2>
-            <button
-              onClick={() => onNavigate("invoices")}
-              className="text-indigo-600 text-sm font-medium hover:text-indigo-700 transition-colors"
-            >
-              عرض الكل
-            </button>
+      {quickActions.length > 0 && (
+        <section className="erp-section">
+          <div className="erp-section-header">
+            <h2 className="erp-section-title">إجراءات سريعة</h2>
+            <span className="text-xs text-slate-400">العمليات الأكثر استخدامًا</span>
           </div>
-          <div className="overflow-x-auto">
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>رقم الفاتورة</th>
-                  <th>العميل</th>
-                  <th>المبلغ</th>
-                  <th>الحالة</th>
-                </tr>
-              </thead>
-              <tbody>
-                {(recentInvoices ?? []).slice(0, 5).map((inv) => (
-                  <tr key={inv._id}>
-                    <td className="font-mono text-xs text-indigo-600">{inv.invoiceNumber}</td>
-                    <td className="font-medium">{inv.customerName}</td>
-                    <td className="font-bold">{formatCurrency(inv.total)}</td>
-                    <td>
-                      <span className={`badge ${inv.status === "paid" ? "badge-success" : inv.status === "partial" ? "badge-warning" : "badge-danger"}`}>
-                        {inv.status === "paid" ? "مدفوعة" : inv.status === "partial" ? "جزئي" : "معلقة"}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-                {(recentInvoices ?? []).length === 0 && (
-                  <tr>
-                    <td colSpan={4} className="text-center py-8 text-slate-400">لا توجد فواتير بعد</td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+          <div className="grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-5">
+            {quickActions.map(action => {
+              const Icon = action.icon;
+              return (
+                <button
+                  key={`${action.page}-${action.label}`}
+                  onClick={() => onNavigate(action.page)}
+                  className="flex min-h-14 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-black text-slate-700 transition hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-800"
+                >
+                  <Icon className="h-4 w-4" />
+                  {action.label}
+                </button>
+              );
+            })}
           </div>
-        </div>}
+        </section>
+      )}
 
-        {/* Right column */}
-        {(canViewRepairs || canViewProducts) && <div className="space-y-4">
-          {/* Repair Status */}
-          {canViewRepairs && <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="font-bold text-slate-800 flex items-center gap-2">
-                <Wrench className="w-4 h-4 text-slate-500" />
-                حالة الصيانة
+      {canViewReports && report === undefined && (
+        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+          {Array.from({ length: 4 }, (_, index) => (
+            <div key={index} className="h-28 animate-pulse rounded-2xl bg-slate-100" />
+          ))}
+        </div>
+      )}
+
+      {statCards.length > 0 && (
+        <section>
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-base font-black text-slate-800">ملخص الأداء</h2>
+            <span className="text-xs text-slate-400">هذا الشهر</span>
+          </div>
+          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+            {statCards.map(card => {
+              const Icon = card.icon;
+              return (
+                <div key={card.title} className="erp-metric-card">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="erp-metric-label">{card.title}</p>
+                      <p className="erp-metric-value">{card.value}</p>
+                      <p className="mt-1 text-xs text-slate-400">{card.note}</p>
+                    </div>
+                    <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${card.tone}`}>
+                      <Icon className="h-5 w-5" />
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
+      {report && canViewProfits && !report.completeness.profitabilityAvailable && (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-800">
+          بعض الفواتير القديمة تحتاج استكمال تكلفة البضاعة قبل عرض مؤشرات الربحية بدقة.
+        </div>
+      )}
+
+      <div className="grid gap-6 xl:grid-cols-3">
+        {canViewInvoices && (
+          <section className="erp-section xl:col-span-2">
+            <div className="erp-section-header">
+              <h2 className="erp-section-title flex items-center gap-2">
+                <FileText className="h-4 w-4 text-emerald-600" />
+                أحدث فواتير المبيعات
               </h2>
-              <button
-                onClick={() => onNavigate("repairs")}
-                className="text-indigo-600 text-sm font-medium hover:text-indigo-700"
-              >
+              <button onClick={() => onNavigate("invoices")} className="text-sm font-bold text-emerald-700">
                 عرض الكل
               </button>
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              {repairStatusCards.map((card, i) => {
-                const Icon = card.icon;
-                return (
-                  <div key={i} className={`${card.bg} rounded-xl p-3 text-center`}>
-                    <p className={`text-2xl font-black ${card.color}`}>{card.value}</p>
-                    <p className="text-xs text-slate-600 mt-0.5">{card.label}</p>
-                  </div>
-                );
-              })}
+            <div className="overflow-x-auto">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>رقم الفاتورة</th>
+                    <th>العميل</th>
+                    <th>الإجمالي</th>
+                    <th>الحالة</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(recentInvoices ?? []).slice(0, 5).map(inv => (
+                    <tr key={inv._id}>
+                      <td className="font-mono text-xs text-blue-700">{inv.invoiceNumber}</td>
+                      <td className="font-medium">{inv.customerName}</td>
+                      <td className="font-bold">{formatCurrency(inv.total)}</td>
+                      <td>
+                        <span className={`badge ${inv.status === "paid" ? "badge-success" : inv.status === "partial" ? "badge-warning" : "badge-danger"}`}>
+                          {inv.status === "paid" ? "مدفوعة" : inv.status === "partial" ? "مدفوعة جزئيًا" : "غير مسددة"}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                  {(recentInvoices ?? []).length === 0 && (
+                    <tr>
+                      <td colSpan={4} className="py-8 text-center text-slate-400">لا توجد فواتير مسجلة حتى الآن.</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
             </div>
-          </div>}
+          </section>
+        )}
 
-          {/* Low Stock Alert */}
-          {canViewProducts && (lowStockProducts ?? []).length > 0 && (
-            <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5">
-              <div className="flex items-center gap-2 mb-3">
-                <AlertTriangle className="w-4 h-4 text-amber-600" />
-                <h2 className="font-bold text-amber-800 text-sm">تنبيه المخزون</h2>
+        <div className="space-y-4">
+          {canViewProducts && (
+            <section className="erp-section">
+              <div className="erp-section-header">
+                <h2 className="erp-section-title flex items-center gap-2">
+                  <Boxes className="h-4 w-4 text-amber-600" />
+                  متابعة المخزون
+                </h2>
+                <button onClick={() => onNavigate("products")} className="text-xs font-bold text-emerald-700">
+                  إدارة المخزون
+                </button>
               </div>
-              <div className="space-y-2">
-                {(lowStockProducts ?? []).slice(0, 4).map((p) => (
-                  <div key={p._id} className="flex items-center justify-between">
-                    <span className="text-xs text-amber-800 font-medium truncate">{p.name}</span>
-                    <span className="badge badge-warning text-xs">{p.stock} متبقي</span>
+              <div className="space-y-2 p-4">
+                {(lowStockProducts ?? []).slice(0, 4).map(product => (
+                  <div key={product._id} className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2.5">
+                    <span className="truncate text-sm font-bold text-slate-700">{product.name}</span>
+                    <span className="badge badge-warning">متبقي {product.stock}</span>
                   </div>
                 ))}
+                {(lowStockProducts ?? []).length === 0 && (
+                  <p className="py-4 text-center text-sm text-slate-400">لا توجد أصناف منخفضة المخزون حاليًا.</p>
+                )}
               </div>
-              <button
-                onClick={() => onNavigate("products")}
-                className="mt-3 text-xs text-amber-700 font-medium hover:text-amber-800"
-              >
-                إدارة المخزون ←
-              </button>
-            </div>
+            </section>
           )}
 
-          {/* Recent Repairs */}
-          {canViewRepairs && <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
-            <h2 className="font-bold text-slate-800 mb-3 flex items-center gap-2">
-              <Wrench className="w-4 h-4 text-slate-500" />
-              آخر أوامر الصيانة
-            </h2>
-            <div className="space-y-2">
-              {(recentRepairs ?? []).slice(0, 3).map((r) => (
-                <div key={r._id} className="flex items-center justify-between py-2 border-b border-slate-50 last:border-0">
-                  <div>
-                    <p className="text-xs font-medium text-slate-800">{r.customerName}</p>
-                    <p className="text-xs text-slate-500">{r.deviceBrand} {r.deviceModel}</p>
-                  </div>
-                  <span className={`badge ${
-                    r.status === "ready" ? "badge-success" :
-                    r.status === "in_progress" ? "badge-warning" :
-                    r.status === "delivered" ? "badge-info" : "badge-purple"
-                  }`}>
-                    {r.status === "received" ? "مستلم" :
-                     r.status === "in_progress" ? "قيد الإصلاح" :
-                     r.status === "ready" ? "جاهز" : "مسلم"}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>}
-        </div>}
-      </div>}
-    </div>
-  );
-}
+          {canViewRepairs && (
+            <section className="erp-section">
+              <div className="erp-section-header">
+                <h2 className="erp-section-title flex items-center gap-2">
+                  <Wrench className="h-4 w-4 text-rose-600" />
+                  حالة أوامر الصيانة
+                </h2>
+              </div>
+              <div className="grid grid-cols-2 gap-3 p-4">
+                {repairStatusCards.map(card => {
+                  const Icon = card.icon;
+                  return (
+                    <button
+                      key={card.label}
+                      onClick={() => onNavigate("repairs")}
+                      className="rounded-xl border border-slate-200 bg-white p-3 text-center transition hover:bg-slate-50"
+                    >
+                      <Icon className="mx-auto mb-1 h-4 w-4 text-slate-500" />
+                      <p className="text-xl font-black text-slate-800">{card.value}</p>
+                      <p className="mt-1 text-xs text-slate-500">{card.label}</p>
+                    </button>
+                  );
+                })}
+              </div>
+            </section>
+          )}
 
-function FileTextIcon() {
-  return (
-    <svg className="w-4 h-4 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-    </svg>
+          {canViewLeads && (
+            <section className="erp-section">
+              <div className="erp-section-header">
+                <h2 className="erp-section-title flex items-center gap-2">
+                  <Target className="h-4 w-4 text-indigo-600" />
+                  العملاء المحتملون
+                </h2>
+                <button onClick={() => onNavigate("crm")} className="text-xs font-bold text-emerald-700">
+                  فتح المتابعة
+                </button>
+              </div>
+              <div className="grid grid-cols-3 gap-3 p-4 text-center">
+                <div className="rounded-xl bg-slate-50 p-3">
+                  <p className="text-xl font-black">{crmStats?.total ?? 0}</p>
+                  <p className="text-xs text-slate-500">الإجمالي</p>
+                </div>
+                <div className="rounded-xl bg-blue-50 p-3">
+                  <p className="text-xl font-black text-blue-700">{crmStats?.new ?? 0}</p>
+                  <p className="text-xs text-slate-500">جدد</p>
+                </div>
+                <div className="rounded-xl bg-emerald-50 p-3">
+                  <p className="text-xl font-black text-emerald-700">{crmStats?.won ?? 0}</p>
+                  <p className="text-xs text-slate-500">تم التعاقد</p>
+                </div>
+              </div>
+            </section>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }
