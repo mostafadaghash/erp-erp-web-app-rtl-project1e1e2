@@ -173,7 +173,7 @@ async function ensureCustomer(page, fixtures, targetBranchId) {
 }
 
 async function ensureSupplier(page, fixtures) {
-  await navigate(page, "الموردين", "suppliers-page");
+  await navigate(page, "الموردون", "suppliers-page");
   await page.getByTestId("supplier-search").fill(fixtures.supplierName);
   let row = await exactRow(page, "supplier-card", "data-supplier-name", fixtures.supplierName);
   if (!row) {
