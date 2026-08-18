@@ -1,0 +1,409 @@
+/* Professional ERP visual system — light, calm, and business-first. */
+:root {
+  --erp-surface: #ffffff;
+  --erp-surface-muted: #f8fafc;
+  --erp-canvas: #f5f7f9;
+  --erp-border: #e5e7eb;
+  --erp-text: #172033;
+  --erp-muted: #64748b;
+  --erp-success: #159455;
+  --erp-danger: #dc4c3f;
+  --erp-warning: #d99016;
+  --erp-info: #2474c8;
+}
+
+body {
+  background: var(--erp-canvas);
+  color: var(--erp-text);
+}
+
+/* Application navigation */
+.erp-navigation {
+  position: relative;
+  z-index: 45;
+  background: rgba(255, 255, 255, 0.98);
+  color: var(--erp-text);
+  border-bottom: 1px solid var(--erp-border);
+  box-shadow: 0 8px 28px rgb(15 23 42 / 0.055);
+}
+
+.erp-navigation-inner {
+  width: 100%;
+  min-height: 68px;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 9px 20px;
+}
+
+.erp-nav-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: max-content;
+  padding-left: 18px;
+  border-left: 1px solid var(--erp-border);
+}
+
+.erp-nav-groups {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.erp-nav-section {
+  position: relative;
+}
+
+.erp-nav-group-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 42px;
+  padding: 0 10px;
+  border-radius: 10px;
+  color: #475569;
+  font-size: 13px;
+  font-weight: 800;
+  white-space: nowrap;
+  transition: 160ms ease;
+}
+
+.erp-nav-group-button:hover,
+.erp-nav-group-button.active,
+.erp-nav-group-button[aria-expanded="true"] {
+  color: var(--brand-primary);
+  background: color-mix(in srgb, var(--brand-primary) 7%, white);
+}
+
+.erp-nav-group-button.active::after {
+  content: "";
+  position: absolute;
+  right: 14px;
+  left: 14px;
+  bottom: -10px;
+  height: 2px;
+  border-radius: 999px;
+  background: var(--brand-primary);
+}
+
+.erp-nav-dropdown {
+  position: absolute;
+  top: calc(100% + 12px);
+  right: 0;
+  width: 230px;
+  padding: 7px;
+  border-radius: 14px;
+  border: 1px solid var(--erp-border);
+  background: #fff;
+  box-shadow: 0 22px 55px rgb(15 23 42 / 0.16);
+}
+
+.erp-nav-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 11px;
+  border-radius: 9px;
+  color: #475569;
+  font-size: 13px;
+  font-weight: 700;
+  text-align: right;
+  transition: 140ms ease;
+}
+
+.erp-nav-item:hover {
+  background: #f8fafc;
+  color: var(--brand-primary);
+}
+
+.erp-nav-item.active {
+  color: var(--brand-primary);
+  background: color-mix(in srgb, var(--brand-primary) 9%, white);
+}
+
+.erp-user-panel {
+  min-width: max-content;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding-right: 15px;
+  border-right: 1px solid var(--erp-border);
+}
+
+.erp-contextbar {
+  min-height: 64px;
+  border-bottom: 1px solid var(--erp-border);
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 4px 16px rgb(15 23 42 / 0.025);
+}
+
+/* Reusable page surfaces */
+.erp-page {
+  padding: 22px;
+}
+
+.erp-page-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.erp-page-title {
+  font-size: 26px;
+  line-height: 1.25;
+  font-weight: 900;
+  color: #162033;
+}
+
+.erp-page-subtitle {
+  margin-top: 5px;
+  color: var(--erp-muted);
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.erp-panel,
+.professional-panel {
+  border: 1px solid var(--erp-border);
+  border-radius: 16px;
+  background: var(--erp-surface);
+  box-shadow: 0 8px 24px rgb(15 23 42 / 0.035);
+}
+
+.erp-card,
+.professional-card {
+  border: 1px solid var(--erp-border);
+  border-radius: 16px;
+  background: var(--erp-surface);
+  box-shadow: 0 6px 18px rgb(15 23 42 / 0.03);
+}
+
+.erp-kpi {
+  min-height: 104px;
+  padding: 17px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 13px;
+}
+
+.erp-kpi-icon {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border-radius: 13px;
+  background: color-mix(in srgb, var(--brand-primary) 9%, white);
+  color: var(--brand-primary);
+}
+
+.erp-kpi-label {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.erp-kpi-value {
+  margin-top: 5px;
+  color: #172033;
+  font-size: 21px;
+  font-weight: 900;
+}
+
+.erp-action-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 42px;
+  padding: 0 15px;
+  border: 1px solid var(--erp-border);
+  border-radius: 10px;
+  background: #fff;
+  color: #334155;
+  font-size: 13px;
+  font-weight: 800;
+  transition: 150ms ease;
+}
+
+.erp-action-button:hover {
+  border-color: color-mix(in srgb, var(--brand-primary) 28%, #dbe2ea);
+  background: color-mix(in srgb, var(--brand-primary) 4%, white);
+  color: var(--brand-primary);
+}
+
+.erp-action-button.primary {
+  border-color: transparent;
+  color: #fff;
+  background: var(--brand-primary);
+}
+
+.erp-action-button.success {
+  border-color: #bde8cd;
+  color: #117b46;
+  background: #f1fbf5;
+}
+
+.erp-action-button.danger {
+  border-color: #f0c8c4;
+  color: #b9392e;
+  background: #fff8f7;
+}
+
+.erp-filterbar {
+  display: grid;
+  grid-template-columns: minmax(220px, 1.5fr) repeat(3, minmax(150px, 0.7fr));
+  gap: 10px;
+  padding: 13px;
+  border: 1px solid var(--erp-border);
+  border-radius: 14px;
+  background: #fff;
+}
+
+/* Apply the same calm treatment to existing pages without changing their behavior. */
+.form-input {
+  min-height: 42px;
+  border-radius: 10px !important;
+  border-color: #dfe5ec !important;
+  background: #fff !important;
+}
+
+.form-input:hover {
+  border-color: #cad4df !important;
+}
+
+.btn-primary {
+  border-radius: 10px !important;
+  background: var(--brand-primary) !important;
+  box-shadow: 0 6px 14px color-mix(in srgb, var(--brand-primary) 15%, transparent) !important;
+}
+
+.btn-secondary,
+.btn-success,
+.btn-danger {
+  border-radius: 10px !important;
+}
+
+.data-table {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.data-table th {
+  background: #f8fafc !important;
+  color: #536177 !important;
+  font-size: 12px !important;
+  letter-spacing: 0 !important;
+}
+
+.data-table td {
+  color: #334155 !important;
+}
+
+.data-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.stat-card {
+  border-radius: 16px !important;
+  box-shadow: 0 6px 18px rgb(15 23 42 / 0.03) !important;
+}
+
+/* Professional authentication surface */
+.auth-shell {
+  background: #f4f7f8 !important;
+}
+
+.auth-grid {
+  opacity: 0.45 !important;
+  background-image:
+    radial-gradient(circle at 82% 16%, color-mix(in srgb, var(--brand-primary) 9%, transparent), transparent 26%),
+    radial-gradient(circle at 12% 82%, color-mix(in srgb, var(--brand-secondary) 7%, transparent), transparent 30%) !important;
+  mask-image: none !important;
+}
+
+.auth-card {
+  border: 1px solid var(--erp-border) !important;
+  background: rgba(255, 255, 255, 0.97) !important;
+  box-shadow: 0 25px 65px rgb(15 23 42 / 0.1) !important;
+  backdrop-filter: blur(14px) !important;
+}
+
+/* Responsive navigation becomes the familiar drawer on mobile. */
+@media (max-width: 1023px) {
+  .erp-navigation {
+    height: 100%;
+    width: 288px;
+    border-bottom: 0;
+    border-left: 1px solid var(--erp-border);
+    box-shadow: -14px 0 40px rgb(15 23 42 / 0.14);
+  }
+
+  .erp-navigation-inner {
+    height: 100%;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+    padding: 16px 12px;
+    overflow: hidden;
+  }
+
+  .erp-nav-brand {
+    padding: 0 0 12px;
+    border-left: 0;
+    border-bottom: 1px solid var(--erp-border);
+  }
+
+  .erp-nav-groups {
+    display: block;
+    flex: 1;
+    overflow-y: auto;
+  }
+
+  .erp-nav-section {
+    margin-bottom: 3px;
+  }
+
+  .erp-nav-group-button {
+    position: relative;
+    width: 100%;
+    justify-content: space-between;
+    padding: 0 11px;
+  }
+
+  .erp-nav-group-button.active::after {
+    display: none;
+  }
+
+  .erp-nav-dropdown {
+    position: static;
+    width: auto;
+    margin: 2px 5px 8px;
+    padding: 4px;
+    border: 0;
+    border-right: 2px solid color-mix(in srgb, var(--brand-primary) 20%, #e2e8f0);
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  .erp-user-panel {
+    display: block;
+    padding: 10px 0 0;
+    border-right: 0;
+    border-top: 1px solid var(--erp-border);
+  }
+
+  .erp-filterbar {
+    grid-template-columns: 1fr;
+  }
+
+  .erp-page {
+    padding: 14px;
+  }
+}
