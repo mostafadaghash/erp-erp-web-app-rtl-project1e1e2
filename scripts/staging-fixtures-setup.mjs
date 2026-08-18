@@ -219,8 +219,37 @@ async function ensureSupplier(page, fixtures) {
 async function ensureProduct(page, fixtures, targetBranchId) {
   await ensureAdminWorkingBranch(page, fixtures, targetBranchId);
   await navigate(page, "الأصناف", "products-page");
-  await page.getByTestId("product-search").fill(fixtures.productName);
-  let row = await exactRow(page, "product-row", "data-product-name", fixtures.productName);
+  const search = page.getByTestId("product-search");
+
+  // SKU is globally unique, so use it as the primary idempotency key. Give the
+  // reactive query a short grace period before deciding the fixture is absent.
+  await search.fill(fixtures.productSku);
+  let row = null;
+  try {
+    row = await page.waitForFunction(
+      (sku) => [...document.querySelectorAll('[data-testid="product-row"]')]
+        .find((element) => element.getAttribute("data-product-sku") === sku) ?? null,
+      fixtures.productSku,
+      { timeout: 10_000 },
+    );
+    await row.dispose();
+    row = await exactRow(page, "product-row", "data-product-sku", fixtures.productSku);
+  } catch (error) {
+    if (!(error instanceof Error) || !error.message.includes("Timeout")) throw error;
+    row = null;
+  }
+
+  if (row) {
+    assert.equal(
+      await row.getAttribute("data-product-name"),
+      fixtures.productName,
+      `Fixture SKU ${fixtures.productSku} belongs to a different product name`,
+    );
+  } else {
+    await search.fill(fixtures.productName);
+    row = await exactRow(page, "product-row", "data-product-name", fixtures.productName);
+  }
+
   if (!row) {
     await page.getByTestId("product-create-open").click();
     await page.getByTestId("product-name").fill(fixtures.productName);
@@ -231,10 +260,13 @@ async function ensureProduct(page, fixtures, targetBranchId) {
     await page.getByTestId("product-min-stock").fill("2");
     await selectExact(page.getByTestId("product-supplier"), fixtures.supplierName);
     await page.getByTestId("product-submit").click();
-    await waitForToast(page, "تمت إضافة المنتج بنجاح");
-    row = await waitForExactRow(page, "product-row", "data-product-name", fixtures.productName);
+    await waitForToast(page, "تمت إضافة الصنف بنجاح");
+    await search.fill(fixtures.productSku);
+    row = await waitForExactRow(page, "product-row", "data-product-sku", fixtures.productSku);
   }
+
   assert.ok(row, "Product fixture did not appear after setup");
+  assert.equal(await row.getAttribute("data-product-name"), fixtures.productName, "Product fixture name does not match the configured fixture");
   assert.equal(await row.getAttribute("data-product-active"), "true", "Product fixture must be active");
   assert.equal(await row.getAttribute("data-product-branch-id"), targetBranchId, "Product fixture belongs to a different branch");
   const currentStock = Number(await row.getAttribute("data-product-stock"));
