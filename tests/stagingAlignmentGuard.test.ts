@@ -9,6 +9,7 @@ const accountSetup = read("scripts/staging-account-setup.mjs");
 const fixtures = read("scripts/staging-fixtures-setup.mjs");
 const business = read("scripts/staging-business-e2e.mjs");
 const browser = read("scripts/staging-browser-e2e.mjs");
+const envCheck = read("scripts/staging-env-check.mjs");
 const stagingAll = read("scripts/staging-all.mjs");
 const helpers = read("tests/e2e/helpers.ts");
 const rolesSpec = read("tests/e2e/roles-branches.spec.ts");
@@ -65,10 +66,9 @@ test("fixture setup follows current ERP navigation and synchronizes the Admin wo
 
 test("mutable business acceptance waits for exact branch selectors instead of racing render", () => {
   for (const testId of ["delivery-branch-select", "repair-branch-select"]) {
-    const escaped = testId.replaceAll("-", "\\-");
     assert.match(
       business,
-      new RegExp(`getByTestId\\(\"${escaped}\"\\)[\\s\\S]{0,180}waitFor\\(\\{ state: \"visible\", timeout: 30_000 \\}\\)[\\s\\S]{0,120}selectExact`),
+      new RegExp(`getByTestId\\(\"${testId}\"\\)[\\s\\S]{0,180}waitFor\\(\\{ state: \"visible\", timeout: 30_000 \\}\\)[\\s\\S]{0,120}selectExact`),
     );
   }
   assert.doesNotMatch(
@@ -101,21 +101,21 @@ test("the full staging runner provisions accounts before role browser and busine
   );
 });
 
-test("Playwright role suite and environment contract cover every ERP role", () => {
+test("Playwright role suite uses the shared account JSON and covers every ERP role", () => {
   for (const role of machineRoles) assert.match(helpers, new RegExp(`\"${role}\"`));
   for (const role of nonAdminRoles) assert.match(rolesSpec, new RegExp(`role: \"${role}\"`));
+  assert.match(helpers, /E2E_ROLE_ACCOUNTS_JSON/);
+  assert.match(envCheck, /E2E_ROLE_ACCOUNTS_JSON/);
+  assert.match(stagingGate, /E2E_ROLE_ACCOUNTS_JSON: \$\{\{ secrets\.E2E_ROLE_ACCOUNTS_JSON \}\}/);
+  assert.match(stagingGate, /E2E_REQUIRE_ALL_ROLES: "true"/);
   for (const variable of [
     "E2E_CUSTOMER_SERVICE_EMAIL",
-    "E2E_CUSTOMER_SERVICE_PASSWORD",
     "E2E_TECHNICIAN_EMAIL",
-    "E2E_TECHNICIAN_PASSWORD",
     "E2E_SHIPPING_EMAIL",
-    "E2E_SHIPPING_PASSWORD",
   ]) {
-    assert.match(stagingGate, new RegExp(variable));
     assert.match(environmentTemplate, new RegExp(variable));
+    assert.match(envCheck, new RegExp(variable));
   }
-  assert.match(stagingGate, /E2E_REQUIRE_ALL_ROLES: "true"/);
 });
 
 test("all Playwright entry points use the same runner version", () => {
