@@ -122,30 +122,64 @@ export function DeliveriesPage({ createRequestToken }: { createRequestToken?: nu
   const reverseConfirmation = useMutation(api.deliveries.reverseConfirmation);
 
   const resetForm = () => {
-    setOrderId(""); setInvoiceId(""); setCity(""); setAddress(""); setCompany(""); setTracking("");
-    setFee("0"); setDate(new Date().toISOString().slice(0, 10)); setReason(""); setAccountId("");
-    setDestinationId(""); setChecked(new Set()); setSelectedSettlementId(null); setReversalReason("");
+    setOrderId("");
+    setInvoiceId("");
+    setCity("");
+    setAddress("");
+    setCompany("");
+    setTracking("");
+    setFee("0");
+    setDate(new Date().toISOString().slice(0, 10));
+    setReason("");
+    setAccountId("");
+    setDestinationId("");
+    setChecked(new Set<string>());
+    setSelectedSettlementId(null);
+    setReversalReason("");
   };
+
   const open = (kind: Modal, row?: Selected) => {
-    resetForm(); setSelected(row ?? null); operationRequestId.current = makeRequestId(); setModal(kind);
+    resetForm();
+    setSelected(row ?? null);
+    operationRequestId.current = makeRequestId();
+    setModal(kind);
   };
   const close = () => { if (!busy) setModal(null); };
-  useEffect(() => { if (createRequestToken && canCreate && activeBranch) open("create"); }, [createRequestToken, canCreate, activeBranch]);
+
+  useEffect(() => {
+    if (createRequestToken && canCreate && activeBranch) open("create");
+  }, [createRequestToken, canCreate, activeBranch]);
 
   const openSettlementReversal = (settlementId: Id<"codSettlements">) => {
-    resetForm(); setSelectedSettlementId(settlementId); operationRequestId.current = makeRequestId(); setModal("reverse-settlement");
+    resetForm();
+    setSelectedSettlementId(settlementId);
+    operationRequestId.current = makeRequestId();
+    setModal("reverse-settlement");
   };
+
   const handleBranchChange = (value: string) => {
-    setBranchId(value ? value as Id<"branches"> : undefined); resetForm(); setSelected(null); setModal(null); operationRequestId.current = makeRequestId();
+    setBranchId(value ? value as Id<"branches"> : undefined);
+    resetForm();
+    setSelected(null);
+    setModal(null);
+    operationRequestId.current = makeRequestId();
   };
+
   const run = async (action: () => Promise<unknown>, message: string) => {
     if (busy) return;
     setBusy(true);
     try {
-      await action(); toast.success(message); resetForm(); setSelected(null); operationRequestId.current = makeRequestId(); setModal(null);
+      await action();
+      toast.success(message);
+      resetForm();
+      setSelected(null);
+      operationRequestId.current = makeRequestId();
+      setModal(null);
     } catch (error) {
       toast.error(getErrorMessage(error, "تعذر إتمام العملية"));
-    } finally { setBusy(false); }
+    } finally {
+      setBusy(false);
+    }
   };
 
   const validationReason = (() => {
@@ -196,27 +230,43 @@ export function DeliveriesPage({ createRequestToken }: { createRequestToken?: nu
     const popup = window.open("", "_blank");
     if (!popup) throw new Error("تعذر فتح نافذة الطباعة");
     popup.opener = null;
-    popup.document.body.innerHTML = `<html dir="rtl"><head><meta charset="utf-8"><title>${escapeHtml(title)}</title><style>body{font-family:Arial;padding:24px}table{width:100%;border-collapse:collapse}td,th{border:1px solid #999;padding:8px}</style></head><body><h1>${escapeHtml(title)}</h1>${bodyHtml}</body></html>`;
-    popup.document.close(); popup.print();
+    popup.document.body.innerHTML = `<html dir="rtl"><head><meta charset="utf-8"><title>${escapeHtml(title)}</title><style>body{font-family:Arial;padding:24px;color:#172033}table{width:100%;border-collapse:collapse;margin-top:16px}td,th{border:1px solid #cbd5e1;padding:8px;text-align:right}.summary{margin-top:18px;line-height:1.9}.signatures{display:flex;justify-content:space-between;gap:24px;margin-top:48px}</style></head><body><h1>${escapeHtml(title)}</h1>${bodyHtml}<div class="signatures"><span>توقيع شركة الشحن: __________</span><span>توقيع المحاسب: __________</span></div></body></html>`;
+    popup.document.close();
+    popup.print();
   };
+
   const printDelivery = async (row: Selected) => {
     if (busy || !canPrint) return;
     setBusy(true);
     try {
       const dto = await convex.query(api.deliveries.printDelivery, { deliveryId: row._id });
-      const items = dto.items.map(item => `<tr><td>${escapeHtml(item.productName)}</td><td>${item.quantity}</td><td>${money.format(item.unitPrice)}</td></tr>`).join("");
-      openPrintWindow(`سند شحن ${dto.deliveryNumber}`, `<p>العميل: ${escapeHtml(dto.customerName)}</p><p>شركة الشحن: ${escapeHtml(dto.shippingCompany)}</p><table><tr><th>الصنف</th><th>الكمية</th><th>السعر</th></tr>${items}</table><p>المطلوب تحصيله: ${money.format(dto.codAmount ?? 0)}</p>`);
-    } catch (error) { toast.error(getErrorMessage(error, "تعذرت طباعة سند الشحن")); }
-    finally { setBusy(false); }
+      const itemRows = dto.items.map(item => `<tr><td>${escapeHtml(item.productName)}</td><td>${escapeHtml(item.quantity)}</td><td>${escapeHtml(money.format(item.unitPrice))}</td></tr>`).join("");
+      openPrintWindow(
+        `سند شحن ${dto.deliveryNumber}`,
+        `<p>أمر البيع: ${escapeHtml(dto.orderNumber ?? "—")} | الفاتورة: ${escapeHtml(dto.invoiceNumber ?? "—")}</p><p>العميل: ${escapeHtml(dto.customerName)} — ${escapeHtml(dto.city)}</p><p>العنوان: ${escapeHtml(dto.address)}</p><p>شركة الشحن: ${escapeHtml(dto.shippingCompany)} | رقم التتبع: ${escapeHtml(dto.trackingNumber ?? "—")}</p><table><thead><tr><th>الصنف</th><th>الكمية</th><th>السعر</th></tr></thead><tbody>${itemRows}</tbody></table><div class="summary"><p>الإجمالي: ${escapeHtml(money.format(dto.totalAmount))}</p><p>المدفوع مقدمًا: ${escapeHtml(money.format(dto.prepaidAmount ?? 0))}</p><p>المطلوب تحصيله: ${escapeHtml(money.format(dto.codAmount ?? 0))}</p><p>الحالة: ${escapeHtml(statusLabel(dto.status))}</p>${dto.reversalReason ? `<p>سبب الإلغاء: ${escapeHtml(dto.reversalReason)}</p>` : ""}</div>`,
+      );
+    } catch (error) {
+      toast.error(getErrorMessage(error, "تعذرت طباعة سند الشحن"));
+    } finally {
+      setBusy(false);
+    }
   };
+
   const printSettlement = async (settlementId: Id<"codSettlements">) => {
     if (busy || !canPrint) return;
     setBusy(true);
     try {
       const dto = await convex.query(api.deliveries.printCodSettlement, { settlementId });
-      openPrintWindow(`سند تسوية ${dto.settlementNumber}`, `<p>التاريخ: ${escapeHtml(dto.date)}</p><p>حساب التحصيل: ${escapeHtml(dto.sourceAccountName)}</p><p>الحساب المستلم: ${escapeHtml(dto.destinationAccountName)}</p><p>الصافي: ${money.format(dto.netAmount)}</p>`);
-    } catch (error) { toast.error(getErrorMessage(error, "تعذرت طباعة التسوية")); }
-    finally { setBusy(false); }
+      const itemRows = dto.items.map(item => `<tr><td>${escapeHtml(item.deliveryNumber)}</td><td>${escapeHtml(item.invoiceNumber)}</td><td>${escapeHtml(money.format(item.codAmount))}</td></tr>`).join("");
+      openPrintWindow(
+        `سند تسوية ${dto.settlementNumber}`,
+        `<p>التاريخ: ${escapeHtml(dto.date)} | الحالة: ${escapeHtml(statusLabel(dto.status))}</p><p>حساب التحصيل: ${escapeHtml(dto.sourceAccountName)}</p><p>الحساب المستلم: ${escapeHtml(dto.destinationAccountName)}</p><table><thead><tr><th>الشحنة</th><th>الفاتورة</th><th>المبلغ المحصل</th></tr></thead><tbody>${itemRows}</tbody></table><div class="summary"><p>الإجمالي: ${escapeHtml(money.format(dto.grossAmount))}</p><p>الرسوم: ${escapeHtml(money.format(dto.feeAmount))}</p><p>الصافي: ${escapeHtml(money.format(dto.netAmount))}</p>${dto.reversalReason ? `<p>سبب إلغاء التسوية: ${escapeHtml(dto.reversalReason)}</p>` : ""}</div>`,
+      );
+    } catch (error) {
+      toast.error(getErrorMessage(error, "تعذرت طباعة التسوية"));
+    } finally {
+      setBusy(false);
+    }
   };
 
   const rows = deliveries.results;
@@ -243,7 +293,10 @@ export function DeliveriesPage({ createRequestToken }: { createRequestToken?: nu
       {!activeBranch && <div role="status" className="erp-info-state">اختر الفرع لعرض الشحنات والتسويات الخاصة به.</div>}
 
       <section className="erp-metric-grid">
-        {metricCards.map(card => { const Icon = card.icon; return <div className="erp-metric-card" key={card.label}><div className="flex items-start justify-between gap-3"><div><p className="erp-metric-label">{card.label}</p><p className="erp-metric-value">{stats === undefined ? "…" : money.format(Number(card.value ?? 0))}</p></div><div className={`flex h-10 w-10 items-center justify-center rounded-xl ${card.tone}`}><Icon className="h-5 w-5" /></div></div></div>; })}
+        {metricCards.map(card => {
+          const Icon = card.icon;
+          return <div className="erp-metric-card" key={card.label}><div className="flex items-start justify-between gap-3"><div><p className="erp-metric-label">{card.label}</p><p className="erp-metric-value">{stats === undefined ? "…" : money.format(Number(card.value ?? 0))}</p></div><div className={`flex h-10 w-10 items-center justify-center rounded-xl ${card.tone}`}><Icon className="h-5 w-5" /></div></div></div>;
+        })}
       </section>
 
       <section className="erp-section">
@@ -255,7 +308,10 @@ export function DeliveriesPage({ createRequestToken }: { createRequestToken?: nu
               {activeBranch && deliveries.status === "LoadingFirstPage" && <tr><td colSpan={5} className="p-6 text-center text-slate-500">جارٍ تحميل الشحنات…</td></tr>}
               {activeBranch && deliveries.status !== "LoadingFirstPage" && rows.length === 0 && <tr><td colSpan={5} className="p-6 text-center text-slate-500">لا توجد شحنات مسجلة في هذا الفرع.</td></tr>}
               {rows.map(delivery => <tr key={delivery._id} data-testid="delivery-row" data-delivery-number={delivery.deliveryNumber} data-customer-name={delivery.customerName} data-status={delivery.status}>
-                <td className="font-mono text-xs font-bold text-blue-700">{delivery.deliveryNumber}</td><td className="font-bold">{delivery.customerName}</td><td><span className={`badge ${statusClass(delivery.status)}`}>{statusLabel(delivery.status)}</span></td><td className="font-black">{money.format(delivery.codAmount ?? 0)}</td>
+                <td className="font-mono text-xs font-bold text-blue-700">{delivery.deliveryNumber}</td>
+                <td className="font-bold">{delivery.customerName}</td>
+                <td><span className={`badge ${statusClass(delivery.status)}`}>{statusLabel(delivery.status)}</span></td>
+                <td className="font-black">{money.format(delivery.codAmount ?? 0)}</td>
                 <td><div className="erp-actions">
                   <button className="erp-action" onClick={() => open("details", delivery)}><Eye size={15} /> تفاصيل</button>
                   {canEdit && delivery.status === "pending" && <><button data-testid="delivery-ship-open" className="erp-action erp-action-primary" onClick={() => open("ship", delivery)}><Truck size={15} /> تسجيل الإرسال</button><button className="erp-action erp-action-danger" onClick={() => open("cancel", delivery)}><Ban size={15} /> إلغاء الشحنة</button></>}
@@ -278,29 +334,58 @@ export function DeliveriesPage({ createRequestToken }: { createRequestToken?: nu
           {activeBranch && settlements.status !== "LoadingFirstPage" && settlements.results.length === 0 && <p className="p-5 text-slate-500">لا توجد تسويات مسجلة في هذا الفرع.</p>}
           {settlements.results.map(settlement => <div key={settlement._id} className="flex flex-col gap-3 p-4 md:flex-row md:items-center md:justify-between"><div><div className="flex gap-2"><span className="font-mono text-xs font-bold text-blue-700">{settlement.settlementNumber}</span><span className={`badge ${statusClass(settlement.status)}`}>{statusLabel(settlement.status)}</span></div><p className="mt-1 text-sm text-slate-500">صافي التسوية: <strong className="text-slate-800">{money.format(settlement.netAmount)}</strong></p></div><div className="erp-actions">{canReverse && settlement.status === "posted" && <button className="erp-action erp-action-danger" onClick={() => openSettlementReversal(settlement._id)}><RotateCcw size={15} /> إلغاء التسوية</button>}{canPrint && <button className="erp-action" onClick={() => void printSettlement(settlement._id)}><Printer size={15} /> طباعة التسوية</button>}</div></div>)}
         </div>
+        {(settlements.status === "CanLoadMore" || settlements.status === "LoadingMore") && <div className="border-t border-slate-100 p-3 text-center"><button className="erp-action" disabled={settlements.status === "LoadingMore"} onClick={() => settlements.loadMore(10)}>{settlements.status === "LoadingMore" ? "جارٍ تحميل المزيد…" : "عرض المزيد من التسويات"}</button></div>}
       </section>}
 
       {modal && <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4 backdrop-blur-sm"><div data-testid="delivery-action-modal" data-modal={modal} className="w-[min(96vw,720px)] max-h-[90vh] space-y-4 overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl">
         <div className="flex items-start justify-between gap-3 border-b border-slate-100 pb-4"><div><h2 className="text-xl font-black">{{ create: "إنشاء شحنة جديدة", ship: "تسجيل إرسال الشحنة", deliver: "تسجيل التسليم والتحصيل", return: "تسجيل مرتجع الشحنة", cancel: "إلغاء الشحنة", "reverse-confirmation": "إلغاء تسجيل التسليم", settle: "تسوية مبالغ التحصيل", "reverse-settlement": "إلغاء تسوية التحصيل", details: "تفاصيل الشحنة" }[modal]}</h2>{modal === "reverse-confirmation" && <p className="mt-1 text-sm text-slate-500">يُستخدم عند تسجيل التسليم بالخطأ لإعادة الشحنة إلى حالتها السابقة.</p>}{modal === "reverse-settlement" && <p className="mt-1 text-sm text-slate-500">يُستخدم لإلغاء تسوية مالية مسجلة بالخطأ مع الاحتفاظ بسجل المراجعة.</p>}</div><button onClick={close} aria-label="إغلاق" className="rounded-xl p-2 hover:bg-slate-100"><X className="h-5 w-5" /></button></div>
 
-        {modal === "details" && deliveryDetails === undefined && <p className="text-slate-500">جارٍ تحميل تفاصيل الشحنة…</p>}
+        {modal === "details" && deliveryDetails === undefined && <p role="status" className="text-slate-500">جارٍ تحميل تفاصيل الشحنة…</p>}
         {modal === "details" && deliveryDetails === null && <p role="alert" className="bg-red-50 p-3 text-red-700">تعذر العثور على الشحنة المطلوبة.</p>}
-        {modal === "details" && deliveryDetails && <div className="space-y-4"><div className="grid gap-3 rounded-2xl bg-slate-50 p-4 sm:grid-cols-2"><p><strong>رقم الشحنة:</strong> {deliveryDetails.deliveryNumber}</p><p><strong>الحالة:</strong> {statusLabel(deliveryDetails.status)}</p><p><strong>أمر البيع:</strong> {deliveryDetails.orderNumber ?? "—"}</p><p><strong>الفاتورة:</strong> {deliveryDetails.invoiceNumber ?? "—"}</p><p><strong>العميل:</strong> {deliveryDetails.customerName}</p><p><strong>الهاتف:</strong> {deliveryDetails.customerPhone}</p><p><strong>المدينة:</strong> {deliveryDetails.city}</p><p><strong>عنوان التسليم:</strong> {deliveryDetails.address}</p><p><strong>شركة الشحن:</strong> {deliveryDetails.shippingCompany}</p><p><strong>رقم التتبع:</strong> {deliveryDetails.trackingNumber ?? "—"}</p><p><strong>المطلوب تحصيله:</strong> {money.format(deliveryDetails.codAmount ?? 0)}</p><p><strong>رسوم الشحن:</strong> {money.format(deliveryDetails.shippingCost ?? 0)}</p></div>{canPrint && selected && <button className="btn-primary" onClick={() => void printDelivery(selected)} disabled={busy}><Printer size={16} /> طباعة سند الشحن</button>}</div>}
+        {modal === "details" && deliveryDetails && <div className="space-y-4">
+          <div className="grid gap-3 rounded-2xl bg-slate-50 p-4 sm:grid-cols-2"><p><strong>رقم الشحنة:</strong> {deliveryDetails.deliveryNumber}</p><p><strong>الحالة:</strong> {statusLabel(deliveryDetails.status)}</p><p><strong>أمر البيع:</strong> {deliveryDetails.orderNumber ?? "—"}</p><p><strong>الفاتورة:</strong> {deliveryDetails.invoiceNumber ?? "—"}</p><p><strong>العميل:</strong> {deliveryDetails.customerName}</p><p><strong>الهاتف:</strong> {deliveryDetails.customerPhone}</p><p><strong>المدينة:</strong> {deliveryDetails.city}</p><p><strong>عنوان التسليم:</strong> {deliveryDetails.address}</p><p><strong>شركة الشحن:</strong> {deliveryDetails.shippingCompany}</p><p><strong>رقم التتبع:</strong> {deliveryDetails.trackingNumber ?? "—"}</p><p><strong>الإجمالي:</strong> {money.format(deliveryDetails.totalAmount)}</p><p><strong>المدفوع مقدمًا:</strong> {money.format(deliveryDetails.prepaidAmount ?? 0)}</p><p><strong>المطلوب تحصيله:</strong> {money.format(deliveryDetails.codAmount ?? 0)}</p><p><strong>رسوم الشحن:</strong> {money.format(deliveryDetails.shippingCost ?? 0)}</p></div>
+          <div><h3 className="mb-2 font-black text-slate-800">الأصناف</h3><div className="overflow-x-auto rounded-xl border border-slate-200"><table className="data-table min-w-[520px]"><thead><tr><th>الصنف</th><th>الكمية</th><th>السعر</th></tr></thead><tbody>{deliveryDetails.items.map((item, index) => <tr key={`${item.productName}-${index}`}><td className="font-bold">{item.productName}</td><td>{item.quantity}</td><td>{money.format(item.unitPrice)}</td></tr>)}</tbody></table></div></div>
+          {canPrint && selected && <button className="btn-primary" onClick={() => void printDelivery(selected)} disabled={busy}><Printer size={16} /> طباعة سند الشحن</button>}
+        </div>}
 
-        {modal === "create" && <div className="space-y-3"><div><label className="form-label">أمر البيع</label><select data-testid="delivery-order-select" className="form-input" value={orderId} onChange={event => { setOrderId(event.target.value); setInvoiceId(""); }}><option value="">اختر أمر البيع</option>{options?.map(order => <option key={order.orderId} value={order.orderId}>{order.orderNumber} — {order.customerName}</option>)}</select></div><div><label className="form-label">فاتورة البيع</label><select data-testid="delivery-invoice-select" className="form-input" value={invoiceId} onChange={event => setInvoiceId(event.target.value)}><option value="">اختر الفاتورة</option>{chosenOrder?.invoices.map(invoice => <option key={invoice.invoiceId} value={invoice.invoiceId}>{invoice.invoiceNumber}</option>)}</select></div>{chosenInvoice && <div className="rounded-xl bg-slate-50 p-4 text-sm"><p><strong>العميل:</strong> {chosenOrder?.customerName}</p><p><strong>إجمالي الفاتورة:</strong> {money.format(chosenInvoice.netTotal)}</p><p><strong>المدفوع مقدمًا:</strong> {money.format(chosenInvoice.paid)}</p><p><strong>المطلوب تحصيله عند التسليم:</strong> {money.format(chosenInvoice.remaining)}</p></div>}<div className="grid gap-3 sm:grid-cols-2"><div><label className="form-label">المدينة</label><input data-testid="delivery-city" className="form-input" value={city} onChange={event => setCity(event.target.value)} /></div><div><label className="form-label">عنوان التسليم</label><input data-testid="delivery-address" className="form-input" value={address} onChange={event => setAddress(event.target.value)} /></div><div><label className="form-label">شركة الشحن</label><input data-testid="delivery-company" className="form-input" value={company} onChange={event => setCompany(event.target.value)} /></div><div><label className="form-label">رقم التتبع</label><input data-testid="delivery-tracking" className="form-input" value={tracking} onChange={event => setTracking(event.target.value)} /></div><div><label className="form-label">رسوم شركة الشحن المتوقعة</label><input data-testid="delivery-carrier-fee" className="form-input" type="number" min="0" step="0.01" value={fee} onChange={event => setFee(event.target.value)} /></div></div></div>}
+        {modal === "create" && <div className="space-y-3">
+          {options === undefined && <p role="status" className="text-slate-500">جارٍ تحميل أوامر البيع الجاهزة…</p>}
+          {options?.length === 0 && <p className="text-slate-500">لا توجد أوامر بيع جاهزة مؤهلة للشحن.</p>}
+          <div><label className="form-label">أمر البيع</label><select data-testid="delivery-order-select" className="form-input" value={orderId} onChange={event => { setOrderId(event.target.value); setInvoiceId(""); }}><option value="">اختر أمر البيع</option>{options?.map(order => <option key={order.orderId} value={order.orderId}>{order.orderNumber} — {order.customerName}</option>)}</select></div>
+          <div><label className="form-label">فاتورة البيع</label><select data-testid="delivery-invoice-select" className="form-input" value={invoiceId} onChange={event => setInvoiceId(event.target.value)}><option value="">اختر الفاتورة</option>{chosenOrder?.invoices.map(invoice => <option key={invoice.invoiceId} value={invoice.invoiceId}>{invoice.invoiceNumber}</option>)}</select></div>
+          {chosenInvoice && <div className="rounded-xl bg-slate-50 p-4 text-sm"><p><strong>العميل:</strong> {chosenOrder?.customerName}</p><p><strong>إجمالي الفاتورة:</strong> {money.format(chosenInvoice.netTotal)}</p><p><strong>المدفوع مقدمًا:</strong> {money.format(chosenInvoice.paid)}</p><p><strong>المطلوب تحصيله عند التسليم:</strong> {money.format(chosenInvoice.remaining)}</p>{chosenOrder?.items.length ? <ul className="mt-2 list-inside list-disc text-slate-600">{chosenOrder.items.map((item, index) => <li key={`${item.productName}-${index}`}>{item.productName} × {item.quantity}</li>)}</ul> : null}</div>}
+          <div className="grid gap-3 sm:grid-cols-2"><div><label className="form-label">المدينة</label><input data-testid="delivery-city" className="form-input" value={city} onChange={event => setCity(event.target.value)} /></div><div><label className="form-label">عنوان التسليم</label><input data-testid="delivery-address" className="form-input" value={address} onChange={event => setAddress(event.target.value)} /></div><div><label className="form-label">شركة الشحن</label><input data-testid="delivery-company" className="form-input" value={company} onChange={event => setCompany(event.target.value)} /></div><div><label className="form-label">رقم التتبع</label><input data-testid="delivery-tracking" className="form-input" value={tracking} onChange={event => setTracking(event.target.value)} /></div><div><label className="form-label">رسوم شركة الشحن المتوقعة</label><input data-testid="delivery-carrier-fee" className="form-input" type="number" min="0" step="0.01" value={fee} onChange={event => setFee(event.target.value)} /></div></div>
+        </div>}
 
-        {modal === "deliver" && <div><label className="form-label">حساب وسيط التحصيل</label><select data-testid="delivery-confirmation-account" className="form-input" value={accountId} onChange={event => setAccountId(event.target.value)}><option value="">اختر الحساب</option>{confirmationAccounts?.map(account => <option key={account._id} value={account._id}>{account.name}</option>)}</select></div>}
+        {modal === "deliver" && <div className="space-y-3">
+          {(selected?.codAmount ?? 0) > 0 && confirmationAccounts === undefined && <p role="status" className="text-slate-500">جارٍ تحميل حسابات وسيط التحصيل…</p>}
+          {(selected?.codAmount ?? 0) > 0 && confirmationAccounts?.length === 0 && <p role="alert" className="bg-amber-50 p-3 text-amber-800">لا توجد حسابات مؤهلة لتحصيل قيمة الشحنة في هذا الفرع.</p>}
+          <div><label className="form-label">حساب وسيط التحصيل</label><select data-testid="delivery-confirmation-account" className="form-input" value={accountId} onChange={event => setAccountId(event.target.value)}><option value="">اختر الحساب</option>{confirmationAccounts?.map(account => <option key={account._id} value={account._id}>{account.name}</option>)}</select></div>
+        </div>}
 
-        {modal === "settle" && <div className="space-y-3"><div><label className="form-label">حساب مبالغ التحصيل</label><select data-testid="delivery-settlement-source" className="form-input" value={accountId} onChange={event => { setAccountId(event.target.value); setChecked(new Set()); }}><option value="">اختر الحساب</option>{settlementSources?.map(account => <option key={account._id} value={account._id}>{account.name}</option>)}</select></div><div className="space-y-2 rounded-xl border border-slate-200 p-3">{unsettled?.map(delivery => <label key={delivery._id} className="flex items-center justify-between gap-3"><span className="flex items-center gap-2"><input data-testid="delivery-settlement-item" data-delivery-number={delivery.deliveryNumber} type="checkbox" checked={checked.has(String(delivery._id))} onChange={() => setChecked(old => { const next = new Set(old); const key = String(delivery._id); next.has(key) ? next.delete(key) : next.add(key); return next; })} /><span>{delivery.deliveryNumber}</span></span><strong>{money.format(delivery.codAmount ?? 0)}</strong></label>)}</div><div><label className="form-label">إيداع المبلغ في</label><select data-testid="delivery-settlement-destination" className="form-input" value={destinationId} onChange={event => setDestinationId(event.target.value)}><option value="">اختر الخزينة أو البنك</option>{destinations?.map(account => <option key={account._id} value={account._id}>{account.name}</option>)}</select></div><div><label className="form-label">رسوم شركة الشحن</label><input className="form-input" type="number" min="0" step="0.01" value={fee} onChange={event => setFee(event.target.value)} /></div><div className="grid grid-cols-3 gap-2 rounded-xl bg-slate-50 p-3 text-center text-sm"><div><span className="block text-xs text-slate-500">الإجمالي</span><strong>{money.format(gross)}</strong></div><div><span className="block text-xs text-slate-500">الرسوم</span><strong>{money.format(Number.isFinite(feeAmount) ? feeAmount : 0)}</strong></div><div><span className="block text-xs text-slate-500">الصافي</span><strong className="text-emerald-700">{money.format(gross - (Number.isFinite(feeAmount) ? feeAmount : 0))}</strong></div></div></div>}
+        {modal === "settle" && <div className="space-y-3">
+          {settlementSources === undefined && <p role="status" className="text-slate-500">جارٍ تحميل حسابات مبالغ التحصيل…</p>}
+          {settlementSources?.length === 0 && <p role="alert" className="bg-amber-50 p-3 text-amber-800">لا توجد حسابات مبالغ تحصيل مؤهلة للتسوية.</p>}
+          <div><label className="form-label">حساب مبالغ التحصيل</label><select data-testid="delivery-settlement-source" className="form-input" value={accountId} onChange={event => { setAccountId(event.target.value); setChecked(new Set<string>()); }}><option value="">اختر الحساب</option>{settlementSources?.map(account => <option key={account._id} value={account._id}>{account.name}</option>)}</select></div>
+          {accountId && unsettled === undefined && <p role="status" className="text-slate-500">جارٍ تحميل الشحنات غير المسواة…</p>}
+          {accountId && unsettled?.length === 0 && <p className="text-slate-500">لا توجد شحنات غير مسواة لهذا الحساب.</p>}
+          <div className="space-y-2 rounded-xl border border-slate-200 p-3">{unsettled?.map(delivery => <label key={delivery._id} className="flex items-center justify-between gap-3"><span className="flex items-center gap-2"><input data-testid="delivery-settlement-item" data-delivery-number={delivery.deliveryNumber} type="checkbox" checked={checked.has(String(delivery._id))} onChange={() => setChecked(old => { const next = new Set(old); const key = String(delivery._id); next.has(key) ? next.delete(key) : next.add(key); return next; })} /><span>{delivery.deliveryNumber}</span></span><strong>{money.format(delivery.codAmount ?? 0)}</strong></label>)}</div>
+          {destinations === undefined && <p role="status" className="text-slate-500">جارٍ تحميل الخزائن والبنوك…</p>}
+          {destinations?.length === 0 && <p role="alert" className="bg-amber-50 p-3 text-amber-800">لا توجد خزينة أو حساب بنكي مؤهل للاستلام.</p>}
+          <div><label className="form-label">إيداع المبلغ في</label><select data-testid="delivery-settlement-destination" className="form-input" value={destinationId} onChange={event => setDestinationId(event.target.value)}><option value="">اختر الخزينة أو البنك</option>{destinations?.map(account => <option key={account._id} value={account._id}>{account.name}</option>)}</select></div>
+          <div><label className="form-label">رسوم شركة الشحن</label><input className="form-input" type="number" min="0" step="0.01" value={fee} onChange={event => setFee(event.target.value)} /></div>
+          <div className="grid grid-cols-3 gap-2 rounded-xl bg-slate-50 p-3 text-center text-sm"><div><span className="block text-xs text-slate-500">الإجمالي</span><strong>{money.format(gross)}</strong></div><div><span className="block text-xs text-slate-500">الرسوم</span><strong>{money.format(Number.isFinite(feeAmount) ? feeAmount : 0)}</strong></div><div><span className="block text-xs text-slate-500">الصافي</span><strong className="text-emerald-700">{money.format(gross - (Number.isFinite(feeAmount) ? feeAmount : 0))}</strong></div></div>
+        </div>}
 
         {!["create", "ship", "deliver", "settle", "reverse-settlement", "details"].includes(modal) && <div><label className="form-label">سبب العملية</label><textarea className="form-input min-h-24" value={reason} onChange={event => setReason(event.target.value)} /></div>}
         {modal === "reverse-settlement" && <div><label className="form-label">سبب إلغاء التسوية</label><textarea className="form-input min-h-24" value={reversalReason} onChange={event => setReversalReason(event.target.value)} /></div>}
         {["create", "deliver", "reverse-confirmation", "settle", "reverse-settlement"].includes(modal) && <div><label className="form-label">التاريخ</label><input data-testid="delivery-action-date" className="form-input" type="date" value={date} onChange={event => setDate(event.target.value)} /></div>}
         {modal !== "details" && validationReason && <p id="delivery-action-validation" role="alert" className="bg-amber-50 p-3 text-sm text-amber-800">{validationReason}</p>}
 
-        {modal !== "details" && <div className="flex justify-end gap-2 border-t border-slate-100 pt-4"><button className="erp-action" onClick={close} disabled={busy}>إلغاء</button><button data-testid="delivery-action-submit" disabled={busy || Boolean(validationReason)} className="btn-primary" onClick={() => {
+        {modal !== "details" && <div className="flex justify-end gap-2 border-t border-slate-100 pt-4"><button className="erp-action" onClick={close} disabled={busy}>إلغاء</button><button data-testid="delivery-action-submit" disabled={busy || Boolean(validationReason)} aria-describedby={validationReason ? "delivery-action-validation" : undefined} title={validationReason ?? undefined} className="btn-primary" onClick={() => {
           if (validationReason) { toast.error(validationReason); return; }
-          const operation = modal; if (!operation || operation === "details") return;
+          const operation = modal;
+          if (!operation || operation === "details") return;
           void run(async () => {
             if (operation === "create" && activeBranch) return createDelivery({ orderId: orderId as Id<"orders">, invoiceId: invoiceId as Id<"invoices">, city, address, shippingCompany: company, trackingNumber: tracking || undefined, expectedCarrierFee: feeAmount, branchId: activeBranch, date, requestId: operationRequestId.current });
             if (operation === "ship" && selected) return updateStatus({ id: selected._id, status: "shipped" });
