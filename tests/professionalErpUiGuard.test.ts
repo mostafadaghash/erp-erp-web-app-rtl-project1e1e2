@@ -31,7 +31,7 @@ test("professional ERP navigation uses conventional Arabic information architect
     "إدارة الشحن",
     "أوامر الصيانة",
     "الحسابات",
-    "الخزينة والبنوك",
+    "الخزائن والبنوك",
     "حسابات العملاء",
     "حسابات الموردين",
     "المستخدمون والصلاحيات",
