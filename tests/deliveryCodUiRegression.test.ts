@@ -118,8 +118,10 @@ test("UI-32 branch changes clear modal and operation state", () => {
   assert.match(source, /const handleBranchChange = \(value: string\) => \{[\s\S]*resetForm\(\)[\s\S]*setSelected\(null\)[\s\S]*setModal\(null\)/);
   assert.match(source, /onChange=\{event => handleBranchChange\(event\.target\.value\)\}/);
 });
-test("UI-33 changing settlement source clears stale selected deliveries", () =>
-  assert.match(source, /setAccountId\(event\.target\.value\); setChecked\(new Set<string>\(\)\);[\s\S]*حساب مبالغ التحصيل/));
+test("UI-33 changing settlement source clears stale selected deliveries", () => {
+  assert.match(source, /حساب مبالغ التحصيل/);
+  assert.match(source, /onChange=\{event => \{ setAccountId\(event\.target\.value\); setChecked\(new Set<string>\(\)\); \}\}/);
+});
 test("UI-34 opening a fresh operation rotates the idempotency request", () =>
   assert.match(source, /resetForm\(\);[\s\S]*setSelected\(row \?\? null\);[\s\S]*operationRequestId\.current = makeRequestId\(\);[\s\S]*setModal\(kind\)/));
 test("UI-35 central validation covers create delivery required inputs", () => {
