@@ -20,15 +20,18 @@ const purchaseReturns = read("src/components/PurchaseReturnsPage.tsx");
 test("professional ERP navigation uses conventional Arabic information architecture", () => {
   for (const label of [
     "المبيعات",
+    "فواتير المبيعات",
     "مرتجعات المبيعات",
     "أوامر البيع",
     "المشتريات",
+    "فواتير المشتريات",
     "مرتجعات المشتريات",
-    "الأصناف",
-    "عمليات الشحن",
+    "دليل الأصناف",
+    "الشحن",
+    "إدارة الشحن",
     "أوامر الصيانة",
     "الحسابات",
-    "الخزائن والبنوك",
+    "الخزينة والبنوك",
     "حسابات العملاء",
     "حسابات الموردين",
     "المستخدمون والصلاحيات",
@@ -37,10 +40,14 @@ test("professional ERP navigation uses conventional Arabic information architect
 
   for (const legacy of [
     "المبيعات والفواتير",
+    "المبيعات والعملاء",
     "الأوردرات",
     "الشحنات الواردة",
+    "المشتريات والموردون",
+    "الشحن والتوصيل",
     "الموظفون والصلاحيات",
     "سجل العمليات",
+    "سجل التدقيق",
   ]) assert.doesNotMatch(sidebar, new RegExp(legacy));
 });
 
@@ -107,8 +114,8 @@ test("sales orders use one professional document name and item terminology", () 
 
 test("shipping creation refers to sales orders consistently", () => {
   for (const label of [
-    "إنشاء من أمر بيع وفاتورة",
-    "اختر أمر بيع جاهزًا",
+    "شحنة جديدة",
+    "اختر أمر البيع",
     "جارٍ تحميل أوامر البيع الجاهزة",
     "لا توجد أوامر بيع جاهزة مؤهلة للشحن",
   ]) assert.match(deliveries, new RegExp(label));
