@@ -26,6 +26,7 @@ import type { ReportingOverview } from "../../shared/reportingView";
 
 interface DashboardProps {
   onNavigate: (page: Page) => void;
+  onRequestCreate: (page: "new-invoice" | "shipments" | "products" | "customers") => void;
   permissions: Permission[];
   modules: Record<string, boolean | undefined>;
 }
@@ -39,7 +40,7 @@ type ModuleCard = {
   enabled: boolean;
 };
 
-export function Dashboard({ onNavigate, permissions, modules }: DashboardProps) {
+export function Dashboard({ onNavigate, onRequestCreate, permissions, modules }: DashboardProps) {
   const can = (permission: Permission) => permissions.includes(permission);
   const enabled = (moduleName: string) => modules[moduleName] !== false;
 
@@ -149,11 +150,11 @@ export function Dashboard({ onNavigate, permissions, modules }: DashboardProps) 
   ].filter(card => card.enabled);
 
   const quickActions = [
-    { page: "new-invoice" as Page, label: "فاتورة بيع", icon: ReceiptText, visible: can("create_invoices") },
-    { page: "shipments" as Page, label: "عملية شراء", icon: ShoppingBag, visible: can("create_shipments") && enabled("shipments") },
-    { page: "products" as Page, label: "إضافة صنف", icon: Package, visible: can("create_products") },
-    { page: "customers" as Page, label: "إضافة عميل", icon: UserPlus, visible: can("create_customers") },
-    { page: "treasury" as Page, label: "الخزينة والبنوك", icon: WalletCards, visible: canViewTreasury },
+    { key: "new-invoice", label: "فاتورة بيع", icon: ReceiptText, visible: can("create_invoices"), onClick: () => onRequestCreate("new-invoice") },
+    { key: "shipments", label: "عملية شراء", icon: ShoppingBag, visible: can("create_shipments") && enabled("shipments"), onClick: () => onRequestCreate("shipments") },
+    { key: "products", label: "إضافة صنف", icon: Package, visible: can("create_products"), onClick: () => onRequestCreate("products") },
+    { key: "customers", label: "إضافة عميل", icon: UserPlus, visible: can("create_customers"), onClick: () => onRequestCreate("customers") },
+    { key: "treasury", label: "الخزينة والبنوك", icon: WalletCards, visible: canViewTreasury, onClick: () => onNavigate("treasury") },
   ].filter(action => action.visible);
 
   const statCards = report
@@ -260,7 +261,7 @@ export function Dashboard({ onNavigate, permissions, modules }: DashboardProps) 
           <div className="grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-5">
             {quickActions.map(action => {
               const Icon = action.icon;
-              return <button key={`${action.page}-${action.label}`} onClick={() => onNavigate(action.page)} className="flex min-h-14 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-black text-slate-700 transition hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-800"><Icon className="h-4 w-4" />{action.label}</button>;
+              return <button key={action.key} onClick={action.onClick} className="flex min-h-14 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-black text-slate-700 transition hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-800"><Icon className="h-4 w-4" />{action.label}</button>;
             })}
           </div>
         </section>
