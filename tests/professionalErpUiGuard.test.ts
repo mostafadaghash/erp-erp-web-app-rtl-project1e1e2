@@ -60,8 +60,8 @@ test("sales returns are a first-class protected page", () => {
 });
 
 test("shell exposes one permission-aware quick creation menu", () => {
-  assert.equal((app.match(/>إجراء جديد</g) ?? []).length, 1);
-  assert.match(app, /data-testid="quick-action-menu"/);
+  assert.equal((app.match(/data-testid="quick-action-menu"/g) ?? []).length, 1);
+  assert.match(app, />إنشاء جديد</);
   assert.match(app, /permission: "create_invoices"/);
   assert.match(app, /permission: "create_shipments"/);
   assert.doesNotMatch(read("src/components/Dashboard.tsx"), />فاتورة جديدة</);
