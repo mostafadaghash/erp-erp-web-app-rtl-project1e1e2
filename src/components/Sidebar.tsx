@@ -102,7 +102,7 @@ const NAV_GROUPS: NavGroup[] = [
     label: "الشحن والتوصيل",
     icon: Truck,
     items: [
-      { id: "deliveries", label: "إدارة الشحن والتحصيل", icon: Truck, moduleKey: "deliveries", permission: "view_deliveries" },
+      { id: "deliveries", label: "عمليات الشحن", icon: Truck, moduleKey: "deliveries", permission: "view_deliveries" },
     ],
   },
   {
