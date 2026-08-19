@@ -73,7 +73,7 @@ const NAV_GROUPS: NavGroup[] = [
   },
   {
     key: "sales",
-    label: "المبيعات والعملاء",
+    label: "المبيعات",
     icon: ShoppingBag,
     items: [
       { id: "invoices", label: "فواتير المبيعات", icon: ReceiptText, moduleKey: "invoices", permission: "view_invoices" },
@@ -85,7 +85,7 @@ const NAV_GROUPS: NavGroup[] = [
   },
   {
     key: "purchases",
-    label: "المشتريات والموردون",
+    label: "المشتريات",
     icon: ShoppingBag,
     items: [
       { id: "shipments", label: "فواتير المشتريات", icon: ShoppingBag, moduleKey: "shipments", permission: "view_shipments" },
@@ -101,7 +101,7 @@ const NAV_GROUPS: NavGroup[] = [
   },
   {
     key: "shipping",
-    label: "الشحن والتوصيل",
+    label: "الشحن",
     icon: Truck,
     items: [{ id: "deliveries", label: "إدارة الشحن", icon: Truck, moduleKey: "deliveries", permission: "view_deliveries" }],
   },
@@ -136,7 +136,7 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { id: "branches", label: "الفروع", icon: Building2, moduleKey: "branches", permission: "view_branches" },
       { id: "employees", label: "المستخدمون والصلاحيات", icon: UserCog, moduleKey: "employees", permission: "view_employees" },
-      { id: "audit-logs", label: "سجل التدقيق", icon: ShieldCheck, permission: "view_audit_logs" },
+      { id: "audit-logs", label: "سجل المراجعة", icon: ShieldCheck, permission: "view_audit_logs" },
       { id: "data-export", label: "تصدير البيانات", icon: DatabaseBackup, permission: "export_data" },
       { id: "settings", label: "إعدادات النظام", icon: Settings, permission: "manage_settings" },
     ],
