@@ -53,7 +53,7 @@ test("sales returns are a first-class protected page", () => {
 });
 
 test("shell exposes one permission-aware quick creation menu", () => {
-  assert.equal((app.match(/>إجراء جديد</g) ?? []).length, 1);
+  assert.equal((app.match(/>إنشاء جديد</g) ?? []).length, 1);
   assert.match(app, /data-testid="quick-action-menu"/);
   assert.match(app, /permission: "create_invoices"/);
   assert.match(app, /permission: "create_shipments"/);
@@ -107,7 +107,7 @@ test("sales orders use one professional document name and item terminology", () 
 
 test("shipping creation refers to sales orders consistently", () => {
   for (const label of [
-    "إنشاء من أمر بيع وفاتورة",
+    "إنشاء شحنة جديدة",
     "اختر أمر بيع جاهزًا",
     "جارٍ تحميل أوامر البيع الجاهزة",
     "لا توجد أوامر بيع جاهزة مؤهلة للشحن",
