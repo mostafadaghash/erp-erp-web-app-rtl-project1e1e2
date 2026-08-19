@@ -44,7 +44,7 @@ const transactionLabels: Record<string, string> = {
 
 const money = new Intl.NumberFormat("ar-EG", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-type Dialog = "opening" | "transfer" | "settlement" | "reverse" | null;
+type Dialog = "opening" | "transfer" | "settlement" | "reverse" | "initialize" | null;
 
 export function TreasuryPage() {
   const accounts = useQuery(api.finance.accounts, {});
@@ -88,7 +88,7 @@ export function TreasuryPage() {
   const branchAccounts = useMemo(() => (accounts ?? []).filter(account => !branchId || String(account.branchId) === branchId), [accounts, branchId]);
   const activeAccounts = branchAccounts.filter(account => account.isActive);
   const cashAndBankAccounts = activeAccounts.filter(account => ["cash", "bank"].includes(account.type));
-  const clearingAccounts = activeAccounts.filter(account => ["paymob_clearing", "fawry_clearing", "card_clearing", "cod_clearing"].includes(account.type));
+  const clearingAccounts = activeAccounts.filter(account => ["paymob_clearing", "fawry_clearing", "card_clearing"].includes(account.type));
   const totalBalance = branchAccounts.reduce((sum, account) => sum + account.currentBalance, 0);
   const totalAvailable = branchAccounts.reduce((sum, account) => sum + account.availableBalance, 0);
   const totalPending = branchAccounts.reduce((sum, account) => sum + account.pendingBalance, 0);
@@ -183,7 +183,7 @@ export function TreasuryPage() {
           <div className="grid gap-3 p-4 md:grid-cols-[220px_1fr_auto] md:items-end">
             <div><label className="form-label">تاريخ بدء التسجيل المالي</label><input data-testid="finance-cutover-date" type="date" disabled={initialization?.state === "initialized"} className="form-input" value={cutoverDate} onChange={event => setCutoverDate(event.target.value)} /></div>
             <p className="rounded-xl bg-slate-50 p-3 text-sm leading-6 text-slate-600">بعد الاعتماد يبدأ النظام في اعتبار الحركات التالية لهذا التاريخ ضمن الدورة المالية الرسمية. راجع الأرصدة الافتتاحية أولًا.</p>
-            <div className="flex flex-wrap gap-2"><button data-testid="finance-configure" className="erp-action" onClick={() => void run(() => configure({ cutoverDate, defaultClearingDelayDays: 1 }), "تم حفظ تاريخ بدء التسجيل المالي")}>حفظ التاريخ</button><button data-testid="finance-confirm" className="btn-primary" disabled={(initialization?.openingBalancesRemaining ?? 1) > 0 || busy} onClick={() => void run(() => confirmInitialization(), "تم اعتماد التشغيل المالي")}>اعتماد التشغيل المالي</button></div>
+            <div className="flex flex-wrap gap-2"><button data-testid="finance-configure" className="erp-action" onClick={() => void run(() => configure({ cutoverDate, defaultClearingDelayDays: 1 }), "تم حفظ تاريخ بدء التسجيل المالي")}>حفظ التاريخ</button><button data-testid="finance-confirm" className="btn-primary" disabled={(initialization?.openingBalancesRemaining ?? 1) > 0 || busy} onClick={() => setDialog("initialize")}>اعتماد التشغيل المالي</button></div>
           </div>
         </section>
       )}
@@ -232,14 +232,18 @@ export function TreasuryPage() {
       {dialog && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4 backdrop-blur-sm">
           <div className="w-[min(96vw,560px)] space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl">
-            <div className="flex items-start justify-between border-b border-slate-100 pb-4"><div><h2 className="text-xl font-black">{dialog === "opening" ? "تسجيل الرصيد الافتتاحي" : dialog === "transfer" ? "تحويل بين الحسابات" : dialog === "settlement" ? "تسوية حساب وسيط" : "إلغاء حركة مالية"}</h2>{dialog === "reverse" && <p className="mt-1 text-sm text-slate-500">سيتم إنشاء حركة عكسية موثقة بدل حذف الحركة الأصلية.</p>}</div><button className="rounded-xl p-2 hover:bg-slate-100" onClick={() => setDialog(null)} aria-label="إغلاق"><X className="h-5 w-5" /></button></div>
+            <div className="flex items-start justify-between border-b border-slate-100 pb-4"><div><h2 className="text-xl font-black">{dialog === "opening" ? "تسجيل الرصيد الافتتاحي" : dialog === "transfer" ? "تحويل بين الحسابات" : dialog === "settlement" ? "تسوية حساب وسيط" : dialog === "initialize" ? "اعتماد التشغيل المالي" : "إلغاء حركة مالية"}</h2>{dialog === "reverse" && <p className="mt-1 text-sm text-slate-500">سيتم إنشاء حركة عكسية موثقة بدل حذف الحركة الأصلية.</p>}</div><button className="rounded-xl p-2 hover:bg-slate-100" onClick={() => setDialog(null)} aria-label="إغلاق"><X className="h-5 w-5" /></button></div>
 
+            {dialog === "initialize" && <div data-testid="finance-confirmation-dialog" className="space-y-3"><p className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm leading-7 text-amber-900">هذا الاعتماد نهائي. بعد تفعيل التشغيل المالي لن تتمكن من تعديل تاريخ بدء التسجيل أو الأرصدة الافتتاحية من شاشة الإعداد.</p><div className="rounded-xl bg-slate-50 p-3 text-sm text-slate-700"><span className="text-slate-500">تاريخ بدء التسجيل المالي:</span> <strong>{cutoverDate}</strong></div></div>}
             {dialog === "opening" && <div><label className="form-label">الرصيد الافتتاحي</label><input className="form-input" type="number" min="0" step="0.01" value={openingAmount} onChange={event => setOpeningAmount(event.target.value)} /></div>}
             {dialog === "transfer" && <div className="space-y-3"><div><label className="form-label">من حساب</label><select className="form-input" value={transferSourceId} onChange={event => setTransferSourceId(event.target.value)}><option value="">اختر الحساب</option>{cashAndBankAccounts.map(account => <option key={account._id} value={account._id}>{account.name} — {money.format(account.availableBalance)}</option>)}</select></div><div><label className="form-label">إلى حساب</label><select className="form-input" value={transferDestinationId} onChange={event => setTransferDestinationId(event.target.value)}><option value="">اختر الحساب</option>{cashAndBankAccounts.map(account => <option key={account._id} value={account._id}>{account.name}</option>)}</select></div><div><label className="form-label">المبلغ</label><input className="form-input" type="number" min="0" step="0.01" value={transferAmount} onChange={event => setTransferAmount(event.target.value)} /></div></div>}
             {dialog === "settlement" && <div className="space-y-3"><div><label className="form-label">الحساب الوسيط</label><select className="form-input" value={settlementSourceId} onChange={event => setSettlementSourceId(event.target.value)}><option value="">اختر الحساب</option>{clearingAccounts.map(account => <option key={account._id} value={account._id}>{account.name}</option>)}</select></div><div><label className="form-label">الإيداع في</label><select className="form-input" value={settlementDestinationId} onChange={event => setSettlementDestinationId(event.target.value)}><option value="">اختر الخزينة أو البنك</option>{cashAndBankAccounts.map(account => <option key={account._id} value={account._id}>{account.name}</option>)}</select></div><div className="grid grid-cols-2 gap-3"><div><label className="form-label">إجمالي التسوية</label><input className="form-input" type="number" min="0" step="0.01" value={settlementGross} onChange={event => setSettlementGross(event.target.value)} /></div><div><label className="form-label">الرسوم</label><input className="form-input" type="number" min="0" step="0.01" value={settlementFee} onChange={event => setSettlementFee(event.target.value)} /></div></div></div>}
             {dialog === "reverse" && <div><label className="form-label">سبب إلغاء الحركة</label><textarea className="form-input min-h-24" value={reverseReason} onChange={event => setReverseReason(event.target.value)} placeholder="اكتب السبب بوضوح" /></div>}
 
-            <div className="flex justify-end gap-2 border-t border-slate-100 pt-4"><button className="erp-action" onClick={() => setDialog(null)} disabled={busy}>إلغاء</button><button className="btn-primary" disabled={busy} onClick={() => {
+            <div className="flex justify-end gap-2 border-t border-slate-100 pt-4"><button className="erp-action" onClick={() => setDialog(null)} disabled={busy}>إلغاء</button><button data-testid={dialog === "initialize" ? "finance-confirm-final" : undefined} className="btn-primary" disabled={busy} onClick={() => {
+              if (dialog === "initialize") {
+                void run(() => confirmInitialization(), "تم اعتماد التشغيل المالي");
+              }
               if (dialog === "opening" && selectedAccountId) {
                 const amount = Number(openingAmount); if (!Number.isFinite(amount) || amount < 0) return toast.error("أدخل رصيدًا صحيحًا");
                 void run(() => postOpeningBalance({ accountId: selectedAccountId, amount, date: cutoverDate, requestId: crypto.randomUUID() }), "تم تسجيل الرصيد الافتتاحي");
@@ -256,7 +260,7 @@ export function TreasuryPage() {
                 if (!reverseReason.trim()) return toast.error("اكتب سبب إلغاء الحركة");
                 void run(() => reverseTransaction({ transactionId: reverseTransactionId, reason: reverseReason.trim(), date: today, requestId: crypto.randomUUID() }), "تم إلغاء الحركة وتسجيل الحركة العكسية");
               }
-            }}>{busy ? "جارٍ الحفظ…" : "حفظ"}</button></div>
+            }}>{busy ? "جارٍ الحفظ…" : dialog === "initialize" ? "اعتماد نهائي" : "حفظ"}</button></div>
           </div>
         </div>
       )}
