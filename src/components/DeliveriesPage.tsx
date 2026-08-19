@@ -230,9 +230,20 @@ export function DeliveriesPage({ createRequestToken }: { createRequestToken?: nu
     const popup = window.open("", "_blank");
     if (!popup) throw new Error("تعذر فتح نافذة الطباعة");
     popup.opener = null;
-    popup.document.body.innerHTML = `<html dir="rtl"><head><meta charset="utf-8"><title>${escapeHtml(title)}</title><style>body{font-family:Arial;padding:24px;color:#172033}table{width:100%;border-collapse:collapse;margin-top:16px}td,th{border:1px solid #cbd5e1;padding:8px;text-align:right}.summary{margin-top:18px;line-height:1.9}.signatures{display:flex;justify-content:space-between;gap:24px;margin-top:48px}</style></head><body><h1>${escapeHtml(title)}</h1>${bodyHtml}<div class="signatures"><span>توقيع شركة الشحن: __________</span><span>توقيع المحاسب: __________</span></div></body></html>`;
+    popup.document.documentElement.dir = "rtl";
+    popup.document.head.innerHTML = `<meta charset="utf-8"><title>${escapeHtml(title)}</title><style>@page{margin:12mm}body{font-family:Arial,sans-serif;padding:24px;color:#172033}h1{margin:0 0 18px}table{width:100%;border-collapse:collapse;margin-top:16px}td,th{border:1px solid #cbd5e1;padding:8px;text-align:right}.summary{margin-top:18px;line-height:1.9}.signatures{display:flex;justify-content:space-between;gap:24px;margin-top:48px}@media print{body{padding:0}}</style>`;
+    popup.document.body.innerHTML = `<h1>${escapeHtml(title)}</h1>${bodyHtml}<div class="signatures"><span>توقيع شركة الشحن: __________</span><span>توقيع المحاسب: __________</span></div>`;
     popup.document.close();
-    popup.print();
+
+    const triggerPrint = () => {
+      popup.focus();
+      popup.requestAnimationFrame(() => popup.requestAnimationFrame(() => popup.print()));
+    };
+    if (popup.document.fonts?.ready) {
+      void popup.document.fonts.ready.then(triggerPrint, triggerPrint);
+    } else {
+      popup.setTimeout(triggerPrint, 0);
+    }
   };
 
   const printDelivery = async (row: Selected) => {
