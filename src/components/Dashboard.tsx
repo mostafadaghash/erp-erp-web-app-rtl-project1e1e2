@@ -5,7 +5,6 @@ import {
   ArrowUpRight,
   BarChart3,
   Boxes,
-  Building2,
   CheckCircle,
   CircleDollarSign,
   Clock,
@@ -187,6 +186,20 @@ export function Dashboard({ onNavigate, permissions, modules }: DashboardProps) 
           icon: CircleDollarSign,
           tone: "bg-rose-50 text-rose-700",
         },
+        {
+          title: "قيد التحصيل لدى شركات الشحن",
+          value: formatCurrency(report.cod.currentOutstanding),
+          note: `تمت تسويته ${formatCurrency(report.cod.settled)}`,
+          icon: Truck,
+          tone: "bg-sky-50 text-sky-700",
+        },
+        ...(canViewProfits && report.profitability ? [{
+          title: "صافي ربح الشهر",
+          value: report.profitability.netProfit === null ? "بيانات التكلفة غير مكتملة" : formatCurrency(report.profitability.netProfit),
+          note: report.profitability.netMargin === null ? `${report.profitability.incompleteCogsInvoices.toLocaleString("ar-EG")} فاتورة تحتاج مراجعة` : `هامش ${report.profitability.netMargin.toLocaleString("ar-EG")}٪`,
+          icon: BarChart3,
+          tone: "bg-violet-50 text-violet-700",
+        }] : []),
       ]
     : [];
 
@@ -205,9 +218,7 @@ export function Dashboard({ onNavigate, permissions, modules }: DashboardProps) 
             <BarChart3 className="h-6 w-6 text-emerald-600" />
             لوحة التحكم
           </div>
-          <p className="erp-page-subtitle">
-            نظرة واضحة وسريعة على أهم أعمالك اليوم
-          </p>
+          <p className="erp-page-subtitle">نظرة واضحة وسريعة على أهم أعمالك اليوم</p>
         </div>
         <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-600 shadow-sm">
           {new Date().toLocaleDateString("ar-EG", {
@@ -233,14 +244,10 @@ export function Dashboard({ onNavigate, permissions, modules }: DashboardProps) 
                 onClick={() => onNavigate(card.page)}
                 className="group min-h-[170px] rounded-2xl border border-slate-200 bg-white p-5 text-right shadow-[0_8px_28px_rgba(15,23,42,.045)] transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-[0_14px_34px_rgba(15,23,42,.07)]"
               >
-                <div className={`mb-5 flex h-12 w-12 items-center justify-center rounded-2xl ${card.tone}`}>
-                  <Icon className="h-6 w-6" />
-                </div>
+                <div className={`mb-5 flex h-12 w-12 items-center justify-center rounded-2xl ${card.tone}`}><Icon className="h-6 w-6" /></div>
                 <h3 className="text-lg font-black text-slate-900">{card.title}</h3>
                 <p className="mt-2 text-sm leading-6 text-slate-500">{card.description}</p>
-                <div className="mt-4 text-xs font-bold text-emerald-700 opacity-80 transition group-hover:opacity-100">
-                  فتح القسم ←
-                </div>
+                <div className="mt-4 text-xs font-bold text-emerald-700 opacity-80 transition group-hover:opacity-100">فتح القسم ←</div>
               </button>
             );
           })}
@@ -249,110 +256,51 @@ export function Dashboard({ onNavigate, permissions, modules }: DashboardProps) 
 
       {quickActions.length > 0 && (
         <section className="erp-section">
-          <div className="erp-section-header">
-            <h2 className="erp-section-title">إجراءات سريعة</h2>
-            <span className="text-xs text-slate-400">العمليات الأكثر استخدامًا</span>
-          </div>
+          <div className="erp-section-header"><h2 className="erp-section-title">إجراءات سريعة</h2><span className="text-xs text-slate-400">العمليات الأكثر استخدامًا</span></div>
           <div className="grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-5">
             {quickActions.map(action => {
               const Icon = action.icon;
-              return (
-                <button
-                  key={`${action.page}-${action.label}`}
-                  onClick={() => onNavigate(action.page)}
-                  className="flex min-h-14 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-black text-slate-700 transition hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-800"
-                >
-                  <Icon className="h-4 w-4" />
-                  {action.label}
-                </button>
-              );
+              return <button key={`${action.page}-${action.label}`} onClick={() => onNavigate(action.page)} className="flex min-h-14 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-black text-slate-700 transition hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-800"><Icon className="h-4 w-4" />{action.label}</button>;
             })}
           </div>
         </section>
       )}
 
       {canViewReports && report === undefined && (
-        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-          {Array.from({ length: 4 }, (_, index) => (
-            <div key={index} className="h-28 animate-pulse rounded-2xl bg-slate-100" />
-          ))}
+        <div className="grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-6">
+          {Array.from({ length: canViewProfits ? 6 : 5 }, (_, index) => <div key={index} className="h-28 animate-pulse rounded-2xl bg-slate-100" />)}
         </div>
       )}
 
       {statCards.length > 0 && (
         <section>
-          <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-base font-black text-slate-800">ملخص الأداء</h2>
-            <span className="text-xs text-slate-400">هذا الشهر</span>
-          </div>
-          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+          <div className="mb-3 flex items-center justify-between"><h2 className="text-base font-black text-slate-800">ملخص الأداء</h2><span className="text-xs text-slate-400">هذا الشهر</span></div>
+          <div className="grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-6">
             {statCards.map(card => {
               const Icon = card.icon;
-              return (
-                <div key={card.title} className="erp-metric-card">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="erp-metric-label">{card.title}</p>
-                      <p className="erp-metric-value">{card.value}</p>
-                      <p className="mt-1 text-xs text-slate-400">{card.note}</p>
-                    </div>
-                    <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${card.tone}`}>
-                      <Icon className="h-5 w-5" />
-                    </div>
-                  </div>
-                </div>
-              );
+              return <div key={card.title} className="erp-metric-card"><div className="flex items-start justify-between gap-3"><div><p className="erp-metric-label">{card.title}</p><p className="erp-metric-value">{card.value}</p><p className="mt-1 text-xs text-slate-400">{card.note}</p></div><div className={`flex h-10 w-10 items-center justify-center rounded-xl ${card.tone}`}><Icon className="h-5 w-5" /></div></div></div>;
             })}
           </div>
         </section>
       )}
 
       {report && canViewProfits && !report.completeness.profitabilityAvailable && (
-        <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-800">
-          بعض الفواتير القديمة تحتاج استكمال تكلفة البضاعة قبل عرض مؤشرات الربحية بدقة.
-        </div>
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-800">بعض الفواتير القديمة تحتاج استكمال تكلفة البضاعة قبل عرض مؤشرات الربحية بدقة.</div>
       )}
 
       <div className="grid gap-6 xl:grid-cols-3">
         {canViewInvoices && (
           <section className="erp-section xl:col-span-2">
             <div className="erp-section-header">
-              <h2 className="erp-section-title flex items-center gap-2">
-                <FileText className="h-4 w-4 text-emerald-600" />
-                أحدث فواتير المبيعات
-              </h2>
-              <button onClick={() => onNavigate("invoices")} className="text-sm font-bold text-emerald-700">
-                عرض الكل
-              </button>
+              <h2 className="erp-section-title flex items-center gap-2"><FileText className="h-4 w-4 text-emerald-600" />أحدث فواتير المبيعات</h2>
+              <button onClick={() => onNavigate("invoices")} className="text-sm font-bold text-emerald-700">عرض الكل</button>
             </div>
             <div className="overflow-x-auto">
               <table className="data-table">
-                <thead>
-                  <tr>
-                    <th>رقم الفاتورة</th>
-                    <th>العميل</th>
-                    <th>الإجمالي</th>
-                    <th>الحالة</th>
-                  </tr>
-                </thead>
+                <thead><tr><th>رقم الفاتورة</th><th>العميل</th><th>الإجمالي</th><th>الحالة</th></tr></thead>
                 <tbody>
-                  {(recentInvoices ?? []).slice(0, 5).map(inv => (
-                    <tr key={inv._id}>
-                      <td className="font-mono text-xs text-blue-700">{inv.invoiceNumber}</td>
-                      <td className="font-medium">{inv.customerName}</td>
-                      <td className="font-bold">{formatCurrency(inv.total)}</td>
-                      <td>
-                        <span className={`badge ${inv.status === "paid" ? "badge-success" : inv.status === "partial" ? "badge-warning" : "badge-danger"}`}>
-                          {inv.status === "paid" ? "مدفوعة" : inv.status === "partial" ? "مدفوعة جزئيًا" : "غير مسددة"}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                  {(recentInvoices ?? []).length === 0 && (
-                    <tr>
-                      <td colSpan={4} className="py-8 text-center text-slate-400">لا توجد فواتير مسجلة حتى الآن.</td>
-                    </tr>
-                  )}
+                  {(recentInvoices ?? []).slice(0, 5).map(inv => <tr key={inv._id}><td className="font-mono text-xs text-blue-700">{inv.invoiceNumber}</td><td className="font-medium">{inv.customerName}</td><td className="font-bold">{formatCurrency(inv.total)}</td><td><span className={`badge ${inv.status === "paid" ? "badge-success" : inv.status === "partial" ? "badge-warning" : "badge-danger"}`}>{inv.status === "paid" ? "مدفوعة" : inv.status === "partial" ? "مدفوعة جزئيًا" : "غير مسددة"}</span></td></tr>)}
+                  {(recentInvoices ?? []).length === 0 && <tr><td colSpan={4} className="py-8 text-center text-slate-400">لا توجد فواتير مسجلة حتى الآن.</td></tr>}
                 </tbody>
               </table>
             </div>
@@ -362,51 +310,21 @@ export function Dashboard({ onNavigate, permissions, modules }: DashboardProps) 
         <div className="space-y-4">
           {canViewProducts && (
             <section className="erp-section">
-              <div className="erp-section-header">
-                <h2 className="erp-section-title flex items-center gap-2">
-                  <Boxes className="h-4 w-4 text-amber-600" />
-                  متابعة المخزون
-                </h2>
-                <button onClick={() => onNavigate("products")} className="text-xs font-bold text-emerald-700">
-                  إدارة المخزون
-                </button>
-              </div>
+              <div className="erp-section-header"><h2 className="erp-section-title flex items-center gap-2"><Boxes className="h-4 w-4 text-amber-600" />متابعة المخزون</h2><button onClick={() => onNavigate("products")} className="text-xs font-bold text-emerald-700">إدارة المخزون</button></div>
               <div className="space-y-2 p-4">
-                {(lowStockProducts ?? []).slice(0, 4).map(product => (
-                  <div key={product._id} className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2.5">
-                    <span className="truncate text-sm font-bold text-slate-700">{product.name}</span>
-                    <span className="badge badge-warning">متبقي {product.stock}</span>
-                  </div>
-                ))}
-                {(lowStockProducts ?? []).length === 0 && (
-                  <p className="py-4 text-center text-sm text-slate-400">لا توجد أصناف منخفضة المخزون حاليًا.</p>
-                )}
+                {(lowStockProducts ?? []).slice(0, 4).map(product => <div key={product._id} className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2.5"><span className="truncate text-sm font-bold text-slate-700">{product.name}</span><span className="badge badge-warning">متبقي {product.stock}</span></div>)}
+                {(lowStockProducts ?? []).length === 0 && <p className="py-4 text-center text-sm text-slate-400">لا توجد أصناف منخفضة المخزون حاليًا.</p>}
               </div>
             </section>
           )}
 
           {canViewRepairs && (
             <section className="erp-section">
-              <div className="erp-section-header">
-                <h2 className="erp-section-title flex items-center gap-2">
-                  <Wrench className="h-4 w-4 text-rose-600" />
-                  حالة أوامر الصيانة
-                </h2>
-              </div>
+              <div className="erp-section-header"><h2 className="erp-section-title flex items-center gap-2"><Wrench className="h-4 w-4 text-rose-600" />حالة أوامر الصيانة</h2></div>
               <div className="grid grid-cols-2 gap-3 p-4">
                 {repairStatusCards.map(card => {
                   const Icon = card.icon;
-                  return (
-                    <button
-                      key={card.label}
-                      onClick={() => onNavigate("repairs")}
-                      className="rounded-xl border border-slate-200 bg-white p-3 text-center transition hover:bg-slate-50"
-                    >
-                      <Icon className="mx-auto mb-1 h-4 w-4 text-slate-500" />
-                      <p className="text-xl font-black text-slate-800">{card.value}</p>
-                      <p className="mt-1 text-xs text-slate-500">{card.label}</p>
-                    </button>
-                  );
+                  return <button key={card.label} onClick={() => onNavigate("repairs")} className="rounded-xl border border-slate-200 bg-white p-3 text-center transition hover:bg-slate-50"><Icon className="mx-auto mb-1 h-4 w-4 text-slate-500" /><p className="text-xl font-black text-slate-800">{card.value}</p><p className="mt-1 text-xs text-slate-500">{card.label}</p></button>;
                 })}
               </div>
             </section>
@@ -414,29 +332,8 @@ export function Dashboard({ onNavigate, permissions, modules }: DashboardProps) 
 
           {canViewLeads && (
             <section className="erp-section">
-              <div className="erp-section-header">
-                <h2 className="erp-section-title flex items-center gap-2">
-                  <Target className="h-4 w-4 text-indigo-600" />
-                  العملاء المحتملون
-                </h2>
-                <button onClick={() => onNavigate("crm")} className="text-xs font-bold text-emerald-700">
-                  فتح المتابعة
-                </button>
-              </div>
-              <div className="grid grid-cols-3 gap-3 p-4 text-center">
-                <div className="rounded-xl bg-slate-50 p-3">
-                  <p className="text-xl font-black">{crmStats?.total ?? 0}</p>
-                  <p className="text-xs text-slate-500">الإجمالي</p>
-                </div>
-                <div className="rounded-xl bg-blue-50 p-3">
-                  <p className="text-xl font-black text-blue-700">{crmStats?.new ?? 0}</p>
-                  <p className="text-xs text-slate-500">جدد</p>
-                </div>
-                <div className="rounded-xl bg-emerald-50 p-3">
-                  <p className="text-xl font-black text-emerald-700">{crmStats?.won ?? 0}</p>
-                  <p className="text-xs text-slate-500">تم التعاقد</p>
-                </div>
-              </div>
+              <div className="erp-section-header"><h2 className="erp-section-title flex items-center gap-2"><Target className="h-4 w-4 text-indigo-600" />العملاء المحتملون</h2><button onClick={() => onNavigate("crm")} className="text-xs font-bold text-emerald-700">فتح المتابعة</button></div>
+              <div className="grid grid-cols-3 gap-3 p-4 text-center"><div className="rounded-xl bg-slate-50 p-3"><p className="text-xl font-black">{crmStats?.total ?? 0}</p><p className="text-xs text-slate-500">الإجمالي</p></div><div className="rounded-xl bg-blue-50 p-3"><p className="text-xl font-black text-blue-700">{crmStats?.new ?? 0}</p><p className="text-xs text-slate-500">جدد</p></div><div className="rounded-xl bg-emerald-50 p-3"><p className="text-xl font-black text-emerald-700">{crmStats?.won ?? 0}</p><p className="text-xs text-slate-500">تم التعاقد</p></div></div>
             </section>
           )}
         </div>
