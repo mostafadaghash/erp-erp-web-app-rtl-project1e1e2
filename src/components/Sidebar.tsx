@@ -6,11 +6,9 @@ import {
   Boxes,
   Building2,
   ChevronDown,
-  ChevronUp,
   CircleDollarSign,
   ClipboardList,
   DatabaseBackup,
-  FileText,
   Landmark,
   LayoutDashboard,
   Package,
@@ -76,11 +74,11 @@ const NAV_GROUPS: NavGroup[] = [
     label: "المبيعات",
     icon: ShoppingBag,
     items: [
-      { id: "invoices", label: "فواتير المبيعات", icon: ReceiptText, moduleKey: "invoices", permission: "view_invoices" },
+      { id: "invoices", label: "المبيعات", icon: ReceiptText, moduleKey: "invoices", permission: "view_invoices" },
       { id: "sales-returns", label: "مرتجعات المبيعات", icon: RotateCcw, moduleKey: "invoices", permission: "view_sales_returns" },
       { id: "orders", label: "أوامر البيع", icon: ClipboardList, moduleKey: "orders", permission: "view_orders" },
-      { id: "customers", label: "دليل العملاء", icon: Users, permission: "view_customers" },
-      { id: "crm", label: "علاقات العملاء", icon: Target, moduleKey: "crm", permission: "view_leads" },
+      { id: "customers", label: "العملاء", icon: Users, permission: "view_customers" },
+      { id: "crm", label: "إدارة علاقات العملاء", icon: Target, moduleKey: "crm", permission: "view_leads" },
     ],
   },
   {
@@ -88,22 +86,24 @@ const NAV_GROUPS: NavGroup[] = [
     label: "المشتريات",
     icon: ShoppingBag,
     items: [
-      { id: "shipments", label: "فواتير المشتريات", icon: ShoppingBag, moduleKey: "shipments", permission: "view_shipments" },
+      { id: "shipments", label: "المشتريات", icon: ShoppingBag, moduleKey: "shipments", permission: "view_shipments" },
       { id: "purchase-returns", label: "مرتجعات المشتريات", icon: RotateCcw, permission: "view_purchase_returns" },
-      { id: "suppliers", label: "دليل الموردين", icon: Truck, moduleKey: "suppliers", permission: "view_suppliers" },
+      { id: "suppliers", label: "الموردون", icon: Truck, moduleKey: "suppliers", permission: "view_suppliers" },
     ],
   },
   {
     key: "inventory",
     label: "المخزون",
     icon: Boxes,
-    items: [{ id: "products", label: "دليل الأصناف", icon: Package, permission: "view_products" }],
+    items: [{ id: "products", label: "الأصناف والمخزون", icon: Package, permission: "view_products" }],
   },
   {
     key: "shipping",
-    label: "الشحن",
+    label: "الشحن والتوصيل",
     icon: Truck,
-    items: [{ id: "deliveries", label: "إدارة الشحن", icon: Truck, moduleKey: "deliveries", permission: "view_deliveries" }],
+    items: [
+      { id: "deliveries", label: "عمليات الشحن", icon: Truck, moduleKey: "deliveries", permission: "view_deliveries" },
+    ],
   },
   {
     key: "service",
@@ -116,11 +116,12 @@ const NAV_GROUPS: NavGroup[] = [
     label: "الحسابات",
     icon: Landmark,
     items: [
-      { id: "treasury", label: "الخزينة والبنوك", icon: Landmark, permission: "view_finance" },
+      { id: "accounts-home", label: "نظرة عامة", icon: Landmark, permission: "view_finance" },
+      { id: "treasury", label: "الخزائن والبنوك", icon: Landmark, permission: "view_finance" },
       { id: "customer-ledger", label: "حسابات العملاء", icon: BookOpen, permission: "view_customer_ledger" },
       { id: "supplier-payments", label: "حسابات الموردين", icon: WalletCards, permission: "view_supplier_ledger" },
       { id: "expenses", label: "المصروفات", icon: CircleDollarSign, moduleKey: "expenses", permission: "view_expenses" },
-      { id: "general-ledger", label: "الأستاذ العام", icon: BookOpen, permission: "view_general_ledger" },
+      { id: "general-ledger", label: "المحاسبة العامة", icon: BookOpen, permission: "view_general_ledger" },
     ],
   },
   {
@@ -131,7 +132,7 @@ const NAV_GROUPS: NavGroup[] = [
   },
   {
     key: "administration",
-    label: "إدارة النظام",
+    label: "الإدارة",
     icon: Settings,
     items: [
       { id: "branches", label: "الفروع", icon: Building2, moduleKey: "branches", permission: "view_branches" },
@@ -164,113 +165,119 @@ export function Sidebar({
   modules,
   brand,
 }: SidebarProps) {
-  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  const [openGroup, setOpenGroup] = useState<string | null>(null);
 
   const isModuleEnabled = (moduleKey?: string) =>
     !moduleKey || modules[moduleKey] !== false;
 
-  const groups = NAV_GROUPS.map(group => ({
+  const groups = NAV_GROUPS.map((group) => ({
     ...group,
-    items: group.items.filter(item =>
-      isModuleEnabled(item.moduleKey) &&
-      (!item.permission || permissions.includes(item.permission))),
-  })).filter(group => group.items.length > 0);
+    items: group.items.filter(
+      (item) =>
+        isModuleEnabled(item.moduleKey) &&
+        (!item.permission || permissions.includes(item.permission)),
+    ),
+  })).filter((group) => group.items.length > 0);
+
+  const navigateTo = (page: Page) => {
+    setOpenGroup(null);
+    onNavigate(page);
+  };
 
   return (
-    <aside className="erp-sidebar h-full flex flex-col" aria-label="القائمة الرئيسية">
-      <div className="border-b border-white/10 px-4 py-4">
-        <div className="flex items-center gap-3">
+    <aside className="erp-navigation h-full w-full" aria-label="القائمة الرئيسية">
+      <div className="erp-navigation-inner">
+        <div className="erp-nav-brand">
           <BrandMark
             name={brand.storeName}
             logoUrl={brand.logoUrl}
             primaryColor={brand.primaryColor}
             secondaryColor={brand.secondaryColor}
             size="md"
-            inverse
           />
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-black text-white">{brand.shortName}</p>
-            <p className="mt-0.5 truncate text-[11px] text-slate-400">{brand.tagline}</p>
+          <div className="min-w-0">
+            <p className="max-w-36 truncate text-sm font-black text-slate-900">{brand.shortName}</p>
+            <p className="mt-0.5 hidden max-w-40 truncate text-[10px] text-slate-400 xl:block">{brand.tagline}</p>
           </div>
           <button
             onClick={onClose}
-            className="rounded-xl p-2 text-slate-400 transition hover:bg-white/10 hover:text-white lg:hidden"
+            className="mr-auto rounded-lg p-2 text-slate-500 transition hover:bg-slate-100 lg:hidden"
             aria-label="إغلاق القائمة الرئيسية"
           >
             <X className="h-4 w-4" />
           </button>
         </div>
-      </div>
 
-      <nav aria-label="القائمة الرئيسية" className="erp-sidebar-scroll flex-1 overflow-y-auto px-3 py-3">
-        {groups.map(group => {
-          const isOpen = !collapsed[group.key];
-          const hasActive = group.items.some(item => item.id === currentPage);
-          const GroupIcon = group.icon;
-          return (
-            <section key={group.key} className="mb-1">
-              <button
-                type="button"
-                data-testid={`nav-group-${group.key}`}
-                onClick={() => setCollapsed(value => ({ ...value, [group.key]: !value[group.key] }))}
-                className={`nav-group-button ${hasActive ? "active" : ""}`}
-                aria-expanded={isOpen}
-                aria-label={`قسم ${group.label}`}
-              >
-                <span className="flex items-center gap-2">
-                  <GroupIcon className="h-3.5 w-3.5" />
-                  {group.label}
-                </span>
-                {isOpen ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
-              </button>
+        <nav aria-label="القائمة الرئيسية" className="erp-nav-groups">
+          {groups.map((group) => {
+            const hasActive = group.items.some((item) => item.id === currentPage);
+            const isOpen = openGroup === group.key;
+            const GroupIcon = group.icon;
 
-              {isOpen && (
-                <div className="mt-1 space-y-0.5">
-                  {group.items.map(item => {
-                    const Icon = item.icon;
-                    const isActive = currentPage === item.id;
-                    return (
-                      <button
-                        key={item.id}
-                        type="button"
-                        data-testid={`nav-${item.id}`}
-                        onClick={() => onNavigate(item.id)}
-                        aria-current={isActive ? "page" : undefined}
-                        className={`sidebar-item w-full ${isActive ? "active" : ""}`}
-                      >
-                        <Icon className="h-4 w-4 shrink-0" />
-                        <span className="truncate">{item.label}</span>
-                        {isActive && <span className="mr-auto h-1.5 w-1.5 rounded-full bg-current" />}
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-            </section>
-          );
-        })}
-      </nav>
+            return (
+              <section key={group.key} className="erp-nav-section">
+                <button
+                  type="button"
+                  data-testid={`nav-group-${group.key}`}
+                  onClick={() => setOpenGroup((value) => (value === group.key ? null : group.key))}
+                  className={`erp-nav-group-button ${hasActive ? "active" : ""}`}
+                  aria-expanded={isOpen}
+                  aria-label={`قسم ${group.label}`}
+                >
+                  <span className="flex items-center gap-2">
+                    <GroupIcon className="h-4 w-4" />
+                    {group.label}
+                  </span>
+                  <ChevronDown className={`h-3.5 w-3.5 transition-transform ${isOpen ? "rotate-180" : ""}`} />
+                </button>
 
-      <div className="border-t border-white/10 p-3">
-        <div className="mb-2 flex items-center gap-3 rounded-2xl bg-white/[0.06] px-3 py-2.5">
-          <div
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-sm font-black text-white"
-            style={{ background: `linear-gradient(135deg, ${brand.primaryColor}, ${brand.secondaryColor})` }}
-          >
-            {userName.trim().charAt(0) || "م"}
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-xs font-bold text-white">{userName}</p>
-            <p
-              data-testid="current-user-role"
-              data-user-role={role}
-              className="mt-0.5 truncate text-[11px] text-slate-400"
+                {isOpen && (
+                  <div className="erp-nav-dropdown">
+                    {group.items.map((item) => {
+                      const Icon = item.icon;
+                      const isActive = item.id === currentPage;
+                      return (
+                        <button
+                          key={item.id}
+                          type="button"
+                          data-testid={`nav-${item.id}`}
+                          onClick={() => navigateTo(item.id)}
+                          aria-current={isActive ? "page" : undefined}
+                          className={`erp-nav-item ${isActive ? "active" : ""}`}
+                        >
+                          <Icon className="h-4 w-4 shrink-0" />
+                          <span className="truncate">{item.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </section>
+            );
+          })}
+        </nav>
+
+        <div className="erp-user-panel">
+          <div className="mb-2 flex items-center gap-2 lg:mb-0">
+            <div
+              className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-xs font-black text-white"
+              style={{ background: `linear-gradient(135deg, ${brand.primaryColor}, ${brand.secondaryColor})` }}
             >
-              {ROLE_LABELS[role] ?? role}
-            </p>
+              {userName.trim().charAt(0) || "م"}
+            </div>
+            <div className="min-w-0">
+              <p className="max-w-28 truncate text-xs font-black text-slate-800">{userName}</p>
+              <p
+                data-testid="current-user-role"
+                data-user-role={role}
+                className="mt-0.5 max-w-28 truncate text-[10px] text-slate-500"
+              >
+                {ROLE_LABELS[role] ?? role}
+              </p>
+            </div>
           </div>
+          <SignOutButton />
         </div>
-        <SignOutButton />
       </div>
     </aside>
   );
