@@ -74,7 +74,7 @@ const NAV_GROUPS: NavGroup[] = [
     label: "المبيعات",
     icon: ShoppingBag,
     items: [
-      { id: "invoices", label: "المبيعات", icon: ReceiptText, moduleKey: "invoices", permission: "view_invoices" },
+      { id: "invoices", label: "فواتير المبيعات", icon: ReceiptText, moduleKey: "invoices", permission: "view_invoices" },
       { id: "sales-returns", label: "مرتجعات المبيعات", icon: RotateCcw, moduleKey: "invoices", permission: "view_sales_returns" },
       { id: "orders", label: "أوامر البيع", icon: ClipboardList, moduleKey: "orders", permission: "view_orders" },
       { id: "customers", label: "العملاء", icon: Users, permission: "view_customers" },
@@ -86,7 +86,7 @@ const NAV_GROUPS: NavGroup[] = [
     label: "المشتريات",
     icon: ShoppingBag,
     items: [
-      { id: "shipments", label: "المشتريات", icon: ShoppingBag, moduleKey: "shipments", permission: "view_shipments" },
+      { id: "shipments", label: "فواتير المشتريات", icon: ShoppingBag, moduleKey: "shipments", permission: "view_shipments" },
       { id: "purchase-returns", label: "مرتجعات المشتريات", icon: RotateCcw, permission: "view_purchase_returns" },
       { id: "suppliers", label: "الموردون", icon: Truck, moduleKey: "suppliers", permission: "view_suppliers" },
     ],
@@ -95,14 +95,14 @@ const NAV_GROUPS: NavGroup[] = [
     key: "inventory",
     label: "المخزون",
     icon: Boxes,
-    items: [{ id: "products", label: "الأصناف والمخزون", icon: Package, permission: "view_products" }],
+    items: [{ id: "products", label: "دليل الأصناف", icon: Package, permission: "view_products" }],
   },
   {
     key: "shipping",
-    label: "الشحن والتوصيل",
+    label: "الشحن",
     icon: Truck,
     items: [
-      { id: "deliveries", label: "عمليات الشحن", icon: Truck, moduleKey: "deliveries", permission: "view_deliveries" },
+      { id: "deliveries", label: "إدارة الشحن", icon: Truck, moduleKey: "deliveries", permission: "view_deliveries" },
     ],
   },
   {
