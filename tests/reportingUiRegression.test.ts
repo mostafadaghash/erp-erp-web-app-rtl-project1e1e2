@@ -156,15 +156,13 @@ test("RUI-22 dashboard does not use legacy invoice or expense stats for accounti
 test("RUI-23 dashboard separates sales collections receivables expenses and COD", () => {
   for (const label of [
     "صافي مبيعات الشهر",
-    "صافي تحصيل الشهر",
+    "صافي التحصيل",
     "مستحقات العملاء",
-    "مصروفات ورسوم الشهر",
-    "COD لدى شركات الشحن",
-  ]) {
-    assert.match(dashboard, new RegExp(label));
-  }
-  assert.match(dashboard, /badge: "رصيد حالي"/);
-  assert.match(dashboard, /badge: "هذا الشهر"/);
+    "مصروفات الشهر",
+    "قيد التحصيل لدى شركات الشحن",
+  ]) assert.match(dashboard, new RegExp(label));
+  assert.match(dashboard, /report\.cod\.currentOutstanding/);
+  assert.match(dashboard, /report\.cod\.settled/);
 });
 
 test("RUI-24 dashboard profit card respects permission and completeness", () => {
@@ -174,9 +172,9 @@ test("RUI-24 dashboard profit card respects permission and completeness", () => 
 });
 
 test("RUI-25 dashboard keeps operational lists outside accounting calculations", () => {
-  assert.match(dashboard, /آخر الفواتير/);
-  assert.match(dashboard, /حالة الصيانة/);
-  assert.match(dashboard, /تنبيه المخزون/);
+  assert.match(dashboard, /أحدث فواتير المبيعات/);
+  assert.match(dashboard, /حالة أوامر الصيانة/);
+  assert.match(dashboard, /متابعة المخزون/);
   assert.doesNotMatch(dashboard, /recentInvoices[\s\S]{0,120}\.(?:reduce|filter)\(/);
 });
 
