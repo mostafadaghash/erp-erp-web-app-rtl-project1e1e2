@@ -408,9 +408,16 @@ export async function sidebarNavigationButton(page, label, { required = true } =
 }
 
 export async function navigateSidebar(page, label) {
+  const groupKey = navigationGroupByLabel[label];
+  assert.ok(groupKey, `Missing navigation group mapping for: ${label}`);
   const button = await sidebarNavigationButton(page, label);
   assert.ok(button);
   await button.click();
+  await page.waitForFunction(
+    (key) => document.querySelector(`[data-testid="nav-group-${key}"]`)?.getAttribute("aria-expanded") === "false",
+    groupKey,
+    { timeout: 30_000 },
+  );
 }
 
 async function assertRoleNavigation(page, role) {
