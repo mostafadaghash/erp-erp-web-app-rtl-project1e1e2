@@ -292,7 +292,7 @@ export function DeliveriesPage({ createRequestToken }: { createRequestToken?: nu
     <div dir="rtl" className="space-y-6 p-4 lg:p-6" data-testid="deliveries-page">
       <header className="erp-page-header">
         <div>
-          <div className="erp-page-title"><Truck className="h-6 w-6 text-emerald-600" />إدارة الشحن والتوصيل</div>
+          <h1 className="erp-page-title"><Truck className="h-6 w-6 text-emerald-600" />إدارة الشحن والتوصيل</h1>
           <p className="erp-page-subtitle">متابعة الشحنات من التجهيز وحتى التسليم وتسوية مبالغ التحصيل</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
