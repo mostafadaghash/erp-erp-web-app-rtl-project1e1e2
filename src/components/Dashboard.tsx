@@ -215,10 +215,10 @@ export function Dashboard({ onNavigate, onRequestCreate, permissions, modules }:
     <div className="space-y-6 p-4 lg:p-6">
       <section className="erp-page-header">
         <div>
-          <div className="erp-page-title">
+          <h1 className="erp-page-title">
             <BarChart3 className="h-6 w-6 text-emerald-600" />
             لوحة التحكم
-          </div>
+          </h1>
           <p className="erp-page-subtitle">نظرة واضحة وسريعة على أهم أعمالك اليوم</p>
         </div>
         <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-600 shadow-sm">
