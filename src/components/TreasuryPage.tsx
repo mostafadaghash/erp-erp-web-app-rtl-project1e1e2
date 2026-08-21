@@ -153,7 +153,7 @@ export function TreasuryPage() {
     <div data-testid="treasury-page" className="space-y-6 p-4 lg:p-6" dir="rtl">
       <header className="erp-page-header">
         <div>
-          <div className="erp-page-title"><Landmark className="h-6 w-6 text-emerald-600" />الخزينة والبنوك</div>
+          <h1 className="erp-page-title"><Landmark className="h-6 w-6 text-emerald-600" />الخزينة والبنوك</h1>
           <p className="erp-page-subtitle">إدارة الحسابات النقدية والبنكية والأرصدة والتحويلات بطريقة واضحة ومباشرة</p>
         </div>
         {canManage && branches && (
