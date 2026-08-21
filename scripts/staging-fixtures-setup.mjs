@@ -5,6 +5,7 @@ import { pathToFileURL } from "node:url";
 import dotenv from "dotenv";
 import {
   launchStagingBrowser,
+  navigateSidebar,
   observeRuntimeFailures,
   redactEvidence,
   safeScreenshot,
@@ -114,8 +115,12 @@ async function waitForToast(page, message) {
   }
 }
 
+const professionalNavigationLabel = {
+  "الأصناف": "دليل الأصناف",
+};
+
 async function navigate(page, label, testId) {
-  await page.getByRole("button", { name: label, exact: true }).click();
+  await navigateSidebar(page, professionalNavigationLabel[label] ?? label);
   await page.getByTestId(testId).waitFor({ state: "visible", timeout: 30_000 });
 }
 
