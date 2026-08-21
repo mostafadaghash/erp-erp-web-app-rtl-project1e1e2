@@ -376,20 +376,20 @@ async function createDeliveryCycle(page, fixtures, marker, orderNumber, invoiceN
   await page.getByTestId("delivery-carrier-fee").fill("0");
   await page.getByTestId("delivery-action-date").fill(fixtures.operationDate);
   await page.getByTestId("delivery-action-submit").click();
-  await waitForToast(page, "تم إنشاء عملية الشحن بنجاح");
+  await waitForToast(page, "تم إنشاء الشحنة بنجاح");
   await page.getByTestId("delivery-action-modal").waitFor({ state: "detached" });
   const created = await waitForNewEntity(page, "delivery-row", "data-delivery-number", before);
 
   let row = created.locator;
   await row.getByTestId("delivery-ship-open").click();
   await page.getByTestId("delivery-action-submit").click();
-  await waitForToast(page, "تم تأكيد إرسال الشحنة");
+  await waitForToast(page, "تم تسجيل إرسال الشحنة");
   row = await waitForEntityState(page, "delivery-row", "data-delivery-number", created.value, "data-status", "shipped");
   await row.getByTestId("delivery-confirm-open").click();
   await selectContaining(page.getByTestId("delivery-confirmation-account"), fixtures.codAccountName);
   await page.getByTestId("delivery-action-date").fill(fixtures.operationDate);
   await page.getByTestId("delivery-action-submit").click();
-  await waitForToast(page, "تم تأكيد التسليم وتسجيل تحصيل COD");
+  await waitForToast(page, "تم تسجيل التسليم والتحصيل بنجاح");
   await waitForEntityState(page, "delivery-row", "data-delivery-number", created.value, "data-status", "delivered");
 
   await page.getByTestId("delivery-settlement-open").click();
@@ -400,7 +400,7 @@ async function createDeliveryCycle(page, fixtures, marker, orderNumber, invoiceN
   await selectContaining(page.getByTestId("delivery-settlement-destination"), fixtures.settlementAccountName);
   await page.getByTestId("delivery-action-date").fill(fixtures.operationDate);
   await page.getByTestId("delivery-action-submit").click();
-  await waitForToast(page, "تم إنشاء تسوية COD بنجاح");
+  await waitForToast(page, "تمت تسوية مبالغ التحصيل بنجاح");
   return created.value;
 }
 
