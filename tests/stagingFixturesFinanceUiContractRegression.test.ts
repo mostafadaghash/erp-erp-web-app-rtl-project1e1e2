@@ -16,3 +16,14 @@ test("staging fixture finance setup follows the current custom modal workflow", 
   assert.match(script, /finance-confirm-final/);
   assert.match(script, /تم إنشاء الحساب بنجاح/);
 });
+
+test("staging fixture finance setup waits for the configured branch option before reading branch options", () => {
+  assert.match(
+    script,
+    /const targetBranch = await selectExact\(branchSelect, fixtures\.branchName\);[\s\S]{0,350}const options =/,
+  );
+  assert.doesNotMatch(
+    script,
+    /const matches = options\.filter\(\(option\) => option\.label === fixtures\.branchName\)/,
+  );
+});
