@@ -341,11 +341,9 @@ async function postOpeningBalance(page, row, amount) {
 async function ensureFinance(page, fixtures) {
   await navigate(page, "الخزائن والبنوك", "treasury-page");
   const branchSelect = page.getByTestId("finance-account-branch");
-  await branchSelect.waitFor({ state: "visible", timeout: 30_000 });
+  const targetBranch = await selectExact(branchSelect, fixtures.branchName);
   const options = (await branchSelect.locator("option").evaluateAll((rows) => rows.map((row) => ({ value: row.value, label: row.textContent?.trim() ?? "" })))).filter((option) => option.value);
-  const matches = options.filter((option) => option.label === fixtures.branchName);
-  assert.equal(matches.length, 1, `Fixture branch must match exactly one active branch: ${fixtures.branchName}`);
-  const targetBranch = matches[0];
+  assert.ok(options.length > 0, "Finance branch options did not load after resolving the fixture branch");
   await page.waitForFunction(
     () => {
       const marker = document.querySelector('[data-testid="finance-initialization"]');
