@@ -3,6 +3,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import {
   launchStagingBrowser,
+  navigateSidebar,
   observeRuntimeFailures,
   redactEvidence,
   safeScreenshot,
@@ -224,8 +225,14 @@ async function waitForToast(page, message) {
   return toast.innerText();
 }
 
+const professionalNavigationLabel = {
+  "المبيعات": "فواتير المبيعات",
+  "عمليات الشحن": "إدارة الشحن",
+  "المشتريات": "فواتير المشتريات",
+};
+
 async function navigate(page, label, testId) {
-  await page.getByRole("button", { name: label, exact: true }).click();
+  await navigateSidebar(page, professionalNavigationLabel[label] ?? label);
   await page.getByTestId(testId).waitFor({ state: "visible", timeout: 30_000 });
 }
 
