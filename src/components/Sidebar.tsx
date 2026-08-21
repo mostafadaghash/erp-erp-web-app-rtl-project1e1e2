@@ -180,7 +180,6 @@ export function Sidebar({
   })).filter((group) => group.items.length > 0);
 
   const navigateTo = (page: Page) => {
-    setOpenGroup(null);
     onNavigate(page);
   };
 
