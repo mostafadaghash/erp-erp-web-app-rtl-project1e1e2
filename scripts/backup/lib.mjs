@@ -5,6 +5,17 @@ import { basename, dirname, resolve } from "node:path";
 
 export const BACKUP_MANIFEST_VERSION = 1;
 export const ENVIRONMENTS = new Set(["development", "staging", "production"]);
+export const RESTORE_DRILL_CHECKS = [
+  "importCompleted",
+  "authentication",
+  "dataCounts",
+  "inventory",
+  "financialAccounts",
+  "customerLedger",
+  "supplierLedger",
+  "criticalWrites",
+  "securityHeaders",
+];
 
 export function normalizeDeployment(value) {
   const deployment = String(value ?? "").trim();
@@ -144,4 +155,41 @@ export function assertPreRestoreBackup({ targetDeployment, targetEnvironment, pr
 
 export function redactCommand(args) {
   return ["npx", ...args].map((part) => /\s/.test(part) ? JSON.stringify(part) : part).join(" ");
+}
+
+export function validateRestoreDrillEvidence({ evidence, sourceManifest, preRestoreManifest }) {
+  if (!evidence || typeof evidence !== "object") throw new Error("restore drill evidence must be an object");
+  if (evidence.schemaVersion !== 1) throw new Error("unsupported restore drill evidence schemaVersion");
+  if (normalizeEnvironment(evidence.environment) !== "staging") throw new Error("restore drill evidence must target staging");
+  const targetDeployment = normalizeDeployment(evidence.targetDeployment);
+  const sourceDeployment = normalizeDeployment(evidence.sourceDeployment);
+  if (targetDeployment === sourceDeployment) throw new Error("restore drill target must be isolated from the source deployment");
+  if (sourceDeployment !== normalizeDeployment(sourceManifest.deployment)) throw new Error("restore drill source deployment mismatch");
+  assertPreRestoreBackup({ targetDeployment, targetEnvironment: "staging", preRestoreManifest });
+  if (evidence.sourceSnapshotSha256 !== sourceManifest.sha256) throw new Error("restore drill source SHA-256 mismatch");
+  if (evidence.preRestoreSnapshotSha256 !== preRestoreManifest.sha256) throw new Error("restore drill pre-restore SHA-256 mismatch");
+  if (!sourceManifest.includeFileStorage) throw new Error("restore drill source must include file storage");
+  if (!/^[a-f0-9]{40}$/.test(String(evidence.releaseCommit ?? ""))) throw new Error("restore drill releaseCommit must be a full Git SHA");
+  if (sourceManifest.sourceCommit && sourceManifest.sourceCommit !== evidence.releaseCommit) throw new Error("restore drill release commit does not match source manifest");
+
+  const sourceCreatedAt = Date.parse(sourceManifest.createdAt);
+  const startedAt = Date.parse(evidence.startedAt);
+  const completedAt = Date.parse(evidence.completedAt);
+  if (![sourceCreatedAt, startedAt, completedAt].every(Number.isFinite)) throw new Error("restore drill timestamps are invalid");
+  if (startedAt < sourceCreatedAt) throw new Error("restore drill started before the recovery point was created");
+  if (completedAt <= startedAt) throw new Error("restore drill completedAt must follow startedAt");
+  const observedRpoHours = (startedAt - sourceCreatedAt) / 3_600_000;
+  const observedRtoMinutes = (completedAt - startedAt) / 60_000;
+  if (observedRpoHours > 24) throw new Error(`restore drill RPO ${observedRpoHours.toFixed(2)}h exceeds 24h`);
+  if (observedRtoMinutes > 240) throw new Error(`restore drill RTO ${observedRtoMinutes.toFixed(2)}m exceeds 240m`);
+
+  if (!evidence.checks || typeof evidence.checks !== "object") throw new Error("restore drill checks are required");
+  for (const check of RESTORE_DRILL_CHECKS) {
+    if (evidence.checks[check] !== true) throw new Error(`restore drill check is not PASS: ${check}`);
+  }
+  if (!String(evidence.operator ?? "").trim()) throw new Error("restore drill operator is required");
+  if (!Array.isArray(evidence.evidenceRefs) || evidence.evidenceRefs.length === 0 || evidence.evidenceRefs.some((value) => !String(value).trim())) {
+    throw new Error("restore drill evidenceRefs must contain at least one reference");
+  }
+  return { targetDeployment, sourceDeployment, observedRpoHours, observedRtoMinutes };
 }

@@ -13,7 +13,7 @@ This toolkit prepares legacy ERP data for a controlled cutover into the current 
 
 ## Input contract
 
-Use JSON with `schemaVersion: 1`, `sourceSystem`, `cutoverDate`, and these arrays:
+Use JSON with `schemaVersion: 2`, `sourceSystem`, `cutoverDate`, and these arrays:
 
 - `branches`
 - `customers`
@@ -49,11 +49,11 @@ Required: `legacyId`, `name`, `phone`.
 
 ### Products
 
-Required: `legacyId`, `sku`, `name`, `stock`, `costPrice`, `sellPrice`.
+Required: `legacyId`, `branchCode`, `sku`, `name`, `stock`, `costPrice`, `sellPrice`.
 
 Optional fields include `inventoryValue`, `supplierLegacyId`, `category`, `barcode`, `minStock`, and `unit`.
 
-When `inventoryValue` is omitted, the dry-run derives it as `stock × costPrice`. This is only a migration preparation convenience; the source control total should still be supplied and reconciled before cutover.
+`branchCode` is mandatory for every product and is reconciled after the write; the executor never guesses a default branch. When `inventoryValue` is omitted, the dry-run derives it as `stock × costPrice`. This is only a migration preparation convenience; the source control total should still be supplied and reconciled before cutover.
 
 ### Financial accounts
 
@@ -61,7 +61,7 @@ Required: `legacyId`, `branchCode`, `code`, `name`, `type`, `balance`.
 
 Supported types match the current finance schema: `cash`, `instapay`, `vodafone_cash`, `fawry_clearing`, `paymob_clearing`, `card_clearing`, `cod_clearing`, `bank`, and `other`.
 
-A negative opening balance requires `allowNegative: true`.
+Opening balances must be non-negative. `allowNegative` controls future operations only; it does not permit importing an unsupported negative opening.
 
 ### COD
 

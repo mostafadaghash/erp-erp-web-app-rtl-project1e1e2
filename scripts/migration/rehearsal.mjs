@@ -166,7 +166,10 @@ const reconciliationResult = runConvex("migrationRehearsal:reconcile", {
   fingerprint: manifest.fingerprint,
   controls,
   expectedCounts,
-  expectedSkus: accepted.products.map((row) => row.sku),
+  expectedProductBindings: accepted.products.map((row) => ({
+    sku: row.sku,
+    branchCode: row.branchCode,
+  })),
 }, deployment);
 
 const evidenceDir = resolve("test-results/migration-rehearsal");

@@ -155,4 +155,6 @@ Any NO-GO blocks Production.
 - [ ] Record final Production commit, deployment identifiers, migration fingerprint and backup SHA-256.
 - [ ] Record launch decision and any accepted residual risks.
 
+Complete and validate the final evidence record using `docs/RELEASE_EVIDENCE.md`. Run the controlled Production checks in `docs/PRODUCTION_SMOKE_TEST.md` immediately after deployment.
+
 The candidate becomes eligible for a real `v1.0.0-rc1` release/tag only after sections B–K have live evidence. Production deployment requires section L and immediate post-launch verification.

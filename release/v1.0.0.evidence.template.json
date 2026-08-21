@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "version": "v1.0.0-rc1",
+  "generatedAt": "",
+  "releaseCommit": "",
+  "productionEligible": false,
+  "decision": "NO-GO",
+  "environments": {
+    "stagingFrontend": "https://mostafa-daghash-erp-staging.pages.dev",
+    "stagingConvex": "academic-puma-235",
+    "migrationRehearsal": "bright-shepherd-116",
+    "productionFrontend": "https://business-tech-erp.pages.dev",
+    "productionConvex": "brave-dachshund-76"
+  },
+  "migrationFingerprint": "",
+  "gates": {
+    "repositoryCi": { "status": "PENDING", "evidence": [] },
+    "stagingE2e": { "status": "PENDING", "evidence": [] },
+    "performance": { "status": "PENDING", "evidence": [] },
+    "security": { "status": "PENDING", "evidence": [] },
+    "migration": { "status": "PENDING", "evidence": [] },
+    "backupRestore": { "status": "PENDING", "evidence": [] },
+    "humanUat": { "status": "PENDING", "evidence": [] },
+    "printing": { "status": "PENDING", "evidence": [] },
+    "monitoring": { "status": "PENDING", "evidence": [] }
+  },
+  "rollback": {
+    "commit": "",
+    "backupSha256": ""
+  },
+  "approvals": {
+    "technicalOwner": { "name": "", "decision": "NO-GO", "approvedAt": "" },
+    "businessOwner": { "name": "", "decision": "NO-GO", "approvedAt": "" }
+  },
+  "notes": "Do not change decision or productionEligible until every gate has real evidence."
+}

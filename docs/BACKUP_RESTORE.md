@@ -159,6 +159,17 @@ A successful CLI exit is not sufficient. Complete all of the following before re
 5. Confirm finance/customer/supplier/general-ledger opening and operational balances remain internally consistent.
 6. Verify critical document reads and one controlled write flow in each enabled module.
 7. Verify login/logout and required security headers on the restored deployment.
+
+Copy `release/restore-drill.evidence.template.json`, fill it only from observed results, and validate the completed drill together with both verified manifests:
+
+```bash
+npm run restore:verify -- \
+  --evidence test-results/restore/restore-drill.json \
+  --source-manifest backups/staging-source.zip.manifest.json \
+  --pre-restore-manifest backups/staging-pre-restore.zip.manifest.json
+```
+
+The verifier refuses a same-deployment drill, a backup without File Storage, a failed mandatory check, RPO above 24 hours, or RTO above 4 hours.
 8. Record actual recovery duration and the newest transaction timestamp represented by the recovery point.
 
 Only then mark the recovery drill successful.

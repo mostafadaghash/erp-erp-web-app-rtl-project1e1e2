@@ -17,6 +17,9 @@ test("migration rehearsal executor is CLI-internal and deployment-gated", () => 
   }
   assert.match(backend, /Migration rehearsal target is not empty/);
   assert.match(backend, /Migration run and fingerprint do not match/);
+  assert.match(backend, /expectedProductBindings/);
+  assert.match(backend, /productBranchMapping/);
+  assert.doesNotMatch(backend, /Parameters<typeof apply\.handler>/);
 });
 
 test("migration rehearsal runner verifies package and refuses permanent deployments", () => {
@@ -27,6 +30,7 @@ test("migration rehearsal runner verifies package and refuses permanent deployme
   assert.match(runner, /migrationRehearsal:apply/);
   assert.match(runner, /migrationRehearsal:reconcile/);
   assert.match(runner, /reconciliationResult\.passed/);
+  assert.match(runner, /expectedProductBindings/);
   for (const deployment of ["brave-dachshund-76", "academic-puma-235", "courteous-dotterel-331"]) {
     assert.match(runner, new RegExp(deployment));
   }

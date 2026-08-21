@@ -1,6 +1,7 @@
 import { internalMutation, internalQuery } from "./_generated/server";
+import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { ConvexError, v } from "convex/values";
-import type { Id } from "./_generated/dataModel";
+import type { Doc, Id } from "./_generated/dataModel";
 import type { AuthUser } from "./lib/auth.ts";
 import { logAction } from "./lib/auth.ts";
 import { changeProductStock } from "./lib/inventory.ts";
@@ -45,7 +46,7 @@ const supplierRow = v.object({
   balances: v.array(v.object({ branchCode: v.string(), balance: v.number() })),
 });
 const productRow = v.object({
-  legacyId: v.string(), sku: v.string(), barcode: v.optional(v.string()), name: v.string(),
+  legacyId: v.string(), branchCode: v.string(), sku: v.string(), barcode: v.optional(v.string()), name: v.string(),
   supplierLegacyId: v.optional(v.string()), category: v.optional(v.string()), stock: v.number(),
   minStock: v.number(), costPrice: v.number(), sellPrice: v.number(), inventoryValue: v.number(),
   unit: v.string(), isActive: v.boolean(),
@@ -68,6 +69,7 @@ const countsValidator = v.object({
   branches: v.number(), customers: v.number(), suppliers: v.number(), products: v.number(),
   financialAccounts: v.number(), codWithCarriers: v.number(),
 });
+const productBindingValidator = v.object({ sku: v.string(), branchCode: v.string() });
 
 function assertRehearsalEnvironment(targetDeployment: string) {
   const configuredDeployment = process.env.MIGRATION_REHEARSAL_DEPLOYMENT?.trim();
@@ -96,14 +98,17 @@ function migrationUserId(migrationRunId: string) {
   return `migration-rehearsal:${migrationRunId}`;
 }
 
-async function existingRun(ctx: Parameters<typeof apply.handler>[0] extends never ? never : any, migrationRunId: string) {
+async function existingRun(
+  ctx: QueryCtx | MutationCtx,
+  migrationRunId: string,
+): Promise<Doc<"auditLogs"> | null> {
   const logs = await ctx.db.query("auditLogs")
-    .withIndex("by_module_action", (q: any) => q.eq("module", "migration_rehearsal").eq("action", "complete"))
+    .withIndex("by_module_action", (q) => q.eq("module", "migration_rehearsal").eq("action", "complete"))
     .collect();
-  return logs.find((log: any) => log.recordId === migrationRunId) ?? null;
+  return logs.find((log) => log.recordId === migrationRunId) ?? null;
 }
 
-async function assertCleanTarget(ctx: any) {
+async function assertCleanTarget(ctx: MutationCtx): Promise<void> {
   const checks = await Promise.all([
     ctx.db.query("branches").first(),
     ctx.db.query("customers").first(),
@@ -146,10 +151,6 @@ export const apply = internalMutation({
     await assertCleanTarget(ctx);
 
     if (args.accepted.branches.length === 0) throw new ConvexError("At least one branch is required");
-    if (args.accepted.branches.length > 1 && args.accepted.products.length > 0) {
-      throw new ConvexError("Current migration schema lacks product branchCode; multi-branch product rehearsal is blocked until the package contract is upgraded");
-    }
-
     const now = Date.now();
     const operatorId = migrationUserId(args.migrationRunId);
     const employeeId = await ctx.db.insert("userProfiles", {
@@ -172,7 +173,7 @@ export const apply = internalMutation({
     for (const row of args.accepted.branches) {
       if (branchByCode.has(row.code)) throw new ConvexError(`Duplicate branch code: ${row.code}`);
       const id = await ctx.db.insert("branches", {
-        name: row.name, address: row.address, phone: row.phone, isActive: row.isActive,
+        code: row.code, name: row.name, address: row.address, phone: row.phone, isActive: row.isActive,
       });
       branchByCode.set(row.code, id);
     }
@@ -209,10 +210,10 @@ export const apply = internalMutation({
 
     const categoryByName = new Map<string, Id<"categories">>();
     const productSkus = new Set<string>();
-    const defaultProductBranchId = branchByCode.values().next().value as Id<"branches"> | undefined;
-    if (args.accepted.products.length > 0 && !defaultProductBranchId) throw new ConvexError("Product branch is unavailable");
     for (const row of args.accepted.products) {
       if (productSkus.has(row.sku)) throw new ConvexError(`Duplicate product SKU: ${row.sku}`);
+      const productBranchId = branchByCode.get(row.branchCode);
+      if (!productBranchId) throw new ConvexError(`Unknown product branchCode: ${row.branchCode}`);
       if (!Number.isInteger(row.stock) || row.stock < 0 || !Number.isInteger(row.minStock) || row.minStock < 0) throw new ConvexError("Invalid product stock values");
       assertMoney(row.inventoryValue, "product inventory value");
       if (!Number.isFinite(row.costPrice) || row.costPrice < 0 || !Number.isFinite(row.sellPrice) || row.sellPrice < 0) throw new ConvexError("Invalid product prices");
@@ -230,7 +231,7 @@ export const apply = internalMutation({
       const id = await ctx.db.insert("products", {
         name: row.name, sku: row.sku, barcode: row.barcode, categoryId, supplierId,
         costPrice: row.costPrice, inventoryValue: 0, sellPrice: row.sellPrice, stock: 0, minStock: row.minStock,
-        unit: row.unit, branchId: defaultProductBranchId, isActive: row.isActive,
+        unit: row.unit, branchId: productBranchId, isActive: row.isActive,
       });
       if (row.stock > 0) {
         await changeProductStock(ctx, user, {
@@ -428,7 +429,7 @@ export const apply = internalMutation({
         suppliers: args.accepted.suppliers.length,
         products: args.accepted.products.length,
         financialAccounts: args.accepted.financialAccounts.length,
-        codWithCarriers: args.accepted.cod.filter((row) => row.status === "with_carrier").length,
+        codWithCarriers: args.accepted.cod.filter((row) => row.status === "with_carrier" && row.amount > 0).length,
       },
     };
   },
@@ -437,7 +438,8 @@ export const apply = internalMutation({
 export const reconcile = internalQuery({
   args: {
     targetDeployment: v.string(), migrationRunId: v.string(), fingerprint: v.string(),
-    controls: controlsValidator, expectedCounts: countsValidator, expectedSkus: v.array(v.string()),
+    controls: controlsValidator, expectedCounts: countsValidator,
+    expectedProductBindings: v.array(productBindingValidator),
   },
   handler: async (ctx, args) => {
     assertRehearsalEnvironment(args.targetDeployment);
@@ -485,10 +487,19 @@ export const reconcile = internalQuery({
       const value = actualCounts[metric as keyof typeof actualCounts];
       if (value !== expected) differences.push({ metric: `count:${metric}`, expected, actual: value });
     }
-    const actualSkus = products.map((product) => product.sku).sort();
-    const expectedSkus = [...args.expectedSkus].sort();
-    if (JSON.stringify(actualSkus) !== JSON.stringify(expectedSkus)) {
-      differences.push({ metric: "skuMapping", expected: expectedSkus.join(","), actual: actualSkus.join(",") });
+    const branchCodeById = new Map(branches.map((branch) => [String(branch._id), branch.code ?? "MISSING"]));
+    const actualProductBindings = products
+      .map((product) => `${product.sku}|${product.branchId ? branchCodeById.get(String(product.branchId)) ?? "MISSING" : "MISSING"}`)
+      .sort();
+    const expectedProductBindings = args.expectedProductBindings
+      .map((binding) => `${binding.sku}|${binding.branchCode}`)
+      .sort();
+    if (JSON.stringify(actualProductBindings) !== JSON.stringify(expectedProductBindings)) {
+      differences.push({
+        metric: "productBranchMapping",
+        expected: expectedProductBindings.join(","),
+        actual: actualProductBindings.join(","),
+      });
     }
     if (!financeSettings?.isInitialized) differences.push({ metric: "financeInitialized", expected: "true", actual: "false" });
 
