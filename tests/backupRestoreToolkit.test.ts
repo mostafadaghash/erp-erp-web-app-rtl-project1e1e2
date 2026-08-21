@@ -168,3 +168,10 @@ test("restore drill evidence proves isolated recovery, mandatory checks, RPO and
     /isolated/,
   );
 });
+
+test("restore drill runbook targets a deployment isolated from source Staging", async () => {
+  const runbook = await readFile("docs/BACKUP_RESTORE.md", "utf8");
+  assert.match(runbook, /--deployment restore-drill/);
+  assert.match(runbook, /restore-drill-pre-restore\.zip\.manifest\.json/);
+  assert.doesNotMatch(runbook, /restore:execute -- \\\n+  --deployment staging/);
+});

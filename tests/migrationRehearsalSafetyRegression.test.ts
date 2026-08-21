@@ -48,3 +48,14 @@ test("package exposes a single guarded rehearsal command", () => {
   const pkg = JSON.parse(read("package.json"));
   assert.equal(pkg.scripts["migration:rehearsal"], "node scripts/migration/rehearsal.mjs");
 });
+
+test("cutover documentation routes writes only to the isolated rehearsal deployment", () => {
+  const cutover = read("docs/MIGRATION_CUTOVER.md");
+  const checklist = read("docs/RELEASE_CHECKLIST.md");
+  assert.match(cutover, /--deployment bright-shepherd-116/);
+  assert.match(cutover, /MIGRATION_REHEARSAL_ENABLED=isolated-migration-rehearsal-only/);
+  assert.match(cutover, /temporary rehearsal deployment only/);
+  assert.doesNotMatch(cutover, /executor is intentionally not part/);
+  assert.match(checklist, /isolated from Development, Staging, and Production/);
+  assert.doesNotMatch(checklist, /Apply the controlled migration procedure to Staging/);
+});

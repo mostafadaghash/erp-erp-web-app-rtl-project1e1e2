@@ -135,9 +135,9 @@ If source data, cutover date and normalization result do not change:
 
 If any accepted business data changes, the fingerprint changes and the operator must treat it as a new migration package. This prevents accidentally mixing reconciliation evidence from two source snapshots.
 
-## Cutover order on Staging
+## Controlled rehearsal on an isolated deployment
 
-The generated `apply-plan.json` orders the live phase as follows:
+The generated `apply-plan.json` orders the controlled rehearsal as follows:
 
 1. Create/resolve branches.
 2. Create/resolve supplier masters.
@@ -148,7 +148,25 @@ The generated `apply-plan.json` orders the live phase as follows:
 7. Post supplier ledger openings.
 8. Reconcile COD carrier receivables before activation.
 
-The live executor is intentionally not part of this write-disabled repository phase. It must be connected to the actual Staging deployment and should call controlled application APIs rather than bulk-importing ledger tables.
+The repository includes a guarded executor for the temporary rehearsal deployment only. It uses internal Convex functions and the normal inventory, finance, customer-ledger, and supplier-ledger posting paths rather than writing ledger tables directly.
+
+Before running it:
+
+1. Deploy the candidate schema/functions to a clean temporary deployment that is not Development, Staging, or Production.
+2. Set `MIGRATION_REHEARSAL_ENABLED=isolated-migration-rehearsal-only` and `MIGRATION_REHEARSAL_DEPLOYMENT=<temporary-deployment>` on that Convex deployment.
+3. Create ignored `.env.migration-rehearsal.local` with matching `CONVEX_DEPLOYMENT=dev:<temporary-deployment>` and `VITE_CONVEX_URL=https://<temporary-deployment>.convex.cloud` values.
+4. Verify that the prepared package has zero rejected rows and zero supplied control differences.
+
+Run the repository rehearsal deployment with an exact target confirmation:
+
+```bash
+npm run migration:rehearsal -- \
+  --package migration/output/cutover-01 \
+  --deployment bright-shepherd-116 \
+  --confirm bright-shepherd-116
+```
+
+The runner refuses every protected permanent deployment, verifies the package before writing, requires an empty target, applies the package atomically, and writes post-apply reconciliation evidence under `test-results/migration-rehearsal/`. Repeating the same `migrationRunId` and fingerprint is idempotent; a different package cannot be mixed with prior run evidence.
 
 ## Required reconciliation before accepting Staging migration
 
@@ -172,7 +190,7 @@ This toolkit does not claim to execute migration against a real database. The fo
 - transform Excel/CSV source files into the JSON contract when their exact columns are known;
 - run dry-run and resolve all rejected rows/differences;
 - back up the target Staging deployment;
-- run the controlled write adapter against Staging;
-- run post-write reconciliation queries;
-- repeat from a restored clean Staging copy to prove rerun behavior;
+- run the guarded rehearsal command against the isolated temporary deployment;
+- retain the generated post-write reconciliation evidence;
+- reset or replace the isolated deployment and repeat the rehearsal to prove rerun behavior;
 - only after UAT sign-off, repeat the same frozen package and fingerprint during Production cutover.

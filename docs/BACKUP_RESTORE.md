@@ -98,7 +98,7 @@ A restore plan verifies the source package and prints the exact target/command w
 
 ```bash
 npm run restore:plan -- \
-  --deployment staging \
+  --deployment restore-drill \
   --environment staging \
   --snapshot-manifest backups/known-good.zip.manifest.json
 ```
@@ -111,15 +111,15 @@ Immediately before executing a destructive restore, create a new backup of the t
 
 ```bash
 npm run backup:create -- \
-  --deployment staging \
+  --deployment restore-drill \
   --environment staging \
-  --output backups/staging-pre-restore.zip
+  --output backups/restore-drill-pre-restore.zip
 ```
 
 Verify it:
 
 ```bash
-npm run backup:verify -- backups/staging-pre-restore.zip.manifest.json
+npm run backup:verify -- backups/restore-drill-pre-restore.zip.manifest.json
 ```
 
 This snapshot is the escape path if the chosen recovery point was wrong or the incident analysis changes after restoration begins.
@@ -128,10 +128,10 @@ This snapshot is the escape path if the chosen recovery point was wrong or the i
 
 ```bash
 npm run restore:execute -- \
-  --deployment staging \
+  --deployment restore-drill \
   --environment staging \
   --snapshot-manifest backups/known-good.zip.manifest.json \
-  --pre-restore-manifest backups/staging-pre-restore.zip.manifest.json
+  --pre-restore-manifest backups/restore-drill-pre-restore.zip.manifest.json
 ```
 
 After the CLI finishes, the environment must remain closed to normal users until the post-restore checks below pass.
@@ -166,7 +166,7 @@ Copy `release/restore-drill.evidence.template.json`, fill it only from observed 
 npm run restore:verify -- \
   --evidence test-results/restore/restore-drill.json \
   --source-manifest backups/staging-source.zip.manifest.json \
-  --pre-restore-manifest backups/staging-pre-restore.zip.manifest.json
+  --pre-restore-manifest backups/restore-drill-pre-restore.zip.manifest.json
 ```
 
 The verifier refuses a same-deployment drill, a backup without File Storage, a failed mandatory check, RPO above 24 hours, or RTO above 4 hours.

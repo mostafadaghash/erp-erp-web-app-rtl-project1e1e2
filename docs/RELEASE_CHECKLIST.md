@@ -76,10 +76,10 @@ Before accepting any release candidate commit:
 - [ ] Resolve every rejected source row or document its approved exclusion.
 - [ ] Resolve every supplied control-total difference.
 - [ ] Record the immutable migration fingerprint and `migrationRunId`.
-- [ ] Back up the clean Staging target.
-- [ ] Apply the controlled migration procedure to Staging.
+- [ ] Confirm the dedicated temporary rehearsal deployment is clean and isolated from Development, Staging, and Production.
+- [ ] Apply the guarded migration procedure only to that temporary rehearsal deployment.
 - [ ] Complete `docs/MIGRATION_RECONCILIATION.md` after the write.
-- [ ] Restore a clean Staging copy and repeat the rehearsal to prove rerun behavior.
+- [ ] Reset or replace the isolated rehearsal deployment and repeat the rehearsal to prove rerun behavior.
 
 ## H. Backup / restore drill
 
