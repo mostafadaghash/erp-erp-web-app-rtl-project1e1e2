@@ -11,7 +11,7 @@ import { roundMoney } from "../../shared/businessRules.ts";
 function hasAtMostTwoDecimals(value: number): boolean { return Number.isFinite(value) && Math.abs(value * 100 - Math.round(value * 100)) < 1e-7; }
 
 export const SUPPLIER_LEDGER_TYPES = ["opening_balance", "purchase_receipt", "purchase_return", "supplier_payment", "supplier_refund", "adjustment", "reversal"] as const;
-type PostingType = "purchase_receipt" | "purchase_return" | "supplier_refund" | "supplier_payment" | "reversal";
+type PostingType = "opening_balance" | "purchase_receipt" | "purchase_return" | "supplier_refund" | "supplier_payment" | "reversal";
 
 export async function postSupplierBalanceMovement(ctx: MutationCtx, user: AuthUser, input: {
   type: PostingType; requestId: string; supplierId: Id<"suppliers">; branchId: Id<"branches">; date: string; amountDelta: number;
@@ -23,8 +23,10 @@ export async function postSupplierBalanceMovement(ctx: MutationCtx, user: AuthUs
   if (!requestId || requestId.length > 200) throw new ConvexError("معرف طلب حركة المورد غير صالح");
   if (!Number.isFinite(input.amountDelta) || !hasAtMostTwoDecimals(input.amountDelta)) throw new ConvexError("قيمة حركة المورد يجب أن تكون مقربة إلى منزلتين");
   const amountDelta = roundMoney(input.amountDelta);
+  if (input.type === "opening_balance" && amountDelta < 0) throw new ConvexError("الرصيد الافتتاحي للمورد لا يمكن أن يكون سالباً");
   if (((input.type === "purchase_receipt" || input.type === "supplier_refund") && amountDelta <= 0) || ((input.type === "supplier_payment" || input.type === "purchase_return") && amountDelta >= 0) || (input.type === "reversal" && amountDelta === 0)) throw new ConvexError("اتجاه حركة المورد لا يتوافق مع نوعها");
-  await requireFinanceInitialized(ctx, input.date);
+  const financeSettings = await requireFinanceInitialized(ctx, input.date);
+  if (input.type === "opening_balance" && input.date !== financeSettings.cutoverDate) throw new ConvexError("تاريخ الرصيد الافتتاحي للمورد يجب أن يساوي تاريخ القطع المالي");
   const supplier = await requireActiveSupplier(ctx, input.supplierId);
   await requireActiveBranch(ctx, input.branchId);
   const idempotencyKey = `${input.type}:${user.userId}:${requestId}`;
@@ -35,6 +37,10 @@ export async function postSupplierBalanceMovement(ctx: MutationCtx, user: AuthUs
   }
   const key = `${input.supplierId}:${input.branchId}`;
   const balanceRow = await ctx.db.query("supplierBalances").withIndex("by_key", q => q.eq("key", key)).unique();
+  if (input.type === "opening_balance") {
+    const existingEntry = await ctx.db.query("supplierLedgerEntries").withIndex("by_supplier_branch_date", q => q.eq("supplierId", input.supplierId).eq("branchId", input.branchId)).first();
+    if (existingEntry || (balanceRow && balanceRow.balance !== 0)) throw new ConvexError("سبق تسجيل رصيد أو حركة تشغيلية لهذا المورد في الفرع");
+  }
   const balanceBefore = roundMoney(balanceRow?.balance ?? 0), balanceAfter = roundMoney(balanceBefore + amountDelta);
   if (balanceAfter < 0) throw new ConvexError("رصيد المورد لا يكفي لتسجيل الدفعة");
   const now = Date.now();
@@ -72,6 +78,24 @@ export async function postSupplierBalanceMovement(ctx: MutationCtx, user: AuthUs
   const entry = await ctx.db.get(id);
   if (!entry) throw new ConvexError("تعذر إنشاء حركة المورد");
   return entry;
+}
+
+export async function initializeSupplierBalance(ctx: MutationCtx, user: AuthUser, input: {
+  requestId: string; supplierId: Id<"suppliers">; branchId: Id<"branches">; date: string; balance: number; notes?: string;
+}) {
+  if (!hasAtMostTwoDecimals(input.balance) || input.balance < 0) throw new ConvexError("الرصيد الافتتاحي للمورد يجب أن يكون غير سالب ودقيقاً إلى قرشين");
+  return await postSupplierBalanceMovement(ctx, user, {
+    type: "opening_balance",
+    requestId: input.requestId,
+    supplierId: input.supplierId,
+    branchId: input.branchId,
+    date: input.date,
+    amountDelta: input.balance,
+    referenceType: "supplier",
+    referenceId: String(input.supplierId),
+    referenceNumber: "OPENING",
+    description: input.notes?.trim() || "الرصيد الافتتاحي للمورد",
+  });
 }
 
 export async function postSupplierLedgerEntry(ctx: MutationCtx, user: AuthUser, input: {
