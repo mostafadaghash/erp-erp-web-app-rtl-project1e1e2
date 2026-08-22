@@ -146,6 +146,7 @@ test("restore drill evidence proves isolated recovery, mandatory checks, RPO and
     checks: {
       importCompleted: true,
       authentication: true,
+      environmentConfiguration: true,
       dataCounts: true,
       inventory: true,
       financialAccounts: true,
@@ -164,6 +165,17 @@ test("restore drill evidence proves isolated recovery, mandatory checks, RPO and
     /inventory/,
   );
   assert.throws(
+    () => validateRestoreDrillEvidence({
+      evidence: {
+        ...evidence,
+        checks: { ...evidence.checks, environmentConfiguration: false },
+      },
+      sourceManifest,
+      preRestoreManifest,
+    }),
+    /environmentConfiguration/,
+  );
+  assert.throws(
     () => validateRestoreDrillEvidence({ evidence: { ...evidence, targetDeployment: sourceManifest.deployment }, sourceManifest, preRestoreManifest }),
     /isolated/,
   );
@@ -173,5 +185,8 @@ test("restore drill runbook targets a deployment isolated from source Staging", 
   const runbook = await readFile("docs/BACKUP_RESTORE.md", "utf8");
   assert.match(runbook, /--deployment restore-drill/);
   assert.match(runbook, /restore-drill-pre-restore\.zip\.manifest\.json/);
+  for (const variable of ["SITE_URL", "JWT_PRIVATE_KEY", "JWKS"]) {
+    assert.match(runbook, new RegExp(variable));
+  }
   assert.doesNotMatch(runbook, /restore:execute -- \\\n+  --deployment staging/);
 });
