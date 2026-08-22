@@ -15,6 +15,8 @@ const preflight = read("scripts/staging-preflight.mjs");
 const loadScript = read("scripts/load-staging.mjs");
 const allScript = read("scripts/staging-all.mjs");
 const packageJson = read("package.json");
+const indexHtml = read("index.html");
+const favicon = read("public/favicon.svg");
 const environmentTemplate = read(".env.staging.example");
 const runbook = read("docs/STAGING_ACCEPTANCE_RUNBOOK.md");
 const matrix = read("tests/STAGING_BROWSER_ACCEPTANCE_MATRIX.md");
@@ -89,6 +91,16 @@ test("STG-05 authentication is runtime and evidence never serializes credentials
     /JSON\.stringify\([^\n]*(?:account\.email|account\.password)/,
   );
   assert.doesNotMatch(script, /console\.log\([^\n]*(?:email|password)/);
+});
+
+test("STG-05a frontend favicon exists and browser errors identify failed resources", () => {
+  assert.match(
+    indexHtml,
+    /rel="icon" type="image\/svg\+xml" href="\/favicon\.svg"/,
+  );
+  assert.match(favicon, /^<svg[\s\S]*<\/svg>\s*$/);
+  assert.match(script, /message\.location\(\)\.url/);
+  assert.match(script, /console\.error\$\{source\}/);
 });
 
 test("STG-06 acceptance checks published headers wildcard CORS and backend binding", () => {
