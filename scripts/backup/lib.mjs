@@ -8,6 +8,7 @@ export const ENVIRONMENTS = new Set(["development", "staging", "production"]);
 export const RESTORE_DRILL_CHECKS = [
   "importCompleted",
   "authentication",
+  "environmentConfiguration",
   "dataCounts",
   "inventory",
   "financialAccounts",
