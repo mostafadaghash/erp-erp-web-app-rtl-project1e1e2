@@ -464,7 +464,22 @@ export function observeRuntimeFailures(page, baseUrl) {
   );
   page.on("console", (message) => {
     if (message.type() === "error") {
-      failures.push(`console.error: ${redactEvidence(message.text())}`);
+      const location = message.location().url;
+      let source = "";
+      if (location) {
+        try {
+          const target = new URL(location);
+          source =
+            target.origin === baseUrl
+              ? ` ${target.pathname}`
+              : ` ${target.origin}`;
+        } catch {
+          source = "";
+        }
+      }
+      failures.push(
+        `console.error${source}: ${redactEvidence(message.text())}`,
+      );
     }
   });
   page.on("requestfailed", (request) => {
