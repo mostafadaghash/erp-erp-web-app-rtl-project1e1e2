@@ -76,6 +76,13 @@ test("Fresh Start evidence is release-bound and records mandatory zero-data chec
   assert.equal(evidence.checks.noBusinessRecords, true);
 });
 
+test("Fresh Start CLI bypasses the Windows npx.cmd spawn failure", async () => {
+  const script = await readFile("scripts/fresh-start/audit.mjs", "utf8");
+  assert.match(script, /spawnSync\(process\.execPath/);
+  assert.match(script, /node_modules\/convex\/bin\/main\.js/);
+  assert.doesNotMatch(script, /npx\.cmd/);
+});
+
 test("legacy demo-data mutation is not shipped to customers", () => {
   assert.equal(existsSync("convex/seed.ts"), false);
 });

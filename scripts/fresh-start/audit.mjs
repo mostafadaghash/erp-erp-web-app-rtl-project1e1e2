@@ -38,8 +38,8 @@ function usage() {
   ].join("\n");
 }
 
-function npxCommand() {
-  return process.platform === "win32" ? "npx.cmd" : "npx";
+function convexCliPath() {
+  return resolve("node_modules/convex/bin/main.js");
 }
 
 function fail(message, status = 1) {
@@ -65,8 +65,8 @@ try {
 }
 
 const query = buildInlineAuditQuery(args.phase);
-const commandArgs = ["convex", "run", "--deployment", args.deployment, "--inline-query", query];
-const run = spawnSync(npxCommand(), commandArgs, {
+const commandArgs = ["run", "--deployment", args.deployment, "--inline-query", query];
+const run = spawnSync(process.execPath, [convexCliPath(), ...commandArgs], {
   cwd: process.cwd(),
   encoding: "utf8",
   windowsHide: true,
