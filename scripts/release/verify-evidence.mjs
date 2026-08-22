@@ -16,7 +16,11 @@ try {
   console.log(`Release evidence: GO (${result.version})`);
   console.log(`Release commit: ${result.releaseCommit}`);
   console.log(`Rollback commit: ${result.rollbackCommit}`);
-  console.log(`Verified live gates: ${result.gateCount}`);
+  console.log(`Data strategy: ${result.dataStrategy}`);
+  console.log(`Verified applicable live gates: ${result.applicableGateCount}`);
+  if (result.notApplicableGates.length > 0) {
+    console.log(`Not applicable by policy: ${result.notApplicableGates.join(", ")}`);
+  }
 } catch (error) {
   console.error(`Release evidence verification failed: ${error instanceof Error ? error.message : String(error)}`);
   process.exit(1);
