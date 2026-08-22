@@ -1,19 +1,23 @@
 import { spawn } from "node:child_process";
+import { readFileSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import dotenv from "dotenv";
 
-dotenv.config({ path: ".env.staging.local", override: false });
+const stagingFileEnvironment = dotenv.parse(readFileSync(".env.staging.local"));
+const stagingEnvironment = { ...stagingFileEnvironment, ...process.env };
+const repositoryEnvironment = { ...process.env };
+for (const key of Object.keys(stagingFileEnvironment)) delete repositoryEnvironment[key];
 
 const validateOnly = process.argv.includes("--validate-config");
 const outputRoot = resolve("test-results/staging-all");
 const reportPath = resolve(outputRoot, "acceptance.json");
 const completed = [];
 
-function commandForNpm(args) {
-  if (process.env.npm_execpath) {
-    return { command: process.execPath, args: [process.env.npm_execpath, ...args] };
+function commandForNpm(args, env) {
+  if (env.npm_execpath) {
+    return { command: process.execPath, args: [env.npm_execpath, ...args] };
   }
   return {
     command: process.platform === "win32" ? "npm.cmd" : "npm",
@@ -21,14 +25,14 @@ function commandForNpm(args) {
   };
 }
 
-async function runStep(name, npmArgs) {
+async function runStep(name, npmArgs, env = stagingEnvironment) {
   const startedAt = Date.now();
   console.log(`\n[staging:all] START ${name}`);
-  const invocation = commandForNpm(npmArgs);
+  const invocation = commandForNpm(npmArgs, env);
   const exitCode = await new Promise((resolveExit, reject) => {
     const child = spawn(invocation.command, invocation.args, {
       cwd: process.cwd(),
-      env: process.env,
+      env,
       stdio: "inherit",
       shell: false,
     });
@@ -68,7 +72,7 @@ async function writeReport(status) {
 }
 
 function requireConfirmation(name) {
-  if (process.env[name] !== "isolated-staging-only") {
+  if (stagingEnvironment[name] !== "isolated-staging-only") {
     throw new Error(`${name} must equal isolated-staging-only`);
   }
 }
@@ -96,7 +100,7 @@ async function main() {
     return;
   }
 
-  await runStep("repository-verify", ["run", "verify"]);
+  await runStep("repository-verify", ["run", "verify"], repositoryEnvironment);
   for (const [name, args] of validationSteps) await runStep(name, args);
   await runStep("live-preflight", ["run", "test:staging-preflight"]);
   await runStep("role-account-setup", ["run", "staging:accounts:setup"]);

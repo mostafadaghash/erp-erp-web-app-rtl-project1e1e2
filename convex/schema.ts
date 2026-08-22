@@ -86,12 +86,13 @@ const applicationTables = {
 
   // الفروع
   branches: defineTable({
+    code: v.optional(v.string()),
     name: v.string(),
     address: v.string(),
     phone: v.optional(v.string()),
     managerId: v.optional(v.string()),
     isActive: v.boolean(),
-  }),
+  }).index("by_code", ["code"]),
 
   // الموردين
   suppliers: defineTable({

@@ -11,7 +11,7 @@ import {
 } from "../scripts/migration/lib.mjs";
 
 const validInput = () => ({
-  schemaVersion: 1,
+  schemaVersion: 2,
   sourceSystem: "legacy-test",
   cutoverDate: "2026-08-31",
   branches: [
@@ -24,7 +24,7 @@ const validInput = () => ({
     { legacyId: "s1", name: "مورد", phone: "01000000002", balances: [{ branchCode: "main", balance: 80 }] },
   ],
   products: [
-    { legacyId: "p1", sku: " abc-1 ", name: "منتج", supplierLegacyId: "s1", stock: 2, minStock: 0, costPrice: 10.25, sellPrice: 15 },
+    { legacyId: "p1", branchCode: "main", sku: " abc-1 ", name: "منتج", supplierLegacyId: "s1", stock: 2, minStock: 0, costPrice: 10.25, sellPrice: 15 },
   ],
   financialAccounts: [
     { legacyId: "a1", branchCode: "main", code: " cash ", name: "الخزنة", type: "cash", balance: 100, allowNegative: false, settlementDelayDays: 0 },
@@ -54,7 +54,51 @@ test("migration normalization is deterministic and rerunnable", () => {
   assert.equal(first.manifest.reconciliationPassed, true);
   assert.equal(first.accepted.branches[0].code, "MAIN");
   assert.equal(first.accepted.products[0].sku, "ABC-1");
+  assert.equal(first.accepted.products[0].branchCode, "MAIN");
   assert.equal(first.accepted.products[0].inventoryValue, 20.5);
+});
+
+test("multi-branch products require and preserve an explicit branch mapping", () => {
+  const input = validInput();
+  input.branches.push({ legacyId: "b2", code: "west", name: "فرع الغرب", address: "Giza" });
+  input.products.push({
+    legacyId: "p2",
+    branchCode: "west",
+    sku: "west-1",
+    name: "منتج الغرب",
+    stock: 1,
+    minStock: 0,
+    costPrice: 30,
+    sellPrice: 40,
+  });
+  input.controlTotals.stockQuantity = 3;
+  input.controlTotals.inventoryValue = 50.5;
+  const result = prepareMigration(input);
+  assert.equal(result.rejected.length, 0);
+  assert.equal(result.accepted.products[1].branchCode, "WEST");
+  assert.equal(result.mapping.products.p2, "WEST|WEST-1");
+  assert.equal(result.manifest.reconciliationPassed, true);
+});
+
+test("product rows without a valid branch are rejected", () => {
+  const input = validInput();
+  delete input.products[0].branchCode;
+  const missing = prepareMigration(input);
+  assert.ok(missing.rejected.some((row) => row.entity === "products" && row.errors.some((error) => error.includes("branchCode is required"))));
+
+  input.products[0].branchCode = "missing";
+  const unknown = prepareMigration(input);
+  assert.ok(unknown.rejected.some((row) => row.entity === "products" && row.errors.some((error) => error.includes("unknown branchCode"))));
+});
+
+test("dry-run rejects openings that official posting paths cannot apply", () => {
+  const input = validInput();
+  input.suppliers[0].balances[0].balance = -1;
+  input.financialAccounts[0].balance = -1;
+  input.financialAccounts[0].allowNegative = true;
+  const result = prepareMigration(input);
+  assert.ok(result.rejected.some((row) => row.entity === "suppliers" && row.errors.some((error) => error.includes("non-negative"))));
+  assert.ok(result.rejected.some((row) => row.entity === "financialAccounts" && row.errors.some((error) => error.includes("non-negative"))));
 });
 
 test("migration fingerprint survives JSON serialization and reload", () => {
@@ -108,7 +152,7 @@ test("opening balance invariants reject contradictory customer and unsafe accoun
   input.financialAccounts[0].allowNegative = false;
   const result = prepareMigration(input);
   assert.ok(result.rejected.some((row) => row.entity === "customers" && row.errors.some((error) => error.includes("simultaneously"))));
-  assert.ok(result.rejected.some((row) => row.entity === "financialAccounts" && row.errors.some((error) => error.includes("allowNegative=true"))));
+  assert.ok(result.rejected.some((row) => row.entity === "financialAccounts" && row.errors.some((error) => error.includes("non-negative"))));
 });
 
 test("reconciliation reports differences instead of hiding them", () => {

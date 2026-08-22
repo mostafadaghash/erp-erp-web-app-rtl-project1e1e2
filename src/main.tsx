@@ -2,51 +2,63 @@ import { createRoot } from "react-dom/client";
 import { ConvexAuthProvider } from "@convex-dev/auth/react";
 import { ConvexReactClient } from "convex/react";
 import "./index.css";
+import "./professional-ui.css";
+import "./professional-navigation.css";
 import App from "./App";
 
 const convexUrl = import.meta.env.VITE_CONVEX_URL;
 
 if (!convexUrl) {
-  // Notify Stunning of error
-  window.parent?.postMessage({ type: 'STUNNING_APP_ERROR', error: 'MISSING_CONVEX_URL' }, '*');
-
-  // Show recoverable error instead of crashing
   createRoot(document.getElementById("root")!).render(
-    <div style={{ padding: '2rem', fontFamily: 'system-ui', maxWidth: '600px', margin: '0 auto' }}>
-      <h1 style={{ color: '#e53e3e' }}>⚠️ Configuration Error</h1>
-      <p>Missing VITE_CONVEX_URL environment variable.</p>
-      <p><strong>To fix:</strong> Ask the AI to redeploy the application.</p>
-      <details style={{ marginTop: '1rem' }}>
-        <summary style={{ cursor: 'pointer', fontWeight: 'bold' }}>Technical Details</summary>
-        <p>The Convex deployment URL wasn't properly configured. This usually happens if:</p>
-        <ul>
-          <li>The deploy step failed partway through</li>
-          <li>The .env.local file wasn't created</li>
-        </ul>
-        <p>Solution: Tell the AI "Please redeploy" and it will fix this automatically.</p>
-      </details>
-    </div>
+    <main
+      dir="rtl"
+      style={{
+        minHeight: "100vh",
+        display: "grid",
+        placeItems: "center",
+        background: "#f7f9fc",
+        padding: "24px",
+        fontFamily: "Tajawal, system-ui, sans-serif",
+      }}
+    >
+      <section
+        style={{
+          width: "min(100%, 520px)",
+          background: "white",
+          border: "1px solid #e6ebf2",
+          borderRadius: "20px",
+          padding: "32px",
+          boxShadow: "0 18px 50px rgba(15,23,42,.08)",
+          textAlign: "center",
+        }}
+      >
+        <div
+          style={{
+            width: "58px",
+            height: "58px",
+            margin: "0 auto 18px",
+            borderRadius: "16px",
+            display: "grid",
+            placeItems: "center",
+            background: "#eaf8f1",
+            color: "#159a63",
+            fontSize: "26px",
+            fontWeight: 900,
+          }}
+        >
+          !
+        </div>
+        <h1 style={{ margin: 0, color: "#172033", fontSize: "24px", fontWeight: 900 }}>
+          الخدمة غير متاحة مؤقتًا
+        </h1>
+        <p style={{ margin: "12px 0 0", color: "#697586", lineHeight: 1.9 }}>
+          تعذر تشغيل النظام في الوقت الحالي. يرجى المحاولة مرة أخرى بعد قليل أو التواصل مع مسؤول النظام إذا استمرت المشكلة.
+        </p>
+      </section>
+    </main>,
   );
 } else {
   const convex = new ConvexReactClient(convexUrl);
-
-  // Intercept Convex errors and show user-friendly messages
-  const originalConsoleError = console.error;
-  console.error = (...args: any[]) => {
-    // Check if this is a Convex error
-    const errorMessage = args.join(' ');
-    if (errorMessage.includes('[CONVEX') && errorMessage.includes('Server Error')) {
-      // Extract just the actual error message
-      const match = errorMessage.match(/Uncaught Error: (.+?)(?:\n|at handler)/);
-      if (match) {
-        // Show simplified error
-        console.warn('⚠️ Error:', match[1]);
-        return; // Don't show the full technical error
-      }
-    }
-    // For non-Convex errors, use original console.error
-    originalConsoleError.apply(console, args);
-  };
 
   createRoot(document.getElementById("root")!).render(
     <ConvexAuthProvider client={convex}>

@@ -7,6 +7,7 @@ import dotenv from "dotenv";
 import {
   gotoStagingPage,
   launchStagingBrowser,
+  navigateSidebar,
   observeRuntimeFailures,
   redactEvidence,
   signIn,
@@ -467,9 +468,7 @@ async function main() {
     const admin = config.accounts.find((account) => account.role === "admin");
     assert.ok(admin);
     await signIn(adminPage, config.baseUrl, admin);
-    await adminPage
-      .getByRole("button", { name: "المستخدمون والصلاحيات", exact: true })
-      .click();
+    await navigateSidebar(adminPage, "المستخدمون والصلاحيات");
     await adminPage
       .getByRole("main")
       .getByRole("heading", { name: "المستخدمون والصلاحيات", exact: true })

@@ -20,12 +20,15 @@ const purchaseReturns = read("src/components/PurchaseReturnsPage.tsx");
 test("professional ERP navigation uses conventional Arabic information architecture", () => {
   for (const label of [
     "المبيعات",
+    "فواتير المبيعات",
     "مرتجعات المبيعات",
     "أوامر البيع",
     "المشتريات",
+    "فواتير المشتريات",
     "مرتجعات المشتريات",
-    "الأصناف",
-    "عمليات الشحن",
+    "دليل الأصناف",
+    "الشحن",
+    "إدارة الشحن",
     "أوامر الصيانة",
     "الحسابات",
     "الخزائن والبنوك",
@@ -37,10 +40,14 @@ test("professional ERP navigation uses conventional Arabic information architect
 
   for (const legacy of [
     "المبيعات والفواتير",
+    "المبيعات والعملاء",
     "الأوردرات",
     "الشحنات الواردة",
+    "المشتريات والموردون",
+    "الشحن والتوصيل",
     "الموظفون والصلاحيات",
     "سجل العمليات",
+    "سجل التدقيق",
   ]) assert.doesNotMatch(sidebar, new RegExp(legacy));
 });
 
@@ -53,8 +60,8 @@ test("sales returns are a first-class protected page", () => {
 });
 
 test("shell exposes one permission-aware quick creation menu", () => {
-  assert.equal((app.match(/>إجراء جديد</g) ?? []).length, 1);
-  assert.match(app, /data-testid="quick-action-menu"/);
+  assert.equal((app.match(/data-testid="quick-action-menu"/g) ?? []).length, 1);
+  assert.match(app, />إنشاء جديد</);
   assert.match(app, /permission: "create_invoices"/);
   assert.match(app, /permission: "create_shipments"/);
   assert.doesNotMatch(read("src/components/Dashboard.tsx"), />فاتورة جديدة</);
@@ -107,8 +114,8 @@ test("sales orders use one professional document name and item terminology", () 
 
 test("shipping creation refers to sales orders consistently", () => {
   for (const label of [
-    "إنشاء من أمر بيع وفاتورة",
-    "اختر أمر بيع جاهزًا",
+    "شحنة جديدة",
+    "اختر أمر البيع",
     "جارٍ تحميل أوامر البيع الجاهزة",
     "لا توجد أوامر بيع جاهزة مؤهلة للشحن",
   ]) assert.match(deliveries, new RegExp(label));

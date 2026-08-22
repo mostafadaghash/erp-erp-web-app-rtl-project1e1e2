@@ -68,7 +68,22 @@ Before accepting any release candidate commit:
 - [ ] Inspect the frontend build/assets for accidental server secrets.
 - [ ] Record the deployed security acceptance result.
 
-## G. Migration rehearsal
+## G. Data start strategy and migration
+
+Select exactly one strategy and record it in the final release evidence.
+
+### Fresh Start
+
+- [ ] The business owner confirms there is no legacy system or legacy data to import.
+- [ ] Opening inventory, financial balances, outstanding customer/supplier balances, outstanding operational documents, and COD are all absent.
+- [ ] The Production target contains no pre-launch business records; required Auth/setup records do not count as business history.
+- [ ] All real stock, money, receivables, payables, and COD will originate through supported application workflows after the approved launch time.
+- [ ] `migrationFingerprint` and `environments.migrationRehearsal` remain `null`.
+- [ ] Only the migration gate is `NOT_APPLICABLE`, with the signed Fresh Start declaration attached as evidence.
+
+If any item above is false, Fresh Start is forbidden and the Legacy Migration path below is mandatory.
+
+### Legacy Migration
 
 - [ ] Freeze a representative copy of legacy source data.
 - [ ] Transform it to the migration input contract.
@@ -76,10 +91,10 @@ Before accepting any release candidate commit:
 - [ ] Resolve every rejected source row or document its approved exclusion.
 - [ ] Resolve every supplied control-total difference.
 - [ ] Record the immutable migration fingerprint and `migrationRunId`.
-- [ ] Back up the clean Staging target.
-- [ ] Apply the controlled migration procedure to Staging.
+- [ ] Confirm the dedicated temporary rehearsal deployment is clean and isolated from Development, Staging, and Production.
+- [ ] Apply the guarded migration procedure only to that temporary rehearsal deployment.
 - [ ] Complete `docs/MIGRATION_RECONCILIATION.md` after the write.
-- [ ] Restore a clean Staging copy and repeat the rehearsal to prove rerun behavior.
+- [ ] Reset or replace the isolated rehearsal deployment and repeat the rehearsal to prove rerun behavior.
 
 ## H. Backup / restore drill
 
@@ -126,7 +141,7 @@ All release owners must answer **GO** before Production deployment:
 - Staging E2E: GO / NO-GO
 - Performance: GO / NO-GO
 - Security: GO / NO-GO
-- Migration/reconciliation: GO / NO-GO
+- Data start strategy/migration: GO / NO-GO
 - Backup/restore: GO / NO-GO
 - Human UAT: GO / NO-GO
 - Monitoring/incident readiness: GO / NO-GO
@@ -135,14 +150,13 @@ Any NO-GO blocks Production.
 
 ## L. Production cutover
 
-- [ ] Freeze legacy writes at the agreed cutover point.
-- [ ] Generate the final legacy source export and control totals.
-- [ ] Verify the final migration fingerprint/package.
+- [ ] For Fresh Start, re-confirm no pre-launch business data exists and record the approved launch timestamp.
+- [ ] For Legacy Migration only, freeze legacy writes and generate the final source export and control totals.
+- [ ] For Legacy Migration only, verify the final migration fingerprint/package.
 - [ ] Create and verify the Production pre-cutover backup.
 - [ ] Deploy the exact approved release candidate code.
-- [ ] Apply the migration/cutover procedure.
-- [ ] Rebuild reporting facts/statistics required after migration.
-- [ ] Complete Production reconciliation.
+- [ ] For Legacy Migration only, apply the migration/cutover procedure, rebuild required facts, and complete reconciliation.
+- [ ] For Fresh Start, initialize permitted zero-value setup only; all business data must enter through normal workflows after launch.
 - [ ] Run Production smoke tests.
 - [ ] Start with limited operator/admin access.
 - [ ] Expand access only after stability checks pass.
@@ -152,7 +166,9 @@ Any NO-GO blocks Production.
 - [ ] Observe errors, auth, finance balances, inventory, invoices, repairs, COD and reporting closely during the launch window.
 - [ ] Confirm scheduled/periodic backup policy is active.
 - [ ] Confirm no migration/rebuild task is still running unexpectedly.
-- [ ] Record final Production commit, deployment identifiers, migration fingerprint and backup SHA-256.
+- [ ] Record final Production commit, deployment identifiers, data strategy, conditional migration fingerprint, and backup SHA-256.
 - [ ] Record launch decision and any accepted residual risks.
+
+Complete and validate the final evidence record using `docs/RELEASE_EVIDENCE.md`. Run the controlled Production checks in `docs/PRODUCTION_SMOKE_TEST.md` immediately after deployment.
 
 The candidate becomes eligible for a real `v1.0.0-rc1` release/tag only after sections B–K have live evidence. Production deployment requires section L and immediate post-launch verification.

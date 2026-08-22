@@ -5,6 +5,7 @@ import { pathToFileURL } from "node:url";
 import dotenv from "dotenv";
 import {
   launchStagingBrowser,
+  navigateSidebar,
   observeRuntimeFailures,
   redactEvidence,
   safeScreenshot,
@@ -114,8 +115,12 @@ async function waitForToast(page, message) {
   }
 }
 
+const professionalNavigationLabel = {
+  "الأصناف": "دليل الأصناف",
+};
+
 async function navigate(page, label, testId) {
-  await page.getByRole("button", { name: label, exact: true }).click();
+  await navigateSidebar(page, professionalNavigationLabel[label] ?? label);
   await page.getByTestId(testId).waitFor({ state: "visible", timeout: 30_000 });
 }
 
@@ -299,7 +304,7 @@ async function ensureAccount(page, branch, name, code, type) {
     await page.getByTestId("finance-account-code").fill(code);
     await page.getByTestId("finance-account-type").selectOption(type);
     await page.getByTestId("finance-account-create").click();
-    await waitForToast(page, "تم إنشاء الحساب برصيد صفر");
+    await waitForToast(page, "تم إنشاء الحساب بنجاح");
     await page.waitForFunction(
       ({ name: expectedName, branchId }) =>
         [...document.querySelectorAll('[data-testid="finance-account-row"]')].some(
@@ -318,11 +323,17 @@ async function ensureAccount(page, branch, name, code, type) {
 
 async function postOpeningBalance(page, row, amount) {
   if ((await row.getAttribute("data-opening-posted")) === "true") return;
-  page.once("dialog", (dialog) => dialog.accept(String(amount)));
+  const accountName = await row.getAttribute("data-account-name");
+  const branchId = await row.getAttribute("data-account-branch-id");
   await row.getByTestId("finance-opening-balance").click();
+  const heading = page.getByRole("heading", { name: "تسجيل الرصيد الافتتاحي", exact: true });
+  await heading.waitFor({ state: "visible", timeout: 30_000 });
+  const modal = heading.locator("..").locator("..").locator("..");
+  await modal.locator('input[type="number"]').fill(String(amount));
+  await modal.getByRole("button", { name: "حفظ", exact: true }).click();
   await page.waitForFunction(
-    ({ name, branchId }) => [...document.querySelectorAll('[data-testid="finance-account-row"]')].some((element) => element.getAttribute("data-account-name") === name && element.getAttribute("data-account-branch-id") === branchId && element.getAttribute("data-opening-posted") === "true"),
-    { name: await row.getAttribute("data-account-name"), branchId: await row.getAttribute("data-account-branch-id") },
+    ({ name, branchId: targetBranchId }) => [...document.querySelectorAll('[data-testid="finance-account-row"]')].some((element) => element.getAttribute("data-account-name") === name && element.getAttribute("data-account-branch-id") === targetBranchId && element.getAttribute("data-opening-posted") === "true"),
+    { name: accountName, branchId },
     { timeout: 45_000 },
   );
 }
@@ -330,17 +341,21 @@ async function postOpeningBalance(page, row, amount) {
 async function ensureFinance(page, fixtures) {
   await navigate(page, "الخزائن والبنوك", "treasury-page");
   const branchSelect = page.getByTestId("finance-account-branch");
-  await branchSelect.waitFor({ state: "visible", timeout: 30_000 });
+  const targetBranch = await selectExact(branchSelect, fixtures.branchName);
   const options = (await branchSelect.locator("option").evaluateAll((rows) => rows.map((row) => ({ value: row.value, label: row.textContent?.trim() ?? "" })))).filter((option) => option.value);
-  const matches = options.filter((option) => option.label === fixtures.branchName);
-  assert.equal(matches.length, 1, `Fixture branch must match exactly one active branch: ${fixtures.branchName}`);
-  const targetBranch = matches[0];
+  assert.ok(options.length > 0, "Finance branch options did not load after resolving the fixture branch");
   await page.waitForFunction(
-    () => ![null, "loading"].includes(document.querySelector('[data-testid="finance-initialization"]')?.getAttribute("data-state") ?? null),
+    () => {
+      const marker = document.querySelector('[data-testid="finance-initialization"]');
+      return !marker || marker.getAttribute("data-state") !== "loading";
+    },
     undefined,
     { timeout: 30_000 },
   );
-  let state = await page.getByTestId("finance-initialization").getAttribute("data-state");
+  const initializationMarker = page.getByTestId("finance-initialization");
+  let state = (await initializationMarker.count())
+    ? await initializationMarker.getAttribute("data-state")
+    : "initialized";
   if (state !== "initialized") {
     await page.getByTestId("finance-cutover-date").fill(fixtures.operationDate ?? new Date().toISOString().slice(0, 10));
     await page.getByTestId("finance-configure").click();
@@ -370,9 +385,14 @@ async function ensureFinance(page, fixtures) {
       const isTargetCash = (await row.getAttribute("data-account-name")) === fixtures.cashAccountName && (await row.getAttribute("data-account-branch-id")) === targetBranch.value;
       await postOpeningBalance(page, row, isTargetCash ? fixtures.cashOpeningBalance : 0);
     }
-    page.once("dialog", (dialog) => dialog.accept());
     await page.getByTestId("finance-confirm").click();
-    await page.waitForFunction(() => document.querySelector('[data-testid="finance-initialization"]')?.getAttribute("data-state") === "initialized", undefined, { timeout: 45_000 });
+    await page.getByTestId("finance-confirmation-dialog").waitFor({ state: "visible", timeout: 30_000 });
+    await page.getByTestId("finance-confirm-final").click();
+    await page.waitForFunction(
+      () => !document.querySelector('[data-testid="finance-initialization"]'),
+      undefined,
+      { timeout: 45_000 },
+    );
   }
 
   const refreshedCash = await accountRow(page, fixtures.cashAccountName, targetBranch.value);

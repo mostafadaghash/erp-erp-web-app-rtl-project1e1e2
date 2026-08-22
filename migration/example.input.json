@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "sourceSystem": "legacy-erp-example",
   "cutoverDate": "2026-08-31",
   "branches": [
@@ -37,6 +37,7 @@
   "products": [
     {
       "legacyId": "PROD-1",
+      "branchCode": "MAIN",
       "sku": "ps5-001",
       "name": "منتج تجريبي",
       "supplierLegacyId": "SUP-1",

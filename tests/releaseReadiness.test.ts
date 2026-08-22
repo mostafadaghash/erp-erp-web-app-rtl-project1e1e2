@@ -8,6 +8,7 @@ test("v1.0.0-rc1 remains repository-prepared and blocked from Production", async
   assert.equal(candidate.version, "v1.0.0-rc1");
   assert.equal(candidate.status, "repository-prepared");
   assert.equal(candidate.productionEligible, false);
+  assert.equal(candidate.dataStrategy, "fresh_start");
   assert.ok(candidate.liveGates.length >= 10);
   assert.ok(candidate.requiredEvidence.length >= 8);
 });
@@ -27,7 +28,7 @@ test("release checklist keeps live acceptance as a hard gate", async () => {
     "Staging infrastructure",
     "Performance acceptance",
     "Deployed security acceptance",
-    "Migration rehearsal",
+    "Data start strategy and migration",
     "Backup / restore drill",
     "Human UAT",
     "Go / no-go",
@@ -36,6 +37,18 @@ test("release checklist keeps live acceptance as a hard gate", async () => {
     assert.ok(checklist.includes(section), `missing release section: ${section}`);
   }
   assert.match(checklist, /Any NO-GO blocks Production/);
+});
+
+test("Fresh Start candidate cannot hide legacy data behind a migration N/A status", async () => {
+  const template = JSON.parse(await readFile("release/v1.0.0.evidence.template.json", "utf8"));
+  const evidenceDocs = await readFile("docs/RELEASE_EVIDENCE.md", "utf8");
+  assert.equal(template.schemaVersion, 2);
+  assert.equal(template.dataStrategy.mode, "fresh_start");
+  assert.equal(template.gates.migration.status, "NOT_APPLICABLE");
+  assert.equal(template.migrationFingerprint, null);
+  assert.equal(template.environments.migrationRehearsal, null);
+  assert.match(evidenceDocs, /hasOpeningInventory/);
+  assert.match(evidenceDocs, /Only the `migration` gate/);
 });
 
 test("UAT covers every configured operational role and branch isolation", async () => {
