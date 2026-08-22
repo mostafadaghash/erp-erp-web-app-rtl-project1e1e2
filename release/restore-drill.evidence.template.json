@@ -12,6 +12,7 @@
   "checks": {
     "importCompleted": false,
     "authentication": false,
+    "environmentConfiguration": false,
     "dataCounts": false,
     "inventory": false,
     "financialAccounts": false,
