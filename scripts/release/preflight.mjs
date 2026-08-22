@@ -17,6 +17,7 @@ const requiredFiles = [
   "docs/INCIDENT_RESPONSE.md",
   "docs/RELEASE_EVIDENCE.md",
   "docs/PRODUCTION_SMOKE_TEST.md",
+  "docs/FRESH_START.md",
   "scripts/staging-env-check.mjs",
   "scripts/migration/prepare.mjs",
   "scripts/migration/verify-package.mjs",
@@ -24,6 +25,8 @@ const requiredFiles = [
   "scripts/backup/verify.mjs",
   "scripts/backup/restore.mjs",
   "scripts/backup/verify-drill.mjs",
+  "scripts/fresh-start/lib.mjs",
+  "scripts/fresh-start/audit.mjs",
   "release/restore-drill.evidence.template.json",
   "release/v1.0.0.evidence.template.json",
   "scripts/release/verify-evidence.mjs",
@@ -42,6 +45,7 @@ const requiredScripts = [
   "restore:plan",
   "restore:execute",
   "restore:verify",
+  "fresh-start:audit",
   "test:e2e:staging",
   "test:e2e:roles",
   "test:e2e:flows",
@@ -105,6 +109,16 @@ try {
   const restore = await readFile("scripts/backup/restore.mjs", "utf8");
   if (!restore.includes("PLAN ONLY: no restore command was executed")) fail("restore plan-only safety marker is missing");
   if (!restore.includes("--pre-restore-manifest")) fail("restore pre-restore backup requirement is missing");
+
+  const freshStart = await readFile("scripts/fresh-start/audit.mjs", "utf8");
+  if (!freshStart.includes("--confirm must exactly match the audited deployment")) fail("Fresh Start target confirmation guard is missing");
+  if (!freshStart.includes("Fresh Start customer deployment audit: PASS")) fail("Fresh Start evidence marker is missing");
+  try {
+    await access("convex/seed.ts");
+    fail("legacy demo-data mutation must not be shipped to customers");
+  } catch (error) {
+    if (error?.code !== "ENOENT") throw error;
+  }
 
   console.log(`Release candidate repository preflight passed: ${candidate.version}`);
   console.log(`Status: ${candidate.status}`);

@@ -30,6 +30,8 @@ Use `fresh_start` only when the business starts without any pre-existing operati
 
 The release evidence must also keep `migrationFingerprint` and `environments.migrationRehearsal` explicitly `null`, set only `gates.migration.status` to `NOT_APPLICABLE`, and attach at least one identical durable Fresh Start declaration reference to both `dataStrategy.evidence` and the migration gate. The named `dataStrategy.approvedBy` must exactly match the business owner approval.
 
+The Fresh Start evidence set must additionally include successful `fresh-start:audit` JSON records for both `blank` and `initialized` phases on the dedicated customer target. These automated audits prove that only permitted zero-value setup exists and that no demo or operational records are present.
+
 If any assertion becomes true before launch, the release must switch to `legacy_migration`; changing only the migration gate status is rejected. Under `legacy_migration`, a full fingerprint, an isolated rehearsal deployment, a `PASS` migration gate, and reconciliation evidence remain mandatory.
 
 Both the technical owner and business owner must record `GO`. The rollback commit must be the previous known-good commit and the rollback backup must be identified by its full SHA-256.

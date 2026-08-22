@@ -34,6 +34,7 @@
     "restore:plan": "node scripts/backup/restore.mjs",
     "restore:execute": "node scripts/backup/restore.mjs --execute",
     "restore:verify": "node scripts/backup/verify-drill.mjs",
+    "fresh-start:audit": "node scripts/fresh-start/audit.mjs",
     "e2e:install": "npm install --no-save --package-lock=false @playwright/test@1.62.1",
     "test:e2e": "playwright test",
     "test:e2e:smoke": "playwright test --grep @smoke",

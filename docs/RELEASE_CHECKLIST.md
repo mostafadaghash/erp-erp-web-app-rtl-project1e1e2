@@ -80,6 +80,9 @@ Select exactly one strategy and record it in the final release evidence.
 - [ ] All real stock, money, receivables, payables, and COD will originate through supported application workflows after the approved launch time.
 - [ ] `migrationFingerprint` and `environments.migrationRehearsal` remain `null`.
 - [ ] Only the migration gate is `NOT_APPLICABLE`, with the signed Fresh Start declaration attached as evidence.
+- [ ] Run `fresh-start:audit` in `blank` phase on the new dedicated customer target before first login/setup.
+- [ ] After permitted zero-value setup, run `fresh-start:audit` again in `initialized` phase.
+- [ ] Attach both release-bound JSON audit files and confirm the legacy demo seed mutation is absent.
 
 If any item above is false, Fresh Start is forbidden and the Legacy Migration path below is mandatory.
 

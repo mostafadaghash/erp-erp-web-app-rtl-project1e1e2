@@ -16,7 +16,7 @@
     "authenticated browser E2E passed against Staging",
     "load test passed against Staging",
     "deployed security headers/session/CORS/CSP checks passed",
-    "Fresh Start declaration proves there is no legacy system, imported data, opening inventory, opening balances, outstanding customer/supplier balances, operational documents, or COD",
+    "Fresh Start declaration plus blank/initialized customer-target audits prove there is no legacy, demo, opening, outstanding, or operational business data",
     "backup and destructive restore drill passed on isolated Staging",
     "role-based human UAT signed off",
     "A4 and physical thermal printing accepted",
@@ -31,7 +31,7 @@
     "Staging Release Gate run",
     "load test report",
     "security acceptance record",
-    "signed Fresh Start declaration and clean Production target evidence",
+    "signed Fresh Start declaration plus blank and initialized clean-target audit JSON",
     "backup snapshot SHA-256 and restore drill record",
     "UAT sign-off",
     "production rollback recovery point"
