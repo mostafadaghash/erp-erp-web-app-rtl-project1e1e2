@@ -114,8 +114,7 @@ function LoginPage({
 
         <div className="auth-card rounded-3xl p-7 sm:p-8">
           <div className="mb-6 text-center">
-            <p className="text-xs font-bold tracking-[0.18em] text-slate-400">بوابة النظام</p>
-            <h2 className="mt-2 text-xl font-black text-white">
+            <h2 className="text-xl font-black text-white">
               {allowSignUp ? "إنشاء الحساب" : "تسجيل الدخول"}
             </h2>
           </div>
