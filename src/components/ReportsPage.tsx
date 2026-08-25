@@ -105,7 +105,7 @@ function MetricCard({
 }) {
   const classes = toneClasses[tone];
   return (
-    <div className="stat-card">
+    <div className="erp-metric-card">
       <div className={`mb-3 flex h-10 w-10 items-center justify-center rounded-xl ${classes.background}`}>
         <Icon className={`h-5 w-5 ${classes.icon}`} />
       </div>
@@ -126,9 +126,9 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <section className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
+    <section className="erp-section p-5">
       <h2 className="mb-4 flex items-center gap-2 font-bold text-slate-800">
-        <Icon className="h-5 w-5 text-indigo-600" />
+        <Icon className="h-5 w-5 text-[var(--erp-accent)]" />
         {title}
       </h2>
       {children}
@@ -198,17 +198,18 @@ export function ReportsPage() {
 
   return (
     <div className="space-y-6 p-4 lg:p-6">
-      <header className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+      <header className="erp-page-header">
         <div>
-          <h1 className="flex items-center gap-2 text-2xl font-black text-slate-800">
-            <BarChart3 className="h-6 w-6 text-indigo-600" />
+          <span className="erp-kicker">تحليلات موثقة من الحركات الفعلية</span>
+          <h1 className="erp-page-title">
+            <BarChart3 className="h-6 w-6 text-[var(--erp-accent)]" />
             مركز التقارير
           </h1>
-          <p className="mt-1 text-sm text-slate-500">
+          <p className="erp-page-subtitle">
             مبنية على تاريخ العملية وصافي الحركات المثبتة في الدفاتر.
           </p>
         </div>
-        <div className="grid gap-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:grid-cols-2">
+        <div className="professional-panel grid gap-3 p-3 sm:grid-cols-2">
           <label className="text-xs font-bold text-slate-600">
             <span className="mb-1 flex items-center gap-1">
               <Building2 className="h-3.5 w-3.5" />

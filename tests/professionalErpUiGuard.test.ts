@@ -10,6 +10,10 @@ const settingsPage = read("src/components/SettingsPage.tsx");
 const settingsApi = read("convex/settings.ts");
 const schema = read("convex/schema.ts");
 const styles = read("src/index.css");
+const professionalStyles = read("src/professional-ui.css");
+const navigationStyles = read("src/professional-navigation.css");
+const branding = read("src/lib/branding.ts");
+const newInvoice = read("src/components/NewInvoicePage.tsx");
 const signOut = read("src/SignOutButton.tsx");
 const purchases = read("src/components/ShipmentsPage.tsx");
 const orders = read("src/components/OrdersPage.tsx");
@@ -78,6 +82,36 @@ test("white-label identity can be changed without source edits", () => {
   assert.match(settingsPage, /غيّر الاسم والشعار والألوان في أي وقت بدون تعديل الكود/);
   assert.match(styles, /--brand-primary/);
   assert.match(styles, /--brand-secondary/);
+});
+
+test("default visual system uses the approved emerald and navy ERP identity", () => {
+  for (const source of [styles, branding, settingsPage, settingsApi]) {
+    assert.match(source, /#16a66a/i);
+    assert.match(source, /#12263a/i);
+  }
+  for (const token of [
+    "--erp-accent",
+    "--erp-navy",
+    "--erp-warning",
+    "--erp-danger",
+    "--erp-border",
+  ]) assert.match(professionalStyles, new RegExp(token));
+  assert.match(navigationStyles, /erp-navigation::before/);
+});
+
+test("sales invoice is a fast keyboard and barcode-ready document workspace", () => {
+  for (const marker of [
+    "erp-pos-page",
+    "erp-pos-grid",
+    "erp-pos-cart",
+    "invoice-product-search",
+    "invoice-submit",
+    "ملخص الفاتورة",
+  ]) assert.match(newInvoice, new RegExp(marker));
+  assert.match(newInvoice, /product\.barcode\?\.toLowerCase\(\)/);
+  assert.match(newInvoice, /event\.key === "F2"/);
+  assert.match(newInvoice, /event\.key === "F9"/);
+  assert.match(newInvoice, /event\.key === "Enter"/);
 });
 
 test("authentication and session controls use professional Arabic copy", () => {

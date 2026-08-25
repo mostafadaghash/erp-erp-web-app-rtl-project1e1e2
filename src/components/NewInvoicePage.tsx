@@ -1,9 +1,20 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { toast } from "sonner";
 import type { Page } from "./ERPApp";
-import { Plus, Trash2, ShoppingCart, Search } from "lucide-react";
+import {
+  ArrowRight,
+  Barcode,
+  CheckCircle2,
+  CreditCard,
+  Minus,
+  Plus,
+  Search,
+  ShoppingCart,
+  Trash2,
+  UserRound,
+} from "lucide-react";
 import type { Id } from "../../convex/_generated/dataModel";
 import { usePermission } from "../lib/access";
 
@@ -28,6 +39,8 @@ export function NewInvoicePage({ onNavigate }: NewInvoicePageProps) {
   const canCollect = usePermission("record_collections");
   const accounts = useQuery(api.finance.collectionAccountPicker, canCollect ? {} : "skip") ?? [];
   const requestId = useRef(crypto.randomUUID());
+  const productSearchRef = useRef<HTMLInputElement>(null);
+  const submitRef = useRef<() => Promise<void>>(async () => undefined);
   const [saving, setSaving] = useState(false);
 
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -133,199 +146,222 @@ export function NewInvoicePage({ onNavigate }: NewInvoicePageProps) {
     }
   };
 
-  return (
-    <div className="p-4 lg:p-6" data-testid="new-invoice-page">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-black text-slate-800 flex items-center gap-2">
-            <ShoppingCart className="w-6 h-6 text-indigo-600" />
-            فاتورة بيع جديدة
-          </h1>
-        </div>
-        <button onClick={() => onNavigate("invoices")} className="btn-secondary">
-          رجوع
-        </button>
-      </div>
+  submitRef.current = handleSubmit;
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Products & Cart */}
-        <div className="lg:col-span-2 space-y-4">
-          {/* Customer */}
-          <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
-            <h2 className="font-bold text-slate-800 mb-4">بيانات العميل</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div>
-                <label className="form-label">اختر عميل</label>
-                <select data-testid="invoice-customer-select" className="form-input" value={customerId} onChange={e => handleSelectCustomer(e.target.value)}>
-                  <option value="">عميل جديد</option>
-                  {customers.map(c => <option key={c._id} value={c._id}>{c.name}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="form-label">اسم العميل *</label>
-                <input className="form-input" value={customerName} onChange={e => setCustomerName(e.target.value)} placeholder="اسم العميل" />
-              </div>
-              <div>
-                <label className="form-label">رقم الهاتف</label>
-                <input className="form-input" value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} placeholder="01xxxxxxxxx" />
-              </div>
-            </div>
+  useEffect(() => {
+    const handleKeyboardShortcut = (event: KeyboardEvent) => {
+      if (event.key === "F2") {
+        event.preventDefault();
+        productSearchRef.current?.focus();
+        productSearchRef.current?.select();
+      }
+      if (event.key === "F9") {
+        event.preventDefault();
+        void submitRef.current();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyboardShortcut);
+    return () => window.removeEventListener("keydown", handleKeyboardShortcut);
+  }, []);
+
+  const addSearchResult = () => {
+    const normalizedSearch = productSearch.trim().toLowerCase();
+    if (!normalizedSearch) return;
+    const exact = filteredProducts.find((product) =>
+      product.sku.toLowerCase() === normalizedSearch ||
+      product.barcode?.toLowerCase() === normalizedSearch
+    );
+    const selected = exact ?? filteredProducts[0];
+    if (selected) addToCart(selected);
+  };
+
+  return (
+    <div className="erp-pos-page" data-testid="new-invoice-page">
+      <header className="erp-pos-header">
+        <div className="flex min-w-0 items-center gap-3">
+          <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-white/10">
+            <ShoppingCart className="h-6 w-6 text-emerald-200" />
+          </div>
+          <div className="min-w-0">
+            <span className="erp-pos-document-badge">نقطة البيع · مستند جديد</span>
+            <h1 className="mt-2 truncate text-xl font-black sm:text-2xl">فاتورة مبيعات جديدة</h1>
+            <p className="mt-1 text-xs text-slate-300">رقم الفاتورة يُنشأ تلقائيًا عند الإصدار</p>
+          </div>
+        </div>
+        <button onClick={() => onNavigate("invoices")} className="flex items-center gap-2 rounded-xl border border-white/15 bg-white/10 px-4 py-2.5 text-sm font-black text-white transition hover:bg-white/15">
+          <ArrowRight className="h-4 w-4" />
+          سجل الفواتير
+        </button>
+      </header>
+
+      <div className="erp-pos-grid">
+        <section className="erp-pos-main">
+          <div className="erp-pos-customer-strip">
+            <label>
+              <span className="form-label flex items-center gap-1.5"><UserRound className="h-4 w-4 text-[var(--erp-accent)]" />الحساب</span>
+              <select data-testid="invoice-customer-select" className="form-input" value={customerId} onChange={e => handleSelectCustomer(e.target.value)}>
+                <option value="">عميل نقدي / جديد</option>
+                {customers.map(c => <option key={c._id} value={c._id}>{c.name}</option>)}
+              </select>
+            </label>
+            <label>
+              <span className="form-label">اسم العميل *</span>
+              <input className="form-input" value={customerName} onChange={e => setCustomerName(e.target.value)} placeholder="اسم العميل" />
+            </label>
+            <label>
+              <span className="form-label">رقم الهاتف</span>
+              <input className="form-input" value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} placeholder="01xxxxxxxxx" />
+            </label>
           </div>
 
-          {/* Product Search */}
-          <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
-            <h2 className="font-bold text-slate-800 mb-4">إضافة أصناف</h2>
-            <div className="relative mb-4">
-              <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-              <input
-                data-testid="invoice-product-search"
-                className="form-input pr-10"
-                placeholder="ابحث عن منتج..."
-                value={productSearch}
-                onChange={e => setProductSearch(e.target.value)}
-              />
-            </div>
+          <div className="erp-pos-search-area">
+            <Search className="absolute right-7 top-1/2 h-5 w-5 -translate-y-1/2 text-[var(--erp-accent)]" />
+            <input
+              ref={productSearchRef}
+              data-testid="invoice-product-search"
+              className="form-input erp-pos-search-input"
+              placeholder="ابحث باسم الصنف أو الكود، أو امسح الباركود..."
+              value={productSearch}
+              onChange={e => setProductSearch(e.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  addSearchResult();
+                }
+              }}
+              autoComplete="off"
+            />
+            <span className="erp-pos-search-hint"><Barcode className="ml-1 inline h-3.5 w-3.5" />بحث سريع F2</span>
+
             {productSearch && (
-              <div className="border border-slate-200 rounded-xl overflow-hidden mb-4 max-h-48 overflow-y-auto">
-                {filteredProducts.slice(0, 8).map(p => (
+              <div className="erp-pos-results">
+                {filteredProducts.slice(0, 10).map(p => (
                   <button
                     key={p._id}
                     data-testid="invoice-product-result"
                     data-product-name={p.name}
                     onClick={() => addToCart(p)}
-                    className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-indigo-50 transition-colors border-b border-slate-100 last:border-0"
+                    className="erp-pos-result"
                   >
-                    <div className="text-right">
-                      <p className="text-sm font-medium text-slate-800">{p.name}</p>
-                      <p className="text-xs text-slate-400">{p.sku} • متوفر: {p.stock}</p>
+                    <div className="min-w-0 text-right">
+                      <p className="truncate text-sm font-black text-slate-800">{p.name}</p>
+                      <p className="mt-1 text-xs text-slate-400">{p.sku} · المتاح {p.stock.toLocaleString("ar-EG")}</p>
                     </div>
-                    <span className="text-indigo-600 font-bold text-sm">{p.sellPrice.toLocaleString("ar-EG")} ج.م</span>
+                    <span className="shrink-0 text-sm font-black text-[var(--erp-accent-strong)]">{p.sellPrice.toLocaleString("ar-EG")} ج.م</span>
                   </button>
                 ))}
-                {filteredProducts.length === 0 && (
-                  <p className="text-center py-4 text-slate-400 text-sm">لا توجد نتائج</p>
-                )}
-              </div>
-            )}
-
-            {/* Cart */}
-            {cart.length > 0 ? (
-              <div className="space-y-2">
-                {cart.map((item) => (
-                  <div key={item.productId} className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl">
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-slate-800 truncate">{item.productName}</p>
-                      <p className="text-xs text-slate-500">{item.unitPrice.toLocaleString("ar-EG")} ج.م/قطعة</p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => updateQuantity(item.productId, item.quantity - 1)}
-                        className="w-7 h-7 bg-white border border-slate-200 rounded-lg flex items-center justify-center hover:bg-slate-100 transition-colors text-slate-600 font-bold"
-                      >-</button>
-                      <span className="w-8 text-center font-bold text-slate-800">{item.quantity}</span>
-                      <button
-                        onClick={() => updateQuantity(item.productId, item.quantity + 1)}
-                        className="w-7 h-7 bg-white border border-slate-200 rounded-lg flex items-center justify-center hover:bg-slate-100 transition-colors text-slate-600 font-bold"
-                      >+</button>
-                    </div>
-                    <span className="font-bold text-indigo-600 text-sm w-24 text-left">
-                      {item.total.toLocaleString("ar-EG")} ج.م
-                    </span>
-                    <button
-                      onClick={() => removeFromCart(item.productId)}
-                      className="p-1.5 hover:bg-red-100 rounded-lg transition-colors text-red-400 hover:text-red-600"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-8 text-slate-400">
-                <ShoppingCart className="w-10 h-10 mx-auto mb-2 opacity-30" />
-                <p className="text-sm">ابحث عن منتج لإضافته</p>
+                {filteredProducts.length === 0 && <p className="py-5 text-center text-sm text-slate-400">لا توجد أصناف مطابقة</p>}
               </div>
             )}
           </div>
-        </div>
 
-        {/* Summary */}
-        <div className="space-y-4">
-          <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 sticky top-4">
-            <h2 className="font-bold text-slate-800 mb-4">ملخص الفاتورة</h2>
-
-            <div className="space-y-3 mb-4">
-              <div className="flex justify-between text-sm">
-                <span className="text-slate-500">المجموع الفرعي</span>
-                <span className="font-medium">{subtotal.toLocaleString("ar-EG")} ج.م</span>
-              </div>
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-slate-500">خصم (%)</span>
-                <input
-                  type="number"
-                  className="w-20 text-center border border-slate-200 rounded-lg px-2 py-1 text-sm"
-                  value={discount}
-                  onChange={e => setDiscount(Number(e.target.value))}
-                  min="0" max="100"
-                />
-              </div>
-              {discountAmount > 0 && (
-                <div className="flex justify-between text-sm text-red-500">
-                  <span>قيمة الخصم</span>
-                  <span>- {discountAmount.toLocaleString("ar-EG")} ج.م</span>
+          <div className="erp-pos-cart">
+            {cart.length > 0 ? (
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th className="w-14">#</th>
+                    <th>اسم الصنف</th>
+                    <th className="w-40">الكمية</th>
+                    <th className="w-32">سعر البيع</th>
+                    <th className="w-32">الإجمالي</th>
+                    <th className="w-16" aria-label="حذف" />
+                  </tr>
+                </thead>
+                <tbody>
+                  {cart.map((item, index) => (
+                    <tr key={item.productId}>
+                      <td className="text-xs font-black text-slate-400">{index + 1}</td>
+                      <td><p className="font-black text-slate-800">{item.productName}</p></td>
+                      <td>
+                        <div className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white p-1">
+                          <button onClick={() => updateQuantity(item.productId, item.quantity - 1)} className="grid h-7 w-7 place-items-center rounded-md text-slate-500 hover:bg-slate-100" aria-label={`تقليل كمية ${item.productName}`}><Minus className="h-3.5 w-3.5" /></button>
+                          <span className="min-w-8 text-center font-black text-slate-800">{item.quantity.toLocaleString("ar-EG")}</span>
+                          <button onClick={() => updateQuantity(item.productId, item.quantity + 1)} className="grid h-7 w-7 place-items-center rounded-md bg-[var(--erp-accent-soft)] text-[var(--erp-accent-strong)] hover:bg-emerald-100" aria-label={`زيادة كمية ${item.productName}`}><Plus className="h-3.5 w-3.5" /></button>
+                        </div>
+                      </td>
+                      <td className="font-bold">{item.unitPrice.toLocaleString("ar-EG")} ج.م</td>
+                      <td className="font-black text-[var(--erp-accent-strong)]">{item.total.toLocaleString("ar-EG")} ج.م</td>
+                      <td>
+                        <button onClick={() => removeFromCart(item.productId)} className="grid h-8 w-8 place-items-center rounded-lg text-red-400 transition hover:bg-red-50 hover:text-red-600" aria-label={`حذف ${item.productName}`}><Trash2 className="h-4 w-4" /></button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : (
+              <div className="erp-pos-empty">
+                <div>
+                  <div className="mx-auto mb-3 grid h-16 w-16 place-items-center rounded-2xl bg-[var(--erp-accent-soft)] text-[var(--erp-accent)]"><Barcode className="h-8 w-8" /></div>
+                  <p className="font-black text-slate-700">ابدأ بالبحث عن صنف أو امسح الباركود</p>
+                  <p className="mt-2 text-sm text-slate-400">اضغط Enter لإضافة أول نتيجة مباشرة إلى الفاتورة</p>
                 </div>
-              )}
-              <div className="flex justify-between text-sm">
-                <span className="text-slate-500">ضريبة القيمة المضافة ({taxRate}%)</span>
-                <span className="font-medium">{taxAmount.toLocaleString("ar-EG")} ج.م</span>
               </div>
-              <div className="border-t border-slate-200 pt-3 flex justify-between">
-                <span className="font-bold text-slate-800">الإجمالي</span>
-                <span data-testid="new-invoice-total" data-value={total} className="font-black text-xl text-indigo-600">{total.toLocaleString("ar-EG")} ج.م</span>
+            )}
+          </div>
+        </section>
+
+        <aside className="erp-pos-summary">
+          <div className="erp-pos-total">
+            <h2 className="mb-2 text-xs font-black uppercase tracking-wide text-emerald-100">ملخص الفاتورة</h2>
+            <div className="flex items-center justify-between gap-3 text-sm font-bold text-emerald-50">
+              <span>إجمالي الفاتورة</span>
+              <span>{cart.length.toLocaleString("ar-EG")} صنف</span>
+            </div>
+            <p data-testid="new-invoice-total" data-value={total} className="erp-pos-total-value">{total.toLocaleString("ar-EG")} <span className="text-base">ج.م</span></p>
+          </div>
+
+          <div className="erp-pos-summary-body">
+            <div className="space-y-1 border-b border-slate-100 pb-3">
+              <div className="erp-pos-summary-row"><span>المجموع الفرعي</span><strong className="text-slate-800">{subtotal.toLocaleString("ar-EG")} ج.م</strong></div>
+              <div className="erp-pos-summary-row">
+                <span>خصم الفاتورة</span>
+                <label className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2">
+                  <input type="number" className="w-14 bg-transparent py-1.5 text-center text-sm font-black outline-none" value={discount} onChange={e => setDiscount(Number(e.target.value))} min="0" max="100" aria-label="نسبة خصم الفاتورة" />
+                  <span className="text-xs text-slate-400">%</span>
+                </label>
               </div>
+              {discountAmount > 0 && <div className="erp-pos-summary-row text-red-500"><span>قيمة الخصم</span><strong>- {discountAmount.toLocaleString("ar-EG")} ج.م</strong></div>}
+              <div className="erp-pos-summary-row"><span>الضريبة ({taxRate}%)</span><strong className="text-slate-800">{taxAmount.toLocaleString("ar-EG")} ج.م</strong></div>
             </div>
 
-            <div className="space-y-3 mb-4">
-              <div>
-                <label className="form-label">حساب التحصيل</label>
+            <div className="mt-4 space-y-3">
+              <label>
+                <span className="form-label flex items-center gap-1.5"><CreditCard className="h-4 w-4 text-[var(--erp-blue)]" />حساب التحصيل</span>
                 <select className="form-input" value={accountId} onChange={e => setAccountId(e.target.value)} disabled={!canCollect || paid <= 0}>
-                  <option value="">{canCollect ? "اختر الحساب المالي" : "يسجل مسؤول التحصيل الدفعة لاحقاً"}</option>
+                  <option value="">{canCollect ? "اختر الخزينة أو الحساب" : "يسجل مسؤول التحصيل الدفعة لاحقًا"}</option>
                   {accounts.map(account => <option key={account._id} value={account._id}>{account.name}</option>)}
                 </select>
-              </div>
-              <div>
-                <label className="form-label">المبلغ المدفوع</label>
-                <input
-                  type="number"
-                  className="form-input"
-                  value={paid}
-                  onChange={e => setPaid(Number(e.target.value))}
-                  max={total}
-                />
-              </div>
-              {remaining > 0 && (
-                <div className="bg-amber-50 border border-amber-200 rounded-xl p-3">
-                  <p className="text-sm text-amber-700 font-medium">
-                    المتبقي: {remaining.toLocaleString("ar-EG")} ج.م
-                  </p>
+              </label>
+              <label>
+                <span className="form-label">المبلغ المدفوع</span>
+                <input type="number" className="form-input text-lg font-black" value={paid} onChange={e => setPaid(Number(e.target.value))} min="0" max={total} />
+              </label>
+              <div className={`rounded-xl border p-3 ${remaining > 0 ? "border-amber-200 bg-amber-50 text-amber-800" : "border-emerald-200 bg-emerald-50 text-emerald-800"}`}>
+                <div className="flex items-center justify-between gap-3 text-sm font-black">
+                  <span>{remaining > 0 ? "المتبقي على العميل" : "الفاتورة مسددة"}</span>
+                  <span>{Math.max(0, remaining).toLocaleString("ar-EG")} ج.م</span>
                 </div>
-              )}
-              <div>
-                <label className="form-label">ملاحظات</label>
-                <textarea data-testid="invoice-notes" className="form-input" rows={2} value={notes} onChange={e => setNotes(e.target.value)} placeholder="ملاحظات..." />
               </div>
+              <label>
+                <span className="form-label">ملاحظات</span>
+                <textarea data-testid="invoice-notes" className="form-input" rows={2} value={notes} onChange={e => setNotes(e.target.value)} placeholder="ملاحظات تظهر مع المستند..." />
+              </label>
             </div>
 
-            <button
-              data-testid="invoice-submit"
-              onClick={handleSubmit}
-              disabled={saving || cart.length === 0}
-              className="w-full py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl font-bold hover:from-indigo-700 hover:to-purple-700 transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed active:scale-95"
-            >
-              إصدار الفاتورة
+            <button data-testid="invoice-submit" onClick={handleSubmit} disabled={saving || cart.length === 0} className="btn-primary mt-4 flex w-full items-center justify-center gap-2 py-3 text-base">
+              <CheckCircle2 className="h-5 w-5" />
+              {saving ? "جارٍ إصدار الفاتورة..." : "إصدار الفاتورة"}
             </button>
+
+            <div className="erp-pos-shortcuts" aria-label="اختصارات الفاتورة">
+              <span className="erp-pos-shortcut"><kbd>F2</kbd> بحث الصنف</span>
+              <span className="erp-pos-shortcut"><kbd>Enter</kbd> إضافة</span>
+              <span className="erp-pos-shortcut"><kbd>F9</kbd> إصدار</span>
+            </div>
           </div>
-        </div>
+        </aside>
       </div>
     </div>
   );

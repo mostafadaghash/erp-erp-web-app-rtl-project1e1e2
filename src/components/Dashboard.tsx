@@ -215,8 +215,9 @@ export function Dashboard({ onNavigate, onRequestCreate, permissions, modules }:
     <div className="space-y-6 p-4 lg:p-6">
       <section className="erp-page-header">
         <div>
+          <span className="erp-kicker">مركز متابعة الأعمال</span>
           <h1 className="erp-page-title">
-            <BarChart3 className="h-6 w-6 text-emerald-600" />
+            <BarChart3 className="h-6 w-6 text-[var(--erp-accent)]" />
             لوحة التحكم
           </h1>
           <p className="erp-page-subtitle">نظرة واضحة وسريعة على أهم أعمالك اليوم</p>
@@ -243,12 +244,12 @@ export function Dashboard({ onNavigate, onRequestCreate, permissions, modules }:
               <button
                 key={card.page}
                 onClick={() => onNavigate(card.page)}
-                className="group min-h-[170px] rounded-2xl border border-slate-200 bg-white p-5 text-right shadow-[0_8px_28px_rgba(15,23,42,.045)] transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-[0_14px_34px_rgba(15,23,42,.07)]"
+                className="erp-module-card group p-5 text-right"
               >
                 <div className={`mb-5 flex h-12 w-12 items-center justify-center rounded-2xl ${card.tone}`}><Icon className="h-6 w-6" /></div>
                 <h3 className="text-lg font-black text-slate-900">{card.title}</h3>
                 <p className="mt-2 text-sm leading-6 text-slate-500">{card.description}</p>
-                <div className="mt-4 text-xs font-bold text-emerald-700 opacity-80 transition group-hover:opacity-100">فتح القسم ←</div>
+                <div className="mt-4 text-xs font-bold text-[var(--erp-accent-strong)] opacity-80 transition group-hover:opacity-100">فتح القسم ←</div>
               </button>
             );
           })}

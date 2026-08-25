@@ -168,13 +168,14 @@ export function InvoicesPage({ onNavigate, view = "sales" }: InvoicesPageProps) 
 
   return (
     <div className="p-4 lg:p-6 space-y-5" data-testid="invoices-page">
-      <div className="flex items-center justify-between">
+      <div className="erp-page-header">
         <div>
-          <h1 className="text-2xl font-black text-slate-800 flex items-center gap-2">
-            <FileText className="w-6 h-6 text-indigo-600" />
-            المبيعات
+          <span className="erp-kicker">مركز الفواتير والتحصيل</span>
+          <h1 className="erp-page-title">
+            <FileText className="w-6 h-6 text-[var(--erp-accent)]" />
+            فواتير المبيعات
           </h1>
-          <p className="text-slate-500 text-sm mt-0.5">{invoices.length} فاتورة</p>
+          <p className="erp-page-subtitle">{invoices.length.toLocaleString("ar-EG")} فاتورة مسجلة</p>
         </div>
         {canCreate && <button onClick={() => onNavigate("new-invoice")} className="btn-primary flex items-center gap-2">
           <Plus className="w-4 h-4" />
@@ -183,23 +184,23 @@ export function InvoicesPage({ onNavigate, view = "sales" }: InvoicesPageProps) 
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-3 gap-3">
-        <div className="bg-indigo-50 rounded-xl p-4 text-center">
-          <p className="text-xl font-black text-indigo-600">{totalRevenue.toLocaleString("ar-EG")}</p>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <div className="erp-metric-card text-center">
+          <p className="text-xl font-black text-[var(--erp-navy)]">{totalRevenue.toLocaleString("ar-EG")}</p>
           <p className="text-xs text-slate-600 mt-0.5">إجمالي المبيعات (ج.م)</p>
         </div>
-        <div className="bg-emerald-50 rounded-xl p-4 text-center">
-          <p className="text-xl font-black text-emerald-600">{totalPaid.toLocaleString("ar-EG")}</p>
+        <div className="erp-metric-card text-center">
+          <p className="text-xl font-black text-[var(--erp-accent-strong)]">{totalPaid.toLocaleString("ar-EG")}</p>
           <p className="text-xs text-slate-600 mt-0.5">المحصل (ج.م)</p>
         </div>
-        <div className="bg-amber-50 rounded-xl p-4 text-center">
+        <div className="erp-metric-card text-center">
           <p className="text-xl font-black text-amber-600">{totalPending.toLocaleString("ar-EG")}</p>
           <p className="text-xs text-slate-600 mt-0.5">المتبقي (ج.م)</p>
         </div>
       </div>
 
       {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-3">
+      <div className="erp-toolbar flex-col sm:flex-row">
         <div className="relative flex-1">
           <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <input
@@ -222,7 +223,7 @@ export function InvoicesPage({ onNavigate, view = "sales" }: InvoicesPageProps) 
       </div>
 
       {/* Table */}
-      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+      <div className="erp-section">
         <div className="overflow-x-auto">
           <table className="data-table">
             <thead>
