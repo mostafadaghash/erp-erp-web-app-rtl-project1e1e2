@@ -317,7 +317,7 @@ export function ERPApp() {
             </div>
           </header>
 
-          <main className="min-h-0 flex-1 overflow-y-auto">
+          <main className="erp-workspace-main min-h-0 flex-1 overflow-y-auto">
             {!authorized && (
               <div className="flex min-h-[70vh] items-center justify-center p-6">
                 <div className="text-center">

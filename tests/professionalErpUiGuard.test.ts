@@ -100,6 +100,20 @@ test("default visual system uses the approved emerald and navy ERP identity", ()
   assert.match(navigationStyles, /erp-navigation::before/);
 });
 
+test("every operational page inherits the Sahl clarity design system", () => {
+  assert.match(app, /className="erp-workspace-main/);
+  for (const marker of [
+    "Sahl-inspired clarity layer",
+    ".erp-workspace-main :where(.data-table, table) th",
+    "border: 1px solid var(--erp-border-strong)",
+    ".erp-workspace-main .btn-primary",
+    ".erp-workspace-main :where(input, select, textarea)",
+  ]) assert.match(professionalStyles, new RegExp(marker.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  assert.match(navigationStyles, /border-radius: 5px/);
+  assert.match(purchaseReturns, /className="erp-section" data-testid="purchase-return-form"/);
+  assert.match(purchaseReturns, /سجل مرتجعات المشتريات/);
+});
+
 test("sales invoice is a fast keyboard and barcode-ready document workspace", () => {
   for (const marker of [
     "erp-pos-page",
