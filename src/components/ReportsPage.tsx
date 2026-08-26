@@ -13,7 +13,9 @@ import {
   CalendarDays,
   CircleDollarSign,
   Package,
+  Printer,
   ReceiptText,
+  SlidersHorizontal,
   ShoppingCart,
   TrendingDown,
   TrendingUp,
@@ -25,6 +27,7 @@ import type { LucideIcon } from "lucide-react";
 import type { ReportingOverview } from "../../shared/reportingView";
 
 type Period = "today" | "week" | "month" | "year" | "custom";
+type ReportKind = "overview" | "sales" | "purchases" | "profit" | "treasury" | "inventory" | "customers" | "suppliers";
 type BranchOption = { _id: Id<"branches">; name: string };
 type Tone = "indigo" | "emerald" | "amber" | "red" | "sky" | "violet";
 
@@ -136,6 +139,90 @@ function Section({
   );
 }
 
+const reportOptions: Array<{ id: ReportKind; title: string; description: string; icon: LucideIcon; profitOnly?: boolean }> = [
+  { id: "overview", title: "الملخص التنفيذي", description: "صورة كاملة عن النشاط", icon: BarChart3 },
+  { id: "sales", title: "تقرير المبيعات", description: "الفواتير والمرتجعات والتحصيل", icon: ShoppingCart },
+  { id: "purchases", title: "تقرير المشتريات", description: "الموردون والتكلفة والمدفوعات", icon: ReceiptText },
+  { id: "profit", title: "الأرباح والخسائر", description: "المبيعات والتكلفة والمصروفات", icon: CircleDollarSign, profitOnly: true },
+  { id: "treasury", title: "الخزينة والتحصيل", description: "الحركة النقدية وحسابات السيولة", icon: WalletCards },
+  { id: "inventory", title: "قيمة المخزون", description: "القيمة الحالية والأصناف الأعلى", icon: Package },
+  { id: "customers", title: "أرصدة العملاء", description: "المديونيات والمقدمات", icon: Users },
+  { id: "suppliers", title: "أرصدة الموردين", description: "المستحقات والسداد", icon: Truck },
+];
+
+function FocusedReport({
+  kind,
+  report,
+  formatCurrency,
+}: {
+  kind: ReportKind;
+  report: ReportingOverview;
+  formatCurrency: (value: number) => string;
+}) {
+  const rows: Record<ReportKind, Array<[string, string]>> = {
+    overview: [
+      ["صافي المبيعات", formatCurrency(report.sales.netSales)],
+      ["صافي التحصيل", formatCurrency(report.collections.netCollections)],
+      ["إجمالي المصروفات", formatCurrency(report.expenses.totalExpenses)],
+      ["رصيد الخزائن والبنوك", formatCurrency(report.currentBalances.liquidAccounts)],
+    ],
+    sales: [
+      ["إجمالي المبيعات", formatCurrency(report.sales.grossSales)],
+      ["مرتجعات المبيعات", formatCurrency(report.sales.salesReturns)],
+      ["صافي المبيعات", formatCurrency(report.sales.netSales)],
+      ["عدد الفواتير", report.sales.invoiceCount.toLocaleString("ar-EG")],
+    ],
+    purchases: [
+      ["المشتريات الواصلة", formatCurrency(report.purchases.landedPurchases)],
+      ["إشعارات خصم المورد", formatCurrency(report.purchases.supplierCredits)],
+      ["مدفوعات الموردين", formatCurrency(report.purchases.supplierPayments)],
+      ["المستحق حاليًا", formatCurrency(report.currentBalances.supplierPayables)],
+    ],
+    profit: [
+      ["صافي المبيعات", formatCurrency(report.sales.netSales)],
+      ["تكلفة البضاعة", report.profitability?.cogs === null || report.profitability?.cogs === undefined ? "غير مكتملة" : formatCurrency(report.profitability.cogs)],
+      ["مجمل الربح", report.profitability?.grossProfit === null || report.profitability?.grossProfit === undefined ? "غير مكتمل" : formatCurrency(report.profitability.grossProfit)],
+      ["صافي الربح", report.profitability?.netProfit === null || report.profitability?.netProfit === undefined ? "غير مكتمل" : formatCurrency(report.profitability.netProfit)],
+    ],
+    treasury: [
+      ["التحصيلات", formatCurrency(report.collections.collections)],
+      ["المبالغ المستردة", formatCurrency(report.collections.refunds)],
+      ["صافي التحصيل", formatCurrency(report.collections.netCollections)],
+      ["الخزائن والبنوك", formatCurrency(report.currentBalances.liquidAccounts)],
+    ],
+    inventory: [
+      ["قيمة المخزون الحالية", report.currentBalances.inventoryValue === undefined ? "غير متاحة" : formatCurrency(report.currentBalances.inventoryValue)],
+      ["المشتريات الواصلة", formatCurrency(report.purchases.landedPurchases)],
+      ["قيمة المرتجعات للمورد", formatCurrency(report.purchases.returnedInventoryValue)],
+      ["أصناف تاريخية ناقصة التكلفة", report.completeness.legacyInventoryValueProducts.toLocaleString("ar-EG")],
+    ],
+    customers: [
+      ["مستحقات العملاء", formatCurrency(report.currentBalances.customerReceivables)],
+      ["مقدمات العملاء", formatCurrency(report.currentBalances.customerAdvances)],
+      ["صافي التحصيل", formatCurrency(report.collections.netCollections)],
+      ["فواتير الفترة", report.sales.invoiceCount.toLocaleString("ar-EG")],
+    ],
+    suppliers: [
+      ["مديونية الموردين", formatCurrency(report.currentBalances.supplierPayables)],
+      ["مديونية منشأة خلال الفترة", formatCurrency(report.purchases.supplierLiabilityCreated)],
+      ["مدفوعات الموردين", formatCurrency(report.purchases.supplierPayments)],
+      ["عدد مستندات الشراء", report.purchases.receiptCount.toLocaleString("ar-EG")],
+    ],
+  };
+
+  return (
+    <section className="erp-section" data-testid={`active-report-${kind}`}>
+      <div className="erp-section-header">
+        <div><p className="text-xs font-bold text-[var(--erp-accent-strong)]">نتيجة التقرير المختار</p><h2 className="erp-section-title mt-1">{reportOptions.find((option) => option.id === kind)?.title}</h2></div>
+        <button className="erp-action" onClick={() => window.print()}><Printer className="h-4 w-4" />طباعة التقرير</button>
+      </div>
+      <dl className="grid gap-0 p-2 sm:grid-cols-2 xl:grid-cols-4">
+        {rows[kind].map(([label, value]) => <div key={label} className="m-1 rounded-xl border border-slate-100 bg-slate-50 p-4"><dt className="text-xs font-bold text-slate-500">{label}</dt><dd className="mt-2 text-lg font-black text-[var(--erp-navy)]">{value}</dd></div>)}
+      </dl>
+    </section>
+  );
+}
+
 export function ReportsPage() {
   const canViewReports = usePermission("view_reports");
   const canViewProfits = usePermission("view_profits");
@@ -146,6 +233,7 @@ export function ReportsPage() {
   const [customFrom, setCustomFrom] = useState(startOfPeriod("month", now));
   const [customTo, setCustomTo] = useState(today);
   const [branchId, setBranchId] = useState<Id<"branches"> | "">("");
+  const [activeReport, setActiveReport] = useState<ReportKind>("overview");
 
   const me = useQuery(api.employees.me);
   const branchesQuery = useQuery(
@@ -279,8 +367,44 @@ export function ReportsPage() {
               </label>
             </div>
           )}
+          <button
+            data-testid="report-apply-filters"
+            className="btn-primary flex items-center justify-center gap-2 sm:col-span-2"
+            disabled={Boolean(validationMessage)}
+            onClick={() => document.getElementById("report-output")?.scrollIntoView({ behavior: "smooth", block: "start" })}
+          >
+            <SlidersHorizontal className="h-4 w-4" />
+            عرض التقرير بالفلاتر المحددة
+          </button>
         </div>
       </header>
+
+      <section className="erp-section" aria-label="التقارير المتاحة">
+        <div className="erp-section-header">
+          <div><h2 className="erp-section-title">التقارير المتاحة</h2><p className="mt-1 text-xs text-slate-500">اختر التقرير ثم حدّد الفرع والفترة واضغط عرض التقرير</p></div>
+          <span className="erp-status">{reportOptions.filter((option) => !option.profitOnly || canViewProfits).length.toLocaleString("ar-EG")} تقارير</span>
+        </div>
+        <div className="grid gap-2 p-3 sm:grid-cols-2 lg:grid-cols-4">
+          {reportOptions.filter((option) => !option.profitOnly || canViewProfits).map((option) => {
+            const Icon = option.icon;
+            const selected = activeReport === option.id;
+            return (
+              <button
+                key={option.id}
+                data-testid={`report-option-${option.id}`}
+                onClick={() => {
+                  setActiveReport(option.id);
+                  requestAnimationFrame(() => document.getElementById("report-output")?.scrollIntoView({ behavior: "smooth", block: "start" }));
+                }}
+                className={`flex items-center gap-3 rounded-xl border p-3 text-right transition ${selected ? "border-emerald-500 bg-emerald-50 text-emerald-900 shadow-sm" : "border-slate-200 bg-white text-slate-700 hover:border-emerald-200 hover:bg-slate-50"}`}
+              >
+                <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${selected ? "bg-emerald-600 text-white" : "bg-slate-100 text-slate-500"}`}><Icon className="h-5 w-5" /></span>
+                <span className="min-w-0"><strong className="block text-sm">{option.title}</strong><small className="mt-1 block truncate text-xs opacity-70">{option.description}</small></span>
+              </button>
+            );
+          })}
+        </div>
+      </section>
 
       {validationMessage && (
         <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
@@ -297,7 +421,7 @@ export function ReportsPage() {
       )}
 
       {report && (
-        <>
+        <div id="report-output" className="contents">
           <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
             <span className="rounded-full bg-slate-100 px-3 py-1">
               {report.scope.from} ← {report.scope.to}
@@ -311,6 +435,8 @@ export function ReportsPage() {
               أساس التاريخ: تاريخ العملية
             </span>
           </div>
+
+          <FocusedReport kind={activeReport} report={report} formatCurrency={formatCurrency} />
 
           {canViewProfits && !report.completeness.profitabilityAvailable && (
             <div className="flex gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-amber-800">
@@ -523,7 +649,7 @@ export function ReportsPage() {
               دون قيمة مخزون تاريخية مكتملة؛ قيمة المخزون الحالية لا تتضمن تقديرًا تلقائيًا لها.
             </div>
           )}
-        </>
+        </div>
       )}
     </div>
   );

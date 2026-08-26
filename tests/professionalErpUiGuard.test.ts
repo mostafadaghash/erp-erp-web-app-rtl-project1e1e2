@@ -20,6 +20,7 @@ const orders = read("src/components/OrdersPage.tsx");
 const deliveries = read("src/components/DeliveriesPage.tsx");
 const repairs = read("src/components/RepairsPage.tsx");
 const purchaseReturns = read("src/components/PurchaseReturnsPage.tsx");
+const reports = read("src/components/ReportsPage.tsx");
 
 test("professional ERP navigation uses conventional Arabic information architecture", () => {
   for (const label of [
@@ -112,6 +113,25 @@ test("sales invoice is a fast keyboard and barcode-ready document workspace", ()
   assert.match(newInvoice, /event\.key === "F2"/);
   assert.match(newInvoice, /event\.key === "F9"/);
   assert.match(newInvoice, /event\.key === "Enter"/);
+  assert.match(professionalStyles, /\.erp-pos-page[\s\S]*height: 100%[\s\S]*overflow: hidden/);
+});
+
+test("historical sales and purchase documents can always be reopened", () => {
+  assert.match(invoices, /data-testid="invoice-open"/);
+  assert.match(invoices, /data-testid="invoice-details-modal"/);
+  assert.match(purchases, /data-testid="purchase-open"/);
+  assert.match(purchases, /data-testid="purchase-details-modal"/);
+  assert.match(read("convex/shipments.ts"), /export const purchaseDocument = query/);
+});
+
+test("reports expose a clickable catalog, explicit filters and printable output", () => {
+  for (const marker of [
+    'id: "sales"',
+    'id: "purchases"',
+    'id: "profit"',
+    "report-apply-filters",
+    "طباعة التقرير",
+  ]) assert.match(reports, new RegExp(marker));
 });
 
 test("authentication and session controls use professional Arabic copy", () => {

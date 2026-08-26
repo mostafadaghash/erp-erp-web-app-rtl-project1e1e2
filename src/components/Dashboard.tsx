@@ -213,45 +213,17 @@ export function Dashboard({ onNavigate, onRequestCreate, permissions, modules }:
 
   return (
     <div className="space-y-6 p-4 lg:p-6">
-      <section className="erp-page-header">
-        <div>
-          <span className="erp-kicker">مركز متابعة الأعمال</span>
-          <h1 className="erp-page-title">
-            <BarChart3 className="h-6 w-6 text-[var(--erp-accent)]" />
-            لوحة التحكم
-          </h1>
-          <p className="erp-page-subtitle">نظرة واضحة وسريعة على أهم أعمالك اليوم</p>
+      <section className="erp-toolbar">
+        <div className="flex items-center gap-3">
+          <span className="grid h-10 w-10 place-items-center rounded-xl bg-emerald-50 text-emerald-700"><BarChart3 className="h-5 w-5" /></span>
+          <div><h1 className="erp-page-title"><BarChart3 className="h-5 w-5 text-[var(--erp-accent)]" />لوحة التحكم</h1><p className="text-xs text-slate-500">المؤشرات والعمليات الأكثر استخدامًا في مكان واحد</p></div>
         </div>
-        <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-600 shadow-sm">
+        <div className="text-sm font-bold text-slate-500">
           {new Date().toLocaleDateString("ar-EG", {
             weekday: "long",
             year: "numeric",
             month: "long",
             day: "numeric",
-          })}
-        </div>
-      </section>
-
-      <section>
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-base font-black text-slate-800">الوحدات الرئيسية</h2>
-          <span className="text-xs text-slate-400">اختر القسم المطلوب</span>
-        </div>
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          {moduleCards.map(card => {
-            const Icon = card.icon;
-            return (
-              <button
-                key={card.page}
-                onClick={() => onNavigate(card.page)}
-                className="erp-module-card group p-5 text-right"
-              >
-                <div className={`mb-5 flex h-12 w-12 items-center justify-center rounded-2xl ${card.tone}`}><Icon className="h-6 w-6" /></div>
-                <h3 className="text-lg font-black text-slate-900">{card.title}</h3>
-                <p className="mt-2 text-sm leading-6 text-slate-500">{card.description}</p>
-                <div className="mt-4 text-xs font-bold text-[var(--erp-accent-strong)] opacity-80 transition group-hover:opacity-100">فتح القسم ←</div>
-              </button>
-            );
           })}
         </div>
       </section>
@@ -285,6 +257,24 @@ export function Dashboard({ onNavigate, onRequestCreate, permissions, modules }:
           </div>
         </section>
       )}
+
+      <section>
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="text-base font-black text-slate-800">الوحدات الرئيسية</h2>
+          <span className="text-xs text-slate-400">وصول سريع لكل أقسام النظام</span>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {moduleCards.map(card => {
+            const Icon = card.icon;
+            return (
+              <button key={card.page} onClick={() => onNavigate(card.page)} className="erp-module-card group flex items-center gap-3 p-4 text-right">
+                <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${card.tone}`}><Icon className="h-5 w-5" /></div>
+                <div className="min-w-0 flex-1"><h3 className="font-black text-slate-900">{card.title}</h3><p className="mt-1 truncate text-xs text-slate-500">{card.description}</p><div className="mt-2 text-xs font-bold text-[var(--erp-accent-strong)]">فتح القسم ←</div></div>
+              </button>
+            );
+          })}
+        </div>
+      </section>
 
       {report && canViewProfits && !report.completeness.profitabilityAvailable && (
         <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-800">بعض الفواتير القديمة تحتاج استكمال تكلفة البضاعة قبل عرض مؤشرات الربحية بدقة.</div>

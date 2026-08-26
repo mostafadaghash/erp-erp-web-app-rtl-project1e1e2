@@ -179,20 +179,22 @@ export function NewInvoicePage({ onNavigate }: NewInvoicePageProps) {
   return (
     <div className="erp-pos-page" data-testid="new-invoice-page">
       <header className="erp-pos-header">
-        <div className="flex min-w-0 items-center gap-3">
-          <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-white/10">
-            <ShoppingCart className="h-6 w-6 text-emerald-200" />
+        <div className="flex min-w-0 items-center gap-2.5">
+          <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-white/10">
+            <ShoppingCart className="h-5 w-5 text-emerald-200" />
           </div>
           <div className="min-w-0">
-            <span className="erp-pos-document-badge">نقطة البيع · مستند جديد</span>
-            <h1 className="mt-2 truncate text-xl font-black sm:text-2xl">فاتورة مبيعات جديدة</h1>
-            <p className="mt-1 text-xs text-slate-300">رقم الفاتورة يُنشأ تلقائيًا عند الإصدار</p>
+            <h1 className="truncate text-base font-black sm:text-lg">فاتورة مبيعات جديدة</h1>
+            <p className="mt-0.5 text-[11px] text-slate-300">رقم المستند يُنشأ تلقائيًا عند الإصدار</p>
           </div>
         </div>
-        <button onClick={() => onNavigate("invoices")} className="flex items-center gap-2 rounded-xl border border-white/15 bg-white/10 px-4 py-2.5 text-sm font-black text-white transition hover:bg-white/15">
-          <ArrowRight className="h-4 w-4" />
-          سجل الفواتير
-        </button>
+        <div className="flex items-center gap-2">
+          <span className="erp-pos-document-badge hidden sm:inline-flex">نقطة بيع سريعة · F2 بحث · F9 إصدار</span>
+          <button onClick={() => onNavigate("invoices")} className="flex items-center gap-2 rounded-lg border border-white/15 bg-white/10 px-3 py-2 text-xs font-black text-white transition hover:bg-white/15">
+            <ArrowRight className="h-4 w-4" />
+            سجل الفواتير
+          </button>
+        </div>
       </header>
 
       <div className="erp-pos-grid">
@@ -346,7 +348,7 @@ export function NewInvoicePage({ onNavigate }: NewInvoicePageProps) {
               </div>
               <label>
                 <span className="form-label">ملاحظات</span>
-                <textarea data-testid="invoice-notes" className="form-input" rows={2} value={notes} onChange={e => setNotes(e.target.value)} placeholder="ملاحظات تظهر مع المستند..." />
+                <textarea data-testid="invoice-notes" className="form-input" rows={1} value={notes} onChange={e => setNotes(e.target.value)} placeholder="ملاحظات تظهر مع المستند..." />
               </label>
             </div>
 

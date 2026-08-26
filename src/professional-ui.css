@@ -291,7 +291,7 @@ tbody tr:hover td {
 
 .erp-module-card {
   position: relative;
-  min-height: 166px;
+  min-height: 128px;
   overflow: hidden;
   border: 1px solid var(--erp-border);
   border-radius: var(--erp-radius-lg);
@@ -332,8 +332,12 @@ tbody tr:hover td {
 
 /* Fast document workspace: Sahl-like operation density with Foodics-like visual discipline. */
 .erp-pos-page {
-  min-height: 100%;
-  padding: 14px;
+  display: flex;
+  height: 100%;
+  min-height: 0;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 8px 12px 10px;
 }
 
 .erp-pos-header {
@@ -341,8 +345,9 @@ tbody tr:hover td {
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  margin-bottom: 12px;
-  padding: 14px 16px;
+  flex: 0 0 auto;
+  margin-bottom: 8px;
+  padding: 8px 12px;
   border: 1px solid var(--erp-border);
   border-radius: var(--erp-radius-lg);
   background: linear-gradient(135deg, var(--erp-navy) 0%, #183a4d 100%);
@@ -365,9 +370,11 @@ tbody tr:hover td {
 
 .erp-pos-grid {
   display: grid;
+  min-height: 0;
+  flex: 1 1 auto;
   grid-template-columns: minmax(0, 1fr) 330px;
-  gap: 12px;
-  align-items: start;
+  gap: 8px;
+  align-items: stretch;
 }
 
 .erp-pos-main,
@@ -379,6 +386,9 @@ tbody tr:hover td {
 }
 
 .erp-pos-main {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
   min-width: 0;
   overflow: hidden;
 }
@@ -386,21 +396,21 @@ tbody tr:hover td {
 .erp-pos-customer-strip {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
-  padding: 12px;
+  gap: 8px;
+  padding: 8px 10px;
   border-bottom: 1px solid var(--erp-border);
   background: var(--erp-surface-soft);
 }
 
 .erp-pos-search-area {
   position: relative;
-  padding: 12px;
+  padding: 8px 10px;
   border-bottom: 1px solid var(--erp-border);
   background: #fff;
 }
 
 .erp-pos-search-input {
-  min-height: 56px !important;
+  min-height: 44px !important;
   padding-inline: 46px 128px !important;
   border: 2px solid color-mix(in srgb, var(--erp-accent) 42%, var(--erp-border)) !important;
   border-radius: 12px !important;
@@ -455,7 +465,8 @@ tbody tr:hover td {
 }
 
 .erp-pos-cart {
-  min-height: 390px;
+  min-height: 0;
+  flex: 1 1 auto;
   overflow: auto;
 }
 
@@ -474,7 +485,7 @@ tbody tr:hover td {
 
 .erp-pos-empty {
   display: grid;
-  min-height: 330px;
+  min-height: 100%;
   place-items: center;
   padding: 34px;
   background:
@@ -484,27 +495,26 @@ tbody tr:hover td {
 }
 
 .erp-pos-summary {
-  position: sticky;
-  top: 12px;
-  overflow: hidden;
+  min-height: 0;
+  overflow: auto;
 }
 
 .erp-pos-total {
-  padding: 20px;
+  padding: 12px 14px;
   background: linear-gradient(145deg, var(--erp-accent) 0%, var(--erp-accent-strong) 100%);
   color: #fff;
 }
 
 .erp-pos-total-value {
-  margin-top: 6px;
-  font-size: clamp(1.8rem, 3vw, 2.6rem);
+  margin-top: 4px;
+  font-size: clamp(1.55rem, 2.4vw, 2.15rem);
   font-weight: 900;
   line-height: 1;
   letter-spacing: -0.02em;
 }
 
 .erp-pos-summary-body {
-  padding: 16px;
+  padding: 11px 13px;
 }
 
 .erp-pos-summary-row {
@@ -512,7 +522,7 @@ tbody tr:hover td {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  min-height: 34px;
+  min-height: 29px;
   color: var(--erp-muted);
   font-size: 0.84rem;
 }
@@ -521,7 +531,7 @@ tbody tr:hover td {
   display: flex;
   flex-wrap: wrap;
   gap: 7px;
-  margin-top: 12px;
+  margin-top: 8px;
 }
 
 .erp-pos-shortcut {
@@ -594,6 +604,20 @@ tbody tr:hover td {
 
   .erp-pos-grid {
     grid-template-columns: 1fr;
+  }
+
+  .erp-pos-page {
+    height: auto;
+    min-height: 100%;
+    overflow: visible;
+  }
+
+  .erp-pos-main {
+    min-height: 620px;
+  }
+
+  .erp-pos-cart {
+    min-height: 360px;
   }
 
   .erp-pos-summary {

@@ -5,7 +5,7 @@ import { useMutation, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { usePermission } from "../lib/access";
 import type { Page } from "./ERPApp";
-import { FileText, Plus, Search, Printer, RotateCcw } from "lucide-react";
+import { Eye, FileText, Plus, Search, Printer, RotateCcw, X } from "lucide-react";
 import { PrintModal } from "./PrintTemplate";
 import { useCurrency } from "../lib/utils";
 import type { Doc, Id } from "../../convex/_generated/dataModel";
@@ -30,6 +30,7 @@ export function InvoicesPage({ onNavigate, view = "sales" }: InvoicesPageProps) 
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState("");
   const [printInvoice, setPrintInvoice] = useState<Doc<"invoices"> | null>(null);
+  const [selectedInvoice, setSelectedInvoice] = useState<Doc<"invoices"> | null>(null);
   const [cancelTarget, setCancelTarget] = useState<Doc<"invoices"> | null>(null);
   const [cancelReason, setCancelReason] = useState("");
   const [isCancelling, setIsCancelling] = useState(false);
@@ -242,7 +243,15 @@ export function InvoicesPage({ onNavigate, view = "sales" }: InvoicesPageProps) 
             <tbody>
               {filtered.map((inv) => (
                 <tr key={inv._id} data-testid="invoice-row" data-invoice-number={inv.invoiceNumber} data-paid={inv.paid} data-remaining={inv.remaining}>
-                  <td className="font-mono text-xs text-indigo-600 font-bold">{inv.invoiceNumber}<details><summary>السجل المالي</summary><FinancialHistory referenceType="invoice" referenceId={String(inv._id)} /></details></td>
+                  <td>
+                    <button
+                      data-testid="invoice-open-number"
+                      onClick={() => setSelectedInvoice(inv)}
+                      className="font-mono text-xs font-black text-[var(--erp-accent-strong)] underline decoration-emerald-200 underline-offset-4 hover:text-emerald-800"
+                    >
+                      {inv.invoiceNumber}
+                    </button>
+                  </td>
                   <td>
                     {canCollect && inv.status !== "cancelled" && inv.status !== "returned" && inv.remaining > 0 && <button data-testid="invoice-collect" className="mr-1 rounded-lg bg-emerald-50 px-2 py-1.5 text-xs font-bold text-emerald-700" onClick={() => collect(inv)}>تحصيل دفعة</button>}
                     {canRefund && inv.status !== "cancelled" && inv.status !== "returned" && inv.paid > 0 && <button data-testid="invoice-refund" className="mr-1 rounded-lg bg-amber-50 px-2 py-1.5 text-xs font-bold text-amber-700" onClick={() => refund(inv)}>استرداد مبلغ</button>}
@@ -277,6 +286,15 @@ export function InvoicesPage({ onNavigate, view = "sales" }: InvoicesPageProps) 
                     </span>
                   </td>
                   <td>
+                    <button
+                      data-testid="invoice-open"
+                      onClick={() => setSelectedInvoice(inv)}
+                      className="erp-action erp-action-primary"
+                      title="فتح الفاتورة"
+                    >
+                      <Eye className="h-4 w-4" />
+                      فتح
+                    </button>
                     {canPrint && inv.status !== "cancelled" && <button
                       onClick={() => { if (canPrint) setPrintInvoice(inv); }}
                       className="p-1.5 hover:bg-indigo-50 rounded-lg transition-colors text-slate-500 hover:text-indigo-600"
@@ -318,6 +336,63 @@ export function InvoicesPage({ onNavigate, view = "sales" }: InvoicesPageProps) 
           data={printInvoice}
           onClose={() => setPrintInvoice(null)}
         />
+      )}
+      {selectedInvoice && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 p-3" dir="rtl" role="dialog" aria-modal="true" data-testid="invoice-details-modal">
+          <div className="flex max-h-[94vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
+            <header className="flex items-center justify-between gap-4 border-b border-slate-200 bg-[var(--erp-navy)] px-5 py-4 text-white">
+              <div>
+                <p className="text-xs font-bold text-emerald-200">فاتورة مبيعات محفوظة</p>
+                <h2 className="mt-1 text-xl font-black">{selectedInvoice.invoiceNumber}</h2>
+              </div>
+              <div className="flex items-center gap-2">
+                {canPrint && selectedInvoice.status !== "cancelled" && (
+                  <button onClick={() => setPrintInvoice(selectedInvoice)} className="rounded-lg border border-white/15 bg-white/10 px-3 py-2 text-xs font-black hover:bg-white/15">
+                    <Printer className="ml-1 inline h-4 w-4" />طباعة
+                  </button>
+                )}
+                <button onClick={() => setSelectedInvoice(null)} className="grid h-9 w-9 place-items-center rounded-lg bg-white/10 hover:bg-white/15" aria-label="إغلاق تفاصيل الفاتورة"><X className="h-5 w-5" /></button>
+              </div>
+            </header>
+
+            <div className="overflow-y-auto p-5">
+              <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <div className="rounded-xl bg-slate-50 p-3"><p className="text-xs text-slate-500">العميل</p><p className="mt-1 font-black text-slate-800">{selectedInvoice.customerName}</p><p className="text-xs text-slate-400">{selectedInvoice.customerPhone || "بدون هاتف"}</p></div>
+                <div className="rounded-xl bg-slate-50 p-3"><p className="text-xs text-slate-500">تاريخ الإنشاء</p><p className="mt-1 font-black text-slate-800">{new Date(selectedInvoice._creationTime).toLocaleString("ar-EG")}</p></div>
+                <div className="rounded-xl bg-emerald-50 p-3"><p className="text-xs text-emerald-700">صافي الفاتورة</p><p className="mt-1 text-lg font-black text-emerald-800">{formatCurrency(selectedInvoice.netTotal ?? selectedInvoice.total)}</p></div>
+                <div className="rounded-xl bg-amber-50 p-3"><p className="text-xs text-amber-700">المتبقي</p><p className="mt-1 text-lg font-black text-amber-800">{formatCurrency(selectedInvoice.remaining)}</p></div>
+              </div>
+
+              <div className="overflow-x-auto rounded-xl border border-slate-200">
+                <table className="data-table min-w-[720px]">
+                  <thead><tr><th>#</th><th>الصنف</th><th>الكمية</th><th>سعر الوحدة</th><th>الخصم</th><th>الإجمالي</th></tr></thead>
+                  <tbody>
+                    {selectedInvoice.items.map((item, index) => (
+                      <tr key={`${item.productName}-${index}`}>
+                        <td>{index + 1}</td><td className="font-bold">{item.productName}</td><td>{item.quantity.toLocaleString("ar-EG")}</td><td>{formatCurrency(item.unitPrice)}</td><td>{item.discount.toLocaleString("ar-EG")}٪</td><td className="font-black">{formatCurrency(item.total)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="mt-4 grid gap-4 lg:grid-cols-[1fr_360px]">
+                <div className="rounded-xl border border-slate-200 p-4">
+                  <h3 className="mb-3 font-black text-slate-800">السجل المالي للفاتورة</h3>
+                  <FinancialHistory referenceType="invoice" referenceId={String(selectedInvoice._id)} />
+                </div>
+                <dl className="space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm">
+                  <div className="flex justify-between"><dt>المجموع الفرعي</dt><dd className="font-bold">{formatCurrency(selectedInvoice.subtotal)}</dd></div>
+                  <div className="flex justify-between"><dt>الخصم</dt><dd className="font-bold text-red-600">{formatCurrency(selectedInvoice.discount)}</dd></div>
+                  <div className="flex justify-between"><dt>الضريبة</dt><dd className="font-bold">{formatCurrency(selectedInvoice.tax)}</dd></div>
+                  <div className="flex justify-between border-t border-slate-200 pt-2 text-base"><dt className="font-black">الإجمالي</dt><dd className="font-black text-[var(--erp-accent-strong)]">{formatCurrency(selectedInvoice.total)}</dd></div>
+                  <div className="flex justify-between"><dt>المدفوع</dt><dd className="font-bold text-emerald-700">{formatCurrency(selectedInvoice.paid)}</dd></div>
+                  {selectedInvoice.notes && <div className="border-t border-slate-200 pt-2"><dt className="text-slate-500">ملاحظات</dt><dd className="mt-1 font-medium text-slate-700">{selectedInvoice.notes}</dd></div>}
+                </dl>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
       {cancelTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" dir="rtl">
