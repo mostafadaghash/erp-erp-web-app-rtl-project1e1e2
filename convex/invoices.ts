@@ -200,6 +200,7 @@ export const create = mutation({
       paymentMethod: paymentAccount?.type ?? "unpaid",
       status: deriveInvoiceStatus({ netTotal: prepared.total, creditedTotal: 0, paid: prepared.paid, remaining: prepared.remaining }),
       notes: args.notes,
+      date: transactionDate,
       branchId,
       userId: user.userId,
       type: "sale",
