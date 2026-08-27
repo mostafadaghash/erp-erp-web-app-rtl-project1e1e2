@@ -1,5 +1,6 @@
-import { useQuery } from "convex/react";
+import { usePaginatedQuery, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
+import type { Id } from "../../convex/_generated/dataModel";
 import type { Page } from "./ERPApp";
 import {
   BarChart3,
@@ -19,6 +20,7 @@ interface DashboardProps {
   onRequestCreate: (page: "new-invoice" | "shipments" | "products" | "customers") => void;
   permissions: Permission[];
   modules: Record<string, boolean | undefined>;
+  branchId?: Id<"branches">;
 }
 
 type ShortcutCard = {
@@ -38,8 +40,15 @@ type RecentInvoice = {
   paid: number;
   remaining: number;
   status: string;
-  date?: string;
 };
+
+function isoDate(date: Date) {
+  return [
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, "0"),
+    String(date.getDate()).padStart(2, "0"),
+  ].join("-");
+}
 
 function Sparkline() {
   return (
@@ -70,7 +79,7 @@ function invoiceStatus(invoice: RecentInvoice) {
   return { label: "غير مسددة", className: "erp-dashboard-status--unpaid" };
 }
 
-export function Dashboard({ onNavigate, permissions, modules }: DashboardProps) {
+export function Dashboard({ onNavigate, permissions, modules, branchId }: DashboardProps) {
   const can = (permission: Permission) => permissions.includes(permission);
   const enabled = (moduleName: string) => modules[moduleName] !== false;
 
@@ -85,12 +94,10 @@ export function Dashboard({ onNavigate, permissions, modules }: DashboardProps) 
   const canViewTreasury = can("view_finance");
 
   const now = new Date();
-  const today = [
-    now.getFullYear(),
-    String(now.getMonth() + 1).padStart(2, "0"),
-    String(now.getDate()).padStart(2, "0"),
-  ].join("-");
+  const today = isoDate(now);
   const monthFrom = `${today.slice(0, 7)}-01`;
+  const recentFromDate = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate());
+  const recentFrom = isoDate(recentFromDate);
 
   const report = useQuery(
     api.reporting.overview,
@@ -99,10 +106,14 @@ export function Dashboard({ onNavigate, permissions, modules }: DashboardProps) 
   const repairStats = useQuery(api.repairs.getStats, canViewRepairs ? {} : "skip");
   const lowStockProducts = useQuery(api.products.list, canViewProducts ? { lowStock: true } : "skip");
   const crmStats = useQuery(api.leads.stats, canViewLeads ? {} : "skip");
-  const recentInvoices = useQuery(
-    api.dashboard.recentInvoices,
-    canViewInvoices ? { limit: 5 } : "skip",
-  ) as RecentInvoice[] | undefined;
+  const recentInvoicesQuery = usePaginatedQuery(
+    api.reporting.salesDetails,
+    canViewInvoices && canViewReports && branchId
+      ? { branchId, from: recentFrom, to: today }
+      : "skip",
+    { initialNumItems: 5 },
+  );
+  const recentInvoices = recentInvoicesQuery.results.slice(0, 5) as RecentInvoice[];
 
   const { formatCurrency, formatAmount } = useCurrency();
 
@@ -168,6 +179,9 @@ export function Dashboard({ onNavigate, permissions, modules }: DashboardProps) 
         { label: "قيد الإصلاح", value: repairStats?.inProgress ?? 0, tone: "rose" },
       ];
 
+  const recentInvoicesAvailable = canViewInvoices && canViewReports && Boolean(branchId);
+  const recentInvoicesLoading = recentInvoicesAvailable && recentInvoicesQuery.status === "LoadingFirstPage";
+
   return (
     <div className="erp-dashboard">
       <div className="erp-dashboard-heading sr-only">
@@ -232,9 +246,9 @@ export function Dashboard({ onNavigate, permissions, modules }: DashboardProps) 
             )}
           </div>
 
-          {canViewInvoices && recentInvoices === undefined ? (
+          {recentInvoicesLoading ? (
             <div className="erp-dashboard-empty">جارٍ تحميل أحدث الفواتير...</div>
-          ) : canViewInvoices && recentInvoices && recentInvoices.length > 0 ? (
+          ) : recentInvoicesAvailable && recentInvoices.length > 0 ? (
             <div className="erp-dashboard-table-wrap">
               <table className="erp-dashboard-table">
                 <thead>
@@ -275,7 +289,13 @@ export function Dashboard({ onNavigate, permissions, modules }: DashboardProps) 
             </div>
           ) : (
             <div className="erp-dashboard-empty">
-              {canViewInvoices ? "لا توجد فواتير مبيعات لعرضها حاليًا." : "لا تملك صلاحية عرض فواتير المبيعات."}
+              {!canViewInvoices
+                ? "لا تملك صلاحية عرض فواتير المبيعات."
+                : !canViewReports
+                  ? "يلزم تصريح التقارير لعرض أحدث الفواتير هنا."
+                  : !branchId
+                    ? "اختر فرع العمل لعرض أحدث الفواتير."
+                    : "لا توجد فواتير مبيعات لعرضها حاليًا."}
             </div>
           )}
         </section>
