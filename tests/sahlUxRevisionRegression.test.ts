@@ -55,7 +55,9 @@ test("SUX-06 sales entry follows the referenced dense workspace division", () =>
 
 test("SUX-07 sales reports are filterable detailed documents", () => {
   assert.match(reports, /api\.reporting\.salesDetails/);
+  assert.match(reports, /usePaginatedQuery/);
   assert.match(reports, /data-testid="sales-detail-invoices"/);
   assert.match(reports, /setExpandedInvoiceId/);
+  assert.match(reports, /invoice\.status !== "cancelled"/);
   assert.match(reports, /عرض التقرير بالفلاتر المحددة/);
 });

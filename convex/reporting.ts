@@ -2,8 +2,10 @@ import { query } from "./_generated/server.js";
 import type { QueryCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import { ConvexError, v } from "convex/values";
+import { paginationOptsValidator } from "convex/server";
 import {
   hasPermission,
+  requireModulePermission,
   requirePermission,
   type AuthUser,
 } from "./lib/auth.ts";
@@ -107,47 +109,40 @@ export const salesDetails = query({
     branchId: v.optional(v.id("branches")),
     from: v.string(),
     to: v.string(),
+    paginationOpts: paginationOptsValidator,
   },
   handler: async (ctx, args) => {
     const user = await requirePermission(ctx, "view_reports");
+    await requireModulePermission(ctx, "view_invoices", "invoices");
     const range = normalizedRange(args.from, args.to);
     const branchIds = await resolveReportBranches(ctx, user, args.branchId);
-    const [invoiceSets, branchDocs] = await Promise.all([
-      Promise.all(
-        branchIds.map((branchId) =>
-          ctx.db
-            .query("invoices")
-            .withIndex("by_branch_date", (q) =>
-              q
-                .eq("branchId", branchId)
-                .gte("date", range.from)
-                .lte("date", range.to),
-            )
-            .collect(),
-        ),
-      ),
-      Promise.all(branchIds.map((branchId) => ctx.db.get(branchId))),
+    if (branchIds.length !== 1) {
+      throw new ConvexError("اختر فرعًا واحدًا لعرض فواتير المبيعات التفصيلية");
+    }
+    const branchId = branchIds[0];
+    const [page, branch] = await Promise.all([
+      ctx.db
+        .query("invoices")
+        .withIndex("by_branch_date", (q) =>
+          q
+            .eq("branchId", branchId)
+            .gte("date", range.from)
+            .lte("date", range.to),
+        )
+        .order("desc")
+        .paginate(args.paginationOpts),
+      ctx.db.get(branchId),
     ]);
-    const branchNames = new Map(
-      branchIds.map((branchId, index) => [
-        String(branchId),
-        branchDocs[index]?.name ?? "فرع غير معروف",
-      ]),
-    );
     const canViewProfits = hasPermission(user, "view_profits");
-    const invoices = invoiceSets
-      .flat()
-      .sort((left, right) =>
-        right.date === left.date
-          ? right.invoiceNumber.localeCompare(left.invoiceNumber)
-          : String(right.date).localeCompare(String(left.date)),
-      )
-      .map((invoice) => ({
+    return {
+      ...page,
+      page: page.page.map((invoice) => ({
         _id: String(invoice._id),
         invoiceNumber: invoice.invoiceNumber,
         date: invoice.date!,
-        branchId: String(invoice.branchId),
-        branchName: branchNames.get(String(invoice.branchId)) ?? "فرع غير معروف",
+        branchId: String(branchId),
+        branchName: branch?.name ?? "فرع غير معروف",
+        customerId: invoice.customerId ? String(invoice.customerId) : undefined,
         customerName: invoice.customerName,
         customerPhone: invoice.customerPhone,
         itemCount: invoice.items.length,
@@ -176,18 +171,7 @@ export const salesDetails = query({
               }
             : {}),
         })),
-      }));
-
-    return {
-      scope: {
-        from: range.from,
-        to: range.to,
-        branchId: branchIds.length === 1 ? String(branchIds[0]) : undefined,
-        branchCount: branchIds.length,
-        consolidated: args.branchId === undefined && branchIds.length > 1,
-        dateBasis: "operation_date" as const,
-      },
-      invoices,
+      })),
     };
   },
 });

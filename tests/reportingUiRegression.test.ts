@@ -17,6 +17,8 @@ const backend = readFileSync(
 
 test("RUI-01 report queries are protected by view_reports and skip", () => {
   assert.match(reports, /usePermission\("view_reports"\)/);
+  assert.match(reports, /usePermission\("view_invoices"\)/);
+  assert.match(reports, /usePaginatedQuery\(/);
   assert.match(reports, /api\.reporting\.overview,[\s\S]*canViewReports[\s\S]*: "skip"/);
   assert.match(reports, /api\.reporting\.salesDetails,[\s\S]*canViewReports[\s\S]*: "skip"/);
 });
@@ -68,7 +70,7 @@ test("RUI-08 reports do not download operational lists to calculate totals", () 
 });
 
 test("RUI-09 sales report consumes detailed invoice rows from the backend", () => {
-  assert.match(reports, /salesDetails\?\.invoices/);
+  assert.match(reports, /salesDetails\.results/);
   assert.match(reports, /invoice\.invoiceNumber/);
   assert.match(reports, /invoice\.customerName/);
   assert.match(reports, /invoice\.netTotal/);
@@ -100,6 +102,7 @@ test("RUI-13 sales report can group by invoices items customers and days", () =>
   for (const label of ["الفواتير", "الأصناف", "العملاء", "الأيام"]) {
     assert.match(reports, new RegExp(label));
   }
+  assert.match(reports, /invoice\.customerId \?\?/);
 });
 
 test("RUI-14 profitability columns are permission gated and never locally guessed", () => {
@@ -122,7 +125,8 @@ test("RUI-16 report output uses detailed tables instead of metric cards", () => 
 
 test("RUI-17 invoice report includes an explicit totals footer", () => {
   assert.match(reports, /<tfoot>/);
-  assert.match(reports, /الإجمالي للفواتير المعروضة/);
+  assert.match(reports, /الإجمالي المحتسب — دون الفواتير الملغاة/);
+  assert.match(reports, /invoice\.status !== "cancelled"/);
   assert.match(reports, /totals\.net/);
   assert.match(reports, /totals\.remaining/);
 });
@@ -142,7 +146,8 @@ test("RUI-19 treasury report separates collections refunds net and COD outstandi
 });
 
 test("RUI-20 reports have explicit loading invalid-range and unauthorized states", () => {
-  assert.match(reports, /salesDetails === undefined/);
+  assert.match(reports, /salesDetails\.status === "LoadingFirstPage"/);
+  assert.match(reports, /تحميل المزيد من الفواتير/);
   assert.match(reports, /report === undefined/);
   assert.match(reports, /validationMessage &&/);
   assert.match(reports, /لا تملك صلاحية عرض التقارير/);
@@ -193,6 +198,9 @@ test("RUI-27 reporting backend protects branch and sales-detail queries", () => 
   assert.match(backend, /export const availableBranches = query/);
   assert.match(backend, /export const salesDetails = query/);
   assert.equal((backend.match(/requirePermission\(ctx, "view_reports"\)/g) ?? []).length >= 3, true);
+  assert.match(backend, /requireModulePermission\(ctx, "view_invoices", "invoices"\)/);
+  assert.match(backend, /paginationOptsValidator/);
+  assert.match(backend, /\.paginate\(args\.paginationOpts\)/);
   assert.match(backend, /user\.role === "admin" \|\| user\.role === "accountant"/);
 });
 

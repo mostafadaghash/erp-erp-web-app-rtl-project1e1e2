@@ -105,6 +105,7 @@ export type ReportingSalesDetails = {
     date: string;
     branchId: string;
     branchName: string;
+    customerId?: string;
     customerName: string;
     customerPhone?: string;
     itemCount: number;
@@ -131,3 +132,5 @@ export type ReportingSalesDetails = {
     }>;
   }>;
 };
+
+export type ReportingSalesInvoice = ReportingSalesDetails["invoices"][number];

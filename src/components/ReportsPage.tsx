@@ -1,5 +1,5 @@
 import { Fragment, useMemo, useState } from "react";
-import { useQuery } from "convex/react";
+import { usePaginatedQuery, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import { usePermission } from "../lib/access";
@@ -23,7 +23,7 @@ import {
 import type { LucideIcon } from "lucide-react";
 import type {
   ReportingOverview,
-  ReportingSalesDetails,
+  ReportingSalesInvoice,
 } from "../../shared/reportingView";
 
 type Period = "today" | "week" | "month" | "year" | "custom";
@@ -38,7 +38,11 @@ type ReportKind =
   | "suppliers";
 type SalesView = "invoices" | "items" | "customers" | "days";
 type BranchOption = { _id: Id<"branches">; name: string };
-type SalesInvoice = ReportingSalesDetails["invoices"][number];
+type SalesInvoice = ReportingSalesInvoice;
+
+function customerKey(invoice: SalesInvoice) {
+  return invoice.customerId ?? `walk-in:${invoice.branchId}:${invoice.customerName}`;
+}
 
 function isoDate(date: Date) {
   const year = date.getFullYear();
@@ -206,7 +210,8 @@ function SummaryReport({ kind, report }: { kind: ReportKind; report: ReportingOv
 function SalesDetailsTable({ invoices, salesView, canViewProfits }: { invoices: SalesInvoice[]; salesView: SalesView; canViewProfits: boolean }) {
   const { formatCurrency, formatAmount } = useCurrency();
   const [expandedInvoiceId, setExpandedInvoiceId] = useState<string | null>(null);
-  const totals = invoices.reduce(
+  const salesInvoices = invoices.filter((invoice) => invoice.status !== "cancelled");
+  const totals = salesInvoices.reduce(
     (result, invoice) => ({
       quantity: result.quantity + invoice.totalQuantity,
       total: result.total + invoice.total,
@@ -217,18 +222,19 @@ function SalesDetailsTable({ invoices, salesView, canViewProfits }: { invoices: 
     }),
     { quantity: 0, total: 0, credited: 0, net: 0, paid: 0, remaining: 0 },
   );
-  const itemRows = invoices.flatMap((invoice) => invoice.items.map((item) => ({ ...item, invoice })));
-  const customerRows = [...invoices.reduce((groups, invoice) => {
-    const current = groups.get(invoice.customerName) ?? { customerName: invoice.customerName, invoiceCount: 0, quantity: 0, net: 0, paid: 0, remaining: 0 };
+  const itemRows = salesInvoices.flatMap((invoice) => invoice.items.map((item) => ({ ...item, invoice })));
+  const customerRows = [...salesInvoices.reduce((groups, invoice) => {
+    const key = customerKey(invoice);
+    const current = groups.get(key) ?? { customerKey: key, customerName: invoice.customerName, invoiceCount: 0, quantity: 0, net: 0, paid: 0, remaining: 0 };
     current.invoiceCount += 1;
     current.quantity += invoice.totalQuantity;
     current.net += invoice.netTotal;
     current.paid += invoice.paid;
     current.remaining += invoice.remaining;
-    groups.set(invoice.customerName, current);
+    groups.set(key, current);
     return groups;
-  }, new Map<string, { customerName: string; invoiceCount: number; quantity: number; net: number; paid: number; remaining: number }>()).values()].sort((left, right) => right.net - left.net);
-  const dayRows = [...invoices.reduce((groups, invoice) => {
+  }, new Map<string, { customerKey: string; customerName: string; invoiceCount: number; quantity: number; net: number; paid: number; remaining: number }>()).values()].sort((left, right) => right.net - left.net);
+  const dayRows = [...salesInvoices.reduce((groups, invoice) => {
     const current = groups.get(invoice.date) ?? { date: invoice.date, invoiceCount: 0, quantity: 0, net: 0, paid: 0, remaining: 0 };
     current.invoiceCount += 1;
     current.quantity += invoice.totalQuantity;
@@ -255,7 +261,7 @@ function SalesDetailsTable({ invoices, salesView, canViewProfits }: { invoices: 
     return (
       <div className="overflow-x-auto"><table className="data-table min-w-[860px]">
         <thead><tr><th>{salesView === "customers" ? "العميل" : "اليوم"}</th><th>عدد الفواتير</th><th>الكمية</th><th>صافي المبيعات</th><th>المحصل</th><th>المتبقي</th></tr></thead>
-        <tbody>{rows.map((row) => <tr key={"customerName" in row ? row.customerName : row.date}><td className="font-bold">{"customerName" in row ? row.customerName : row.date}</td><td>{formatAmount(row.invoiceCount)}</td><td>{formatAmount(row.quantity)}</td><td className="font-bold">{formatCurrency(row.net)}</td><td>{formatCurrency(row.paid)}</td><td>{formatCurrency(row.remaining)}</td></tr>)}</tbody>
+        <tbody>{rows.map((row) => <tr key={"customerKey" in row ? row.customerKey : row.date}><td className="font-bold">{"customerName" in row ? row.customerName : row.date}</td><td>{formatAmount(row.invoiceCount)}</td><td>{formatAmount(row.quantity)}</td><td className="font-bold">{formatCurrency(row.net)}</td><td>{formatCurrency(row.paid)}</td><td>{formatCurrency(row.remaining)}</td></tr>)}</tbody>
       </table></div>
     );
   }
@@ -272,13 +278,14 @@ function SalesDetailsTable({ invoices, salesView, canViewProfits }: { invoices: 
           {expanded && <tr className="report-invoice-items-row"><td colSpan={14}><div className="m-2 border border-slate-200 bg-white p-2"><div className="mb-2 flex items-center justify-between"><strong>أصناف الفاتورة {invoice.invoiceNumber}</strong><span className="text-xs text-slate-500">اضغط على الفاتورة مرة أخرى للإغلاق</span></div><table className="data-table"><thead><tr><th>#</th><th>الصنف</th><th>الكمية</th><th>سعر الوحدة</th><th>الخصم</th><th>الإجمالي</th>{canViewProfits && <><th>التكلفة</th><th>الربح</th></>}</tr></thead><tbody>{invoice.items.map((item, index) => <tr key={`${item.productId}-${index}`}><td>{formatAmount(index + 1)}</td><td className="font-bold">{item.productName}</td><td>{formatAmount(item.quantity)}</td><td>{formatCurrency(item.unitPrice)}</td><td>{formatAmount(item.discount)}٪</td><td>{formatCurrency(item.total)}</td>{canViewProfits && <><td>{item.costTotal === undefined ? "—" : formatCurrency(item.costTotal)}</td><td>{item.grossProfit === undefined ? "—" : formatCurrency(item.grossProfit)}</td></>}</tr>)}</tbody></table></div></td></tr>}
         </Fragment>;
       })}</tbody>
-      <tfoot><tr><th colSpan={5}>الإجمالي للفواتير المعروضة</th><th>{formatAmount(invoices.reduce((sum, invoice) => sum + invoice.itemCount, 0))}</th><th>{formatAmount(totals.quantity)}</th><th>{formatCurrency(totals.total)}</th><th>{formatCurrency(totals.credited)}</th><th>{formatCurrency(totals.net)}</th><th>{formatCurrency(totals.paid)}</th><th>{formatCurrency(totals.remaining)}</th><th colSpan={2}>{formatAmount(invoices.length)} فاتورة</th></tr></tfoot>
+      <tfoot><tr><th colSpan={5}>الإجمالي المحتسب — دون الفواتير الملغاة</th><th>{formatAmount(salesInvoices.reduce((sum, invoice) => sum + invoice.itemCount, 0))}</th><th>{formatAmount(totals.quantity)}</th><th>{formatCurrency(totals.total)}</th><th>{formatCurrency(totals.credited)}</th><th>{formatCurrency(totals.net)}</th><th>{formatCurrency(totals.paid)}</th><th>{formatCurrency(totals.remaining)}</th><th colSpan={2}>{formatAmount(salesInvoices.length)} فاتورة</th></tr></tfoot>
     </table></div>
   );
 }
 
 export function ReportsPage() {
   const canViewReports = usePermission("view_reports");
+  const canViewInvoices = usePermission("view_invoices");
   const canViewProfits = usePermission("view_profits");
   const now = new Date();
   const today = isoDate(now);
@@ -301,16 +308,24 @@ export function ReportsPage() {
   const validationMessage = rangeError(from, to);
   const reportArgs = !validationMessage ? { from, to, branchId: canSelectBranch && branchId ? branchId : undefined } : null;
   const report = useQuery(api.reporting.overview, canViewReports && activeReport !== "sales" && reportArgs ? reportArgs : "skip") as ReportingOverview | undefined;
-  const salesDetails = useQuery(api.reporting.salesDetails, canViewReports && activeReport === "sales" && reportArgs ? reportArgs : "skip") as ReportingSalesDetails | undefined;
+  const requiresSalesBranch = activeReport === "sales" && canSelectBranch && !branchId;
+  const salesReportArgs = reportArgs && !requiresSalesBranch
+    ? { from, to, branchId: canSelectBranch ? branchId as Id<"branches"> : undefined }
+    : null;
+  const salesDetails = usePaginatedQuery(
+    api.reporting.salesDetails,
+    canViewReports && canViewInvoices && activeReport === "sales" && salesReportArgs ? salesReportArgs : "skip",
+    { initialNumItems: 50 },
+  );
 
-  const salesInvoices = salesDetails?.invoices ?? [];
-  const customerOptions = useMemo(() => [...new Set(salesInvoices.map((invoice) => invoice.customerName))].sort(), [salesInvoices]);
+  const salesInvoices = salesDetails.results as ReportingSalesInvoice[];
+  const customerOptions = useMemo(() => [...new Map(salesInvoices.map((invoice) => [customerKey(invoice), invoice.customerName])).entries()].sort((left, right) => left[1].localeCompare(right[1])), [salesInvoices]);
   const productOptions = useMemo(() => [...new Set(salesInvoices.flatMap((invoice) => invoice.items.map((item) => item.productName)))].sort(), [salesInvoices]);
   const filteredInvoices = useMemo(() => {
     const term = search.trim().toLowerCase();
     return salesInvoices.filter((invoice) =>
       (!term || invoice.invoiceNumber.toLowerCase().includes(term) || invoice.customerName.toLowerCase().includes(term) || invoice.items.some((item) => item.productName.toLowerCase().includes(term))) &&
-      (!customerFilter || invoice.customerName === customerFilter) &&
+      (!customerFilter || customerKey(invoice) === customerFilter) &&
       (!productFilter || invoice.items.some((item) => item.productName === productFilter)) &&
       (!paymentFilter || invoice.paymentMethod === paymentFilter) &&
       (!statusFilter || invoice.status === statusFilter),
@@ -340,16 +355,16 @@ export function ReportsPage() {
           <label><span className="form-label flex items-center gap-1"><CalendarDays className="h-4 w-4" />الفترة</span><select className="form-input" value={period} onChange={(event) => changePeriod(event.target.value as Period)}>{(Object.keys(periodLabels) as Period[]).map((value) => <option key={value} value={value}>{periodLabels[value]}</option>)}</select></label>
           <label><span className="form-label">من تاريخ</span><input className="form-input" type="date" value={from} onChange={(event) => { setPeriod("custom"); setFrom(event.target.value); }} /></label>
           <label><span className="form-label">إلى تاريخ</span><input className="form-input" type="date" value={to} onChange={(event) => { setPeriod("custom"); setTo(event.target.value); }} /></label>
-          <label><span className="form-label flex items-center gap-1"><Building2 className="h-4 w-4" />الفرع</span>{canSelectBranch ? <select className="form-input" value={branchId} onChange={(event) => setBranchId(event.target.value as Id<"branches"> | "")}><option value="">كل الفروع — مجمع</option>{branches.map((branch) => <option key={branch._id} value={branch._id}>{branch.name}</option>)}</select> : <span className="form-input block">{branches[0]?.name ?? "فرع المستخدم"}</span>}</label>
+          <label><span className="form-label flex items-center gap-1"><Building2 className="h-4 w-4" />الفرع</span>{canSelectBranch ? <select className="form-input" value={branchId} onChange={(event) => setBranchId(event.target.value as Id<"branches"> | "")}><option value="">{activeReport === "sales" ? "اختر فرع التقرير" : "كل الفروع — مجمع"}</option>{branches.map((branch) => <option key={branch._id} value={branch._id}>{branch.name}</option>)}</select> : <span className="form-input block">{branches[0]?.name ?? "فرع المستخدم"}</span>}</label>
         </div>
 
         {activeReport === "sales" && <div className="grid gap-3 border-t border-slate-200 p-3 md:grid-cols-2 xl:grid-cols-5">
           <label className="relative xl:col-span-2"><span className="form-label">بحث داخل التقرير</span><Search className="absolute right-3 top-10 h-4 w-4 text-slate-400" /><input className="form-input pr-9" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="رقم الفاتورة أو العميل أو الصنف" /></label>
-          <label><span className="form-label">العميل</span><select className="form-input" value={customerFilter} onChange={(event) => setCustomerFilter(event.target.value)}><option value="">كل العملاء</option>{customerOptions.map((customer) => <option key={customer} value={customer}>{customer}</option>)}</select></label>
+          <label><span className="form-label">العميل</span><select className="form-input" value={customerFilter} onChange={(event) => setCustomerFilter(event.target.value)}><option value="">كل العملاء</option>{customerOptions.map(([key, name]) => <option key={key} value={key}>{name}</option>)}</select></label>
           <label><span className="form-label">الصنف</span><select className="form-input" value={productFilter} onChange={(event) => setProductFilter(event.target.value)}><option value="">كل الأصناف</option>{productOptions.map((product) => <option key={product} value={product}>{product}</option>)}</select></label>
           <label><span className="form-label">طريقة الدفع</span><select className="form-input" value={paymentFilter} onChange={(event) => setPaymentFilter(event.target.value)}><option value="">كل طرق الدفع</option>{[...new Set(salesInvoices.map((invoice) => invoice.paymentMethod))].map((value) => <option key={value} value={value}>{paymentLabels[value] ?? value}</option>)}</select></label>
           <label><span className="form-label">الحالة</span><select className="form-input" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option value="">كل الحالات</option>{[...new Set(salesInvoices.map((invoice) => invoice.status))].map((value) => <option key={value} value={value}>{statusLabels[value] ?? value}</option>)}</select></label>
-          <button data-testid="report-apply-filters" className="btn-primary self-end xl:col-span-4" disabled={Boolean(validationMessage)} onClick={() => document.getElementById("report-output")?.scrollIntoView({ behavior: "smooth", block: "start" })}>عرض التقرير بالفلاتر المحددة</button>
+          <button data-testid="report-apply-filters" className="btn-primary self-end xl:col-span-4" disabled={Boolean(validationMessage) || requiresSalesBranch || !canViewInvoices} onClick={() => document.getElementById("report-output")?.scrollIntoView({ behavior: "smooth", block: "start" })}>عرض التقرير بالفلاتر المحددة</button>
         </div>}
       </section>
 
@@ -358,7 +373,7 @@ export function ReportsPage() {
       {!validationMessage && activeReport === "sales" && <section id="report-output" className="erp-section" data-testid="active-report-sales">
         <div className="erp-section-header"><div><p className="text-xs font-bold text-[var(--erp-accent-strong)]">من {from} إلى {to}</p><h2 className="erp-section-title mt-1">تقرير تحليل المبيعات</h2></div><span className="erp-status">أساس التاريخ: تاريخ العملية</span></div>
         <div className="sales-report-view-tabs">{([["invoices", "الفواتير"], ["items", "الأصناف"], ["customers", "العملاء"], ["days", "الأيام"]] as Array<[SalesView, string]>).map(([value, label]) => <button key={value} className={salesView === value ? "active" : ""} onClick={() => setSalesView(value)}>{label}</button>)}</div>
-        {salesDetails === undefined ? <div className="h-72 animate-pulse bg-slate-100" /> : <SalesDetailsTable invoices={filteredInvoices} salesView={salesView} canViewProfits={canViewProfits} />}
+        {!canViewInvoices ? <div className="erp-empty-state m-3 py-16">تحتاج صلاحية عرض فواتير المبيعات لفتح التقرير التفصيلي.</div> : requiresSalesBranch ? <div className="erp-empty-state m-3 py-16">اختر فرعًا واحدًا لعرض فواتير المبيعات التفصيلية.</div> : salesDetails.status === "LoadingFirstPage" ? <div className="h-72 animate-pulse bg-slate-100" /> : <><SalesDetailsTable invoices={filteredInvoices} salesView={salesView} canViewProfits={canViewProfits} />{(salesDetails.status === "CanLoadMore" || salesDetails.status === "LoadingMore") && <div className="border-t border-slate-200 p-3 text-center"><button className="btn-secondary" disabled={salesDetails.status === "LoadingMore"} onClick={() => salesDetails.loadMore(50)}>{salesDetails.status === "LoadingMore" ? "جارٍ تحميل المزيد…" : "تحميل المزيد من الفواتير"}</button><p className="mt-2 text-xs text-slate-400">البحث والتجميع يطبقان على النتائج المحمّلة حاليًا.</p></div>}</>}
       </section>}
 
       {!validationMessage && activeReport !== "sales" && report === undefined && <div className="h-72 animate-pulse rounded-xl bg-slate-100" />}
