@@ -141,19 +141,19 @@ export function Dashboard({ onNavigate, permissions, modules }: DashboardProps) 
     },
   ].filter((card) => card.visible);
 
-  const profitAvailable = canViewProfits && report?.profitability;
-  const profitValue = profitAvailable
-    ? report.profitability!.netProfit === null
+  const profitability = canViewProfits ? report?.profitability : undefined;
+  const profitValue = profitability
+    ? profitability.netProfit === null
       ? "—"
-      : formatCurrency(report.profitability!.netProfit)
+      : formatCurrency(profitability.netProfit)
     : lowStockProducts
       ? `${formatAmount(lowStockProducts.length)} صنف`
       : "—";
-  const profitLabel = profitAvailable ? "صافي ربح الشهر" : "أصناف منخفضة المخزون";
-  const profitNote = profitAvailable
-    ? report.profitability!.netMargin === null
+  const profitLabel = profitability ? "صافي ربح الشهر" : "أصناف منخفضة المخزون";
+  const profitNote = profitability
+    ? profitability.netMargin === null
       ? "بيانات التكلفة تحتاج مراجعة"
-      : `هامش ${formatAmount(report.profitability!.netMargin)}٪`
+      : `هامش ${formatAmount(profitability.netMargin)}٪`
     : "تحتاج متابعة المخزون";
 
   const followUpTiles = canViewLeads
@@ -170,9 +170,9 @@ export function Dashboard({ onNavigate, permissions, modules }: DashboardProps) 
 
   return (
     <div className="erp-dashboard">
-      <div className="erp-dashboard-heading">
+      <div className="erp-dashboard-heading sr-only">
         <div>
-          <p className="erp-dashboard-kicker">الرئيسية</p>
+          <p className="erp-dashboard-kicker">لوحة التحكم</p>
           <h1 className="erp-page-title">لوحة التحكم</h1>
         </div>
       </div>
