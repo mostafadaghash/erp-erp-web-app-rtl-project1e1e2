@@ -14,6 +14,9 @@ test("invoice creation uses the server business date and does not send a UTC-der
   const frontend = readFileSync("src/components/NewInvoicePage.tsx", "utf8");
   assert.match(backend, /const transactionDate = args\.initialPayment\?\.paymentDate \?\? businessDate\(\)/);
   assert.match(backend, /const ledgerDate = transactionDate/);
-  assert.match(backend, /date: transactionDate/);
+  assert.match(
+    backend,
+    /ctx\.db\.insert\("invoices",\s*\{[\s\S]*?date:\s*transactionDate,[\s\S]*?branchId/,
+  );
   assert.doesNotMatch(frontend, /paymentDate: new Date\(\)\.toISOString\(\)\.slice\(0, 10\)/);
 });
