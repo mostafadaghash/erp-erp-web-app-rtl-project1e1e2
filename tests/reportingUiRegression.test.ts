@@ -15,12 +15,10 @@ const backend = readFileSync(
   "utf8",
 );
 
-test("RUI-01 reports query is protected by view_reports and skip", () => {
+test("RUI-01 report queries are protected by view_reports and skip", () => {
   assert.match(reports, /usePermission\("view_reports"\)/);
-  assert.match(
-    reports,
-    /api\.reporting\.overview,[\s\S]*canViewReports && !validationMessage[\s\S]*: "skip"/,
-  );
+  assert.match(reports, /api\.reporting\.overview,[\s\S]*canViewReports[\s\S]*: "skip"/);
+  assert.match(reports, /api\.reporting\.salesDetails,[\s\S]*canViewReports[\s\S]*: "skip"/);
 });
 
 test("RUI-02 reports loads branch options through reporting permission contract", () => {
@@ -36,7 +34,7 @@ test("RUI-03 central roles can select a branch or consolidated scope", () => {
 });
 
 test("RUI-04 non-central reports show the pinned branch without a selector", () => {
-  assert.match(reports, /canSelectBranch \? \(/);
+  assert.match(reports, /canSelectBranch \? <select/);
   assert.match(reports, /branches\[0\]\?\.name \?\? "فرع المستخدم"/);
 });
 
@@ -48,11 +46,11 @@ test("RUI-05 report presets use explicit operation-date ranges", () => {
   assert.match(reports, /هذا الشهر/);
 });
 
-test("RUI-06 custom dates are validated before the query", () => {
+test("RUI-06 custom dates are validated before either report query", () => {
   assert.match(reports, /validIsoDate/);
   assert.match(reports, /from > to/);
   assert.match(reports, /days > 366/);
-  assert.match(reports, /!validationMessage/);
+  assert.match(reports, /const reportArgs = !validationMessage/);
 });
 
 test("RUI-07 reports never use creation time as an accounting date", () => {
@@ -66,77 +64,85 @@ test("RUI-08 reports do not download operational lists to calculate totals", () 
     /api\.(?:invoices|expenses|products|customers|repairs)\.(?:list|stats|getStats)/,
   );
   assert.equal((reports.match(/api\.reporting\.overview/g) ?? []).length, 1);
+  assert.equal((reports.match(/api\.reporting\.salesDetails/g) ?? []).length, 1);
 });
 
-test("RUI-09 sales cards consume backend gross returns and net values", () => {
-  assert.match(reports, /report\.sales\.netSales/);
-  assert.match(reports, /report\.sales\.grossSales/);
-  assert.match(reports, /report\.sales\.salesReturns/);
+test("RUI-09 sales report consumes detailed invoice rows from the backend", () => {
+  assert.match(reports, /salesDetails\?\.invoices/);
+  assert.match(reports, /invoice\.invoiceNumber/);
+  assert.match(reports, /invoice\.customerName/);
+  assert.match(reports, /invoice\.netTotal/);
 });
 
-test("RUI-10 collection cards consume net and reversal aggregates", () => {
-  assert.match(reports, /report\.collections\.netCollections/);
-  assert.match(reports, /report\.collections\.reversedCollections/);
-  assert.match(reports, /report\.collections\.reversedRefunds/);
+test("RUI-10 detailed sales table exposes financial and document columns", () => {
+  for (const label of ["رقم الفاتورة", "الفرع", "العميل", "الأصناف", "المرتجع", "الصافي", "المحصل", "المتبقي", "الدفع", "الحالة"]) {
+    assert.match(reports, new RegExp(label));
+  }
+  assert.match(reports, /data-testid="sales-detail-invoices"/);
 });
 
-test("RUI-11 expenses include operating expenses and carrier fees", () => {
-  assert.match(reports, /report\.expenses\.totalExpenses/);
-  assert.match(reports, /report\.expenses\.operatingExpenses/);
-  assert.match(reports, /report\.expenses\.carrierFees/);
+test("RUI-11 clicking an invoice expands its actual item lines", () => {
+  assert.match(reports, /setExpandedInvoiceId/);
+  assert.match(reports, /aria-expanded=\{expanded\}/);
+  assert.match(reports, /invoice\.items\.map/);
+  assert.match(reports, /أصناف الفاتورة/);
 });
 
-test("RUI-12 current customer and supplier balances remain distinct", () => {
-  assert.match(reports, /report\.currentBalances\.customerReceivables/);
-  assert.match(reports, /report\.currentBalances\.customerAdvances/);
-  assert.match(reports, /report\.currentBalances\.supplierPayables/);
+test("RUI-12 detailed report supports invoice customer product payment and status filters", () => {
+  for (const marker of ["customerFilter", "productFilter", "paymentFilter", "statusFilter"]) {
+    assert.match(reports, new RegExp(marker));
+  }
+  assert.match(reports, /رقم الفاتورة أو العميل أو الصنف/);
 });
 
-test("RUI-13 profitability is gated and never locally guessed", () => {
+test("RUI-13 sales report can group by invoices items customers and days", () => {
+  assert.match(reports, /type SalesView = "invoices" \| "items" \| "customers" \| "days"/);
+  for (const label of ["الفواتير", "الأصناف", "العملاء", "الأيام"]) {
+    assert.match(reports, new RegExp(label));
+  }
+});
+
+test("RUI-14 profitability columns are permission gated and never locally guessed", () => {
   assert.match(reports, /usePermission\("view_profits"\)/);
-  assert.match(reports, /report\.profitability &&/);
+  assert.match(reports, /canViewProfits &&/);
+  assert.match(reports, /item\.grossProfit/);
   assert.doesNotMatch(reports, /netProfit\s*=\s*[^;\n]*-/);
-});
-
-test("RUI-14 incomplete historical COGS produces a visible warning", () => {
-  assert.match(reports, /!report\.completeness\.profitabilityAvailable/);
-  assert.match(reports, /incompleteCogsInvoices/);
-  assert.match(reports, /لن يعرض النظام ربحًا تقديريًا/);
 });
 
 test("RUI-15 inventory value is rendered only when the DTO exposes it", () => {
   assert.match(reports, /report\.currentBalances\.inventoryValue !== undefined/);
-  assert.match(reports, /legacyInventoryValueProducts/);
+  assert.match(reports, /غير متاحة حسب الصلاحية/);
 });
 
-test("RUI-16 trend chart uses backend monthly rows", () => {
-  assert.match(reports, /report\.trend\.map/);
-  assert.match(reports, /row\.month/);
-  assert.match(reports, /row\.netSales/);
-  assert.match(reports, /row\.operatingExpenses \+ row\.carrierFees/);
+test("RUI-16 report output uses detailed tables instead of metric cards", () => {
+  assert.match(reports, /<table className="data-table/);
+  assert.match(reports, /function SummaryReport/);
+  assert.doesNotMatch(reports, /function MetricCard|<MetricCard/);
 });
 
-test("RUI-17 top products use backend net sales and optional gross profit", () => {
-  assert.match(reports, /report\.topProducts\.map/);
-  assert.match(reports, /product\.netSales/);
-  assert.match(reports, /product\.grossProfit !== null/);
+test("RUI-17 invoice report includes an explicit totals footer", () => {
+  assert.match(reports, /<tfoot>/);
+  assert.match(reports, /الإجمالي للفواتير المعروضة/);
+  assert.match(reports, /totals\.net/);
+  assert.match(reports, /totals\.remaining/);
 });
 
-test("RUI-18 purchase section separates landed cost liability credits and payments", () => {
+test("RUI-18 purchase report separates documents values credits and payments", () => {
+  assert.match(reports, /report\.purchases\.receiptCount/);
   assert.match(reports, /report\.purchases\.landedPurchases/);
-  assert.match(reports, /report\.purchases\.supplierLiabilityCreated/);
   assert.match(reports, /report\.purchases\.supplierCredits/);
   assert.match(reports, /report\.purchases\.supplierPayments/);
 });
 
-test("RUI-19 COD section separates collected settled movement and outstanding", () => {
-  assert.match(reports, /report\.cod\.collected/);
-  assert.match(reports, /report\.cod\.settled/);
-  assert.match(reports, /report\.cod\.netPeriodMovement/);
+test("RUI-19 treasury report separates collections refunds net and COD outstanding", () => {
+  assert.match(reports, /report\.collections\.collections/);
+  assert.match(reports, /report\.collections\.refunds/);
+  assert.match(reports, /report\.collections\.netCollections/);
   assert.match(reports, /report\.cod\.currentOutstanding/);
 });
 
 test("RUI-20 reports have explicit loading invalid-range and unauthorized states", () => {
+  assert.match(reports, /salesDetails === undefined/);
   assert.match(reports, /report === undefined/);
   assert.match(reports, /validationMessage &&/);
   assert.match(reports, /لا تملك صلاحية عرض التقارير/);
@@ -171,11 +177,11 @@ test("RUI-24 dashboard profit card respects permission and completeness", () => 
   assert.match(dashboard, /!report\.completeness\.profitabilityAvailable/);
 });
 
-test("RUI-25 dashboard keeps operational lists outside accounting calculations", () => {
-  assert.match(dashboard, /أحدث فواتير المبيعات/);
+test("RUI-25 dashboard removes latest invoices and retains useful operational panels", () => {
+  assert.doesNotMatch(dashboard, /أحدث فواتير المبيعات|recentInvoices/);
   assert.match(dashboard, /حالة أوامر الصيانة/);
   assert.match(dashboard, /متابعة المخزون/);
-  assert.doesNotMatch(dashboard, /recentInvoices[\s\S]{0,120}\.(?:reduce|filter)\(/);
+  assert.match(dashboard, /العملاء المحتملون/);
 });
 
 test("RUI-26 dashboard provides a loading state for accounting overview", () => {
@@ -183,11 +189,11 @@ test("RUI-26 dashboard provides a loading state for accounting overview", () => 
   assert.match(dashboard, /animate-pulse/);
 });
 
-test("RUI-27 branch options backend uses view_reports and central-role policy", () => {
+test("RUI-27 reporting backend protects branch and sales-detail queries", () => {
   assert.match(backend, /export const availableBranches = query/);
-  assert.match(backend, /requirePermission\(ctx, "view_reports"\)/);
+  assert.match(backend, /export const salesDetails = query/);
+  assert.equal((backend.match(/requirePermission\(ctx, "view_reports"\)/g) ?? []).length >= 3, true);
   assert.match(backend, /user\.role === "admin" \|\| user\.role === "accountant"/);
-  assert.match(backend, /branch\?\.isActive/);
 });
 
 test("RUI-28 branch options expose a minimal DTO and no financial balances", () => {

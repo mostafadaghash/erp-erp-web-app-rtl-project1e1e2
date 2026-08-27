@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { Page } from "./ERPApp";
 import {
   BarChart3,
@@ -65,7 +65,7 @@ interface NavGroup {
 const NAV_GROUPS: NavGroup[] = [
   {
     key: "home",
-    label: "الرئيسية",
+    label: "لوحة التحكم",
     icon: LayoutDashboard,
     items: [{ id: "dashboard", label: "لوحة التحكم", icon: LayoutDashboard }],
   },
@@ -167,6 +167,20 @@ export function Sidebar({
 }: SidebarProps) {
   const [openGroup, setOpenGroup] = useState<string | null>(null);
 
+  useEffect(() => {
+    if (!openGroup) return;
+    const closeOnOutsidePress = (event: PointerEvent) => {
+      const openSection = document.querySelector<HTMLElement>(
+        `[data-nav-group-section="${openGroup}"]`,
+      );
+      if (event.target instanceof Node && !openSection?.contains(event.target)) {
+        setOpenGroup(null);
+      }
+    };
+    document.addEventListener("pointerdown", closeOnOutsidePress);
+    return () => document.removeEventListener("pointerdown", closeOnOutsidePress);
+  }, [openGroup]);
+
   const isModuleEnabled = (moduleKey?: string) =>
     !moduleKey || modules[moduleKey] !== false;
 
@@ -215,7 +229,11 @@ export function Sidebar({
             const GroupIcon = group.icon;
 
             return (
-              <section key={group.key} className="erp-nav-section">
+              <section
+                key={group.key}
+                className="erp-nav-section"
+                data-nav-group-section={group.key}
+              >
                 <button
                   type="button"
                   data-testid={`nav-group-${group.key}`}

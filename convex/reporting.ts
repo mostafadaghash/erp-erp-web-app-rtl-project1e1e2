@@ -102,6 +102,96 @@ async function resolveReportBranches(
   return [user.branchId];
 }
 
+export const salesDetails = query({
+  args: {
+    branchId: v.optional(v.id("branches")),
+    from: v.string(),
+    to: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const user = await requirePermission(ctx, "view_reports");
+    const range = normalizedRange(args.from, args.to);
+    const branchIds = await resolveReportBranches(ctx, user, args.branchId);
+    const [invoiceSets, branchDocs] = await Promise.all([
+      Promise.all(
+        branchIds.map((branchId) =>
+          ctx.db
+            .query("invoices")
+            .withIndex("by_branch_date", (q) =>
+              q
+                .eq("branchId", branchId)
+                .gte("date", range.from)
+                .lte("date", range.to),
+            )
+            .collect(),
+        ),
+      ),
+      Promise.all(branchIds.map((branchId) => ctx.db.get(branchId))),
+    ]);
+    const branchNames = new Map(
+      branchIds.map((branchId, index) => [
+        String(branchId),
+        branchDocs[index]?.name ?? "فرع غير معروف",
+      ]),
+    );
+    const canViewProfits = hasPermission(user, "view_profits");
+    const invoices = invoiceSets
+      .flat()
+      .sort((left, right) =>
+        right.date === left.date
+          ? right.invoiceNumber.localeCompare(left.invoiceNumber)
+          : String(right.date).localeCompare(String(left.date)),
+      )
+      .map((invoice) => ({
+        _id: String(invoice._id),
+        invoiceNumber: invoice.invoiceNumber,
+        date: invoice.date!,
+        branchId: String(invoice.branchId),
+        branchName: branchNames.get(String(invoice.branchId)) ?? "فرع غير معروف",
+        customerName: invoice.customerName,
+        customerPhone: invoice.customerPhone,
+        itemCount: invoice.items.length,
+        totalQuantity: invoice.items.reduce((sum, item) => sum + item.quantity, 0),
+        subtotal: invoice.subtotal,
+        discount: invoice.discount,
+        tax: invoice.tax,
+        total: invoice.total,
+        creditedTotal: invoice.creditedTotal ?? 0,
+        netTotal: invoice.netTotal ?? invoice.total,
+        paid: invoice.paid,
+        remaining: invoice.remaining,
+        paymentMethod: invoice.paymentMethod,
+        status: invoice.status,
+        items: invoice.items.map((item) => ({
+          productId: String(item.productId),
+          productName: item.productName,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          discount: item.discount,
+          total: item.total,
+          ...(canViewProfits && item.costTotal !== undefined
+            ? {
+                costTotal: item.costTotal,
+                grossProfit: roundMoney(item.total - item.costTotal),
+              }
+            : {}),
+        })),
+      }));
+
+    return {
+      scope: {
+        from: range.from,
+        to: range.to,
+        branchId: branchIds.length === 1 ? String(branchIds[0]) : undefined,
+        branchCount: branchIds.length,
+        consolidated: args.branchId === undefined && branchIds.length > 1,
+        dateBasis: "operation_date" as const,
+      },
+      invoices,
+    };
+  },
+});
+
 async function loadBranchData(
   ctx: QueryCtx,
   branchId: Id<"branches">,

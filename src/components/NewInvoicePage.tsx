@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import type { Id } from "../../convex/_generated/dataModel";
 import { usePermission } from "../lib/access";
+import { useCurrency } from "../lib/utils";
 
 interface NewInvoicePageProps {
   onNavigate: (page: Page) => void;
@@ -38,6 +39,7 @@ export function NewInvoicePage({ onNavigate }: NewInvoicePageProps) {
   const createInvoice = useMutation(api.invoices.create);
   const canCollect = usePermission("record_collections");
   const accounts = useQuery(api.finance.collectionAccountPicker, canCollect ? {} : "skip") ?? [];
+  const { formatAmount } = useCurrency();
   const requestId = useRef(crypto.randomUUID());
   const productSearchRef = useRef<HTMLInputElement>(null);
   const submitRef = useRef<() => Promise<void>>(async () => undefined);
@@ -248,9 +250,9 @@ export function NewInvoicePage({ onNavigate }: NewInvoicePageProps) {
                   >
                     <div className="min-w-0 text-right">
                       <p className="truncate text-sm font-black text-slate-800">{p.name}</p>
-                      <p className="mt-1 text-xs text-slate-400">{p.sku} · المتاح {p.stock.toLocaleString("ar-EG")}</p>
+                      <p className="mt-1 text-xs text-slate-400">{p.sku} · المتاح {formatAmount(p.stock)}</p>
                     </div>
-                    <span className="shrink-0 text-sm font-black text-[var(--erp-accent-strong)]">{p.sellPrice.toLocaleString("ar-EG")} ج.م</span>
+                    <span className="shrink-0 text-sm font-black text-[var(--erp-accent-strong)]">{formatAmount(p.sellPrice)} ج.م</span>
                   </button>
                 ))}
                 {filteredProducts.length === 0 && <p className="py-5 text-center text-sm text-slate-400">لا توجد أصناف مطابقة</p>}
@@ -279,12 +281,12 @@ export function NewInvoicePage({ onNavigate }: NewInvoicePageProps) {
                       <td>
                         <div className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white p-1">
                           <button onClick={() => updateQuantity(item.productId, item.quantity - 1)} className="grid h-7 w-7 place-items-center rounded-md text-slate-500 hover:bg-slate-100" aria-label={`تقليل كمية ${item.productName}`}><Minus className="h-3.5 w-3.5" /></button>
-                          <span className="min-w-8 text-center font-black text-slate-800">{item.quantity.toLocaleString("ar-EG")}</span>
+                          <span className="min-w-8 text-center font-black text-slate-800">{formatAmount(item.quantity)}</span>
                           <button onClick={() => updateQuantity(item.productId, item.quantity + 1)} className="grid h-7 w-7 place-items-center rounded-md bg-[var(--erp-accent-soft)] text-[var(--erp-accent-strong)] hover:bg-emerald-100" aria-label={`زيادة كمية ${item.productName}`}><Plus className="h-3.5 w-3.5" /></button>
                         </div>
                       </td>
-                      <td className="font-bold">{item.unitPrice.toLocaleString("ar-EG")} ج.م</td>
-                      <td className="font-black text-[var(--erp-accent-strong)]">{item.total.toLocaleString("ar-EG")} ج.م</td>
+                      <td className="font-bold">{formatAmount(item.unitPrice)} ج.م</td>
+                      <td className="font-black text-[var(--erp-accent-strong)]">{formatAmount(item.total)} ج.م</td>
                       <td>
                         <button onClick={() => removeFromCart(item.productId)} className="grid h-8 w-8 place-items-center rounded-lg text-red-400 transition hover:bg-red-50 hover:text-red-600" aria-label={`حذف ${item.productName}`}><Trash2 className="h-4 w-4" /></button>
                       </td>
@@ -305,18 +307,23 @@ export function NewInvoicePage({ onNavigate }: NewInvoicePageProps) {
         </section>
 
         <aside className="erp-pos-summary">
+          <div className="erp-pos-rail-mode">
+            <ShoppingCart className="h-5 w-5" />
+            <div><strong>بيع جديد</strong><small>فاتورة مبيعات</small></div>
+          </div>
           <div className="erp-pos-total">
             <h2 className="mb-2 text-xs font-black uppercase tracking-wide text-emerald-100">ملخص الفاتورة</h2>
             <div className="flex items-center justify-between gap-3 text-sm font-bold text-emerald-50">
               <span>إجمالي الفاتورة</span>
-              <span>{cart.length.toLocaleString("ar-EG")} صنف</span>
+              <span>{formatAmount(cart.length)} صنف</span>
             </div>
-            <p data-testid="new-invoice-total" data-value={total} className="erp-pos-total-value">{total.toLocaleString("ar-EG")} <span className="text-base">ج.م</span></p>
+            <p data-testid="new-invoice-total" data-value={total} className="erp-pos-total-value">{formatAmount(total)} <span className="text-base">ج.م</span></p>
+            <div className="erp-pos-document-meta"><span>رقم الفاتورة: تلقائي</span><span>{new Date().toLocaleDateString("ar-EG-u-nu-latn")}</span></div>
           </div>
 
           <div className="erp-pos-summary-body">
             <div className="space-y-1 border-b border-slate-100 pb-3">
-              <div className="erp-pos-summary-row"><span>المجموع الفرعي</span><strong className="text-slate-800">{subtotal.toLocaleString("ar-EG")} ج.م</strong></div>
+              <div className="erp-pos-summary-row"><span>المجموع الفرعي</span><strong className="text-slate-800">{formatAmount(subtotal)} ج.م</strong></div>
               <div className="erp-pos-summary-row">
                 <span>خصم الفاتورة</span>
                 <label className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2">
@@ -324,8 +331,8 @@ export function NewInvoicePage({ onNavigate }: NewInvoicePageProps) {
                   <span className="text-xs text-slate-400">%</span>
                 </label>
               </div>
-              {discountAmount > 0 && <div className="erp-pos-summary-row text-red-500"><span>قيمة الخصم</span><strong>- {discountAmount.toLocaleString("ar-EG")} ج.م</strong></div>}
-              <div className="erp-pos-summary-row"><span>الضريبة ({taxRate}%)</span><strong className="text-slate-800">{taxAmount.toLocaleString("ar-EG")} ج.م</strong></div>
+              {discountAmount > 0 && <div className="erp-pos-summary-row text-red-500"><span>قيمة الخصم</span><strong>- {formatAmount(discountAmount)} ج.م</strong></div>}
+              <div className="erp-pos-summary-row"><span>الضريبة ({formatAmount(taxRate)}%)</span><strong className="text-slate-800">{formatAmount(taxAmount)} ج.م</strong></div>
             </div>
 
             <div className="mt-4 space-y-3">
@@ -343,7 +350,7 @@ export function NewInvoicePage({ onNavigate }: NewInvoicePageProps) {
               <div className={`rounded-xl border p-3 ${remaining > 0 ? "border-amber-200 bg-amber-50 text-amber-800" : "border-emerald-200 bg-emerald-50 text-emerald-800"}`}>
                 <div className="flex items-center justify-between gap-3 text-sm font-black">
                   <span>{remaining > 0 ? "المتبقي على العميل" : "الفاتورة مسددة"}</span>
-                  <span>{Math.max(0, remaining).toLocaleString("ar-EG")} ج.م</span>
+                  <span>{formatAmount(Math.max(0, remaining))} ج.م</span>
                 </div>
               </div>
               <label>
@@ -352,7 +359,7 @@ export function NewInvoicePage({ onNavigate }: NewInvoicePageProps) {
               </label>
             </div>
 
-            <button data-testid="invoice-submit" onClick={handleSubmit} disabled={saving || cart.length === 0} className="btn-primary mt-4 flex w-full items-center justify-center gap-2 py-3 text-base">
+            <button data-testid="invoice-submit" onClick={handleSubmit} disabled={saving || cart.length === 0} className="erp-pos-save-action mt-4 flex w-full items-center justify-center gap-2 py-3 text-base">
               <CheckCircle2 className="h-5 w-5" />
               {saving ? "جارٍ إصدار الفاتورة..." : "إصدار الفاتورة"}
             </button>

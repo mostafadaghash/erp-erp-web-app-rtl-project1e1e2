@@ -89,3 +89,45 @@ export type ReportingOverview = {
     profitabilityAvailable: boolean;
   };
 };
+
+export type ReportingSalesDetails = {
+  scope: {
+    from: string;
+    to: string;
+    branchId?: string;
+    branchCount: number;
+    consolidated: boolean;
+    dateBasis: "operation_date";
+  };
+  invoices: Array<{
+    _id: string;
+    invoiceNumber: string;
+    date: string;
+    branchId: string;
+    branchName: string;
+    customerName: string;
+    customerPhone?: string;
+    itemCount: number;
+    totalQuantity: number;
+    subtotal: number;
+    discount: number;
+    tax: number;
+    total: number;
+    creditedTotal: number;
+    netTotal: number;
+    paid: number;
+    remaining: number;
+    paymentMethod: string;
+    status: string;
+    items: Array<{
+      productId: string;
+      productName: string;
+      quantity: number;
+      unitPrice: number;
+      discount: number;
+      total: number;
+      costTotal?: number;
+      grossProfit?: number;
+    }>;
+  }>;
+};

@@ -145,12 +145,7 @@ export function InvoicesPage({ onNavigate, view = "sales" }: InvoicesPageProps) 
     inv.customerName.toLowerCase().includes(search.toLowerCase())
   ).filter(inv => !filterStatus || inv.status === filterStatus);
 
-  const activeFiltered = filtered.filter(invoice => invoice.status !== "cancelled");
-  const totalRevenue = activeFiltered.reduce((s, i) => s + (i.netTotal ?? i.total), 0);
-  const totalPaid = activeFiltered.reduce((s, i) => s + i.paid, 0);
-  const totalPending = activeFiltered.reduce((s, i) => s + i.remaining, 0);
-
-  const { formatCurrency } = useCurrency();
+  const { formatCurrency, formatAmount } = useCurrency();
 
   if (view === "returns") {
     return (
@@ -176,28 +171,12 @@ export function InvoicesPage({ onNavigate, view = "sales" }: InvoicesPageProps) 
             <FileText className="w-6 h-6 text-[var(--erp-accent)]" />
             فواتير المبيعات
           </h1>
-          <p className="erp-page-subtitle">{invoices.length.toLocaleString("ar-EG")} فاتورة مسجلة</p>
+          <p className="erp-page-subtitle">{formatAmount(invoices.length)} فاتورة مسجلة</p>
         </div>
         {canCreate && <button onClick={() => onNavigate("new-invoice")} className="btn-primary flex items-center gap-2">
           <Plus className="w-4 h-4" />
           فاتورة بيع جديدة
         </button>}
-      </div>
-
-      {/* Stats */}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <div className="erp-metric-card text-center">
-          <p className="text-xl font-black text-[var(--erp-navy)]">{totalRevenue.toLocaleString("ar-EG")}</p>
-          <p className="text-xs text-slate-600 mt-0.5">إجمالي المبيعات (ج.م)</p>
-        </div>
-        <div className="erp-metric-card text-center">
-          <p className="text-xl font-black text-[var(--erp-accent-strong)]">{totalPaid.toLocaleString("ar-EG")}</p>
-          <p className="text-xs text-slate-600 mt-0.5">المحصل (ج.م)</p>
-        </div>
-        <div className="erp-metric-card text-center">
-          <p className="text-xl font-black text-amber-600">{totalPending.toLocaleString("ar-EG")}</p>
-          <p className="text-xs text-slate-600 mt-0.5">المتبقي (ج.م)</p>
-        </div>
       </div>
 
       {/* Filters */}
@@ -242,29 +221,46 @@ export function InvoicesPage({ onNavigate, view = "sales" }: InvoicesPageProps) 
             </thead>
             <tbody>
               {filtered.map((inv) => (
-                <tr key={inv._id} data-testid="invoice-row" data-invoice-number={inv.invoiceNumber} data-paid={inv.paid} data-remaining={inv.remaining}>
+                <tr
+                  key={inv._id}
+                  data-testid="invoice-row"
+                  data-invoice-number={inv.invoiceNumber}
+                  data-paid={inv.paid}
+                  data-remaining={inv.remaining}
+                  className="invoice-row-compact cursor-pointer"
+                  tabIndex={0}
+                  aria-label={`فتح الفاتورة ${inv.invoiceNumber}`}
+                  onClick={() => setSelectedInvoice(inv)}
+                  onKeyDown={(event) => {
+                    if (event.target !== event.currentTarget) return;
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      setSelectedInvoice(inv);
+                    }
+                  }}
+                >
                   <td>
                     <button
                       data-testid="invoice-open-number"
-                      onClick={() => setSelectedInvoice(inv)}
+                      onClick={(event) => { event.stopPropagation(); setSelectedInvoice(inv); }}
                       className="font-mono text-xs font-black text-[var(--erp-accent-strong)] underline decoration-emerald-200 underline-offset-4 hover:text-emerald-800"
                     >
                       {inv.invoiceNumber}
                     </button>
                   </td>
                   <td>
-                    {canCollect && inv.status !== "cancelled" && inv.status !== "returned" && inv.remaining > 0 && <button data-testid="invoice-collect" className="mr-1 rounded-lg bg-emerald-50 px-2 py-1.5 text-xs font-bold text-emerald-700" onClick={() => collect(inv)}>تحصيل دفعة</button>}
-                    {canRefund && inv.status !== "cancelled" && inv.status !== "returned" && inv.paid > 0 && <button data-testid="invoice-refund" className="mr-1 rounded-lg bg-amber-50 px-2 py-1.5 text-xs font-bold text-amber-700" onClick={() => refund(inv)}>استرداد مبلغ</button>}
+                    {canCollect && inv.status !== "cancelled" && inv.status !== "returned" && inv.remaining > 0 && <button data-testid="invoice-collect" className="mr-1 rounded-lg bg-emerald-50 px-2 py-1.5 text-xs font-bold text-emerald-700" onClick={(event) => { event.stopPropagation(); collect(inv); }}>تحصيل دفعة</button>}
+                    {canRefund && inv.status !== "cancelled" && inv.status !== "returned" && inv.paid > 0 && <button data-testid="invoice-refund" className="mr-1 rounded-lg bg-amber-50 px-2 py-1.5 text-xs font-bold text-amber-700" onClick={(event) => { event.stopPropagation(); refund(inv); }}>استرداد مبلغ</button>}
                     <p className="font-medium text-slate-800">{inv.customerName}</p>
                     {inv.customerPhone && <p className="text-xs text-slate-400">{inv.customerPhone}</p>}
                   </td>
                   <td className="text-slate-500 text-xs">
-                    {new Date(inv._creationTime).toLocaleDateString("ar-EG")}
+                    {new Date(inv._creationTime).toLocaleDateString("ar-EG-u-nu-latn")}
                   </td>
-                  <td className="font-bold">{inv.total.toLocaleString("ar-EG")} ج.م</td><td>{(inv.creditedTotal ?? 0).toLocaleString("ar-EG")} ج.م</td><td className="font-bold">{(inv.netTotal ?? inv.total).toLocaleString("ar-EG")} ج.م</td>
-                  <td className="text-emerald-600 font-medium">{inv.paid.toLocaleString("ar-EG")} ج.م</td>
+                  <td className="font-bold">{formatCurrency(inv.total)}</td><td>{formatCurrency(inv.creditedTotal ?? 0)}</td><td className="font-bold">{formatCurrency(inv.netTotal ?? inv.total)}</td>
+                  <td className="text-emerald-600 font-medium">{formatCurrency(inv.paid)}</td>
                   <td className={`font-medium ${inv.remaining > 0 ? "text-amber-600" : "text-slate-400"}`}>
-                    {inv.remaining.toLocaleString("ar-EG")} ج.م
+                    {formatCurrency(inv.remaining)}
                   </td>
                   <td>
                     <span className="text-xs text-slate-600">
@@ -288,7 +284,7 @@ export function InvoicesPage({ onNavigate, view = "sales" }: InvoicesPageProps) 
                   <td>
                     <button
                       data-testid="invoice-open"
-                      onClick={() => setSelectedInvoice(inv)}
+                      onClick={(event) => { event.stopPropagation(); setSelectedInvoice(inv); }}
                       className="erp-action erp-action-primary"
                       title="فتح الفاتورة"
                     >
@@ -296,7 +292,7 @@ export function InvoicesPage({ onNavigate, view = "sales" }: InvoicesPageProps) 
                       فتح
                     </button>
                     {canPrint && inv.status !== "cancelled" && <button
-                      onClick={() => { if (canPrint) setPrintInvoice(inv); }}
+                      onClick={(event) => { event.stopPropagation(); if (canPrint) setPrintInvoice(inv); }}
                       className="p-1.5 hover:bg-indigo-50 rounded-lg transition-colors text-slate-500 hover:text-indigo-600"
                       title="طباعة الفاتورة"
                     >
@@ -304,14 +300,11 @@ export function InvoicesPage({ onNavigate, view = "sales" }: InvoicesPageProps) 
                     </button>}
                     {canCancel && ["unpaid", "partial", "paid"].includes(inv.status) && (inv.creditedTotal ?? 0) === 0 && inv.paid === 0 && (
                       <button
-                        onClick={() => { setCancelTarget(inv); setCancelReason(""); }}
+                        onClick={(event) => { event.stopPropagation(); setCancelTarget(inv); setCancelReason(""); }}
                         className="mr-1 rounded-lg bg-red-50 px-2 py-1.5 text-xs font-bold text-red-700 hover:bg-red-100"
                       >
                         إلغاء الفاتورة
                       </button>
-                    )}
-                    {canCancel && inv.status !== "cancelled" && inv.paid > 0 && (
-                      <p className="mt-1 text-xs text-amber-700">تحتاج معالجة استرداد مالي قبل الإلغاء</p>
                     )}
                   </td>
                 </tr>
@@ -358,7 +351,7 @@ export function InvoicesPage({ onNavigate, view = "sales" }: InvoicesPageProps) 
             <div className="overflow-y-auto p-5">
               <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 <div className="rounded-xl bg-slate-50 p-3"><p className="text-xs text-slate-500">العميل</p><p className="mt-1 font-black text-slate-800">{selectedInvoice.customerName}</p><p className="text-xs text-slate-400">{selectedInvoice.customerPhone || "بدون هاتف"}</p></div>
-                <div className="rounded-xl bg-slate-50 p-3"><p className="text-xs text-slate-500">تاريخ الإنشاء</p><p className="mt-1 font-black text-slate-800">{new Date(selectedInvoice._creationTime).toLocaleString("ar-EG")}</p></div>
+                <div className="rounded-xl bg-slate-50 p-3"><p className="text-xs text-slate-500">تاريخ الإنشاء</p><p className="mt-1 font-black text-slate-800">{new Date(selectedInvoice._creationTime).toLocaleString("ar-EG-u-nu-latn")}</p></div>
                 <div className="rounded-xl bg-emerald-50 p-3"><p className="text-xs text-emerald-700">صافي الفاتورة</p><p className="mt-1 text-lg font-black text-emerald-800">{formatCurrency(selectedInvoice.netTotal ?? selectedInvoice.total)}</p></div>
                 <div className="rounded-xl bg-amber-50 p-3"><p className="text-xs text-amber-700">المتبقي</p><p className="mt-1 text-lg font-black text-amber-800">{formatCurrency(selectedInvoice.remaining)}</p></div>
               </div>
@@ -369,7 +362,7 @@ export function InvoicesPage({ onNavigate, view = "sales" }: InvoicesPageProps) 
                   <tbody>
                     {selectedInvoice.items.map((item, index) => (
                       <tr key={`${item.productName}-${index}`}>
-                        <td>{index + 1}</td><td className="font-bold">{item.productName}</td><td>{item.quantity.toLocaleString("ar-EG")}</td><td>{formatCurrency(item.unitPrice)}</td><td>{item.discount.toLocaleString("ar-EG")}٪</td><td className="font-black">{formatCurrency(item.total)}</td>
+                        <td>{formatAmount(index + 1)}</td><td className="font-bold">{item.productName}</td><td>{formatAmount(item.quantity)}</td><td>{formatCurrency(item.unitPrice)}</td><td>{formatAmount(item.discount)}٪</td><td className="font-black">{formatCurrency(item.total)}</td>
                       </tr>
                     ))}
                   </tbody>

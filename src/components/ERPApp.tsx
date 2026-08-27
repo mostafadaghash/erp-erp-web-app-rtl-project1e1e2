@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { ChevronDown, Menu, Plus, ShieldX } from "lucide-react";
 import { toast } from "sonner";
@@ -85,7 +85,7 @@ const PAGE_MODULES: Partial<Record<Page, string>> = {
 };
 
 const PAGE_META: Record<Page, { group: string; title: string }> = {
-  dashboard: { group: "الرئيسية", title: "لوحة التحكم" },
+  dashboard: { group: "لوحة التحكم", title: "لوحة التحكم" },
   products: { group: "المخزون", title: "الأصناف والمخزون" },
   customers: { group: "المبيعات", title: "العملاء" },
   invoices: { group: "المبيعات", title: "المبيعات" },
@@ -137,6 +137,7 @@ export function ERPApp() {
   const [currentPage, setCurrentPage] = useState<Page>("dashboard");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [quickMenuOpen, setQuickMenuOpen] = useState(false);
+  const quickMenuRef = useRef<HTMLDivElement>(null);
   const [createRequest, setCreateRequest] = useState<{ page: Page; token: number } | null>(null);
   const [customerLedgerTarget, setCustomerLedgerTarget] = useState<{
     customerId: Id<"customers">;
@@ -149,6 +150,20 @@ export function ERPApp() {
   const permissions = me?.permissions ?? [];
   const can = (permission: Permission) => permissions.includes(permission);
   const modules = (settings?.modules ?? {}) as Record<string, boolean | undefined>;
+
+  useEffect(() => {
+    if (!quickMenuOpen) return;
+    const closeOnOutsidePress = (event: PointerEvent) => {
+      if (
+        event.target instanceof Node &&
+        !quickMenuRef.current?.contains(event.target)
+      ) {
+        setQuickMenuOpen(false);
+      }
+    };
+    document.addEventListener("pointerdown", closeOnOutsidePress);
+    return () => document.removeEventListener("pointerdown", closeOnOutsidePress);
+  }, [quickMenuOpen]);
 
   const isModuleEnabled = (page: Page) => {
     const moduleName = PAGE_MODULES[page];
@@ -284,7 +299,7 @@ export function ERPApp() {
               )}
 
               {createActions.length > 0 && (
-                <div className="relative">
+                <div className="relative" ref={quickMenuRef}>
                   <button
                     type="button"
                     data-testid="quick-action-menu"

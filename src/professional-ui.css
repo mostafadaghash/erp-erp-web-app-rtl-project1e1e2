@@ -372,9 +372,11 @@ tbody tr:hover td {
   display: grid;
   min-height: 0;
   flex: 1 1 auto;
-  grid-template-columns: minmax(0, 1fr) 330px;
+  grid-template-columns: minmax(0, 1fr) 236px;
+  grid-template-areas: "workspace rail";
   gap: 8px;
   align-items: stretch;
+  direction: ltr;
 }
 
 .erp-pos-main,
@@ -386,14 +388,17 @@ tbody tr:hover td {
 }
 
 .erp-pos-main {
+  grid-area: workspace;
   display: flex;
   min-height: 0;
   flex-direction: column;
   min-width: 0;
   overflow: hidden;
+  direction: rtl;
 }
 
 .erp-pos-customer-strip {
+  order: 1;
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
@@ -403,6 +408,7 @@ tbody tr:hover td {
 }
 
 .erp-pos-search-area {
+  order: 0;
   position: relative;
   padding: 8px 10px;
   border-bottom: 1px solid var(--erp-border);
@@ -465,6 +471,7 @@ tbody tr:hover td {
 }
 
 .erp-pos-cart {
+  order: 2;
   min-height: 0;
   flex: 1 1 auto;
   overflow: auto;
@@ -495,8 +502,37 @@ tbody tr:hover td {
 }
 
 .erp-pos-summary {
+  grid-area: rail;
+  display: flex;
+  flex-direction: column;
   min-height: 0;
   overflow: auto;
+  direction: rtl;
+}
+
+.erp-pos-rail-mode {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border-bottom: 1px solid #0f7650;
+  background: linear-gradient(180deg, #22b96d 0%, #129153 100%);
+  color: #fff;
+}
+
+.erp-pos-rail-mode strong,
+.erp-pos-rail-mode small {
+  display: block;
+}
+
+.erp-pos-rail-mode strong {
+  font-size: 1rem;
+}
+
+.erp-pos-rail-mode small {
+  margin-top: 2px;
+  color: #d9f8e9;
+  font-size: 0.68rem;
 }
 
 .erp-pos-total {
@@ -511,6 +547,18 @@ tbody tr:hover td {
   font-weight: 900;
   line-height: 1;
   letter-spacing: -0.02em;
+}
+
+.erp-pos-document-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.2);
+  padding-top: 8px;
+  color: #e5fff1;
+  font-size: 0.7rem;
+  font-weight: 800;
 }
 
 .erp-pos-summary-body {
@@ -532,6 +580,27 @@ tbody tr:hover td {
   flex-wrap: wrap;
   gap: 7px;
   margin-top: 8px;
+}
+
+.erp-pos-save-action {
+  min-height: 74px;
+  border: 1px solid #dca915;
+  border-radius: 6px;
+  background: linear-gradient(180deg, #ffdc4b 0%, #f6bd22 100%);
+  color: #173048;
+  box-shadow: 0 8px 18px rgba(194, 145, 10, 0.2);
+  font-weight: 950;
+  transition: 150ms ease;
+}
+
+.erp-pos-save-action:not(:disabled):hover {
+  border-color: #b98500;
+  background: linear-gradient(180deg, #ffe672 0%, #ffc82e 100%);
+}
+
+.erp-pos-save-action:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
 }
 
 .erp-pos-shortcut {
@@ -604,6 +673,7 @@ tbody tr:hover td {
 
   .erp-pos-grid {
     grid-template-columns: 1fr;
+    grid-template-areas: "workspace" "rail";
   }
 
   .erp-pos-page {
@@ -936,6 +1006,93 @@ tbody tr:hover td {
 
 .erp-workspace-main :where(.data-table, table) tbody tr:hover td {
   background: #e2f7eb !important;
+}
+
+.erp-workspace-main .invoice-row-compact td {
+  height: 32px !important;
+  padding: 4px 7px !important;
+  font-size: 0.76rem;
+}
+
+.erp-workspace-main .invoice-row-compact button {
+  min-height: 26px !important;
+  padding: 3px 7px !important;
+}
+
+.erp-workspace-main .invoice-row-compact:focus-visible td {
+  background: #dff4e8 !important;
+}
+
+.report-type-tabs,
+.sales-report-view-tabs {
+  display: flex;
+  align-items: stretch;
+  overflow-x: auto;
+  background: #f8fafc;
+}
+
+.report-type-tabs button,
+.sales-report-view-tabs button {
+  display: inline-flex;
+  min-width: max-content;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border: 0 !important;
+  border-left: 1px solid var(--erp-border) !important;
+  border-radius: 0 !important;
+  background: linear-gradient(180deg, #fff 0%, #edf1f3 100%) !important;
+  padding: 10px 18px !important;
+  color: #435466 !important;
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
+.report-type-tabs button.active,
+.sales-report-view-tabs button.active {
+  border-bottom: 3px solid var(--erp-accent) !important;
+  background: #e5f7ed !important;
+  color: var(--erp-accent-strong) !important;
+}
+
+.sales-report-view-tabs {
+  border-bottom: 1px solid var(--erp-border-strong);
+}
+
+.sales-report-view-tabs button {
+  flex: 1 0 110px;
+}
+
+.report-filter-panel .form-input {
+  min-height: 38px !important;
+}
+
+.report-invoice-row td {
+  height: 34px !important;
+  padding: 5px 7px !important;
+  font-size: 0.75rem;
+}
+
+.report-invoice-items-row > td {
+  padding: 0 !important;
+  background: #eef4f1 !important;
+}
+
+.report-invoice-items-row table th,
+.report-invoice-items-row table td {
+  height: 31px !important;
+  padding: 4px 7px !important;
+  font-size: 0.73rem;
+}
+
+.erp-workspace-main table tfoot th,
+.erp-workspace-main table tfoot td {
+  border: 1px solid #aebbc4 !important;
+  background: #f7d554 !important;
+  padding: 7px 9px !important;
+  color: #203142 !important;
+  font-size: 0.76rem;
+  font-weight: 950;
 }
 
 .erp-workspace-main :where(.badge, .erp-status) {

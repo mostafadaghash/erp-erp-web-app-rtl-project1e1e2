@@ -69,10 +69,9 @@ export function Dashboard({ onNavigate, onRequestCreate, permissions, modules }:
   ) as ReportingOverview | undefined;
   const repairStats = useQuery(api.repairs.getStats, canViewRepairs ? {} : "skip");
   const lowStockProducts = useQuery(api.products.list, canViewProducts ? { lowStock: true } : "skip");
-  const recentInvoices = useQuery(api.invoices.list, canViewInvoices ? {} : "skip");
   const crmStats = useQuery(api.leads.stats, canViewLeads ? {} : "skip");
 
-  const { formatCurrency } = useCurrency();
+  const { formatCurrency, formatAmount } = useCurrency();
 
   const moduleCards: ModuleCard[] = [
     {
@@ -162,7 +161,7 @@ export function Dashboard({ onNavigate, onRequestCreate, permissions, modules }:
         {
           title: "صافي مبيعات الشهر",
           value: formatCurrency(report.sales.netSales),
-          note: `${report.sales.invoiceCount.toLocaleString("ar-EG")} فاتورة`,
+          note: `${formatAmount(report.sales.invoiceCount)} فاتورة`,
           icon: ReceiptText,
           tone: "bg-emerald-50 text-emerald-700",
         },
@@ -197,7 +196,7 @@ export function Dashboard({ onNavigate, onRequestCreate, permissions, modules }:
         ...(canViewProfits && report.profitability ? [{
           title: "صافي ربح الشهر",
           value: report.profitability.netProfit === null ? "بيانات التكلفة غير مكتملة" : formatCurrency(report.profitability.netProfit),
-          note: report.profitability.netMargin === null ? `${report.profitability.incompleteCogsInvoices.toLocaleString("ar-EG")} فاتورة تحتاج مراجعة` : `هامش ${report.profitability.netMargin.toLocaleString("ar-EG")}٪`,
+          note: report.profitability.netMargin === null ? `${formatAmount(report.profitability.incompleteCogsInvoices)} فاتورة تحتاج مراجعة` : `هامش ${formatAmount(report.profitability.netMargin)}٪`,
           icon: BarChart3,
           tone: "bg-violet-50 text-violet-700",
         }] : []),
@@ -219,7 +218,7 @@ export function Dashboard({ onNavigate, onRequestCreate, permissions, modules }:
           <div><h1 className="erp-page-title"><BarChart3 className="h-5 w-5 text-[var(--erp-accent)]" />لوحة التحكم</h1><p className="text-xs text-slate-500">المؤشرات والعمليات الأكثر استخدامًا في مكان واحد</p></div>
         </div>
         <div className="text-sm font-bold text-slate-500">
-          {new Date().toLocaleDateString("ar-EG", {
+          {new Date().toLocaleDateString("ar-EG-u-nu-latn", {
             weekday: "long",
             year: "numeric",
             month: "long",
@@ -280,52 +279,40 @@ export function Dashboard({ onNavigate, onRequestCreate, permissions, modules }:
         <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-800">بعض الفواتير القديمة تحتاج استكمال تكلفة البضاعة قبل عرض مؤشرات الربحية بدقة.</div>
       )}
 
-      <div className="grid gap-6 xl:grid-cols-3">
-        {canViewInvoices && (
-          <section className="erp-section xl:col-span-2">
-            <div className="erp-section-header">
-              <h2 className="erp-section-title flex items-center gap-2"><FileText className="h-4 w-4 text-emerald-600" />أحدث فواتير المبيعات</h2>
-              <button onClick={() => onNavigate("invoices")} className="text-sm font-bold text-emerald-700">عرض الكل</button>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="data-table">
-                <thead><tr><th>رقم الفاتورة</th><th>العميل</th><th>الإجمالي</th><th>الحالة</th></tr></thead>
-                <tbody>
-                  {(recentInvoices ?? []).slice(0, 5).map(inv => <tr key={inv._id}><td className="font-mono text-xs text-blue-700">{inv.invoiceNumber}</td><td className="font-medium">{inv.customerName}</td><td className="font-bold">{formatCurrency(inv.total)}</td><td><span className={`badge ${inv.status === "paid" ? "badge-success" : inv.status === "partial" ? "badge-warning" : "badge-danger"}`}>{inv.status === "paid" ? "مدفوعة" : inv.status === "partial" ? "مدفوعة جزئيًا" : "غير مسددة"}</span></td></tr>)}
-                  {(recentInvoices ?? []).length === 0 && <tr><td colSpan={4} className="py-8 text-center text-slate-400">لا توجد فواتير مسجلة حتى الآن.</td></tr>}
-                </tbody>
-              </table>
-            </div>
-          </section>
-        )}
-
-        <div className="space-y-4">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <div>
           {canViewProducts && (
             <section className="erp-section">
               <div className="erp-section-header"><h2 className="erp-section-title flex items-center gap-2"><Boxes className="h-4 w-4 text-amber-600" />متابعة المخزون</h2><button onClick={() => onNavigate("products")} className="text-xs font-bold text-emerald-700">إدارة المخزون</button></div>
               <div className="space-y-2 p-4">
-                {(lowStockProducts ?? []).slice(0, 4).map(product => <div key={product._id} className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2.5"><span className="truncate text-sm font-bold text-slate-700">{product.name}</span><span className="badge badge-warning">متبقي {product.stock}</span></div>)}
+                {(lowStockProducts ?? []).slice(0, 4).map(product => <div key={product._id} className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2.5"><span className="truncate text-sm font-bold text-slate-700">{product.name}</span><span className="badge badge-warning">متبقي {formatAmount(product.stock)}</span></div>)}
                 {(lowStockProducts ?? []).length === 0 && <p className="py-4 text-center text-sm text-slate-400">لا توجد أصناف منخفضة المخزون حاليًا.</p>}
               </div>
             </section>
           )}
 
+        </div>
+
+        <div>
           {canViewRepairs && (
             <section className="erp-section">
               <div className="erp-section-header"><h2 className="erp-section-title flex items-center gap-2"><Wrench className="h-4 w-4 text-rose-600" />حالة أوامر الصيانة</h2></div>
               <div className="grid grid-cols-2 gap-3 p-4">
                 {repairStatusCards.map(card => {
                   const Icon = card.icon;
-                  return <button key={card.label} onClick={() => onNavigate("repairs")} className="rounded-xl border border-slate-200 bg-white p-3 text-center transition hover:bg-slate-50"><Icon className="mx-auto mb-1 h-4 w-4 text-slate-500" /><p className="text-xl font-black text-slate-800">{card.value}</p><p className="mt-1 text-xs text-slate-500">{card.label}</p></button>;
+                  return <button key={card.label} onClick={() => onNavigate("repairs")} className="rounded-xl border border-slate-200 bg-white p-3 text-center transition hover:bg-slate-50"><Icon className="mx-auto mb-1 h-4 w-4 text-slate-500" /><p className="text-xl font-black text-slate-800">{formatAmount(card.value)}</p><p className="mt-1 text-xs text-slate-500">{card.label}</p></button>;
                 })}
               </div>
             </section>
           )}
 
+        </div>
+
+        <div>
           {canViewLeads && (
             <section className="erp-section">
               <div className="erp-section-header"><h2 className="erp-section-title flex items-center gap-2"><Target className="h-4 w-4 text-indigo-600" />العملاء المحتملون</h2><button onClick={() => onNavigate("crm")} className="text-xs font-bold text-emerald-700">فتح المتابعة</button></div>
-              <div className="grid grid-cols-3 gap-3 p-4 text-center"><div className="rounded-xl bg-slate-50 p-3"><p className="text-xl font-black">{crmStats?.total ?? 0}</p><p className="text-xs text-slate-500">الإجمالي</p></div><div className="rounded-xl bg-blue-50 p-3"><p className="text-xl font-black text-blue-700">{crmStats?.new ?? 0}</p><p className="text-xs text-slate-500">جدد</p></div><div className="rounded-xl bg-emerald-50 p-3"><p className="text-xl font-black text-emerald-700">{crmStats?.won ?? 0}</p><p className="text-xs text-slate-500">تم التعاقد</p></div></div>
+              <div className="grid grid-cols-3 gap-3 p-4 text-center"><div className="rounded-xl bg-slate-50 p-3"><p className="text-xl font-black">{formatAmount(crmStats?.total ?? 0)}</p><p className="text-xs text-slate-500">الإجمالي</p></div><div className="rounded-xl bg-blue-50 p-3"><p className="text-xl font-black text-blue-700">{formatAmount(crmStats?.new ?? 0)}</p><p className="text-xs text-slate-500">جدد</p></div><div className="rounded-xl bg-emerald-50 p-3"><p className="text-xl font-black text-emerald-700">{formatAmount(crmStats?.won ?? 0)}</p><p className="text-xs text-slate-500">تم التعاقد</p></div></div>
             </section>
           )}
         </div>
