@@ -25,12 +25,14 @@ test("RELEASE-CLOSURE-02 generic clearing settlement excludes COD clearing accou
   assert.doesNotMatch(definition, /cod_clearing/);
 });
 
-test("RELEASE-CLOSURE-03 dashboard creation shortcuts use the shared create-request path", () => {
+test("RELEASE-CLOSURE-03 creation remains centralized through the shared shell request path", () => {
   assert.match(dashboard, /onRequestCreate: \(page:/);
-  for (const page of ["new-invoice", "shipments", "products", "customers"]) {
-    assert.ok(dashboard.includes(`onRequestCreate("${page}")`), `missing create request for ${page}`);
-  }
+  assert.match(shell, /const requestCreate = \(page: CreateTarget\)/);
   assert.match(shell, /<Dashboard onNavigate=\{navigate\} onRequestCreate=\{requestCreate\}/);
+  for (const page of ["new-invoice", "shipments", "products", "customers"]) {
+    assert.ok(shell.includes(`page: "${page}"`), `missing shared create action for ${page}`);
+  }
+  assert.doesNotMatch(dashboard, /useMutation|api\.[\w.]+\.(?:create|update|remove)/);
 });
 
 test("RELEASE-CLOSURE-04 delivery print document is composed safely and waits for rendering", () => {
