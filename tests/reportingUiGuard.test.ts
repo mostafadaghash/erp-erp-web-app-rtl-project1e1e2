@@ -48,17 +48,19 @@ test("accounting reports cannot regress to client-side list aggregation", () => 
   assert.match(reports, /api\.reporting\.overview/);
 });
 
-test("dashboard accounting cannot regress to duplicate invoice statistics", () => {
+test("dashboard accounting cannot regress to legacy duplicate statistics", () => {
   assert.doesNotMatch(dashboard, /invoiceStats|expenseStats|إجمالي المبيعات المدفوعة/);
-  assert.equal((dashboard.match(/title: "مستحقات العملاء"/g) ?? []).length, 1);
-  assert.match(dashboard, /api\.reporting\.overview/);
+  assert.equal((dashboard.match(/api\.reporting\.overview/g) ?? []).length, 1);
+  assert.match(dashboard, /report\.cod\.currentOutstanding/);
+  assert.match(dashboard, /report\.cod\.settled/);
 });
 
 test("profit and inventory presentation remains permission aware", () => {
   assert.match(reports, /canViewProfits/);
   assert.match(reports, /profitabilityAvailable/);
   assert.match(reports, /inventoryValue !== undefined/);
-  assert.match(dashboard, /canViewProfits && report\.profitability/);
+  assert.match(dashboard, /canViewProfits \? report\?\.profitability : undefined/);
+  assert.match(dashboard, /lowStockProducts/);
 });
 
 test("reporting UI and backend branch picker remain read-only and typed", () => {
