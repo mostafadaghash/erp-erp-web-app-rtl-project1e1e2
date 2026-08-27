@@ -13,7 +13,6 @@ import type * as auth from "../auth.js";
 import type * as branches from "../branches.js";
 import type * as categories from "../categories.js";
 import type * as customers from "../customers.js";
-import type * as dashboard from "../dashboard.js";
 import type * as deliveries from "../deliveries.js";
 import type * as employees from "../employees.js";
 import type * as expenses from "../expenses.js";
@@ -52,7 +51,6 @@ declare const fullApi: ApiFromModules<{
   branches: typeof branches;
   categories: typeof categories;
   customers: typeof customers;
-  dashboard: typeof dashboard;
   deliveries: typeof deliveries;
   employees: typeof employees;
   expenses: typeof expenses;
