@@ -168,10 +168,30 @@ body {
 .badge-purple { @apply bg-purple-100 text-purple-700; }
 
 /* Print styles */
+.print-only { display: none; }
+
 @media print {
   .no-print { display: none !important; }
-  .print-only { display: block !important; }
-  body { background: white; margin: 0; padding: 0; }
+
+  /* Only the dedicated document is printable; the ERP screen stays hidden. */
+  body * { visibility: hidden !important; }
+  .print-only,
+  .print-only * { visibility: visible !important; }
+  .print-only {
+    display: block !important;
+    position: absolute !important;
+    inset: 0 !important;
+    width: 100% !important;
+    background: white !important;
+  }
+
+  html,
+  body {
+    background: white !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
   * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
 }
 
@@ -421,9 +441,165 @@ body {
   line-height: 1.8;
 }
 
+/* Invoice print layouts: intentionally limited to the V1 pilot set. */
+.print-layout-a4-compact,
+.print-layout-a4-detailed {
+  width: 100%;
+  max-width: 210mm;
+  min-height: 270mm;
+  box-sizing: border-box;
+}
+
+.print-layout-a4-detailed .print-header {
+  background: #e5e7eb;
+  border: 1px solid #64748b;
+  padding: 14px;
+}
+
+.print-layout-a4-detailed .print-customer-box,
+.print-layout-a4-detailed .print-totals-box,
+.print-layout-a4-detailed .print-notes {
+  border-radius: 0;
+  border-color: #64748b;
+}
+
+.print-layout-a4-detailed .print-th,
+.print-layout-a4-detailed .print-td {
+  border-color: #64748b;
+}
+
+.print-detail-blank-row {
+  height: 28px;
+}
+
+.print-layout-thermal-80 {
+  width: 80mm;
+  max-width: 80mm;
+  min-height: auto;
+  box-sizing: border-box;
+  padding: 4mm;
+  font-size: 10.5px;
+  line-height: 1.4;
+}
+
+.print-layout-thermal-80 .print-header {
+  display: block;
+  text-align: center;
+  margin-bottom: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px dashed #334155;
+}
+
+.print-layout-thermal-80 .print-logo {
+  width: 42px;
+  height: 42px;
+  margin: 0 auto 4px;
+}
+
+.print-layout-thermal-80 .print-store-info,
+.print-layout-thermal-80 .print-doc-info {
+  text-align: center;
+}
+
+.print-layout-thermal-80 .print-doc-info {
+  align-items: center;
+  margin-top: 8px;
+}
+
+.print-layout-thermal-80 .print-store-name {
+  font-size: 17px;
+}
+
+.print-layout-thermal-80 .print-doc-badge {
+  background: transparent;
+  color: #111827;
+  border: 1px solid #111827;
+  border-radius: 0;
+}
+
+.print-layout-thermal-80 .print-customer-box {
+  border: 0;
+  border-bottom: 1px dashed #64748b;
+  border-radius: 0;
+  background: white;
+  padding: 6px 0 9px;
+  margin-bottom: 9px;
+}
+
+.print-layout-thermal-80 .print-customer-label {
+  display: none;
+}
+
+.print-layout-thermal-80 .print-customer-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 2px;
+}
+
+.print-layout-thermal-80 .print-table {
+  font-size: 9.5px;
+  margin-bottom: 8px;
+}
+
+.print-layout-thermal-80 .print-th,
+.print-layout-thermal-80 .print-td {
+  padding: 5px 3px;
+  border-color: #64748b;
+}
+
+.print-layout-thermal-80 .print-totals {
+  margin-bottom: 8px;
+}
+
+.print-layout-thermal-80 .print-totals-box {
+  width: 100%;
+  min-width: 0;
+  border-radius: 0;
+  border-color: #64748b;
+}
+
+.print-layout-thermal-80 .print-total-row,
+.print-layout-thermal-80 .print-total-final {
+  padding: 5px 7px;
+  font-size: 11px;
+}
+
+.print-layout-thermal-80 .print-notes {
+  border-radius: 0;
+  padding: 6px;
+  margin-bottom: 8px;
+}
+
+.print-layout-thermal-80 .print-footer {
+  border-top: 1px dashed #64748b;
+  padding-top: 8px;
+  font-size: 9.5px;
+}
+
+@page invoice-a4 {
+  size: A4 portrait;
+  margin: 0;
+}
+
+@page invoice-thermal {
+  size: 80mm auto;
+  margin: 0;
+}
+
+.print-layout-a4-compact,
+.print-layout-a4-detailed {
+  page: invoice-a4;
+}
+
+.print-layout-thermal-80 {
+  page: invoice-thermal;
+}
+
 @media print {
   .print-page { padding: 15mm 18mm; }
+  .print-layout-thermal-80 { padding: 4mm; margin: 0 auto; }
   .print-store-name { font-size: 20px; }
+  .print-layout-thermal-80 .print-store-name { font-size: 17px; }
   .print-doc-number { font-size: 15px; }
 }
 
