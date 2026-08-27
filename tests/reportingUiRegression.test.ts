@@ -14,10 +14,6 @@ const backend = readFileSync(
   new URL("../convex/reporting.ts", import.meta.url),
   "utf8",
 );
-const dashboardBackend = readFileSync(
-  new URL("../convex/dashboard.ts", import.meta.url),
-  "utf8",
-);
 
 test("RUI-01 report queries are protected by view_reports and skip", () => {
   assert.match(reports, /usePermission\("view_reports"\)/);
@@ -183,20 +179,22 @@ test("RUI-24 dashboard profit presentation respects permission and incomplete co
   assert.match(dashboard, /بيانات التكلفة تحتاج مراجعة/);
 });
 
-test("RUI-25 dashboard recent invoices are bounded permission-protected and operational", () => {
-  assert.match(dashboard, /api\.dashboard\.recentInvoices/);
-  assert.match(dashboard, /canViewInvoices \? \{ limit: 5 \} : "skip"/);
+test("RUI-25 dashboard recent invoices reuse the bounded deployed sales-details query", () => {
+  assert.match(dashboard, /usePaginatedQuery\(/);
+  assert.match(dashboard, /api\.reporting\.salesDetails/);
+  assert.match(dashboard, /canViewInvoices && canViewReports && branchId/);
+  assert.match(dashboard, /initialNumItems: 5/);
+  assert.match(dashboard, /results\.slice\(0, 5\)/);
   assert.match(dashboard, /أحدث فواتير المبيعات/);
   assert.match(dashboard, /متابعة المخزون/);
   assert.match(dashboard, /العملاء المحتملون/);
-  assert.match(dashboardBackend, /requireModulePermission\(ctx, "view_invoices", "invoices"\)/);
-  assert.match(dashboardBackend, /Math\.min\(10, Math\.max\(1, requestedLimit\)\)/);
-  assert.match(dashboardBackend, /\.take\(limit\)/);
-  assert.doesNotMatch(dashboardBackend, /\.collect\(\)/);
+  assert.match(backend, /paginationOptsValidator/);
+  assert.match(backend, /\.paginate\(args\.paginationOpts\)/);
+  assert.doesNotMatch(dashboard, /api\.invoices\.list/);
 });
 
 test("RUI-26 dashboard provides an explicit recent-invoice loading state", () => {
-  assert.match(dashboard, /recentInvoices === undefined/);
+  assert.match(dashboard, /recentInvoicesQuery\.status === "LoadingFirstPage"/);
   assert.match(dashboard, /جارٍ تحميل أحدث الفواتير/);
 });
 
