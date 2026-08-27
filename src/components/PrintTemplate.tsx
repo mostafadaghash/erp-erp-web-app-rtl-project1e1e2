@@ -140,11 +140,11 @@ function formatTime(ts: number | string) {
 
 function escapeHtml(value: string) {
   return value
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
 }
 
 const PRINT_CSS = `
@@ -407,6 +407,7 @@ function RepairTemplate({ data, settings }: { data: RepairData; settings: any })
           {data.intakeCondition && <><span className="erp-print-label">حالة الاستلام</span><span>{data.intakeCondition}</span></>}
           {data.diagnosis && <><span className="erp-print-label">التشخيص</span><span>{data.diagnosis}</span></>}
           {data.technicianName && <><span className="erp-print-label">الفني</span><span>{data.technicianName}</span></>}
+          {data.employeeName && <><span className="erp-print-label">أنشأ الأمر</span><span>{data.employeeName}</span></>}
           {data.expectedDate && <><span className="erp-print-label">التسليم المتوقع</span><span>{data.expectedDate}</span></>}
           {data.deliveredDate && <><span className="erp-print-label">تاريخ التسليم</span><span>{data.deliveredDate}</span></>}
         </div>
@@ -420,7 +421,7 @@ function RepairTemplate({ data, settings }: { data: RepairData; settings: any })
       <section className="erp-print-summary"><div>{data.qualityCheckNotes ? <div className="erp-print-notes"><strong>اختبار الجودة:</strong> {data.qualityCheckNotes}</div> : null}</div><table className="erp-print-totals"><tbody><tr><td>تكلفة القطع</td><td>{money(data.parts.reduce((sum, part) => sum + (part.lineTotal ?? part.cost * part.quantity), 0))}</td></tr><tr><td>أجرة الإصلاح</td><td>{money(data.laborCost)}</td></tr><tr className="erp-print-total-final"><td>الإجمالي</td><td>{money(data.totalCost)}</td></tr><tr><td>العربون</td><td>{money(data.deposit)}</td></tr><tr><td>المتبقي</td><td>{money(data.remaining)}</td></tr></tbody></table></section>
 
       {data.warrantyDays !== undefined && <div className="erp-print-notes"><strong>الضمان:</strong> {data.warrantyDays} يوم{data.warrantyUntil ? ` — حتى ${data.warrantyUntil}` : ""}</div>}
-      {data.history && data.history.length > 0 && <><div className="erp-print-section-title">سجل الحالات</div><table className="erp-print-table"><thead><tr><th>التاريخ</th><th>الانتقال</th><th>بواسطة</th><th>السبب</th></tr></thead><tbody>{data.history.map((entry, index) => <tr key={`${entry.date}-${index}`}><td>{entry.date}</td><td>{entry.fromStatus ? `${statusLabel[entry.fromStatus] ?? entry.fromStatus} ← ` : ""}{statusLabel[entry.toStatus] ?? entry.toStatus}</td><td>{entry.employeeName}</td><td>{entry.reason ?? "—"}</td></tr>)}</tbody></table></>}
+      {data.history && data.history.length > 0 && <><div className="erp-print-section-title">سجل حالات الصيانة</div><table className="erp-print-table"><thead><tr><th>التاريخ</th><th>الانتقال</th><th>بواسطة</th><th>السبب</th></tr></thead><tbody>{data.history.map((entry, index) => <tr key={`${entry.date}-${index}`}><td>{entry.date}</td><td>{entry.fromStatus ? `${statusLabel[entry.fromStatus] ?? entry.fromStatus} ← ` : ""}{statusLabel[entry.toStatus] ?? entry.toStatus}</td><td>{entry.employeeName}</td><td>{entry.reason ?? "—"}</td></tr>)}</tbody></table></>}
       {data.notes && <div className="erp-print-notes"><strong>ملاحظات:</strong> {data.notes}</div>}
       <div className="erp-print-signatures"><div className="erp-print-signature">توقيع العميل (استلام)</div><div className="erp-print-signature">توقيع الفني</div></div>
       <div className="erp-print-footer">{settings?.invoiceFooter || `يرجى الاحتفاظ بهذا المستند — ${settings?.storeName ?? "المتجر"}`}</div>
