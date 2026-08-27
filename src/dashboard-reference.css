@@ -1,0 +1,619 @@
+/* Dashboard reference skin — mirrors the approved DAGHASH desktop dashboard while preserving RTL behavior. */
+
+/* ──────────────────────────────────────────────
+   Top navigation
+   ────────────────────────────────────────────── */
+@media (min-width: 1024px) {
+  .erp-navigation {
+    color: #fff;
+    border-bottom-color: rgba(255, 255, 255, 0.08);
+    background: linear-gradient(90deg, #1c2641 0%, #142d45 50%, #103f49 100%);
+    box-shadow: 0 8px 24px rgba(14, 32, 53, 0.18);
+  }
+
+  .erp-navigation::before {
+    height: 3px;
+    background: linear-gradient(90deg, #d3ad63 0 21%, #62c9a7 21% 72%, #0c5660 72% 100%);
+  }
+
+  .erp-navigation-inner {
+    min-height: 58px;
+    direction: rtl;
+    gap: 8px;
+    padding: 7px 16px 6px;
+  }
+
+  .erp-nav-brand {
+    order: 0;
+    padding-left: 18px;
+    border-left-color: rgba(255, 255, 255, 0.14);
+  }
+
+  .erp-nav-brand p:first-of-type {
+    color: #f7fbfc !important;
+    font-size: 15px;
+    letter-spacing: 0.02em;
+  }
+
+  .erp-nav-brand p:last-of-type {
+    color: rgba(226, 240, 241, 0.62) !important;
+  }
+
+  .erp-nav-groups {
+    order: 1;
+    gap: 1px;
+  }
+
+  .erp-nav-group-button {
+    min-height: 40px;
+    padding-inline: 9px;
+    color: #f2f6f7;
+    border-color: transparent;
+    border-radius: 7px;
+    font-size: 12px;
+  }
+
+  .erp-nav-group-button:hover,
+  .erp-nav-group-button.active,
+  .erp-nav-group-button[aria-expanded="true"] {
+    color: #fff;
+    border-color: rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.075);
+  }
+
+  .erp-nav-group-button.active::after {
+    right: 11px;
+    left: 11px;
+    bottom: -9px;
+    height: 3px;
+    background: #2db697;
+  }
+
+  .erp-nav-dropdown {
+    top: calc(100% + 10px);
+    border-color: #dbe5e8;
+    background: #fff;
+    box-shadow: 0 24px 55px rgba(15, 31, 49, 0.2);
+  }
+
+  .erp-user-panel {
+    order: 2;
+    padding-right: 12px;
+    border-right-color: rgba(255, 255, 255, 0.13);
+  }
+
+  .erp-user-panel p:first-of-type {
+    color: #fff !important;
+  }
+
+  .erp-user-panel p:last-of-type {
+    color: rgba(232, 241, 243, 0.62) !important;
+  }
+
+  .erp-user-panel > button {
+    min-height: 38px;
+    border-color: rgba(255, 255, 255, 0.18) !important;
+    border-radius: 7px !important;
+    background: rgba(12, 30, 48, 0.24) !important;
+    color: #f5f8fa !important;
+    box-shadow: none !important;
+  }
+
+  .erp-user-panel > button:hover {
+    border-color: rgba(255, 255, 255, 0.28) !important;
+    background: rgba(255, 255, 255, 0.08) !important;
+  }
+
+  .erp-contextbar {
+    min-height: 58px;
+    border-bottom: 0;
+    background: rgba(249, 252, 252, 0.96);
+    box-shadow: none;
+  }
+}
+
+/* ──────────────────────────────────────────────
+   Dashboard canvas
+   ────────────────────────────────────────────── */
+.erp-dashboard {
+  position: relative;
+  min-height: 100%;
+  overflow: hidden;
+  padding: 4px 18px 20px;
+  background:
+    radial-gradient(circle at 88% 8%, rgba(185, 227, 228, 0.58), transparent 26rem),
+    radial-gradient(circle at 11% 38%, rgba(221, 234, 220, 0.68), transparent 18rem),
+    radial-gradient(circle at 70% 47%, rgba(227, 232, 244, 0.72), transparent 23rem),
+    linear-gradient(180deg, #f8fbfb 0%, #f2f7f7 100%);
+}
+
+.erp-dashboard > * {
+  position: relative;
+  z-index: 1;
+}
+
+.erp-dashboard-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.erp-dashboard-heading .erp-page-title {
+  margin: 0;
+  font-size: 1.65rem;
+  line-height: 1.15;
+  color: #17243b;
+}
+
+.erp-dashboard-kicker {
+  margin-bottom: 3px;
+  color: #7b8791;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+/* Primary shortcuts */
+.erp-dashboard-shortcut-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.erp-dashboard-shortcut {
+  position: relative;
+  display: grid;
+  min-height: 90px;
+  grid-template-columns: 54px minmax(0, 1fr) 78px;
+  align-items: center;
+  gap: 10px;
+  overflow: hidden;
+  padding: 15px 16px;
+  border: 1px solid rgba(15, 38, 61, 0.12);
+  border-radius: 10px;
+  color: #fff;
+  text-align: right;
+  box-shadow: 0 7px 18px rgba(20, 40, 60, 0.15);
+  transition: transform 150ms ease, box-shadow 150ms ease;
+}
+
+.erp-dashboard-shortcut:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 11px 24px rgba(20, 40, 60, 0.2);
+}
+
+.erp-dashboard-shortcut--navy {
+  background: linear-gradient(112deg, #152444 0%, #1b2b52 58%, #113f52 100%);
+}
+
+.erp-dashboard-shortcut--blue {
+  background: linear-gradient(112deg, #16254a 0%, #1c3156 56%, #0f5960 100%);
+}
+
+.erp-dashboard-shortcut--deep {
+  background: linear-gradient(112deg, #192448 0%, #1f2c4f 52%, #12575b 100%);
+}
+
+.erp-dashboard-shortcut--teal {
+  background: linear-gradient(112deg, #0b5961 0%, #0e6870 55%, #0b4d58 100%);
+}
+
+.erp-dashboard-shortcut::after {
+  content: "";
+  position: absolute;
+  inset: auto auto -48px -34px;
+  width: 136px;
+  height: 136px;
+  border-radius: 999px;
+  background: rgba(58, 204, 176, 0.08);
+}
+
+.erp-dashboard-shortcut-icon {
+  display: grid;
+  width: 46px;
+  height: 46px;
+  place-items: center;
+  border-radius: 9px;
+  background: linear-gradient(145deg, rgba(213, 176, 92, 0.24), rgba(64, 200, 175, 0.18));
+  color: #dfbd6b;
+}
+
+.erp-dashboard-shortcut-copy {
+  min-width: 0;
+}
+
+.erp-dashboard-shortcut-title {
+  font-size: 15px;
+  font-weight: 900;
+  color: #fff;
+}
+
+.erp-dashboard-shortcut-description {
+  margin-top: 4px;
+  overflow: hidden;
+  color: rgba(239, 246, 247, 0.75);
+  font-size: 11px;
+  line-height: 1.5;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.erp-dashboard-shortcut-link {
+  margin-top: 5px;
+  color: #e1bb62;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.erp-dashboard-spark {
+  opacity: 0.9;
+}
+
+.erp-dashboard-spark svg {
+  display: block;
+  width: 72px;
+  height: 40px;
+}
+
+.erp-dashboard-report-row {
+  display: flex;
+  justify-content: flex-start;
+  margin-top: 12px;
+}
+
+.erp-dashboard-report-card {
+  position: relative;
+  display: flex;
+  width: calc(25% - 11px);
+  min-height: 72px;
+  align-items: center;
+  gap: 12px;
+  overflow: hidden;
+  padding: 12px 15px;
+  border: 1px solid #dbe4e6;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.96);
+  text-align: right;
+  box-shadow: 0 5px 15px rgba(25, 45, 61, 0.1);
+}
+
+.erp-dashboard-report-card::before {
+  content: "";
+  position: absolute;
+  bottom: -46px;
+  left: -30px;
+  width: 105px;
+  height: 105px;
+  border-radius: 999px;
+  background: rgba(95, 202, 158, 0.13);
+}
+
+.erp-dashboard-report-icon {
+  display: grid;
+  width: 42px;
+  height: 42px;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 8px;
+  background: #eeecfb;
+  color: #504793;
+}
+
+.erp-dashboard-report-title {
+  color: #1a273a;
+  font-size: 15px;
+  font-weight: 900;
+}
+
+.erp-dashboard-report-description {
+  margin-top: 3px;
+  color: #8a939b;
+  font-size: 10.5px;
+}
+
+.erp-dashboard-report-link {
+  margin-top: 4px;
+  color: #1b8b69;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+/* Lower dashboard */
+.erp-dashboard-main-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 2.15fr) minmax(315px, 0.92fr);
+  gap: 18px;
+  align-items: start;
+  margin-top: 12px;
+}
+
+.erp-dashboard-panel {
+  overflow: hidden;
+  border: 1px solid #d7e1e4;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.97);
+  box-shadow: 0 5px 16px rgba(25, 45, 61, 0.1);
+}
+
+.erp-dashboard-panel + .erp-dashboard-panel {
+  margin-top: 12px;
+}
+
+.erp-dashboard-panel-header {
+  display: flex;
+  min-height: 46px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 9px 13px;
+  border-bottom: 1px solid #e2e8ea;
+  background: rgba(255, 255, 255, 0.95);
+}
+
+.erp-dashboard-panel-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: #1d2738;
+  font-size: 15px;
+  font-weight: 900;
+}
+
+.erp-dashboard-panel-action {
+  border-radius: 6px;
+  background: linear-gradient(180deg, #146c70, #0f555e);
+  padding: 7px 11px;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 900;
+  box-shadow: 0 3px 8px rgba(12, 75, 82, 0.18);
+}
+
+.erp-dashboard-mini-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  padding: 12px;
+}
+
+.erp-dashboard-mini-card {
+  min-height: 112px;
+  padding: 12px;
+  border: 1px solid #e1e7e9;
+  border-radius: 9px;
+  background: #fff;
+  box-shadow: 0 3px 10px rgba(24, 44, 58, 0.05);
+}
+
+.erp-dashboard-mini-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.erp-dashboard-mini-icon {
+  display: grid;
+  width: 35px;
+  height: 35px;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 8px;
+}
+
+.erp-dashboard-mini-icon--mint {
+  background: #e1f4ef;
+  color: #24877b;
+}
+
+.erp-dashboard-mini-icon--lilac {
+  background: #f1eafb;
+  color: #69529a;
+}
+
+.erp-dashboard-mini-label {
+  color: #59626e;
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.erp-dashboard-mini-value {
+  margin-top: 8px;
+  color: #1f2a3c;
+  font-size: 18px;
+  font-weight: 900;
+}
+
+.erp-dashboard-mini-note {
+  margin-top: 4px;
+  color: #9aa2a9;
+  font-size: 9.5px;
+}
+
+.erp-dashboard-lead-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 9px;
+  padding: 12px;
+}
+
+.erp-dashboard-lead-tile {
+  min-height: 68px;
+  border-radius: 8px;
+  padding: 9px 6px;
+  text-align: center;
+}
+
+.erp-dashboard-lead-tile--green {
+  background: linear-gradient(180deg, #dcf5e8, #cff0df);
+  color: #0c6c4a;
+}
+
+.erp-dashboard-lead-tile--amber {
+  background: linear-gradient(180deg, #fff3d3, #fce9b7);
+  color: #8d6814;
+}
+
+.erp-dashboard-lead-tile--rose {
+  background: linear-gradient(180deg, #fee1e1, #f9cecf);
+  color: #9a2528;
+}
+
+.erp-dashboard-lead-value {
+  font-size: 18px;
+  font-weight: 900;
+}
+
+.erp-dashboard-lead-label {
+  margin-top: 3px;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+/* Recent invoices */
+.erp-dashboard-invoices {
+  min-width: 0;
+}
+
+.erp-dashboard-table-wrap {
+  overflow-x: auto;
+}
+
+.erp-dashboard-table {
+  width: 100%;
+  min-width: 620px;
+  border-collapse: separate;
+  border-spacing: 0;
+  table-layout: fixed;
+}
+
+.erp-dashboard-table th {
+  height: 38px;
+  padding: 7px 13px;
+  border-bottom: 1px solid #e1e7ea;
+  background: #fff;
+  color: #303c4d;
+  font-size: 11px;
+  font-weight: 900;
+  text-align: right;
+}
+
+.erp-dashboard-table td {
+  height: 37px;
+  padding: 7px 13px;
+  border-bottom: 1px solid #edf1f2 !important;
+  background: rgba(255, 255, 255, 0.98);
+  color: #2f3948;
+  font-size: 11px;
+  text-align: right;
+}
+
+.erp-dashboard-table tbody tr:last-child td {
+  border-bottom: 0 !important;
+}
+
+.erp-dashboard-table tbody tr {
+  cursor: pointer;
+}
+
+.erp-dashboard-table tbody tr:hover td {
+  background: #f5faf9;
+}
+
+.erp-dashboard-invoice-number {
+  direction: ltr;
+  display: inline-block;
+  font-variant-numeric: tabular-nums;
+  color: #182334;
+  font-weight: 700;
+}
+
+.erp-dashboard-status {
+  display: inline-flex;
+  min-width: 62px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  padding: 4px 9px;
+  font-size: 9.5px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.erp-dashboard-status--paid {
+  background: #cfeedd;
+  color: #1c724d;
+}
+
+.erp-dashboard-status--partial {
+  background: #f9e7b9;
+  color: #866315;
+}
+
+.erp-dashboard-status--unpaid {
+  background: #f7d1d1;
+  color: #9a3335;
+}
+
+.erp-dashboard-status--cancelled {
+  background: #e9edf0;
+  color: #68727d;
+}
+
+.erp-dashboard-empty {
+  padding: 34px 18px;
+  color: #8d969e;
+  font-size: 12px;
+  text-align: center;
+}
+
+@media (max-width: 1199px) {
+  .erp-dashboard-shortcut-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .erp-dashboard-report-card {
+    width: calc(50% - 7px);
+  }
+
+  .erp-dashboard-main-grid {
+    grid-template-columns: minmax(0, 1.7fr) minmax(290px, 0.9fr);
+  }
+}
+
+@media (max-width: 899px) {
+  .erp-dashboard {
+    padding-inline: 12px;
+  }
+
+  .erp-dashboard-main-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .erp-dashboard-side {
+    order: 2;
+  }
+
+  .erp-dashboard-invoices {
+    order: 1;
+  }
+}
+
+@media (max-width: 639px) {
+  .erp-dashboard-shortcut-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .erp-dashboard-report-card {
+    width: 100%;
+  }
+
+  .erp-dashboard-shortcut {
+    grid-template-columns: 50px minmax(0, 1fr) 68px;
+  }
+
+  .erp-dashboard-mini-grid {
+    grid-template-columns: 1fr;
+  }
+}
