@@ -2,6 +2,8 @@
 
 This checklist is the final go/no-go contract for the first production release. Repository preparation can be completed before a laptop/Staging environment exists; all live gates require recorded evidence from the deployed environment.
 
+The product scope for this release is locked by `docs/V1_PILOT_SCOPE.md`. Work outside that contract must not delay the Cloud V1 pilot.
+
 ## A. Repository gate — automated
 
 Before accepting any release candidate commit:
