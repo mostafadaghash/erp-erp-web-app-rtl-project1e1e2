@@ -342,7 +342,7 @@ export function ERPApp() {
                 </div>
               </div>
             )}
-            {authorized && currentPage === "dashboard" && <Dashboard onNavigate={navigate} onRequestCreate={requestCreate} permissions={permissions} modules={modules} />}
+            {authorized && currentPage === "dashboard" && <Dashboard onNavigate={navigate} onRequestCreate={requestCreate} permissions={permissions} modules={modules} branchId={me.branchId} />}
             {authorized && currentPage === "accounts-home" && <AccountsHubPage onNavigate={navigate} permissions={permissions} />}
             {authorized && currentPage === "products" && <ProductsPage createRequestToken={createToken("products")} />}
             {authorized && currentPage === "customers" && <CustomersPage onOpenLedger={openCustomerLedger} createRequestToken={createToken("customers")} />}
