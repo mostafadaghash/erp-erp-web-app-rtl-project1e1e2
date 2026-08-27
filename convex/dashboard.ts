@@ -6,21 +6,22 @@ export const recentInvoices = query({
   args: { limit: v.optional(v.number()) },
   handler: async (ctx, args) => {
     const user = await requireModulePermission(ctx, "view_invoices", "invoices");
-    const requestedLimit = Number.isFinite(args.limit) ? Math.trunc(args.limit ?? 5) : 5;
+    const requestedLimit =
+      typeof args.limit === "number" && Number.isFinite(args.limit)
+        ? Math.trunc(args.limit)
+        : 5;
     const limit = Math.min(10, Math.max(1, requestedLimit));
+    const branchId = user.branchId;
 
-    let invoices;
-    if (user.branchId) {
-      invoices = await ctx.db
-        .query("invoices")
-        .withIndex("by_branch_date", (q) => q.eq("branchId", user.branchId))
-        .order("desc")
-        .take(limit);
-    } else if (user.role === "admin") {
-      invoices = await ctx.db.query("invoices").order("desc").take(limit);
-    } else {
-      return [];
-    }
+    const invoices = branchId
+      ? await ctx.db
+          .query("invoices")
+          .withIndex("by_branch_date", (q) => q.eq("branchId", branchId))
+          .order("desc")
+          .take(limit)
+      : user.role === "admin"
+        ? await ctx.db.query("invoices").order("desc").take(limit)
+        : [];
 
     return invoices.map((invoice) => ({
       _id: String(invoice._id),
