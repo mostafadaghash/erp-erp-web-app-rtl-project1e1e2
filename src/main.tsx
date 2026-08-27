@@ -4,6 +4,7 @@ import { ConvexReactClient } from "convex/react";
 import "./index.css";
 import "./professional-ui.css";
 import "./professional-navigation.css";
+import "./dashboard-reference.css";
 import App from "./App";
 
 const convexUrl = import.meta.env.VITE_CONVEX_URL;
