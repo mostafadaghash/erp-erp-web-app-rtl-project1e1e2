@@ -14,6 +14,10 @@ const backend = readFileSync(
   new URL("../convex/reporting.ts", import.meta.url),
   "utf8",
 );
+const dashboardBackend = readFileSync(
+  new URL("../convex/dashboard.ts", import.meta.url),
+  "utf8",
+);
 
 test("RUI-01 report queries are protected by view_reports and skip", () => {
   assert.match(reports, /usePermission\("view_reports"\)/);
@@ -153,45 +157,47 @@ test("RUI-20 reports have explicit loading invalid-range and unauthorized states
   assert.match(reports, /لا تملك صلاحية عرض التقارير/);
 });
 
-test("RUI-21 dashboard accounting cards use the reporting overview", () => {
+test("RUI-21 dashboard accounting data uses the reporting overview", () => {
   assert.match(dashboard, /api\.reporting\.overview/);
   assert.match(dashboard, /canViewReports \? \{ from: monthFrom, to: today \} : "skip"/);
 });
 
-test("RUI-22 dashboard does not use legacy invoice or expense stats for accounting", () => {
+test("RUI-22 dashboard avoids legacy accounting stat endpoints", () => {
   assert.doesNotMatch(dashboard, /invoiceStats|expenseStats|api\.invoices\.stats|api\.expenses\.getStats/);
-  assert.match(dashboard, /report\.sales\.netSales/);
-  assert.match(dashboard, /report\.expenses\.totalExpenses/);
-});
-
-test("RUI-23 dashboard separates sales collections receivables expenses and COD", () => {
-  for (const label of [
-    "صافي مبيعات الشهر",
-    "صافي التحصيل",
-    "مستحقات العملاء",
-    "مصروفات الشهر",
-    "قيد التحصيل لدى شركات الشحن",
-  ]) assert.match(dashboard, new RegExp(label));
   assert.match(dashboard, /report\.cod\.currentOutstanding/);
   assert.match(dashboard, /report\.cod\.settled/);
 });
 
-test("RUI-24 dashboard profit card respects permission and completeness", () => {
-  assert.match(dashboard, /canViewProfits && report\.profitability/);
-  assert.match(dashboard, /report\.profitability\.netProfit === null/);
-  assert.match(dashboard, /!report\.completeness\.profitabilityAvailable/);
+test("RUI-23 reference dashboard keeps focused operational accounting indicators", () => {
+  assert.match(dashboard, /قيد التحصيل لدى شركات الشحن/);
+  assert.match(dashboard, /صافي ربح الشهر/);
+  assert.match(dashboard, /متابعة المخزون/);
+  assert.match(dashboard, /report\.cod\.currentOutstanding/);
+  assert.match(dashboard, /report\.cod\.settled/);
 });
 
-test("RUI-25 dashboard removes latest invoices and retains useful operational panels", () => {
-  assert.doesNotMatch(dashboard, /أحدث فواتير المبيعات|recentInvoices/);
-  assert.match(dashboard, /حالة أوامر الصيانة/);
+test("RUI-24 dashboard profit presentation respects permission and incomplete costs", () => {
+  assert.match(dashboard, /canViewProfits \? report\?\.profitability : undefined/);
+  assert.match(dashboard, /profitability\.netProfit === null/);
+  assert.match(dashboard, /profitability\.netMargin === null/);
+  assert.match(dashboard, /بيانات التكلفة تحتاج مراجعة/);
+});
+
+test("RUI-25 dashboard recent invoices are bounded permission-protected and operational", () => {
+  assert.match(dashboard, /api\.dashboard\.recentInvoices/);
+  assert.match(dashboard, /canViewInvoices \? \{ limit: 5 \} : "skip"/);
+  assert.match(dashboard, /أحدث فواتير المبيعات/);
   assert.match(dashboard, /متابعة المخزون/);
   assert.match(dashboard, /العملاء المحتملون/);
+  assert.match(dashboardBackend, /requireModulePermission\(ctx, "view_invoices", "invoices"\)/);
+  assert.match(dashboardBackend, /Math\.min\(10, Math\.max\(1, requestedLimit\)\)/);
+  assert.match(dashboardBackend, /\.take\(limit\)/);
+  assert.doesNotMatch(dashboardBackend, /\.collect\(\)/);
 });
 
-test("RUI-26 dashboard provides a loading state for accounting overview", () => {
-  assert.match(dashboard, /canViewReports && report === undefined/);
-  assert.match(dashboard, /animate-pulse/);
+test("RUI-26 dashboard provides an explicit recent-invoice loading state", () => {
+  assert.match(dashboard, /recentInvoices === undefined/);
+  assert.match(dashboard, /جارٍ تحميل أحدث الفواتير/);
 });
 
 test("RUI-27 reporting backend protects branch and sales-detail queries", () => {
