@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { usePermission } from "../lib/access";
@@ -83,6 +84,7 @@ interface RepairData {
 }
 
 export type PrintType = "invoice" | "order" | "repair";
+export type InvoicePrintLayout = "a4-compact" | "a4-detailed" | "thermal-80";
 export type PrintData = InvoiceData | OrderData | RepairData;
 
 interface PrintTemplateProps {
@@ -120,7 +122,10 @@ function formatDate(ts: number | string) {
 }
 
 // ─── قالب الفاتورة ─────────────────────────────────────────────────────────────
-function InvoiceTemplate({ data, settings }: { data: InvoiceData; settings: any }) {
+function InvoiceTemplate({ data, settings, layout }: { data: InvoiceData; settings: any; layout: InvoicePrintLayout }) {
+  const isThermal = layout === "thermal-80";
+  const isDetailed = layout === "a4-detailed";
+  const showDiscountColumn = !isThermal && data.items.some(i => (i.discount ?? 0) > 0);
   const storeName = settings?.storeName ?? "المتجر";
   const legalName = settings?.legalName ?? "";
   const invoiceFooter = settings?.invoiceFooter ?? "";
@@ -129,7 +134,7 @@ function InvoiceTemplate({ data, settings }: { data: InvoiceData; settings: any 
   const taxRate = settings?.taxRate ?? 0;
 
   return (
-    <div className="print-page">
+    <div className={`print-page print-layout-${layout}`} data-print-layout={layout}>
       {/* رأس الفاتورة */}
       <div className="print-header">
         {settings?.logoUrl && (
@@ -176,13 +181,13 @@ function InvoiceTemplate({ data, settings }: { data: InvoiceData; settings: any 
       <table className="print-table">
         <thead>
           <tr>
-            <th className="print-th" style={{ width: "40%" }}>المنتج</th>
+            <th className="print-th" style={{ width: isThermal ? "55%" : "40%" }}>المنتج</th>
             <th className="print-th" style={{ width: "15%", textAlign: "center" }}>الكمية</th>
-            <th className="print-th" style={{ width: "20%", textAlign: "center" }}>سعر الوحدة</th>
-            {data.items.some(i => (i.discount ?? 0) > 0) && (
+            {!isThermal && <th className="print-th" style={{ width: "20%", textAlign: "center" }}>سعر الوحدة</th>}
+            {showDiscountColumn && (
               <th className="print-th" style={{ width: "10%", textAlign: "center" }}>خصم</th>
             )}
-            <th className="print-th" style={{ width: "20%", textAlign: "center" }}>الإجمالي</th>
+            <th className="print-th" style={{ width: isThermal ? "30%" : "20%", textAlign: "center" }}>الإجمالي</th>
           </tr>
         </thead>
         <tbody>
@@ -190,13 +195,22 @@ function InvoiceTemplate({ data, settings }: { data: InvoiceData; settings: any 
             <tr key={i} className={i % 2 === 0 ? "print-tr-even" : ""}>
               <td className="print-td">{item.productName}</td>
               <td className="print-td" style={{ textAlign: "center" }}>{item.quantity}</td>
-              <td className="print-td" style={{ textAlign: "center" }}>{item.unitPrice.toLocaleString("ar-EG")} ج.م</td>
-              {data.items.some(it => (it.discount ?? 0) > 0) && (
+              {!isThermal && <td className="print-td" style={{ textAlign: "center" }}>{item.unitPrice.toLocaleString("ar-EG")} ج.م</td>}
+              {showDiscountColumn && (
                 <td className="print-td" style={{ textAlign: "center", color: "#dc2626" }}>
                   {(item.discount ?? 0) > 0 ? `${item.discount} ج.م` : "—"}
                 </td>
               )}
               <td className="print-td" style={{ textAlign: "center", fontWeight: "bold" }}>{item.total.toLocaleString("ar-EG")} ج.م</td>
+            </tr>
+          ))}
+          {isDetailed && Array.from({ length: Math.max(0, 12 - data.items.length) }).map((_, i) => (
+            <tr key={`blank-${i}`} className="print-detail-blank-row" aria-hidden="true">
+              <td className="print-td">&nbsp;</td>
+              <td className="print-td">&nbsp;</td>
+              <td className="print-td">&nbsp;</td>
+              {showDiscountColumn && <td className="print-td">&nbsp;</td>}
+              <td className="print-td">&nbsp;</td>
             </tr>
           ))}
         </tbody>
@@ -649,6 +663,7 @@ export function PrintModal({ type, data, onClose }: PrintTemplateProps) {
   const canPrintRepair = usePermission("print_repairs");
   const allowed = type === "invoice" || type === "order" ? canPrintInvoice : canPrintRepair;
   const settings = useQuery(api.settings.getPublic);
+  const [invoiceLayout, setInvoiceLayout] = useState<InvoicePrintLayout>("a4-compact");
 
   const handlePrint = () => {
     if (!allowed) return;
@@ -658,7 +673,7 @@ export function PrintModal({ type, data, onClose }: PrintTemplateProps) {
   return (
     <>
       {/* نافذة المعاينة */}
-      <div className="fixed inset-0 bg-black/60 z-50 flex items-start justify-center p-4 overflow-y-auto no-print">
+      <div className="fixed inset-0 bg-black/60 z-[100] flex items-start justify-center p-4 overflow-y-auto no-print" role="dialog" aria-modal="true" aria-label="معاينة الطباعة">
         <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl my-4">
           {/* شريط الأدوات */}
           <div className="flex items-center justify-between p-4 border-b border-slate-200 sticky top-0 bg-white rounded-t-2xl z-10">
@@ -676,6 +691,21 @@ export function PrintModal({ type, data, onClose }: PrintTemplateProps) {
               </div>
             </div>
             <div className="flex items-center gap-2">
+              {type === "invoice" && (
+                <label className="flex items-center gap-2 text-xs font-bold text-slate-600">
+                  <span className="hidden sm:inline">التصميم</span>
+                  <select
+                    aria-label="تصميم فاتورة الطباعة"
+                    value={invoiceLayout}
+                    onChange={(event) => setInvoiceLayout(event.target.value as InvoicePrintLayout)}
+                    className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none focus:border-indigo-400"
+                  >
+                    <option value="a4-compact">A4 مختصر</option>
+                    <option value="a4-detailed">A4 تفصيلي</option>
+                    <option value="thermal-80">حراري 80mm</option>
+                  </select>
+                </label>
+              )}
               <button
                 onClick={handlePrint}
                 className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm font-medium hover:bg-indigo-700 transition-colors"
@@ -700,7 +730,7 @@ export function PrintModal({ type, data, onClose }: PrintTemplateProps) {
           <div className="p-6 bg-slate-100">
             <div className="bg-white shadow-lg rounded-lg overflow-hidden">
               {type === "invoice" && (
-                <InvoiceTemplate data={data as InvoiceData} settings={settings} />
+                <InvoiceTemplate data={data as InvoiceData} settings={settings} layout={invoiceLayout} />
               )}
               {type === "order" && (
                 <OrderTemplate data={data as OrderData} settings={settings} />
@@ -716,7 +746,7 @@ export function PrintModal({ type, data, onClose }: PrintTemplateProps) {
       {/* محتوى الطباعة الفعلي */}
       <div className="print-only" style={{ display: "none" }}>
         {type === "invoice" && (
-          <InvoiceTemplate data={data as InvoiceData} settings={settings} />
+          <InvoiceTemplate data={data as InvoiceData} settings={settings} layout={invoiceLayout} />
         )}
         {type === "order" && (
           <OrderTemplate data={data as OrderData} settings={settings} />
