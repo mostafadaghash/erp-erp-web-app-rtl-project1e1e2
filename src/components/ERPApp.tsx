@@ -85,7 +85,7 @@ const PAGE_MODULES: Partial<Record<Page, string>> = {
 };
 
 const PAGE_META: Record<Page, { group: string; title: string }> = {
-  dashboard: { group: "لوحة التحكم", title: "لوحة التحكم" },
+  dashboard: { group: "الرئيسية", title: "الرئيسية" },
   products: { group: "المخزون", title: "الأصناف والمخزون" },
   customers: { group: "المبيعات", title: "العملاء" },
   invoices: { group: "المبيعات", title: "المبيعات" },
@@ -342,7 +342,7 @@ export function ERPApp() {
                 </div>
               </div>
             )}
-            {authorized && currentPage === "dashboard" && <Dashboard onNavigate={navigate} onRequestCreate={requestCreate} permissions={permissions} modules={modules} branchId={me.branchId} />}
+            {authorized && currentPage === "dashboard" && <Dashboard onNavigate={navigate} onRequestCreate={requestCreate} permissions={permissions} modules={modules} />}
             {authorized && currentPage === "accounts-home" && <AccountsHubPage onNavigate={navigate} permissions={permissions} />}
             {authorized && currentPage === "products" && <ProductsPage createRequestToken={createToken("products")} />}
             {authorized && currentPage === "customers" && <CustomersPage onOpenLedger={openCustomerLedger} createRequestToken={createToken("customers")} />}
