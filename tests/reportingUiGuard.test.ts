@@ -14,7 +14,7 @@ const reports = readFileSync(
   new URL("../src/components/ReportsPage.tsx", import.meta.url),
   "utf8",
 );
-const dashboard = readFileSync(
+const home = readFileSync(
   new URL("../src/components/Dashboard.tsx", import.meta.url),
   "utf8",
 );
@@ -48,23 +48,24 @@ test("accounting reports cannot regress to client-side list aggregation", () => 
   assert.match(reports, /api\.reporting\.overview/);
 });
 
-test("dashboard accounting cannot regress to legacy duplicate statistics", () => {
-  assert.doesNotMatch(dashboard, /invoiceStats|expenseStats|إجمالي المبيعات المدفوعة/);
-  assert.equal((dashboard.match(/api\.reporting\.overview/g) ?? []).length, 1);
-  assert.match(dashboard, /report\.cod\.currentOutstanding/);
-  assert.match(dashboard, /report\.cod\.settled/);
+test("home launcher cannot regress to dashboard accounting statistics", () => {
+  assert.doesNotMatch(home, /invoiceStats|expenseStats|إجمالي المبيعات المدفوعة/);
+  assert.doesNotMatch(home, /useQuery|usePaginatedQuery|api\.reporting\.overview|report\.cod/);
+  assert.match(home, /title: "الحسابات"/);
+  assert.match(home, /visible: can\("view_finance"\)/);
 });
 
-test("profit and inventory presentation remains permission aware", () => {
+test("profit inventory and report access remain permission aware", () => {
   assert.match(reports, /canViewProfits/);
   assert.match(reports, /profitabilityAvailable/);
   assert.match(reports, /inventoryValue !== undefined/);
-  assert.match(dashboard, /canViewProfits \? report\?\.profitability : undefined/);
-  assert.match(dashboard, /lowStockProducts/);
+  assert.match(home, /title: "المخزون"[\s\S]*?visible: can\("view_products"\)/);
+  assert.match(home, /title: "الحسابات"[\s\S]*?visible: can\("view_finance"\)/);
+  assert.match(home, /title: "التقارير"[\s\S]*?visible: can\("view_reports"\)/);
 });
 
-test("reporting UI and backend branch picker remain read-only and typed", () => {
-  for (const source of [reports, dashboard]) {
+test("reporting UI and home launcher remain read-only and typed", () => {
+  for (const source of [reports, home]) {
     assert.doesNotMatch(source, /useMutation|as any|@ts-ignore/);
   }
 });
