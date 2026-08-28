@@ -9,8 +9,8 @@ import {
   CircleDollarSign,
   ClipboardList,
   DatabaseBackup,
+  Home,
   Landmark,
-  LayoutDashboard,
   Package,
   ReceiptText,
   RotateCcw,
@@ -62,13 +62,9 @@ interface NavGroup {
   items: NavItem[];
 }
 
+const HOME_ITEM: NavItem = { id: "dashboard", label: "الرئيسية", icon: Home };
+
 const NAV_GROUPS: NavGroup[] = [
-  {
-    key: "home",
-    label: "لوحة التحكم",
-    icon: LayoutDashboard,
-    items: [{ id: "dashboard", label: "لوحة التحكم", icon: LayoutDashboard }],
-  },
   {
     key: "sales",
     label: "المبيعات",
@@ -223,6 +219,17 @@ export function Sidebar({
         </div>
 
         <nav aria-label="القائمة الرئيسية" className="erp-nav-groups">
+          <button
+            type="button"
+            data-testid="nav-dashboard"
+            onClick={() => navigateTo(HOME_ITEM.id)}
+            aria-current={currentPage === HOME_ITEM.id ? "page" : undefined}
+            className={`erp-nav-home-button ${currentPage === HOME_ITEM.id ? "active" : ""}`}
+          >
+            <Home className="h-4 w-4" />
+            <span>{HOME_ITEM.label}</span>
+          </button>
+
           {groups.map((group) => {
             const hasActive = group.items.some((item) => item.id === currentPage);
             const isOpen = openGroup === group.key;
