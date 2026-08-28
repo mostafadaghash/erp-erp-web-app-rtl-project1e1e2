@@ -179,22 +179,20 @@ test("RUI-24 dashboard profit presentation respects permission and incomplete co
   assert.match(dashboard, /بيانات التكلفة تحتاج مراجعة/);
 });
 
-test("RUI-25 dashboard recent invoices reuse the bounded deployed sales-details query", () => {
-  assert.match(dashboard, /usePaginatedQuery\(/);
-  assert.match(dashboard, /api\.reporting\.salesDetails/);
-  assert.match(dashboard, /canViewInvoices && canViewReports && branchId/);
-  assert.match(dashboard, /initialNumItems: 5/);
-  assert.match(dashboard, /results\.slice\(0, 5\)/);
+test("RUI-25 dashboard recent invoices stay compatible with the currently deployed staging backend", () => {
+  assert.match(dashboard, /api\.invoices\.list/);
+  assert.match(dashboard, /canViewInvoices \? \(branchId \? \{ branchId \} : \{\}\) : "skip"/);
+  assert.match(dashboard, /recentInvoicesResult \?\? \[\]/);
+  assert.match(dashboard, /\.slice\(0, 5\)/);
   assert.match(dashboard, /أحدث فواتير المبيعات/);
   assert.match(dashboard, /متابعة المخزون/);
   assert.match(dashboard, /العملاء المحتملون/);
-  assert.match(backend, /paginationOptsValidator/);
-  assert.match(backend, /\.paginate\(args\.paginationOpts\)/);
-  assert.doesNotMatch(dashboard, /api\.invoices\.list/);
+  assert.doesNotMatch(dashboard, /api\.reporting\.salesDetails/);
+  assert.match(backend, /export const salesDetails = query/);
 });
 
 test("RUI-26 dashboard provides an explicit recent-invoice loading state", () => {
-  assert.match(dashboard, /recentInvoicesQuery\.status === "LoadingFirstPage"/);
+  assert.match(dashboard, /recentInvoicesResult === undefined/);
   assert.match(dashboard, /جارٍ تحميل أحدث الفواتير/);
 });
 
