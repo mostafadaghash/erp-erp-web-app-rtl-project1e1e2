@@ -2,11 +2,12 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
-const dashboard = readFileSync("src/components/Dashboard.tsx", "utf8");
+const app = readFileSync("src/components/ERPApp.tsx", "utf8");
+const home = readFileSync("src/components/Dashboard.tsx", "utf8");
 
-test("dashboard exposes the main page title as an accessible heading", () => {
-  assert.match(
-    dashboard,
-    /<h1 className="erp-page-title">[\s\S]*?لوحة التحكم[\s\S]*?<\/h1>/,
-  );
+test("home page exposes الرئيسية through the shared accessible page heading", () => {
+  assert.match(app, /dashboard: \{ group: "الرئيسية", title: "الرئيسية" \}/);
+  assert.match(app, /<h1 className="truncate text-base font-black text-slate-900 lg:text-lg">\{pageMeta\.title\}<\/h1>/);
+  assert.match(home, /ابدأ من الرئيسية/);
+  assert.doesNotMatch(home, /لوحة التحكم/);
 });
