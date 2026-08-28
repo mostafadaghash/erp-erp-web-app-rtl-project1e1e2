@@ -6,7 +6,7 @@ const reports = readFileSync(
   new URL("../src/components/ReportsPage.tsx", import.meta.url),
   "utf8",
 );
-const dashboard = readFileSync(
+const home = readFileSync(
   new URL("../src/components/Dashboard.tsx", import.meta.url),
   "utf8",
 );
@@ -153,46 +153,48 @@ test("RUI-20 reports have explicit loading invalid-range and unauthorized states
   assert.match(reports, /لا تملك صلاحية عرض التقارير/);
 });
 
-test("RUI-21 dashboard accounting data uses the reporting overview", () => {
-  assert.match(dashboard, /api\.reporting\.overview/);
-  assert.match(dashboard, /canViewReports \? \{ from: monthFrom, to: today \} : "skip"/);
+test("RUI-21 home launcher has no accounting or invoice data queries", () => {
+  assert.doesNotMatch(home, /useQuery|usePaginatedQuery|api\./);
+  assert.doesNotMatch(home, /أحدث فواتير المبيعات|صافي ربح الشهر|قيد التحصيل/);
 });
 
-test("RUI-22 dashboard avoids legacy accounting stat endpoints", () => {
-  assert.doesNotMatch(dashboard, /invoiceStats|expenseStats|api\.invoices\.stats|api\.expenses\.getStats/);
-  assert.match(dashboard, /report\.cod\.currentOutstanding/);
-  assert.match(dashboard, /report\.cod\.settled/);
+test("RUI-22 home launcher exposes main business modules", () => {
+  for (const label of ["المبيعات", "المشتريات", "المخزون", "الحسابات", "التقارير"]) {
+    assert.match(home, new RegExp(label));
+  }
+  assert.match(home, /erp-home-module-strip/);
 });
 
-test("RUI-23 reference dashboard keeps focused operational accounting indicators", () => {
-  assert.match(dashboard, /قيد التحصيل لدى شركات الشحن/);
-  assert.match(dashboard, /صافي ربح الشهر/);
-  assert.match(dashboard, /متابعة المخزون/);
-  assert.match(dashboard, /report\.cod\.currentOutstanding/);
-  assert.match(dashboard, /report\.cod\.settled/);
+test("RUI-23 home launcher exposes quick creation actions", () => {
+  assert.match(home, /فاتورة بيع جديدة/);
+  assert.match(home, /عملية شراء/);
+  assert.match(home, /إضافة صنف/);
+  assert.match(home, /عميل جديد/);
+  assert.match(home, /onRequestCreate/);
 });
 
-test("RUI-24 dashboard profit presentation respects permission and incomplete costs", () => {
-  assert.match(dashboard, /canViewProfits \? report\?\.profitability : undefined/);
-  assert.match(dashboard, /profitability\.netProfit === null/);
-  assert.match(dashboard, /profitability\.netMargin === null/);
-  assert.match(dashboard, /بيانات التكلفة تحتاج مراجعة/);
+test("RUI-24 home launcher keeps permissions and module gates", () => {
+  assert.match(home, /permissions\.includes\(permission\)/);
+  assert.match(home, /modules\[moduleName\] !== false/);
+  assert.match(home, /can\("view_invoices"\)/);
+  assert.match(home, /can\("view_finance"\)/);
+  assert.match(home, /can\("view_reports"\)/);
 });
 
-test("RUI-25 dashboard omits recent invoices by explicit UX decision", () => {
-  assert.doesNotMatch(dashboard, /أحدث فواتير المبيعات/);
-  assert.doesNotMatch(dashboard, /api\.invoices\.list/);
-  assert.doesNotMatch(dashboard, /recentInvoices/);
-  assert.match(dashboard, /متابعة المخزون/);
-  assert.match(dashboard, /العملاء المحتملون/);
+test("RUI-25 home launcher has document and management shortcuts", () => {
+  assert.match(home, /erp-home-doc-grid/);
+  assert.match(home, /erp-home-management-grid/);
+  assert.match(home, /مرتجعات المبيعات/);
+  assert.match(home, /مرتجعات المشتريات/);
+  assert.match(home, /الخزائن والبنوك/);
+  assert.match(home, /الصيانة/);
 });
 
-test("RUI-26 dashboard primary sections are full clickable controls with visible titles", () => {
-  assert.match(dashboard, /<h1 className="erp-page-title">لوحة التحكم<\/h1>/);
-  assert.match(dashboard, /className={`erp-dashboard-shortcut erp-dashboard-shortcut--\$\{tile\.tone\}`}/);
-  assert.match(dashboard, /onClick=\{\(\) => onNavigate\(tile\.page\)\}/);
-  assert.match(dashboard, /erp-dashboard-shortcut-title/);
-  assert.match(dashboard, /erp-dashboard-shortcut-description/);
+test("RUI-26 home launcher uses full clickable controls and no dashboard label", () => {
+  assert.match(home, /onClick=\{action\.onClick\}/);
+  assert.match(home, /<button/);
+  assert.match(home, /ابدأ من الرئيسية/);
+  assert.doesNotMatch(home, /لوحة التحكم/);
 });
 
 test("RUI-27 reporting backend protects branch and sales-detail queries", () => {
@@ -214,12 +216,12 @@ test("RUI-28 branch options expose a minimal DTO and no financial balances", () 
   assert.doesNotMatch(branchQuery, /balance|inventoryValue|currentBalance/);
 });
 
-test("RUI-29 reporting UI performs no mutation or financial write", () => {
+test("RUI-29 reporting and home UIs perform no direct financial write", () => {
   assert.doesNotMatch(reports, /useMutation|ctx\.db|api\.[\w.]+\.(?:create|update|remove|reverse)/);
-  assert.doesNotMatch(dashboard, /useMutation|ctx\.db/);
+  assert.doesNotMatch(home, /useMutation|ctx\.db/);
 });
 
-test("RUI-30 reporting UI contains no unsafe TypeScript escape", () => {
+test("RUI-30 reporting and home UIs contain no unsafe TypeScript escape", () => {
   assert.doesNotMatch(reports, /as any|@ts-ignore/);
-  assert.doesNotMatch(dashboard, /as any|@ts-ignore/);
+  assert.doesNotMatch(home, /as any|@ts-ignore/);
 });
