@@ -1,11 +1,12 @@
 import { FinancialHistory } from "./FinancialHistory";
 import { SalesReturnsPanel } from "./SalesReturnsPanel";
+import { InvoiceEditDialog } from "./InvoiceEditDialog";
 import { useRef, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { usePermission } from "../lib/access";
 import type { Page } from "./ERPApp";
-import { Eye, FileText, Plus, Search, Printer, RotateCcw, X } from "lucide-react";
+import { Eye, FileText, Pencil, Plus, Search, Printer, RotateCcw, X } from "lucide-react";
 import { PrintModal } from "./PrintTemplate";
 import { useCurrency } from "../lib/utils";
 import type { Doc, Id } from "../../convex/_generated/dataModel";
@@ -19,6 +20,7 @@ interface InvoicesPageProps {
 
 export function InvoicesPage({ onNavigate, view = "sales" }: InvoicesPageProps) {
   const canCreate = usePermission("create_invoices");
+  const canEdit = usePermission("edit_invoices");
   const canPrint = usePermission("print_invoices");
   const canCancel = usePermission("delete_invoices");
   const canCollect = usePermission("record_collections");
@@ -31,6 +33,7 @@ export function InvoicesPage({ onNavigate, view = "sales" }: InvoicesPageProps) 
   const [filterStatus, setFilterStatus] = useState("");
   const [printInvoice, setPrintInvoice] = useState<Doc<"invoices"> | null>(null);
   const [selectedInvoice, setSelectedInvoice] = useState<Doc<"invoices"> | null>(null);
+  const [editInvoice, setEditInvoice] = useState<Doc<"invoices"> | null>(null);
   const [cancelTarget, setCancelTarget] = useState<Doc<"invoices"> | null>(null);
   const [cancelReason, setCancelReason] = useState("");
   const [isCancelling, setIsCancelling] = useState(false);
@@ -68,6 +71,7 @@ export function InvoicesPage({ onNavigate, view = "sales" }: InvoicesPageProps) 
       setIsCancelling(false);
     }
   };
+
   const collect = (invoice: Doc<"invoices">) => {
     setCollectTarget(invoice);
     setCollectionAmount("");
@@ -76,6 +80,7 @@ export function InvoicesPage({ onNavigate, view = "sales" }: InvoicesPageProps) 
     setCollectionNotes("");
     collectionRequestId.current = crypto.randomUUID();
   };
+
   const submitCollection = async (event: React.FormEvent) => {
     event.preventDefault();
     const amount = Number(collectionAmount);
@@ -103,6 +108,7 @@ export function InvoicesPage({ onNavigate, view = "sales" }: InvoicesPageProps) 
       setIsCollecting(false);
     }
   };
+
   const refund = (invoice: Doc<"invoices">) => {
     setRefundTarget(invoice);
     setRefundAmount("");
@@ -111,6 +117,7 @@ export function InvoicesPage({ onNavigate, view = "sales" }: InvoicesPageProps) 
     setRefundReason("");
     refundRequestId.current = crypto.randomUUID();
   };
+
   const submitRefund = async (event: React.FormEvent) => {
     event.preventDefault();
     const amount = Number(refundAmount);
@@ -179,7 +186,6 @@ export function InvoicesPage({ onNavigate, view = "sales" }: InvoicesPageProps) 
         </button>}
       </div>
 
-      {/* Filters */}
       <div className="erp-toolbar flex-col sm:flex-row">
         <div className="relative flex-1">
           <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
@@ -202,7 +208,6 @@ export function InvoicesPage({ onNavigate, view = "sales" }: InvoicesPageProps) 
         </select>
       </div>
 
-      {/* Table */}
       <div className="erp-section">
         <div className="overflow-x-auto">
           <table className="data-table">
@@ -322,7 +327,6 @@ export function InvoicesPage({ onNavigate, view = "sales" }: InvoicesPageProps) 
         </div>
       </div>
 
-      {/* Print Modal */}
       {canPrint && printInvoice && (
         <PrintModal
           type="invoice"
@@ -330,6 +334,7 @@ export function InvoicesPage({ onNavigate, view = "sales" }: InvoicesPageProps) 
           onClose={() => setPrintInvoice(null)}
         />
       )}
+
       {selectedInvoice && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 p-3" dir="rtl" role="dialog" aria-modal="true" data-testid="invoice-details-modal">
           <div className="flex max-h-[94vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
@@ -339,6 +344,17 @@ export function InvoicesPage({ onNavigate, view = "sales" }: InvoicesPageProps) 
                 <h2 className="mt-1 text-xl font-black">{selectedInvoice.invoiceNumber}</h2>
               </div>
               <div className="flex items-center gap-2">
+                {canEdit && selectedInvoice.status !== "cancelled" && (
+                  <button
+                    type="button"
+                    data-testid="invoice-edit-open"
+                    onClick={() => setEditInvoice(selectedInvoice)}
+                    className="rounded-lg border border-white/15 bg-emerald-500/20 px-3 py-2 text-xs font-black text-emerald-50 hover:bg-emerald-500/30"
+                    title="تعديل الكمية أو السعر أو حذف صنف"
+                  >
+                    <Pencil className="ml-1 inline h-4 w-4" />تعديل
+                  </button>
+                )}
                 {canPrint && selectedInvoice.status !== "cancelled" && (
                   <button onClick={() => setPrintInvoice(selectedInvoice)} className="rounded-lg border border-white/15 bg-white/10 px-3 py-2 text-xs font-black hover:bg-white/15">
                     <Printer className="ml-1 inline h-4 w-4" />طباعة
@@ -387,6 +403,18 @@ export function InvoicesPage({ onNavigate, view = "sales" }: InvoicesPageProps) 
           </div>
         </div>
       )}
+
+      {canEdit && editInvoice && (
+        <InvoiceEditDialog
+          invoice={editInvoice}
+          onClose={() => setEditInvoice(null)}
+          onSaved={() => {
+            setEditInvoice(null);
+            setSelectedInvoice(null);
+          }}
+        />
+      )}
+
       {cancelTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" dir="rtl">
           <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
@@ -404,6 +432,7 @@ export function InvoicesPage({ onNavigate, view = "sales" }: InvoicesPageProps) 
           </div>
         </div>
       )}
+
       {collectTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" dir="rtl">
           <form data-testid="invoice-collection-form" onSubmit={submitCollection} className="w-full max-w-md space-y-4 rounded-2xl bg-white p-6 shadow-2xl">
@@ -422,6 +451,7 @@ export function InvoicesPage({ onNavigate, view = "sales" }: InvoicesPageProps) 
           </form>
         </div>
       )}
+
       {refundTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" dir="rtl">
           <form data-testid="invoice-refund-form" onSubmit={submitRefund} className="w-full max-w-md space-y-4 rounded-2xl bg-white p-6 shadow-2xl">
