@@ -1,273 +1,386 @@
-import { useQuery } from "convex/react";
-import { api } from "../../convex/_generated/api";
-import type { Id } from "../../convex/_generated/dataModel";
 import type { Page } from "./ERPApp";
 import {
+  ArrowLeft,
   BarChart3,
   Boxes,
+  Building2,
+  CircleDollarSign,
+  ClipboardList,
   Landmark,
+  PackagePlus,
+  ReceiptText,
+  RotateCcw,
+  ShoppingBag,
   Target,
   Truck,
+  UserPlus,
   Users,
+  WalletCards,
   Wrench,
 } from "lucide-react";
-import { useCurrency } from "../lib/utils";
 import type { Permission } from "../../convex/lib/permissions";
-import type { ReportingOverview } from "../../shared/reportingView";
 
 interface DashboardProps {
   onNavigate: (page: Page) => void;
   onRequestCreate: (page: "new-invoice" | "shipments" | "products" | "customers") => void;
   permissions: Permission[];
   modules: Record<string, boolean | undefined>;
-  branchId?: Id<"branches">;
 }
 
-type ShortcutTile = {
-  page: Page;
+type HomeAction = {
+  key: string;
   title: string;
-  description: string;
+  subtitle?: string;
   icon: React.ElementType;
-  tone: "navy" | "blue" | "deep" | "teal";
+  tone: string;
+  featured?: boolean;
   visible: boolean;
+  onClick: () => void;
 };
 
-function isoDate(date: Date) {
-  return [
-    date.getFullYear(),
-    String(date.getMonth() + 1).padStart(2, "0"),
-    String(date.getDate()).padStart(2, "0"),
-  ].join("-");
-}
-
-function Sparkline() {
-  return (
-    <div className="erp-dashboard-spark" aria-hidden="true">
-      <svg viewBox="0 0 76 42" fill="none">
-        <path
-          d="M2 31 C10 28 11 18 18 20 C26 22 27 28 34 25 C42 22 43 10 51 13 C59 16 60 21 67 16 L74 8"
-          stroke="#dfbd68"
-          strokeWidth="2.25"
-          strokeLinecap="round"
-        />
-        <circle cx="74" cy="8" r="2.6" fill="#e8c268" />
-      </svg>
-    </div>
-  );
-}
-
-export function Dashboard({ onNavigate, permissions, modules }: DashboardProps) {
+export function Dashboard({ onNavigate, onRequestCreate, permissions, modules }: DashboardProps) {
   const can = (permission: Permission) => permissions.includes(permission);
   const enabled = (moduleName: string) => modules[moduleName] !== false;
 
-  const canViewRepairs = can("view_repairs") && enabled("repairs");
-  const canViewProducts = can("view_products");
-  const canViewLeads = can("view_leads") && enabled("crm");
-  const canViewReports = can("view_reports");
-  const canViewProfits = can("view_profits");
-  const canViewSuppliers = can("view_suppliers") && enabled("suppliers");
-  const canViewCustomers = can("view_customers");
-  const canViewTreasury = can("view_finance");
-
-  const now = new Date();
-  const today = isoDate(now);
-  const monthFrom = `${today.slice(0, 7)}-01`;
-
-  const report = useQuery(
-    api.reporting.overview,
-    canViewReports ? { from: monthFrom, to: today } : "skip",
-  ) as ReportingOverview | undefined;
-  const repairStats = useQuery(api.repairs.getStats, canViewRepairs ? {} : "skip");
-  const lowStockProducts = useQuery(api.products.list, canViewProducts ? { lowStock: true } : "skip");
-  const crmStats = useQuery(api.leads.stats, canViewLeads ? {} : "skip");
-
-  const { formatCurrency, formatAmount } = useCurrency();
-
-  const shortcuts: ShortcutTile[] = [
+  const mainModules: HomeAction[] = [
     {
-      page: "treasury",
-      title: "الخزينة والبنوك",
-      description: "الأرصدة والمعاملات والحركة النقدية",
+      key: "sales",
+      title: "المبيعات",
+      subtitle: "الفواتير والعملاء وأوامر البيع",
+      icon: ReceiptText,
+      tone: "emerald",
+      visible: can("view_invoices") && enabled("invoices"),
+      onClick: () => onNavigate("invoices"),
+    },
+    {
+      key: "purchases",
+      title: "المشتريات",
+      subtitle: "الموردون وفواتير الشراء",
+      icon: ShoppingBag,
+      tone: "cyan",
+      visible: can("view_shipments") && enabled("shipments"),
+      onClick: () => onNavigate("shipments"),
+    },
+    {
+      key: "inventory",
+      title: "المخزون",
+      subtitle: "الأصناف والكميات والحركة",
+      icon: Boxes,
+      tone: "violet",
+      visible: can("view_products"),
+      onClick: () => onNavigate("products"),
+    },
+    {
+      key: "accounts",
+      title: "الحسابات",
+      subtitle: "الخزائن والبنوك والحسابات",
       icon: Landmark,
-      tone: "navy",
-      visible: canViewTreasury,
+      tone: "amber",
+      visible: can("view_finance"),
+      onClick: () => onNavigate("accounts-home"),
     },
     {
-      page: "customers",
-      title: "العملاء",
-      description: "دليل العملاء والأرصدة والمتابعة",
-      icon: Users,
+      key: "reports",
+      title: "التقارير",
+      subtitle: "تقارير المبيعات والمخزون والحسابات",
+      icon: BarChart3,
       tone: "blue",
-      visible: canViewCustomers,
+      visible: can("view_reports") && enabled("reports"),
+      onClick: () => onNavigate("reports"),
+    },
+  ].filter((action) => action.visible);
+
+  const quickActions: HomeAction[] = [
+    {
+      key: "new-sale",
+      title: "فاتورة بيع جديدة",
+      subtitle: "ابدأ عملية بيع مباشرة",
+      icon: ReceiptText,
+      tone: "emerald",
+      featured: true,
+      visible: can("create_invoices") && enabled("invoices"),
+      onClick: () => onRequestCreate("new-invoice"),
     },
     {
-      page: "suppliers",
-      title: "الموردون",
-      description: "دليل الموردين والمستحقات والمدفوعات",
+      key: "new-purchase",
+      title: "عملية شراء",
+      subtitle: "إضافة فاتورة أو توريد جديد",
+      icon: ShoppingBag,
+      tone: "orange",
+      featured: true,
+      visible: can("create_shipments") && enabled("shipments"),
+      onClick: () => onRequestCreate("shipments"),
+    },
+    {
+      key: "new-product",
+      title: "إضافة صنف",
+      subtitle: "تعريف صنف جديد بالمخزون",
+      icon: PackagePlus,
+      tone: "cyan",
+      visible: can("create_products"),
+      onClick: () => onRequestCreate("products"),
+    },
+    {
+      key: "new-customer",
+      title: "عميل جديد",
+      subtitle: "إضافة عميل إلى الدليل",
+      icon: UserPlus,
+      tone: "violet",
+      visible: can("create_customers"),
+      onClick: () => onRequestCreate("customers"),
+    },
+  ].filter((action) => action.visible);
+
+  const documentActions: HomeAction[] = [
+    {
+      key: "sales-list",
+      title: "فواتير المبيعات",
+      icon: ReceiptText,
+      tone: "emerald",
+      visible: can("view_invoices") && enabled("invoices"),
+      onClick: () => onNavigate("invoices"),
+    },
+    {
+      key: "sales-return",
+      title: "مرتجعات المبيعات",
+      icon: RotateCcw,
+      tone: "rose",
+      visible: can("view_sales_returns") && enabled("invoices"),
+      onClick: () => onNavigate("sales-returns"),
+    },
+    {
+      key: "purchase-list",
+      title: "فواتير المشتريات",
+      icon: ShoppingBag,
+      tone: "orange",
+      visible: can("view_shipments") && enabled("shipments"),
+      onClick: () => onNavigate("shipments"),
+    },
+    {
+      key: "purchase-return",
+      title: "مرتجعات المشتريات",
+      icon: RotateCcw,
+      tone: "plum",
+      visible: can("view_purchase_returns"),
+      onClick: () => onNavigate("purchase-returns"),
+    },
+    {
+      key: "orders",
+      title: "أوامر البيع",
+      icon: ClipboardList,
+      tone: "blue",
+      visible: can("view_orders") && enabled("orders"),
+      onClick: () => onNavigate("orders"),
+    },
+    {
+      key: "shipping",
+      title: "الشحن والتوصيل",
       icon: Truck,
-      tone: "deep",
-      visible: canViewSuppliers,
+      tone: "cyan",
+      visible: can("view_deliveries") && enabled("deliveries"),
+      onClick: () => onNavigate("deliveries"),
     },
     {
-      page: "repairs",
-      title: "الصيانة",
-      description: "أوامر الصيانة وحالة الأجهزة والمتابعة",
-      icon: Wrench,
-      tone: "teal",
-      visible: canViewRepairs,
+      key: "expenses",
+      title: "المصروفات",
+      icon: CircleDollarSign,
+      tone: "red",
+      visible: can("view_expenses") && enabled("expenses"),
+      onClick: () => onNavigate("expenses"),
     },
-  ].filter((tile) => tile.visible);
+    {
+      key: "treasury",
+      title: "الخزائن والبنوك",
+      icon: WalletCards,
+      tone: "gold",
+      visible: can("view_finance"),
+      onClick: () => onNavigate("treasury"),
+    },
+  ].filter((action) => action.visible);
 
-  const profitability = canViewProfits ? report?.profitability : undefined;
-  const profitValue = profitability
-    ? profitability.netProfit === null
-      ? "—"
-      : formatCurrency(profitability.netProfit)
-    : lowStockProducts
-      ? `${formatAmount(lowStockProducts.length)} صنف`
-      : "—";
-  const profitLabel = profitability ? "صافي ربح الشهر" : "أصناف منخفضة المخزون";
-  const profitNote = profitability
-    ? profitability.netMargin === null
-      ? "بيانات التكلفة تحتاج مراجعة"
-      : `هامش ${formatAmount(profitability.netMargin)}٪`
-    : "تحتاج متابعة المخزون";
-
-  const followUpTiles = canViewLeads
-    ? [
-        { label: "تم التعاقد", value: crmStats?.won ?? 0, tone: "green" },
-        { label: "جدد", value: crmStats?.new ?? 0, tone: "amber" },
-        { label: "الإجمالي", value: crmStats?.total ?? 0, tone: "rose" },
-      ]
-    : [
-        { label: "جاهزة للتسليم", value: repairStats?.ready ?? 0, tone: "green" },
-        { label: "مستلمة", value: repairStats?.received ?? 0, tone: "amber" },
-        { label: "قيد الإصلاح", value: repairStats?.inProgress ?? 0, tone: "rose" },
-      ];
+  const managementActions: HomeAction[] = [
+    {
+      key: "customers",
+      title: "العملاء",
+      subtitle: "الدليل والأرصدة والمتابعة",
+      icon: Users,
+      tone: "teal",
+      visible: can("view_customers"),
+      onClick: () => onNavigate("customers"),
+    },
+    {
+      key: "suppliers",
+      title: "الموردون",
+      subtitle: "الدليل والحسابات والمدفوعات",
+      icon: Truck,
+      tone: "slate",
+      visible: can("view_suppliers") && enabled("suppliers"),
+      onClick: () => onNavigate("suppliers"),
+    },
+    {
+      key: "repairs",
+      title: "الصيانة",
+      subtitle: "أوامر الصيانة وحالة الأجهزة",
+      icon: Wrench,
+      tone: "indigo",
+      visible: can("view_repairs") && enabled("repairs"),
+      onClick: () => onNavigate("repairs"),
+    },
+    {
+      key: "crm",
+      title: "متابعة العملاء",
+      subtitle: "الفرص والعملاء المحتملون",
+      icon: Target,
+      tone: "purple",
+      visible: can("view_leads") && enabled("crm"),
+      onClick: () => onNavigate("crm"),
+    },
+    {
+      key: "branches",
+      title: "الفروع",
+      subtitle: "إدارة فروع المنشأة",
+      icon: Building2,
+      tone: "navy",
+      visible: can("view_branches") && enabled("branches"),
+      onClick: () => onNavigate("branches"),
+    },
+  ].filter((action) => action.visible);
 
   return (
-    <div className="erp-dashboard">
-      <header className="erp-dashboard-heading">
+    <div className="erp-home">
+      <section className="erp-home-intro" aria-labelledby="home-heading">
         <div>
-          <p className="erp-dashboard-kicker">الرئيسية</p>
-          <h1 className="erp-page-title">لوحة التحكم</h1>
+          <p className="erp-home-eyebrow">مساحة العمل</p>
+          <h2 id="home-heading">ابدأ من الرئيسية</h2>
+          <p>اختر القسم أو العملية التي تريد تنفيذها مباشرة.</p>
         </div>
-      </header>
+        <div className="erp-home-orbit" aria-hidden="true">
+          <span />
+          <span />
+          <span />
+        </div>
+      </section>
 
-      {shortcuts.length > 0 && (
-        <section className="erp-dashboard-shortcut-grid" aria-label="الأقسام الرئيسية">
-          {shortcuts.map((tile) => {
-            const Icon = tile.icon;
-            return (
-              <button
-                key={tile.page}
-                type="button"
-                onClick={() => onNavigate(tile.page)}
-                className={`erp-dashboard-shortcut erp-dashboard-shortcut--${tile.tone}`}
-                aria-label={`فتح قسم ${tile.title}`}
-              >
-                <span className="erp-dashboard-shortcut-icon"><Icon className="h-5 w-5" /></span>
-                <span className="erp-dashboard-shortcut-copy">
-                  <span className="erp-dashboard-shortcut-title block">{tile.title}</span>
-                  <span className="erp-dashboard-shortcut-description block">{tile.description}</span>
-                </span>
-                <Sparkline />
-              </button>
-            );
-          })}
+      {mainModules.length > 0 && (
+        <section className="erp-home-section" aria-labelledby="home-modules-title">
+          <div className="erp-home-section-head">
+            <div>
+              <p className="erp-home-section-kicker">الأقسام الرئيسية</p>
+              <h3 id="home-modules-title">انتقل إلى القسم</h3>
+            </div>
+          </div>
+          <div className="erp-home-module-strip">
+            {mainModules.map((action) => {
+              const Icon = action.icon;
+              return (
+                <button
+                  key={action.key}
+                  type="button"
+                  className={`erp-home-module erp-home-tone--${action.tone}`}
+                  onClick={action.onClick}
+                >
+                  <span className="erp-home-module-icon"><Icon /></span>
+                  <span className="erp-home-module-copy">
+                    <strong>{action.title}</strong>
+                    <small>{action.subtitle}</small>
+                  </span>
+                  <ArrowLeft className="erp-home-arrow" aria-hidden="true" />
+                </button>
+              );
+            })}
+          </div>
         </section>
       )}
 
-      {canViewReports && (
-        <div className="erp-dashboard-report-row">
-          <button
-            type="button"
-            onClick={() => onNavigate("reports")}
-            className="erp-dashboard-report-card"
-            aria-label="فتح قسم التقارير"
-          >
-            <span className="erp-dashboard-report-icon"><BarChart3 className="h-5 w-5" /></span>
-            <span>
-              <span className="erp-dashboard-report-title block">التقارير</span>
-              <span className="erp-dashboard-report-description block">تقارير المبيعات والمخزون والحسابات</span>
-            </span>
-          </button>
-        </div>
+      {quickActions.length > 0 && (
+        <section className="erp-home-section" aria-labelledby="home-quick-title">
+          <div className="erp-home-section-head">
+            <div>
+              <p className="erp-home-section-kicker">وصول سريع</p>
+              <h3 id="home-quick-title">ابدأ عملية جديدة</h3>
+            </div>
+          </div>
+          <div className="erp-home-quick-grid">
+            {quickActions.map((action) => {
+              const Icon = action.icon;
+              return (
+                <button
+                  key={action.key}
+                  type="button"
+                  className={`erp-home-quick ${action.featured ? "erp-home-quick--featured" : ""} erp-home-tone--${action.tone}`}
+                  onClick={action.onClick}
+                >
+                  <span className="erp-home-quick-icon"><Icon /></span>
+                  <span>
+                    <strong>{action.title}</strong>
+                    <small>{action.subtitle}</small>
+                  </span>
+                  <ArrowLeft className="erp-home-arrow" aria-hidden="true" />
+                </button>
+              );
+            })}
+          </div>
+        </section>
       )}
 
-      <div className="erp-dashboard-secondary-grid">
-        {(canViewProducts || canViewReports) && (
-          <section className="erp-dashboard-panel">
-            <div className="erp-dashboard-panel-header">
-              <h2 className="erp-dashboard-panel-title">
-                <Boxes className="h-4 w-4 text-amber-600" />
-                متابعة المخزون
-              </h2>
-              {canViewProducts && (
-                <button type="button" onClick={() => onNavigate("products")} className="erp-dashboard-panel-action">
-                  إدارة المخزون
-                </button>
-              )}
+      {documentActions.length > 0 && (
+        <section className="erp-home-section" aria-labelledby="home-documents-title">
+          <div className="erp-home-section-head">
+            <div>
+              <p className="erp-home-section-kicker">المستندات والحركة</p>
+              <h3 id="home-documents-title">اختر نوع العملية</h3>
             </div>
-            <div className="erp-dashboard-mini-grid">
-              <div className="erp-dashboard-mini-card">
-                <div className="erp-dashboard-mini-head">
-                  <div>
-                    <p className="erp-dashboard-mini-label">قيد التحصيل لدى شركات الشحن</p>
-                    <p className="erp-dashboard-mini-value">
-                      {report ? formatCurrency(report.cod.currentOutstanding) : "—"}
-                    </p>
-                    <p className="erp-dashboard-mini-note">
-                      {report ? `تمت تسوية ${formatCurrency(report.cod.settled)}` : "بانتظار بيانات التقرير"}
-                    </p>
-                  </div>
-                  <span className="erp-dashboard-mini-icon erp-dashboard-mini-icon--mint"><Truck className="h-4 w-4" /></span>
-                </div>
-              </div>
-
-              <div className="erp-dashboard-mini-card">
-                <div className="erp-dashboard-mini-head">
-                  <div>
-                    <p className="erp-dashboard-mini-label">{profitLabel}</p>
-                    <p className="erp-dashboard-mini-value">{profitValue}</p>
-                    <p className="erp-dashboard-mini-note">{profitNote}</p>
-                  </div>
-                  <span className="erp-dashboard-mini-icon erp-dashboard-mini-icon--lilac"><BarChart3 className="h-4 w-4" /></span>
-                </div>
-              </div>
-            </div>
-          </section>
-        )}
-
-        {(canViewLeads || canViewRepairs) && (
-          <section className="erp-dashboard-panel">
-            <div className="erp-dashboard-panel-header">
-              <h2 className="erp-dashboard-panel-title">
-                <Target className="h-4 w-4 text-violet-500" />
-                {canViewLeads ? "العملاء المحتملون" : "متابعة الصيانة"}
-              </h2>
-              <button
-                type="button"
-                onClick={() => onNavigate(canViewLeads ? "crm" : "repairs")}
-                className="erp-dashboard-panel-action"
-              >
-                فتح المتابعة
-              </button>
-            </div>
-            <div className="erp-dashboard-lead-grid">
-              {followUpTiles.map((tile) => (
-                <div
-                  key={tile.label}
-                  className={`erp-dashboard-lead-tile erp-dashboard-lead-tile--${tile.tone}`}
+          </div>
+          <div className="erp-home-doc-grid">
+            {documentActions.map((action, index) => {
+              const Icon = action.icon;
+              return (
+                <button
+                  key={action.key}
+                  type="button"
+                  className={`erp-home-doc erp-home-doc--${(index % 4) + 1} erp-home-tone--${action.tone}`}
+                  onClick={action.onClick}
                 >
-                  <p className="erp-dashboard-lead-value">{formatAmount(tile.value)}</p>
-                  <p className="erp-dashboard-lead-label">{tile.label}</p>
-                </div>
-              ))}
+                  <span className="erp-home-doc-icon"><Icon /></span>
+                  <strong>{action.title}</strong>
+                  <ArrowLeft className="erp-home-arrow" aria-hidden="true" />
+                </button>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
+      {managementActions.length > 0 && (
+        <section className="erp-home-section erp-home-section--last" aria-labelledby="home-management-title">
+          <div className="erp-home-section-head">
+            <div>
+              <p className="erp-home-section-kicker">الإدارة والمتابعة</p>
+              <h3 id="home-management-title">اختصارات العمل اليومي</h3>
             </div>
-          </section>
-        )}
-      </div>
+          </div>
+          <div className="erp-home-management-grid">
+            {managementActions.map((action) => {
+              const Icon = action.icon;
+              return (
+                <button
+                  key={action.key}
+                  type="button"
+                  className={`erp-home-management erp-home-tone--${action.tone}`}
+                  onClick={action.onClick}
+                >
+                  <span className="erp-home-management-icon"><Icon /></span>
+                  <span>
+                    <strong>{action.title}</strong>
+                    <small>{action.subtitle}</small>
+                  </span>
+                  <ArrowLeft className="erp-home-arrow" aria-hidden="true" />
+                </button>
+              );
+            })}
+          </div>
+        </section>
+      )}
     </div>
   );
 }
