@@ -1,0 +1,104 @@
+/* Final dashboard interaction/contrast corrections. Loaded after dashboard-reference.css. */
+
+.erp-dashboard-heading {
+  display: flex !important;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin: 0 0 14px;
+  padding-top: 8px;
+}
+
+.erp-dashboard-heading .erp-page-title {
+  display: block !important;
+  color: #14213a !important;
+  font-size: 1.55rem;
+  font-weight: 900;
+}
+
+.erp-dashboard-kicker {
+  display: block !important;
+  color: #778394 !important;
+}
+
+.erp-dashboard-shortcut {
+  isolation: isolate;
+  cursor: pointer;
+  appearance: none;
+  border-color: rgba(255, 255, 255, 0.08) !important;
+  color: #fff !important;
+}
+
+.erp-dashboard-shortcut--navy {
+  background: linear-gradient(112deg, #172440 0%, #1b2b50 58%, #123e50 100%) !important;
+}
+
+.erp-dashboard-shortcut--blue {
+  background: linear-gradient(112deg, #182548 0%, #1d3156 56%, #10565e 100%) !important;
+}
+
+.erp-dashboard-shortcut--deep {
+  background: linear-gradient(112deg, #1a2446 0%, #202d4e 52%, #12565a 100%) !important;
+}
+
+.erp-dashboard-shortcut--teal {
+  background: linear-gradient(112deg, #0b555e 0%, #0e666e 55%, #0b4b56 100%) !important;
+}
+
+.erp-dashboard-shortcut::after {
+  z-index: 0;
+}
+
+.erp-dashboard-shortcut-icon,
+.erp-dashboard-shortcut-copy,
+.erp-dashboard-spark {
+  position: relative;
+  z-index: 2;
+}
+
+.erp-dashboard-shortcut-title {
+  color: #ffffff !important;
+  opacity: 1 !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+}
+
+.erp-dashboard-shortcut-description {
+  color: rgba(244, 249, 250, 0.82) !important;
+  opacity: 1 !important;
+}
+
+.erp-dashboard-shortcut:hover,
+.erp-dashboard-shortcut:focus-visible {
+  border-color: rgba(224, 190, 105, 0.55) !important;
+  box-shadow: 0 12px 28px rgba(15, 35, 55, 0.24) !important;
+  outline: none;
+}
+
+.erp-dashboard-report-card {
+  cursor: pointer;
+  appearance: none;
+}
+
+.erp-dashboard-report-card:hover,
+.erp-dashboard-report-card:focus-visible {
+  border-color: #93cdbd;
+  box-shadow: 0 9px 22px rgba(25, 75, 66, 0.14);
+  outline: none;
+}
+
+.erp-dashboard-secondary-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+  align-items: start;
+  margin-top: 14px;
+}
+
+.erp-dashboard-secondary-grid .erp-dashboard-panel + .erp-dashboard-panel {
+  margin-top: 0;
+}
+
+@media (max-width: 899px) {
+  .erp-dashboard-secondary-grid {
+    grid-template-columns: 1fr;
+  }
+}
