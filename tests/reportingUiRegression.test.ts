@@ -179,21 +179,20 @@ test("RUI-24 dashboard profit presentation respects permission and incomplete co
   assert.match(dashboard, /بيانات التكلفة تحتاج مراجعة/);
 });
 
-test("RUI-25 dashboard recent invoices stay compatible with the currently deployed staging backend", () => {
-  assert.match(dashboard, /api\.invoices\.list/);
-  assert.match(dashboard, /canViewInvoices \? \(branchId \? \{ branchId \} : \{\}\) : "skip"/);
-  assert.match(dashboard, /recentInvoicesResult \?\? \[\]/);
-  assert.match(dashboard, /\.slice\(0, 5\)/);
-  assert.match(dashboard, /أحدث فواتير المبيعات/);
+test("RUI-25 dashboard omits recent invoices by explicit UX decision", () => {
+  assert.doesNotMatch(dashboard, /أحدث فواتير المبيعات/);
+  assert.doesNotMatch(dashboard, /api\.invoices\.list/);
+  assert.doesNotMatch(dashboard, /recentInvoices/);
   assert.match(dashboard, /متابعة المخزون/);
   assert.match(dashboard, /العملاء المحتملون/);
-  assert.doesNotMatch(dashboard, /api\.reporting\.salesDetails/);
-  assert.match(backend, /export const salesDetails = query/);
 });
 
-test("RUI-26 dashboard provides an explicit recent-invoice loading state", () => {
-  assert.match(dashboard, /recentInvoicesResult === undefined/);
-  assert.match(dashboard, /جارٍ تحميل أحدث الفواتير/);
+test("RUI-26 dashboard primary sections are full clickable controls with visible titles", () => {
+  assert.match(dashboard, /<h1 className="erp-page-title">لوحة التحكم<\/h1>/);
+  assert.match(dashboard, /className={`erp-dashboard-shortcut erp-dashboard-shortcut--\$\{tile\.tone\}`}/);
+  assert.match(dashboard, /onClick=\{\(\) => onNavigate\(tile\.page\)\}/);
+  assert.match(dashboard, /erp-dashboard-shortcut-title/);
+  assert.match(dashboard, /erp-dashboard-shortcut-description/);
 });
 
 test("RUI-27 reporting backend protects branch and sales-detail queries", () => {
