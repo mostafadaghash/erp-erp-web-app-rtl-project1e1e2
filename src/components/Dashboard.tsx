@@ -1,4 +1,4 @@
-import { usePaginatedQuery, useQuery } from "convex/react";
+import { useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import type { Page } from "./ERPApp";
@@ -96,8 +96,6 @@ export function Dashboard({ onNavigate, permissions, modules, branchId }: Dashbo
   const now = new Date();
   const today = isoDate(now);
   const monthFrom = `${today.slice(0, 7)}-01`;
-  const recentFromDate = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate());
-  const recentFrom = isoDate(recentFromDate);
 
   const report = useQuery(
     api.reporting.overview,
@@ -106,14 +104,11 @@ export function Dashboard({ onNavigate, permissions, modules, branchId }: Dashbo
   const repairStats = useQuery(api.repairs.getStats, canViewRepairs ? {} : "skip");
   const lowStockProducts = useQuery(api.products.list, canViewProducts ? { lowStock: true } : "skip");
   const crmStats = useQuery(api.leads.stats, canViewLeads ? {} : "skip");
-  const recentInvoicesQuery = usePaginatedQuery(
-    api.reporting.salesDetails,
-    canViewInvoices && canViewReports && branchId
-      ? { branchId, from: recentFrom, to: today }
-      : "skip",
-    { initialNumItems: 5 },
-  );
-  const recentInvoices = recentInvoicesQuery.results.slice(0, 5) as RecentInvoice[];
+  const recentInvoicesResult = useQuery(
+    api.invoices.list,
+    canViewInvoices ? (branchId ? { branchId } : {}) : "skip",
+  ) as RecentInvoice[] | undefined;
+  const recentInvoices = (recentInvoicesResult ?? []).slice(0, 5);
 
   const { formatCurrency, formatAmount } = useCurrency();
 
@@ -179,8 +174,8 @@ export function Dashboard({ onNavigate, permissions, modules, branchId }: Dashbo
         { label: "قيد الإصلاح", value: repairStats?.inProgress ?? 0, tone: "rose" },
       ];
 
-  const recentInvoicesAvailable = canViewInvoices && canViewReports && Boolean(branchId);
-  const recentInvoicesLoading = recentInvoicesAvailable && recentInvoicesQuery.status === "LoadingFirstPage";
+  const recentInvoicesAvailable = canViewInvoices;
+  const recentInvoicesLoading = recentInvoicesAvailable && recentInvoicesResult === undefined;
 
   return (
     <div className="erp-dashboard">
@@ -291,11 +286,7 @@ export function Dashboard({ onNavigate, permissions, modules, branchId }: Dashbo
             <div className="erp-dashboard-empty">
               {!canViewInvoices
                 ? "لا تملك صلاحية عرض فواتير المبيعات."
-                : !canViewReports
-                  ? "يلزم تصريح التقارير لعرض أحدث الفواتير هنا."
-                  : !branchId
-                    ? "اختر فرع العمل لعرض أحدث الفواتير."
-                    : "لا توجد فواتير مبيعات لعرضها حاليًا."}
+                : "لا توجد فواتير مبيعات لعرضها حاليًا."}
             </div>
           )}
         </section>
