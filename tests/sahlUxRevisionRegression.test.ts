@@ -5,7 +5,7 @@ import { readFileSync } from "node:fs";
 const read = (path: string) => readFileSync(new URL(path, import.meta.url), "utf8");
 const sidebar = read("../src/components/Sidebar.tsx");
 const app = read("../src/components/ERPApp.tsx");
-const dashboard = read("../src/components/Dashboard.tsx");
+const home = read("../src/components/Dashboard.tsx");
 const invoices = read("../src/components/InvoicesPage.tsx");
 const newInvoice = read("../src/components/NewInvoicePage.tsx");
 const reports = read("../src/components/ReportsPage.tsx");
@@ -20,16 +20,22 @@ test("SUX-01 navigation dropdowns close on an outside pointer press", () => {
   assert.match(app, /!quickMenuRef\.current\?\.contains\(event\.target\)/);
 });
 
-test("SUX-02 home navigation is consistently named dashboard", () => {
-  assert.doesNotMatch(sidebar, /label: "الرئيسية"/);
-  assert.match(sidebar, /label: "لوحة التحكم"/);
-  assert.match(app, /dashboard: \{ group: "لوحة التحكم", title: "لوحة التحكم" \}/);
+test("SUX-02 home is named الرئيسية and is a direct navigation item", () => {
+  assert.match(sidebar, /HOME_ITEM: NavItem = \{ id: "dashboard", label: "الرئيسية"/);
+  assert.match(sidebar, /data-testid="nav-dashboard"/);
+  assert.match(sidebar, /className=\{`erp-nav-home-button/);
+  assert.doesNotMatch(sidebar, /key: "home"[\s\S]{0,160}items:/);
+  assert.match(app, /dashboard: \{ group: "الرئيسية", title: "الرئيسية" \}/);
+  assert.doesNotMatch(app, /لوحة التحكم/);
 });
 
-test("SUX-03 monetary and dashboard values use Latin digits", () => {
+test("SUX-03 home is an interactive launcher rather than a metrics dashboard", () => {
   assert.match(utils, /ar-EG-u-nu-latn/);
-  assert.match(dashboard, /formatAmount/);
-  assert.doesNotMatch(dashboard, /toLocaleString\("ar-EG"\)/);
+  assert.match(home, /erp-home-module-strip/);
+  assert.match(home, /erp-home-quick-grid/);
+  assert.match(home, /erp-home-doc-grid/);
+  assert.match(home, /onClick=\{action\.onClick\}/);
+  assert.doesNotMatch(home, /useQuery|api\.reporting|أحدث فواتير المبيعات|لوحة التحكم/);
 });
 
 test("SUX-04 sales list has no summary cards or accounting cancellation warning", () => {
