@@ -1,0 +1,571 @@
+/* Final POS-oriented structure for the sales invoice workspace.
+   This layer intentionally loads after new-invoice-redesign.css. */
+
+.erp-workspace-main .pos-invoice-v3 {
+  --pos-green: #12a565;
+  --pos-green-dark: #08784a;
+  --pos-green-soft: #e9f8f1;
+  --pos-navy: #12263f;
+  --pos-navy-2: #183854;
+  --pos-line: #d7e0e6;
+  --pos-line-strong: #bcc9d2;
+  --pos-muted: #718096;
+  --pos-bg: #eef3f5;
+  display: flex;
+  min-height: 0;
+  height: 100%;
+  gap: 0;
+  padding: 8px 10px 8px;
+  background: var(--pos-bg);
+}
+
+/* Command header --------------------------------------------------------- */
+.erp-workspace-main .pos-invoice-command-header {
+  min-height: 54px;
+  margin-bottom: 8px;
+  padding: 7px 10px;
+  border: 1px solid var(--pos-line-strong);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--pos-navy);
+  box-shadow: 0 2px 7px rgba(18, 38, 63, .06);
+}
+
+.erp-workspace-main .pos-invoice-command-header::after { display: none; }
+
+.pos-invoice-heading,
+.pos-invoice-header-actions,
+.pos-invoice-meta-line {
+  display: flex;
+  align-items: center;
+}
+
+.pos-invoice-heading { min-width: 0; gap: 9px; }
+.pos-invoice-title-icon {
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  flex: none;
+  border: 1px solid #c6ead9;
+  border-radius: 7px;
+  background: var(--pos-green-soft);
+  color: var(--pos-green-dark);
+}
+
+.erp-workspace-main .pos-invoice-command-header h1 {
+  margin: 0;
+  color: #14273a !important;
+  font-size: 1.05rem;
+  line-height: 1.1;
+  font-weight: 950;
+}
+
+.pos-invoice-meta-line {
+  gap: 10px;
+  margin-top: 3px;
+  color: #7a8795;
+  font-size: .64rem;
+  font-weight: 750;
+}
+
+.pos-invoice-meta-line span + span {
+  padding-inline-start: 10px;
+  border-inline-start: 1px solid #dce4e9;
+}
+
+.pos-invoice-header-actions { gap: 6px; flex-wrap: wrap; }
+.erp-workspace-main .pos-invoice-command-header .pos-header-action {
+  min-height: 34px !important;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1px solid #c7d2da !important;
+  border-radius: 6px !important;
+  background: linear-gradient(180deg, #fff, #f2f5f7) !important;
+  padding: 5px 10px !important;
+  color: #30465b !important;
+  font-size: .72rem;
+  font-weight: 900;
+  box-shadow: 0 1px 3px rgba(18, 38, 63, .05) !important;
+}
+
+.erp-workspace-main .pos-invoice-command-header .pos-header-action-primary {
+  border-color: #0c814f !important;
+  background: linear-gradient(180deg, #19b66f, #0d8e57) !important;
+  color: #fff !important;
+}
+
+.pos-header-action kbd {
+  border-radius: 4px;
+  background: rgba(18, 38, 63, .08);
+  padding: 2px 5px;
+  color: inherit;
+  font-family: inherit;
+  font-size: .58rem;
+}
+.pos-header-action-primary kbd { background: rgba(255,255,255,.16); }
+
+/* Core desktop split ----------------------------------------------------- */
+.erp-workspace-main .pos-invoice-layout {
+  min-height: 0;
+  flex: 1 1 auto;
+  grid-template-columns: minmax(0, 1fr) 292px;
+  grid-template-areas: "workspace rail";
+  gap: 8px;
+  align-items: stretch;
+}
+
+.erp-workspace-main .pos-invoice-workspace {
+  display: grid;
+  min-height: 0;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  gap: 6px;
+  border: 1px solid var(--pos-line-strong);
+  border-radius: 7px;
+  background: #fff;
+  box-shadow: 0 2px 7px rgba(18, 38, 63, .05);
+  overflow: hidden;
+}
+
+/* Search ---------------------------------------------------------------- */
+.erp-workspace-main .pos-invoice-search-zone {
+  order: 0;
+  min-height: 58px;
+  margin: 0;
+  padding: 7px 9px;
+  border: 0;
+  border-bottom: 1px solid var(--pos-line);
+  border-radius: 0;
+  background: #f9fbfc;
+  box-shadow: none;
+}
+
+.erp-workspace-main .pos-invoice-search-zone .erp-pos-search-input {
+  min-height: 44px !important;
+  padding-inline: 42px 125px !important;
+  border: 2px solid #8cb4a1 !important;
+  border-radius: 6px !important;
+  background: #fff !important;
+  font-size: .92rem !important;
+  font-weight: 850;
+}
+
+.erp-workspace-main .pos-invoice-search-zone .pos-invoice-search-icon {
+  position: absolute;
+  z-index: 2;
+  right: 22px !important;
+  top: 50%;
+  width: 19px;
+  height: 19px;
+  transform: translateY(-50%);
+  color: var(--pos-green-dark) !important;
+}
+
+.erp-workspace-main .pos-invoice-search-zone .erp-pos-search-hint {
+  inset-inline-end: 20px;
+  min-height: 30px;
+  border-radius: 5px;
+  padding: 5px 7px;
+  font-size: .65rem;
+}
+
+/* Customer/account operating row ---------------------------------------- */
+.erp-workspace-main .pos-invoice-customer-row {
+  order: 1;
+  display: grid;
+  grid-template-columns: 1.05fr 1fr .8fr 1.15fr;
+  gap: 6px;
+  margin: 0;
+  padding: 7px 8px 8px;
+  border: 0;
+  border-bottom: 1px solid var(--pos-line);
+  border-radius: 0;
+  background: #fff;
+  box-shadow: none;
+}
+
+.erp-workspace-main .pos-invoice-customer-row::before,
+.erp-workspace-main .pos-invoice-customer-row::after { display: none; content: none; }
+
+.erp-workspace-main .pos-invoice-customer-row .form-label {
+  margin-bottom: 3px;
+  font-size: .66rem;
+  color: #45596c;
+}
+
+.erp-workspace-main .pos-invoice-customer-row .form-input {
+  min-height: 36px !important;
+  height: 36px;
+  border-radius: 5px !important;
+  padding: 5px 8px;
+  font-size: .78rem;
+}
+
+/* Items grid ------------------------------------------------------------- */
+.erp-workspace-main .pos-invoice-items-grid {
+  order: 2;
+  position: relative;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border: 0;
+  border-radius: 0;
+  background: #fff;
+  box-shadow: none;
+  overflow: auto;
+}
+
+.erp-workspace-main .pos-invoice-items-grid::before { display: none !important; content: none !important; }
+
+.pos-invoice-items-title {
+  position: sticky;
+  z-index: 6;
+  top: 0;
+  min-height: 34px;
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 0 9px;
+  border-bottom: 1px solid var(--pos-line-strong);
+  background: linear-gradient(180deg, #f6f9f8, #eaf0ed);
+  color: #2f4558;
+  font-size: .7rem;
+  font-weight: 950;
+}
+
+.pos-invoice-items-title span:last-child {
+  color: var(--pos-green-dark);
+  font-size: .64rem;
+}
+
+.erp-workspace-main .pos-invoice-table {
+  min-width: 1060px;
+  width: 100%;
+  border: 0 !important;
+  table-layout: fixed;
+}
+
+.erp-workspace-main .pos-invoice-table thead th {
+  position: sticky;
+  z-index: 5;
+  top: 34px;
+  height: 34px !important;
+  padding: 4px 6px !important;
+  border-color: #c7d1d8 !important;
+  background: linear-gradient(180deg, #edf3f0, #dfe8e3) !important;
+  color: #2f4354 !important;
+  font-size: .68rem;
+  box-shadow: inset 0 2px 0 var(--pos-green) !important;
+}
+
+.erp-workspace-main .pos-invoice-table tbody td {
+  height: 39px !important;
+  padding: 4px 6px !important;
+  border-color: #d9e0e5 !important;
+  font-size: .72rem;
+}
+
+.erp-workspace-main .pos-invoice-table tbody tr:nth-child(even) td { background: #f8fafb; }
+.erp-workspace-main .pos-invoice-table tbody tr:hover td { background: #eef9f3 !important; }
+
+.pos-invoice-quantity-control {
+  display: grid;
+  grid-template-columns: 27px minmax(38px, 1fr) 27px;
+  align-items: center;
+  gap: 2px;
+  max-width: 108px;
+  margin-inline: auto;
+}
+
+.erp-workspace-main .pos-invoice-quantity-control button {
+  min-height: 27px !important;
+  height: 27px;
+  padding: 0 !important;
+  border: 1px solid #c5d0d7 !important;
+  background: #f7f9fa !important;
+}
+
+.erp-workspace-main .pos-invoice-quantity-control input,
+.erp-workspace-main .pos-line-discount {
+  min-height: 27px !important;
+  height: 27px;
+  border: 1px solid #c7d1d8 !important;
+  border-radius: 4px !important;
+  background: #fff !important;
+  padding: 2px 4px !important;
+  text-align: center;
+  font-size: .72rem;
+  font-weight: 900;
+  box-shadow: none !important;
+}
+
+.erp-workspace-main .pos-line-discount { width: 58px; }
+.erp-workspace-main .pos-line-delete {
+  min-height: 27px !important;
+  width: 29px;
+  height: 27px;
+  display: grid;
+  place-items: center;
+  margin-inline: auto;
+  border-color: #efd0d0 !important;
+  background: #fff6f6 !important;
+  padding: 0 !important;
+  color: #cf4040 !important;
+}
+
+.pos-invoice-empty-row td { padding: 0 !important; height: auto !important; }
+.erp-workspace-main .pos-invoice-empty-row:hover td { background: #fff !important; }
+.erp-workspace-main .pos-invoice-empty-row .erp-pos-empty {
+  min-height: 285px;
+  height: 100%;
+  padding: 28px;
+  background:
+    repeating-linear-gradient(0deg, transparent 0, transparent 47px, rgba(218,226,231,.44) 48px),
+    #fff;
+}
+.erp-workspace-main .pos-invoice-empty-row .erp-pos-empty::after { display: none; content: none; }
+.erp-workspace-main .pos-invoice-empty-row .erp-pos-empty > div > div:first-child {
+  width: 62px;
+  height: 62px;
+  border-radius: 14px !important;
+}
+
+/* Summary rail ----------------------------------------------------------- */
+.erp-workspace-main .pos-invoice-summary-panel {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--pos-line-strong);
+  border-radius: 7px;
+  background: #fff;
+  box-shadow: 0 2px 7px rgba(18,38,63,.06);
+  overflow: auto;
+}
+
+.erp-workspace-main .pos-invoice-summary-panel .erp-pos-rail-mode { display: none; }
+.erp-workspace-main .pos-invoice-total-card {
+  padding: 13px 14px 12px;
+  border-radius: 6px 6px 0 0;
+  background: linear-gradient(145deg, #075e45 0%, #0b8a57 58%, #10a767 100%);
+}
+
+.erp-workspace-main .pos-invoice-total-card h2 {
+  margin: 0 0 8px !important;
+  color: #dff9ed !important;
+  font-size: .72rem;
+}
+
+.pos-invoice-total-caption {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: rgba(239,255,247,.9);
+  font-size: .68rem;
+  font-weight: 850;
+}
+
+.erp-workspace-main .pos-invoice-total-card .erp-pos-total-value {
+  margin-top: 6px;
+  font-size: clamp(1.75rem, 2.3vw, 2.2rem);
+  letter-spacing: -.025em;
+}
+.erp-workspace-main .pos-invoice-total-card .erp-pos-total-value span { font-size: .8rem; }
+.erp-workspace-main .pos-invoice-total-card .erp-pos-document-meta {
+  flex-direction: row;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 9px;
+  padding-top: 7px;
+  font-size: .58rem;
+}
+
+.erp-workspace-main .pos-invoice-summary-panel .erp-pos-summary-body {
+  display: flex;
+  min-height: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+  padding: 9px 10px 10px;
+}
+
+.pos-invoice-summary-totals {
+  padding-bottom: 7px;
+  border-bottom: 1px solid #dfe6ea;
+}
+
+.erp-workspace-main .pos-invoice-summary-panel .erp-pos-summary-row {
+  min-height: 29px;
+  font-size: .7rem;
+}
+
+.pos-summary-percent-input {
+  width: 72px;
+  display: flex;
+  align-items: center;
+  border: 1px solid #c9d4db;
+  border-radius: 4px;
+  background: #fff;
+  overflow: hidden;
+}
+.erp-workspace-main .pos-summary-percent-input input {
+  min-height: 27px !important;
+  width: 48px;
+  border: 0 !important;
+  background: transparent !important;
+  padding: 2px 4px !important;
+  text-align: center;
+  font-size: .7rem;
+  font-weight: 900;
+  box-shadow: none !important;
+}
+.pos-summary-percent-input span { color: #7a8896; font-size: .65rem; }
+
+.pos-invoice-grand-total-row {
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 5px -4px 0;
+  border: 1px solid #bce8d2;
+  border-radius: 5px;
+  background: #eaf9f1;
+  padding: 5px 7px;
+  color: #08764a;
+  font-size: .72rem;
+  font-weight: 950;
+}
+
+.pos-invoice-payment-stack {
+  display: grid;
+  gap: 7px;
+  margin-top: 8px;
+}
+
+.erp-workspace-main .pos-invoice-payment-stack .form-label {
+  margin-bottom: 2px;
+  font-size: .65rem;
+}
+.erp-workspace-main .pos-invoice-payment-stack .form-input {
+  min-height: 34px !important;
+  height: 34px;
+  border-radius: 5px !important;
+  padding: 4px 7px;
+  font-size: .72rem;
+}
+.erp-workspace-main .pos-invoice-payment-stack .pos-paid-input { font-size: .86rem; font-weight: 950; }
+
+.pos-invoice-balance-card {
+  min-height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border: 1px solid #bde6d1;
+  border-radius: 5px;
+  background: #ecfaf3;
+  padding: 6px 8px;
+  color: #087249;
+  font-size: .7rem;
+  font-weight: 900;
+}
+.pos-invoice-balance-card.is-due { border-color: #f0d49b; background: #fff8e8; color: #9a6905; }
+
+.erp-workspace-main .pos-invoice-issue-button {
+  min-height: 43px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  margin-top: auto !important;
+  border-radius: 6px !important;
+  font-size: .78rem;
+}
+
+/* Persistent desktop shortcut bar --------------------------------------- */
+.pos-invoice-bottom-bar {
+  min-height: 46px;
+  display: grid;
+  flex: 0 0 auto;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: 4px;
+  margin-top: 7px;
+  padding: 5px;
+  border: 1px solid #aebcc6;
+  border-radius: 7px;
+  background: #263746;
+  box-shadow: 0 -2px 7px rgba(18,38,63,.08);
+}
+
+.erp-workspace-main .pos-invoice-bottom-bar button {
+  min-height: 34px !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1px solid #536474 !important;
+  border-radius: 5px !important;
+  background: linear-gradient(180deg, #fff, #e8edef) !important;
+  padding: 4px 6px !important;
+  color: #293c4e !important;
+  font-size: .64rem;
+  font-weight: 900;
+  box-shadow: none !important;
+}
+.erp-workspace-main .pos-invoice-bottom-bar button:nth-child(5) {
+  border-color: #138853 !important;
+  background: linear-gradient(180deg, #2bc17a, #139058) !important;
+  color: #fff !important;
+}
+.erp-workspace-main .pos-invoice-bottom-bar button:disabled { opacity: .45; cursor: not-allowed; }
+.pos-invoice-bottom-bar kbd {
+  border-radius: 3px;
+  background: #1c3349;
+  padding: 2px 4px;
+  color: #fff;
+  font-family: inherit;
+  font-size: .56rem;
+}
+
+/* Responsive ------------------------------------------------------------- */
+@media (min-width: 1181px) {
+  .erp-workspace-main .pos-invoice-summary-panel {
+    position: sticky;
+    top: 0;
+    max-height: 100%;
+  }
+}
+
+@media (max-width: 1280px) and (min-width: 981px) {
+  .erp-workspace-main .pos-invoice-layout { grid-template-columns: minmax(0, 1fr) 262px; }
+  .erp-workspace-main .pos-invoice-customer-row { grid-template-columns: 1fr 1fr .8fr; }
+  .erp-workspace-main .pos-invoice-customer-row label:last-child { grid-column: 1 / -1; }
+  .pos-invoice-bottom-bar { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+
+@media (max-width: 980px) {
+  .erp-workspace-main .pos-invoice-v3 { height: auto; min-height: 100%; overflow: visible; }
+  .erp-workspace-main .pos-invoice-layout {
+    grid-template-columns: 1fr;
+    grid-template-areas: "workspace" "rail";
+  }
+  .erp-workspace-main .pos-invoice-workspace { min-height: 620px; }
+  .erp-workspace-main .pos-invoice-summary-panel { max-height: none; }
+  .erp-workspace-main .pos-invoice-customer-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .pos-invoice-bottom-bar { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+
+@media (max-width: 680px) {
+  .erp-workspace-main .pos-invoice-v3 { padding: 6px; }
+  .erp-workspace-main .pos-invoice-command-header { align-items: stretch; flex-direction: column; }
+  .pos-invoice-header-actions { width: 100%; }
+  .erp-workspace-main .pos-invoice-command-header .pos-header-action { flex: 1 1 auto; }
+  .erp-workspace-main .pos-invoice-customer-row { grid-template-columns: 1fr; }
+  .erp-workspace-main .pos-invoice-search-zone .erp-pos-search-input { padding-inline: 39px 12px !important; }
+  .erp-workspace-main .pos-invoice-search-zone .erp-pos-search-hint { display: none; }
+  .pos-invoice-bottom-bar { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
