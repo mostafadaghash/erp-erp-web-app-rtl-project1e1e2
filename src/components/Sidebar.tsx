@@ -87,6 +87,7 @@ const NAV_GROUPS: NavGroup[] = [
     label: "المشتريات",
     icon: ShoppingBag,
     items: [
+      { id: "new-purchase-invoice", label: "فاتورة مشتريات جديدة", icon: ReceiptText, moduleKey: "shipments", permission: "create_shipments" },
       { id: "shipments", label: "فواتير المشتريات", icon: ShoppingBag, moduleKey: "shipments", permission: "view_shipments" },
       { id: "purchase-returns", label: "مرتجعات المشتريات", icon: RotateCcw, permission: "view_purchase_returns" },
       { id: "suppliers", label: "الموردون", icon: Truck, moduleKey: "suppliers", permission: "view_suppliers" },

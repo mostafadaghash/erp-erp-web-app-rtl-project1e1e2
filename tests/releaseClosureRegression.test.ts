@@ -29,7 +29,7 @@ test("RELEASE-CLOSURE-03 creation remains centralized through the shared shell r
   assert.doesNotMatch(dashboard, /onRequestCreate/);
   assert.match(shell, /const requestCreate = \(page: CreateTarget, nextVoucherKind\?: "receipt" \| "disbursement"\)/);
   assert.match(shell, /<Dashboard onOpenReport=\{openReport\} permissions=\{permissions\}/);
-  for (const page of ["new-invoice", "shipments", "customers", "repairs", "vouchers", "inventory"]) {
+  for (const page of ["new-invoice", "new-purchase-invoice", "customers", "repairs", "vouchers", "inventory"]) {
     assert.ok(shell.includes(`page: "${page}"`), `missing shared create action for ${page}`);
   }
   assert.doesNotMatch(dashboard, /useMutation|api\.[\w.]+\.(?:create|update|remove)/);
