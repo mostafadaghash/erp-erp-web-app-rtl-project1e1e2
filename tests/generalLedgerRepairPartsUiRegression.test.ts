@@ -17,20 +17,20 @@ test("RPU-02 repair form sends inventory product IDs and integer quantities", ()
 });
 
 test("RPU-03 repair part picker displays server price stock and unit", () => {
-  assert.match(source, /part\.sellPrice\.toLocaleString/);
+  assert.match(source, /money\(part\.sellPrice\)/);
   assert.match(source, /متاح \{part\.stock\} \{part\.unit\}/);
   assert.doesNotMatch(source, /part\.costPrice|part\.inventoryValue/);
 });
 
 test("RPU-04 repair form supports adding and removing dynamic part rows", () => {
   assert.match(source, /setParts\(\(current\) => \[/);
-  assert.match(source, /current\.filter\(\(_, partIndex\)/);
+  assert.match(source, /current\.filter\(\(_, rowIndex\)/);
   assert.match(source, /إضافة قطعة/);
   assert.match(source, /حذف/);
 });
 
 test("RPU-05 repair form rejects duplicate product selections", () => {
-  assert.match(source, /new Set\(selectedParts\.map/);
+  assert.match(source, /new Set\(completedPartRows\.map/);
   assert.match(source, /لا يمكن تكرار قطعة الغيار/);
 });
 
@@ -41,10 +41,9 @@ test("RPU-06 repair total combines labor and server-priced parts", () => {
 });
 
 test("RPU-07 deposit is capped by labor plus parts total", () => {
-  assert.match(
-    source,
-    /Number\(form\.deposit\) > Number\(form\.laborCost \|\| 0\) \+ partsTotal/,
-  );
+  assert.match(source, /const depositAmount = Number\(form\.deposit \|\| 0\)/);
+  assert.match(source, /const laborCostAmount = Number\(form\.laborCost \|\| 0\)/);
+  assert.match(source, /depositAmount > laborCostAmount \+ partsTotal/);
   assert.match(source, /العربون لا يمكن أن يتجاوز إجمالي أمر الصيانة/);
 });
 
@@ -75,10 +74,10 @@ test("RPU-10 a new form and branch change clear stale creation state", () => {
   assert.match(source, /const handleBranchChange = \(value: string\) => \{[\s\S]*resetCreateState\(\);[\s\S]*setShowForm\(false\)/);
 });
 
-test("RPU-11 repair cards display stored part snapshots and line totals", () => {
-  assert.match(source, /r\.parts\.length > 0/);
+test("RPU-11 repair details display stored part snapshots and line totals", () => {
+  assert.match(source, /detailTarget\.parts\.map/);
   assert.match(source, /part\.lineTotal \?\? part\.cost \* part\.quantity/);
-  assert.match(source, /قطع الغيار/);
+  assert.match(source, /القطع المستخدمة/);
 });
 
 test("RPU-12 repair parts UI contains no unsafe TypeScript escape", () => {

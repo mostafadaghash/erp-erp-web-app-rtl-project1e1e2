@@ -117,7 +117,7 @@ test("RFU-12 modal validation enforces server-compatible monetary limits", () =>
 test("RFU-13 collection is hidden for terminal repairs while refund remains permission based", () => {
   assert.match(page, /r\.status !== "delivered"/);
   assert.match(page, /r\.status !== "cancelled"/);
-  assert.match(page, /canRefund && r\.deposit > 0/);
+  assert.match(page, /canRefund && detailTarget\.deposit > 0/);
 });
 
 test("RFU-14 financial UI surfaces Convex errors without unsafe escapes", () => {

@@ -204,7 +204,11 @@ const applicationTables = {
     branchId: v.optional(v.id("branches")),
     isActive: v.boolean(),
     warrantyMonths: v.optional(v.number()),
-  }).index("by_sku", ["sku"]).index("by_category", ["categoryId"]).index("by_branch", ["branchId"]),
+  })
+    .index("by_sku", ["sku"])
+    .index("by_category", ["categoryId"])
+    .index("by_branch", ["branchId"])
+    .index("by_branch_active", ["branchId", "isActive"]),
 
   inventoryMovements: defineTable({
     productId: v.id("products"),
