@@ -21,6 +21,7 @@ import { ExpensesPage } from "./ExpensesPage";
 import { GeneralLedgerPage } from "./GeneralLedgerPage";
 import { InvoicesPage } from "./InvoicesPage";
 import { NewInvoicePage } from "./NewInvoicePage";
+import { NewPurchaseInvoicePage } from "./NewPurchaseInvoicePage";
 import { OrdersPage } from "./OrdersPage";
 import { ProductsPage } from "./ProductsPage";
 import { PurchaseReturnsPage } from "./PurchaseReturnsPage";
@@ -41,7 +42,7 @@ import type { ReportKind } from "./ReportsPage";
 
 export type Page =
   | "dashboard" | "products" | "inventory" | "customers" | "invoices" | "sales-returns" | "quotes" | "credit-invoices"
-  | "new-invoice" | "repairs" | "expenses" | "suppliers" | "orders"
+  | "new-invoice" | "new-purchase-invoice" | "repairs" | "expenses" | "suppliers" | "orders"
   | "deliveries" | "shipments" | "branches" | "employees" | "crm"
   | "reports" | "settings" | "audit-logs" | "accounts-home" | "treasury"
   | "supplier-payments" | "purchase-returns" | "customer-ledger"
@@ -54,6 +55,7 @@ const PAGE_PERMISSIONS: Partial<Record<Page, Permission>> = {
   invoices: "view_invoices",
   "sales-returns": "view_sales_returns",
   "new-invoice": "create_invoices",
+  "new-purchase-invoice": "create_shipments",
   quotes: "view_quotes",
   "credit-invoices": "view_invoices",
   repairs: "view_repairs",
@@ -83,6 +85,7 @@ const PAGE_MODULES: Partial<Record<Page, string>> = {
   invoices: "invoices",
   "sales-returns": "invoices",
   "new-invoice": "invoices",
+  "new-purchase-invoice": "shipments",
   quotes: "invoices",
   "credit-invoices": "invoices",
   orders: "orders",
@@ -105,6 +108,7 @@ const PAGE_META: Record<Page, { group: string; title: string }> = {
   invoices: { group: "المبيعات", title: "المبيعات" },
   "sales-returns": { group: "المبيعات", title: "مرتجعات المبيعات" },
   "new-invoice": { group: "المبيعات", title: "فاتورة بيع جديدة" },
+  "new-purchase-invoice": { group: "المشتريات", title: "فاتورة مشتريات جديدة" },
   quotes: { group: "المبيعات", title: "عروض الأسعار" },
   "credit-invoices": { group: "الحسابات", title: "الفواتير الآجلة" },
   repairs: { group: "الصيانة", title: "أوامر الصيانة" },
@@ -132,6 +136,7 @@ const PAGE_META: Record<Page, { group: string; title: string }> = {
 
 type CreateTarget =
   | "new-invoice"
+  | "new-purchase-invoice"
   | "orders"
   | "customers"
   | "products"
@@ -148,7 +153,7 @@ type CreateTarget =
 
 const CREATE_ACTIONS: Array<{ id: string; page: CreateTarget; label: string; permission: Permission; voucherKind?: "receipt" | "disbursement" }> = [
   { id: "invoice", page: "new-invoice", label: "فاتورة بيع", permission: "create_invoices" },
-  { id: "purchase", page: "shipments", label: "فاتورة شراء", permission: "create_shipments" },
+  { id: "purchase", page: "new-purchase-invoice", label: "فاتورة شراء", permission: "create_shipments" },
   { id: "sales-return", page: "sales-returns", label: "مرتجع بيع", permission: "create_sales_returns" },
   { id: "purchase-return", page: "purchase-returns", label: "مرتجع شراء", permission: "create_purchase_returns" },
   { id: "customer", page: "customers", label: "إضافة عميل", permission: "create_customers" },
@@ -236,7 +241,7 @@ export function ERPApp() {
 
   const requestCreate = (page: CreateTarget, nextVoucherKind?: "receipt" | "disbursement") => {
     if (!canAccessPage(page)) return;
-    if (page === "new-invoice") return navigate(page);
+    if (page === "new-invoice" || page === "new-purchase-invoice") return navigate(page);
     if (nextVoucherKind) setVoucherKind(nextVoucherKind);
     setCurrentPage(page);
     setCreateRequest({ page, token: Date.now() });
@@ -391,6 +396,7 @@ export function ERPApp() {
             {authorized && currentPage === "sales-returns" && <InvoicesPage onNavigate={navigate} view="returns" />}
             {authorized && currentPage === "credit-invoices" && <InvoicesPage onNavigate={navigate} view="sales" creditOnly />}
             {authorized && currentPage === "new-invoice" && <NewInvoicePage onNavigate={navigate} />}
+            {authorized && currentPage === "new-purchase-invoice" && <NewPurchaseInvoicePage onNavigate={navigate} />}
             {authorized && currentPage === "quotes" && <QuotesPage createRequestToken={createToken("quotes")} />}
             {authorized && currentPage === "repairs" && <RepairsPage createRequestToken={createToken("repairs")} />}
             {authorized && currentPage === "expenses" && <ExpensesPage createRequestToken={createToken("expenses")} />}
