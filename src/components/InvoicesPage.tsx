@@ -6,7 +6,7 @@ import { useMutation, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { usePermission } from "../lib/access";
 import type { Page } from "./ERPApp";
-import { Eye, FileText, Pencil, Plus, Search, Printer, RotateCcw, X } from "lucide-react";
+import { CalendarDays, Eye, FileText, Pencil, Plus, Search, Printer, RotateCcw, X } from "lucide-react";
 import { PrintModal } from "./PrintTemplate";
 import { useCurrency } from "../lib/utils";
 import type { Doc, Id } from "../../convex/_generated/dataModel";
@@ -17,6 +17,59 @@ interface InvoicesPageProps {
   onNavigate: (page: Page) => void;
   view?: "sales" | "returns";
   creditOnly?: boolean;
+}
+
+type InvoiceDateFilter = "today" | "7days" | "month" | "custom" | "all";
+
+function toDateInputValue(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function parseLocalDate(value: string) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) return null;
+  const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function invoiceMatchesDateFilter(
+  timestamp: number,
+  filter: InvoiceDateFilter,
+  customFrom: string,
+  customTo: string,
+) {
+  if (filter === "all") return true;
+
+  const now = new Date();
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const startOfTomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+  let from: Date;
+  let toExclusive: Date;
+
+  if (filter === "today") {
+    from = startOfToday;
+    toExclusive = startOfTomorrow;
+  } else if (filter === "7days") {
+    from = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6);
+    toExclusive = startOfTomorrow;
+  } else if (filter === "month") {
+    from = new Date(now.getFullYear(), now.getMonth(), 1);
+    toExclusive = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+  } else {
+    const parsedFrom = parseLocalDate(customFrom);
+    const parsedTo = parseLocalDate(customTo);
+    if (!parsedFrom && !parsedTo) return true;
+    if (parsedFrom && parsedTo && parsedFrom.getTime() > parsedTo.getTime()) return false;
+    from = parsedFrom ?? new Date(0);
+    toExclusive = parsedTo
+      ? new Date(parsedTo.getFullYear(), parsedTo.getMonth(), parsedTo.getDate() + 1)
+      : new Date(8640000000000000);
+  }
+
+  return timestamp >= from.getTime() && timestamp < toExclusive.getTime();
 }
 
 export function InvoicesPage({ onNavigate, view = "sales", creditOnly = false }: InvoicesPageProps) {
@@ -32,6 +85,12 @@ export function InvoicesPage({ onNavigate, view = "sales", creditOnly = false }:
   const refundPayment = useMutation(api.invoices.refundPayment);
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState("");
+  const [dateFilter, setDateFilter] = useState<InvoiceDateFilter>("month");
+  const [customFrom, setCustomFrom] = useState(() => {
+    const now = new Date();
+    return toDateInputValue(new Date(now.getFullYear(), now.getMonth(), 1));
+  });
+  const [customTo, setCustomTo] = useState(() => toDateInputValue(new Date()));
   const [printInvoice, setPrintInvoice] = useState<Doc<"invoices"> | null>(null);
   const [selectedInvoice, setSelectedInvoice] = useState<Doc<"invoices"> | null>(null);
   const [editInvoice, setEditInvoice] = useState<Doc<"invoices"> | null>(null);
@@ -148,10 +207,12 @@ export function InvoicesPage({ onNavigate, view = "sales", creditOnly = false }:
     }
   };
 
+  const customRangeInvalid = dateFilter === "custom" && Boolean(customFrom && customTo && customFrom > customTo);
   const filtered = invoices.filter(inv =>
     inv.invoiceNumber.includes(search) ||
     inv.customerName.toLowerCase().includes(search.toLowerCase())
   ).filter(inv => !filterStatus || inv.status === filterStatus)
+    .filter(inv => invoiceMatchesDateFilter(inv._creationTime, dateFilter, customFrom, customTo))
     .filter(inv => !creditOnly || (inv.remaining > 0 && inv.status !== "cancelled"));
 
   const { formatCurrency, formatAmount } = useCurrency();
@@ -188,17 +249,35 @@ export function InvoicesPage({ onNavigate, view = "sales", creditOnly = false }:
         </button>}
       </div>
 
-      <div className="erp-toolbar flex-col sm:flex-row">
-        <div className="relative flex-1">
+      <div className="erp-toolbar flex-col gap-2 lg:flex-row lg:flex-wrap lg:items-center">
+        <div className="relative min-w-0 flex-1">
           <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <input
-            className="form-input pr-10"
+            className="form-input w-full pr-10"
             placeholder="بحث برقم الفاتورة أو اسم العميل..."
             value={search}
             onChange={e => setSearch(e.target.value)}
           />
         </div>
-        <select className="form-input sm:w-40" value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
+
+        <div className="relative shrink-0 lg:w-44">
+          <CalendarDays className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <select
+            data-testid="invoice-date-filter"
+            className="form-input w-full pr-9"
+            value={dateFilter}
+            onChange={event => setDateFilter(event.target.value as InvoiceDateFilter)}
+            aria-label="فترة فواتير المبيعات"
+          >
+            <option value="today">اليوم</option>
+            <option value="7days">آخر 7 أيام</option>
+            <option value="month">هذا الشهر</option>
+            <option value="custom">فترة مخصصة</option>
+            <option value="all">كل الفترات</option>
+          </select>
+        </div>
+
+        <select className="form-input lg:w-40" value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
           <option value="">كل الحالات</option>
           <option value="paid">مدفوعة</option>
           <option value="partial">جزئي</option>
@@ -208,6 +287,35 @@ export function InvoicesPage({ onNavigate, view = "sales", creditOnly = false }:
           <option value="paid_returned_partial">مدفوعة ومرتجعة جزئيًا</option>
           <option value="returned">مرتجعة بالكامل</option>
         </select>
+
+        {dateFilter === "custom" && (
+          <div className="flex w-full flex-wrap items-center gap-2 border-t border-slate-100 pt-2 lg:basis-full">
+            <span className="text-xs font-bold text-slate-500">الفترة المخصصة</span>
+            <label className="flex items-center gap-2 text-xs font-bold text-slate-500">
+              من
+              <input
+                data-testid="invoice-date-from"
+                className="form-input h-10 w-[150px] py-1.5 text-xs"
+                type="date"
+                value={customFrom}
+                max={customTo || undefined}
+                onChange={event => setCustomFrom(event.target.value)}
+              />
+            </label>
+            <label className="flex items-center gap-2 text-xs font-bold text-slate-500">
+              إلى
+              <input
+                data-testid="invoice-date-to"
+                className="form-input h-10 w-[150px] py-1.5 text-xs"
+                type="date"
+                value={customTo}
+                min={customFrom || undefined}
+                onChange={event => setCustomTo(event.target.value)}
+              />
+            </label>
+            {customRangeInvalid && <span role="alert" className="text-xs font-bold text-red-600">تاريخ البداية يجب ألا يكون بعد تاريخ النهاية.</span>}
+          </div>
+        )}
       </div>
 
       <div className="erp-section">
@@ -320,7 +428,7 @@ export function InvoicesPage({ onNavigate, view = "sales", creditOnly = false }:
                 <tr>
                   <td colSpan={11} className="text-center py-12 text-slate-400">
                     <FileText className="w-10 h-10 mx-auto mb-2 opacity-30" />
-                    لا توجد فواتير
+                    {customRangeInvalid ? "راجع الفترة الزمنية المحددة" : "لا توجد فواتير مطابقة للفلاتر"}
                   </td>
                 </tr>
               )}
