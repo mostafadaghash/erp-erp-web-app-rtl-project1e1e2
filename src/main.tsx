@@ -10,6 +10,7 @@ import "./dashboard-final-fixes.css";
 import "./new-invoice-redesign.css";
 import "./new-invoice-pos-final.css";
 import "./invoice-customer-fields-polish.css";
+import "./invoice-list-filter-polish.css";
 import App from "./App";
 
 class RuntimeErrorBoundary extends Component<
