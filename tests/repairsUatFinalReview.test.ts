@@ -47,7 +47,7 @@ test("RFU-05 tracking copy and rotation await clipboard and expose a busy guard"
   assert.match(page, /const copyTrackingLink = async/);
   assert.match(page, /await navigator\.clipboard\.writeText\(url\)/);
   assert.match(page, /finally \{\s*setTrackingBusyId\(null\)/);
-  assert.match(page, /disabled=\{trackingBusyId === r\._id\}/);
+  assert.match(page, /disabled=\{trackingBusyId === detailTarget\._id\}/);
   assert.ok(page.includes("تعذر نسخ رابط التتبع"));
   assert.ok(page.includes("تم تجديد الرابط لكن تعذر نسخه"));
 });

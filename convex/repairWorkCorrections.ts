@@ -18,6 +18,17 @@ import { INVENTORY_MOVEMENT_TYPES } from "../shared/inventoryRules";
 import { roundMoney } from "../shared/businessRules";
 
 const clean = (value?: string) => value?.trim() || undefined;
+const MAX_PART_PICKER_RESULTS = 1_000;
+
+const partOptionValidator = v.object({
+  _id: v.id("products"),
+  name: v.string(),
+  sku: v.string(),
+  barcode: v.optional(v.string()),
+  stock: v.number(),
+  sellPrice: v.number(),
+  unit: v.string(),
+});
 
 function assertMoney(value: number, label: string) {
   if (
@@ -47,15 +58,17 @@ function normalizeRequestId(value: string) {
 
 export const partPicker = query({
   args: { branchId: v.id("branches") },
+  returns: v.array(partOptionValidator),
   handler: async (ctx, args) => {
     const user = await requireModulePermission(ctx, "edit_repairs", "repairs");
     assertBranchAccess(user, { branchId: args.branchId });
     const products = await ctx.db
       .query("products")
-      .withIndex("by_branch", (q) => q.eq("branchId", args.branchId))
-      .collect();
+      .withIndex("by_branch_active", (q) =>
+        q.eq("branchId", args.branchId).eq("isActive", true),
+      )
+      .take(MAX_PART_PICKER_RESULTS);
     return products
-      .filter((product) => product.isActive)
       .sort((a, b) => a.name.localeCompare(b.name, "ar"))
       .map((product) => ({
         _id: product._id,
@@ -87,6 +100,7 @@ export const updateWork = mutation({
     reason: v.string(),
     requestId: v.string(),
   },
+  returns: v.id("repairs"),
   handler: async (ctx, args) => {
     const user = await requireModulePermission(ctx, "edit_repairs", "repairs");
     const reason = correctionReason(args.reason);
@@ -153,13 +167,37 @@ export const updateWork = mutation({
       throw new ConvexError("يجب ربط أمر الصيانة بعميل مسجل قبل تعديل قيمته المحاسبية");
     }
 
+    // A correction must never invent a value for stock that was issued by an
+    // older repair record. Validate every historical leg before the first
+    // inventory write so legacy rows are sent to manual review instead.
+    for (const part of repair.parts) {
+      if (!part.productId || part.quantity <= 0) continue;
+      if (
+        part.inventoryValueRemoved === undefined ||
+        !Number.isFinite(part.inventoryValueRemoved) ||
+        part.inventoryValueRemoved < 0
+      ) {
+        throw new ConvexError(
+          "أمر الصيانة القديم يحتوي قطعًا بلا تكلفة مخزون تاريخية؛ راجعه يدويًا قبل تعديل أعمال الصيانة",
+        );
+      }
+      const product = await ctx.db.get(part.productId);
+      if (!product || product.branchId !== repair.branchId) {
+        throw new ConvexError(
+          "تعذر استعادة قطعة غيار إلى مخزون فرع أمر الصيانة",
+        );
+      }
+    }
+
     // Restore the exact historical inventory value of the old issued parts.
     for (const part of repair.parts) {
       if (!part.productId || part.quantity <= 0) continue;
-      const exactValue = roundMoney(
-        part.inventoryValueRemoved ??
-          (part.historicalUnitCost ?? 0) * part.quantity,
-      );
+      if (part.inventoryValueRemoved === undefined) {
+        throw new ConvexError(
+          "أمر الصيانة القديم يحتوي قطعًا بلا تكلفة مخزون تاريخية؛ راجعه يدويًا قبل تعديل أعمال الصيانة",
+        );
+      }
+      const exactValue = roundMoney(part.inventoryValueRemoved);
       const historicalUnitCost =
         part.historicalUnitCost ??
         (part.quantity > 0 ? exactValue / part.quantity : 0);
@@ -168,7 +206,7 @@ export const updateWork = mutation({
         quantityDelta: part.quantity,
         unitCost: historicalUnitCost,
         valueDelta: exactValue,
-        type: INVENTORY_MOVEMENT_TYPES.repairPartIssue,
+        type: INVENTORY_MOVEMENT_TYPES.repairPartReversal,
         reason: `عكس قطع الصيانة قبل تصحيح ${repair.repairNumber}`,
         referenceId: String(repair._id),
         referenceType: "repair_work_correction",

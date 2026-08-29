@@ -38,6 +38,8 @@ test("REPAIR-WORK-04 correction reverses old inventory and posts actual used par
   assert.match(backend, /عكس قطع الصيانة قبل تصحيح/);
   assert.match(backend, /quantityDelta: part\.quantity/);
   assert.match(backend, /valueDelta: exactValue/);
+  assert.match(backend, /type: INVENTORY_MOVEMENT_TYPES\.repairPartReversal/);
+  assert.match(backend, /بلا تكلفة مخزون تاريخية/);
   assert.match(backend, /صرف قطع الصيانة بعد تصحيح/);
   assert.match(backend, /quantityDelta: -requested\.quantity/);
   assert.match(backend, /partsCogsTotal/);

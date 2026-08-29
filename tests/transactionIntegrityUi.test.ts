@@ -15,7 +15,9 @@ test("repair UI follows the typed backend status contract", () => {
   const repairs = source("src/components/RepairsPage.tsx");
   assert.doesNotMatch(repairs, /deliveredDate/);
   assert.match(repairs, /REPAIR_TRANSITIONS\[currentStatus\]\.map/);
-  assert.match(repairs, /applyStatus\(cancelTarget\._id, "cancelled", cancelReason\.trim\(\)\)/);
+  assert.match(repairs, /await transitionStatus\(\{/);
+  assert.match(repairs, /status: transitionNext/);
+  assert.match(repairs, /requestId: transitionRequestId/);
   assert.match(repairs, /r\.status !== "delivered" && r\.status !== "cancelled"/);
   assert.doesNotMatch(repairs, /status: string/);
 });

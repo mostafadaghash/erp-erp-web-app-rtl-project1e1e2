@@ -1,8 +1,34 @@
-import test from "node:test";
+import test, { after, before } from "node:test";
 import assert from "node:assert/strict";
+import { existsSync } from "node:fs";
+import { resolve } from "node:path";
 import { convexTest } from "convex-test";
 import schema from "../convex/schema.ts";
 import { api } from "../convex/_generated/api.js";
+import { symlink, unlink } from "./moduleLinkTestUtils.ts";
+
+const links = [
+  ["convex/_generated/server", "server.js"],
+  ["convex/lib/auth", "auth.ts"],
+  ["convex/lib/inventory", "inventory.ts"],
+  ["convex/lib/customerLedger", "customerLedger.ts"],
+  ["convex/lib/generalLedgerRepairs", "generalLedgerRepairs.ts"],
+  ["convex/lib/generalLedgerRules", "generalLedgerRules.ts"],
+  ["shared/inventoryRules", "inventoryRules.ts"],
+  ["shared/businessRules", "businessRules.ts"],
+] as const;
+
+before(async () => {
+  for (const [path, target] of links) {
+    if (!existsSync(resolve(path))) await symlink(target, resolve(path));
+  }
+});
+
+after(async () => {
+  for (const [path] of links) {
+    if (existsSync(resolve(path))) await unlink(resolve(path));
+  }
+});
 
 const modules = {
   "../convex/_generated/api.js": () => import("../convex/_generated/api.js"),
@@ -120,7 +146,9 @@ test("RWC-I01 ready repair can replace issued parts and recalculate totals atomi
   assert.equal(state.product?.inventoryValue, 800);
   assert.equal(state.movements.length, 2);
   assert.equal(state.movements[0].quantityDelta, 1);
+  assert.equal(state.movements[0].type, "repair_part_reversal");
   assert.equal(state.movements[1].quantityDelta, -2);
+  assert.equal(state.movements[1].type, "repair_part_issue");
   assert.equal(state.audit.at(-1)?.module, "repairs");
   assert.match(state.audit.at(-1)?.details ?? "", /إثبات القطع الفعلية/);
 });
@@ -165,4 +193,50 @@ test("RWC-I03 correction cannot reduce total below already collected amount", as
     }),
     /الإجمالي الجديد أقل من المبلغ المحصل/,
   );
+});
+
+test("RWC-I04 legacy issued parts without exact valuation are rejected without stock changes", async () => {
+  const e = await fixture("ready");
+  await e.raw.run(async (ctx) => {
+    const repair = await ctx.db.get(e.repairId);
+    assert.ok(repair);
+    await ctx.db.patch(e.repairId, {
+      parts: repair.parts.map((part) => ({
+        productId: part.productId,
+        name: part.name,
+        cost: part.cost,
+        quantity: part.quantity,
+        unitPrice: part.unitPrice,
+        lineTotal: part.lineTotal,
+      })),
+      partsCogsTotal: undefined,
+      costingVersion: undefined,
+    });
+  });
+  const beforeState = await e.raw.run(async (ctx) => ({
+    repair: await ctx.db.get(e.repairId),
+    product: await ctx.db.get(e.productId),
+  }));
+
+  await assert.rejects(
+    () => e.admin.mutation(api.repairWorkCorrections.updateWork, {
+      repairId: e.repairId,
+      laborCost: 60,
+      parts: [{ productId: e.productId, quantity: 1, unitPrice: 150 }],
+      notes: "تعديل ملاحظات على أمر قديم",
+      date: "2026-08-29",
+      reason: "اختبار حماية التكلفة التاريخية",
+      requestId: "repair-work-legacy-01",
+    }),
+    /بلا تكلفة مخزون تاريخية/,
+  );
+
+  const afterState = await e.raw.run(async (ctx) => ({
+    repair: await ctx.db.get(e.repairId),
+    product: await ctx.db.get(e.productId),
+    movements: await ctx.db.query("inventoryMovements").collect(),
+  }));
+  assert.deepEqual(afterState.repair, beforeState.repair);
+  assert.deepEqual(afterState.product, beforeState.product);
+  assert.equal(afterState.movements.length, 0);
 });

@@ -86,7 +86,7 @@ test("RAV-08 backend remains authoritative for all operational guards", () => {
 
 test("RAV-09 validation preserves stable idempotency IDs during retries", () => {
   assert.match(page, /creationRequestId:\s*requestId/);
-  assert.match(page, /requestId:\s*transitionRequest\.requestId/);
+  assert.match(page, /requestId:\s*transitionRequestId/);
   assert.match(page, /requestId:\s*collectionRequestId/);
   assert.match(page, /requestId:\s*refundRequestId/);
 });
