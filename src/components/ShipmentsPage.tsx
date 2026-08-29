@@ -7,9 +7,10 @@ import { Id } from "../../convex/_generated/dataModel";
 import { getErrorMessage } from "../lib/errors";
 import {
   Eye, ReceiptText, Ship, Plus, X, Search, Clock, Plane,
-  CheckCircle, XCircle, Trash2, Package,
+  CheckCircle, XCircle, Trash2, Package, Pencil,
   TrendingDown, AlertCircle
 } from "lucide-react";
+import { PurchaseOrderEditDialog } from "./PurchaseOrderEditDialog";
 
 type ShipmentStatus = "ordered" | "in_transit" | "arrived" | "cancelled";
 
@@ -47,6 +48,7 @@ export function ShipmentsPage({ createRequestToken }: { createRequestToken?: num
 
   const shipments = useQuery(api.shipments.list, filterStatus !== "all" ? { status: filterStatus } : {});
   const [selectedShipment, setSelectedShipment] = useState<NonNullable<typeof shipments>[number] | null>(null);
+  const [editShipment, setEditShipment] = useState<NonNullable<typeof shipments>[number] | null>(null);
   const purchaseDocument = useQuery(
     api.shipments.purchaseDocument,
     selectedShipment ? { id: selectedShipment._id } : "skip",
@@ -278,6 +280,16 @@ export function ShipmentsPage({ createRequestToken }: { createRequestToken?: num
       {/* New Shipment Form */}
       {showForm && <NewShipmentForm onClose={() => setShowForm(false)} />}
       {receiving && <ReceiveShipmentModal shipment={receiving} onClose={() => setReceiving(null)} />}
+      {editShipment && (
+        <PurchaseOrderEditDialog
+          shipment={editShipment}
+          onClose={() => setEditShipment(null)}
+          onSaved={() => {
+            setEditShipment(null);
+            setSelectedShipment(null);
+          }}
+        />
+      )}
       {selectedShipment && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 p-3" dir="rtl" role="dialog" aria-modal="true" data-testid="purchase-details-modal">
           <div className="flex max-h-[94vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
@@ -286,13 +298,31 @@ export function ShipmentsPage({ createRequestToken }: { createRequestToken?: num
                 <div className="grid h-10 w-10 place-items-center rounded-xl bg-white/10"><ReceiptText className="h-5 w-5 text-emerald-200" /></div>
                 <div><p className="text-xs font-bold text-emerald-200">{purchaseDocument?.receipt ? "فاتورة مشتريات محفوظة" : "أمر شراء محفوظ"}</p><h2 className="mt-1 text-xl font-black">{purchaseDocument?.receipt?.receiptNumber ?? selectedShipment.shipmentNumber}</h2></div>
               </div>
-              <button onClick={() => setSelectedShipment(null)} className="grid h-9 w-9 place-items-center rounded-lg bg-white/10 hover:bg-white/15" aria-label="إغلاق مستند المشتريات"><X className="h-5 w-5" /></button>
+              <div className="flex items-center gap-2">
+                {canEdit && selectedShipment.status !== "arrived" && selectedShipment.status !== "cancelled" && !purchaseDocument?.receipt && (
+                  <button
+                    type="button"
+                    data-testid="purchase-edit-open"
+                    onClick={() => setEditShipment(selectedShipment)}
+                    className="rounded-lg border border-white/15 bg-emerald-500/20 px-3 py-2 text-xs font-black text-emerald-50 hover:bg-emerald-500/30"
+                    title="تعديل الكمية أو تكلفة الشراء"
+                  >
+                    <Pencil className="ml-1 inline h-4 w-4" />تعديل
+                  </button>
+                )}
+                <button onClick={() => setSelectedShipment(null)} className="grid h-9 w-9 place-items-center rounded-lg bg-white/10 hover:bg-white/15" aria-label="إغلاق مستند المشتريات"><X className="h-5 w-5" /></button>
+              </div>
             </header>
             <div className="overflow-y-auto p-5">
               {purchaseDocument === undefined ? (
                 <div className="py-16 text-center text-sm text-slate-400">جارٍ فتح المستند...</div>
               ) : (
                 <>
+                  {purchaseDocument?.receipt && (
+                    <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                      هذا المستند تم استلامه وترحيله للمخزون ومديونية المورد. تصحيح الكميات أو القيم يتم عبر مرتجع مشتريات أو عكس موثق، وليس بتغيير الفاتورة التاريخية مباشرة.
+                    </div>
+                  )}
                   <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                     <div className="rounded-xl bg-slate-50 p-3"><p className="text-xs text-slate-500">المورد</p><p className="mt-1 font-black text-slate-800">{selectedShipment.supplierName}</p></div>
                     <div className="rounded-xl bg-slate-50 p-3"><p className="text-xs text-slate-500">رقم عملية الشراء</p><p className="mt-1 font-mono font-black text-slate-800">{selectedShipment.shipmentNumber}</p></div>
