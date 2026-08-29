@@ -59,7 +59,8 @@ export function NewCustomerPage({ onClose }: { onClose: () => void }) {
 
   useEffect(() => {
     if (me?.branchId || selectedBranchId || branches.length !== 1) return;
-    setSelectedBranchId(String(branches[0]._id));
+    const onlyBranch = branches[0];
+    if (onlyBranch) setSelectedBranchId(String(onlyBranch._id));
   }, [branches, me?.branchId, selectedBranchId]);
 
   const updateField = (field: keyof ContactFormValues, value: string) => {
@@ -102,8 +103,7 @@ export function NewCustomerPage({ onClose }: { onClose: () => void }) {
     }
   };
 
-  const handleCreateCategory = async (event: React.FormEvent) => {
-    event.preventDefault();
+  const handleCreateCategory = async () => {
     const name = categoryName.trim();
     if (!name || savingCategory) return;
 
@@ -236,7 +236,7 @@ export function NewCustomerPage({ onClose }: { onClose: () => void }) {
 
         {showCategoryForm && canCreateCategories && (
           <section className="professional-panel p-4">
-            <form onSubmit={handleCreateCategory} className="flex flex-col gap-3 sm:flex-row sm:items-end">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
               <Field label="تصنيف جديد" className="flex-1">
                 <div className="relative">
                   <Tags className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -244,6 +244,11 @@ export function NewCustomerPage({ onClose }: { onClose: () => void }) {
                     className="form-input pr-10"
                     value={categoryName}
                     onChange={(event) => setCategoryName(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key !== "Enter") return;
+                      event.preventDefault();
+                      void handleCreateCategory();
+                    }}
                     placeholder="مثال: عملاء جملة"
                     maxLength={80}
                     disabled={savingCategory}
@@ -251,14 +256,14 @@ export function NewCustomerPage({ onClose }: { onClose: () => void }) {
                 </div>
               </Field>
               <div className="flex gap-2">
-                <button type="submit" className="btn-primary" disabled={!categoryName.trim() || savingCategory}>
+                <button type="button" className="btn-primary" onClick={() => void handleCreateCategory()} disabled={!categoryName.trim() || savingCategory}>
                   {savingCategory ? "جارٍ الحفظ…" : "حفظ التصنيف"}
                 </button>
                 <button type="button" className="btn-secondary" onClick={() => { setShowCategoryForm(false); setCategoryName(""); }}>
                   إلغاء
                 </button>
               </div>
-            </form>
+            </div>
           </section>
         )}
 
