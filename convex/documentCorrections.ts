@@ -11,13 +11,8 @@ import { changeProductStock } from "./lib/inventory";
 import { postCustomerLedgerEntry } from "./lib/customerLedger";
 import { postSupplierBalanceMovement } from "./lib/supplierLedger";
 import { requireFinanceInitialized } from "./lib/finance";
-import {
-  INVENTORY_MOVEMENT_TYPES,
-} from "../shared/inventoryRules";
-import {
-  deriveInvoiceStatus,
-  roundMoney,
-} from "../shared/businessRules";
+import { INVENTORY_MOVEMENT_TYPES } from "../shared/inventoryRules";
+import { deriveInvoiceStatus, roundMoney } from "../shared/businessRules";
 import {
   inventoryValueForPurchaseReturn,
   purchaseReceiptAfterCredit,
@@ -77,7 +72,13 @@ export const editPurchaseOrder = mutation({
       throw new ConvexError("تكلفة الشحن غير صالحة");
     }
 
-    const items = [];
+    const items: Array<{
+      productId?: Id<"products">;
+      productName: string;
+      quantity: number;
+      unitCost: number;
+      total: number;
+    }> = [];
     for (const item of args.items) {
       if (!Number.isInteger(item.quantity) || item.quantity <= 0) {
         throw new ConvexError("كمية الشراء يجب أن تكون عدداً صحيحاً أكبر من صفر");
@@ -107,7 +108,6 @@ export const editPurchaseOrder = mutation({
     const totalCost = roundMoney(items.reduce((sum, item) => sum + item.total, 0));
     const shippingCost = roundMoney(args.shippingCost);
     const grandTotal = roundMoney(totalCost + shippingCost);
-
     await ctx.db.patch(shipment._id, {
       items,
       totalCost,
@@ -145,7 +145,6 @@ export const editPurchaseOrder = mutation({
         grandTotal,
       },
     });
-
     return { totalCost, shippingCost, grandTotal };
   },
 });
@@ -225,7 +224,7 @@ export const editSalesReturn = mutation({
         productId: original.productId,
         productName: original.productName,
         quantityReturned: requested.quantity,
-        unitPrice: unitCredit,
+        unitPrice: original.unitPrice,
         creditAmount: roundMoney(unitCredit * requested.quantity),
         historicalUnitCost: original.unitCost,
         returnedCostTotal: roundMoney(original.unitCost * requested.quantity),
@@ -271,7 +270,6 @@ export const editSalesReturn = mutation({
     const paid = roundMoney(basePaid - cashRefund);
     const remaining = roundMoney(baseRemaining - debtReduction);
     const status = deriveInvoiceStatus({ netTotal, creditedTotal, paid, remaining });
-
     await ctx.db.patch(note._id, {
       items: normalized,
       subtotal: totalCredit,
@@ -331,7 +329,6 @@ export const editSalesReturn = mutation({
         itemsCount: normalized.length,
       },
     });
-
     return { totalCredit, debtReduction, cashRefund };
   },
 });
@@ -359,7 +356,6 @@ export const editPurchaseReturn = mutation({
     if (row.cashRefund > 0 || row.financialTransactionId) {
       throw new ConvexError("هذا المرتجع مرتبط برد نقدي من المورد؛ اعكس المرتجع ثم أنشئ المستند الصحيح للحفاظ على أثر الخزينة");
     }
-    if (!row.branchId) throw new ConvexError("مرتجع المشتريات بلا فرع");
     if (args.items.length === 0) throw new ConvexError("يجب أن يحتوي المرتجع على صنف واحد على الأقل");
     await requireFinanceInitialized(ctx, args.date);
 
@@ -382,6 +378,19 @@ export const editPurchaseReturn = mutation({
       }
     }
 
+    for (const item of row.items) {
+      await changeProductStock(ctx, user, {
+        productId: item.productId,
+        quantityDelta: item.quantityReturned,
+        unitCost: item.inventoryValueRemoved / item.quantityReturned,
+        valueDelta: item.inventoryValueRemoved,
+        type: INVENTORY_MOVEMENT_TYPES.purchaseReturn,
+        reason: `عكس أثر مرتجع قبل تصحيح ${row.returnNumber}`,
+        referenceId: String(row._id),
+        referenceType: "purchase_return_correction",
+      });
+    }
+
     const seen = new Set<number>();
     const prepared: Array<{
       receiptItemIndex: number;
@@ -395,21 +404,6 @@ export const editPurchaseReturn = mutation({
       inventoryValueRemoved: number;
     }> = [];
     let goodsCredit = 0;
-
-    // First restore the previous return exactly, then value the corrected return
-    // from the now-restored current inventory state.
-    for (const item of row.items) {
-      await changeProductStock(ctx, user, {
-        productId: item.productId,
-        quantityDelta: item.quantityReturned,
-        unitCost: item.inventoryValueRemoved / item.quantityReturned,
-        valueDelta: item.inventoryValueRemoved,
-        type: INVENTORY_MOVEMENT_TYPES.purchaseReturn,
-        reason: `عكس أثر مرتجع قبل تصحيح ${row.returnNumber}`,
-        referenceId: String(row._id),
-        referenceType: "purchase_return_correction",
-      });
-    }
 
     for (const requested of args.items) {
       if (!Number.isInteger(requested.receiptItemIndex) || requested.receiptItemIndex < 0 || seen.has(requested.receiptItemIndex)) {
@@ -425,15 +419,17 @@ export const editPurchaseReturn = mutation({
       const historical = receipt.items[requested.receiptItemIndex];
       if (!historical) throw new ConvexError("بند مستند الشراء الأصلي غير موجود");
       const available = historical.quantity - (returnedElsewhere.get(requested.receiptItemIndex) ?? 0);
-      if (requested.quantity > available) throw new ConvexError(`كمية المرتجع تتجاوز المتاح للصنف ${historical.productName}`);
-      const maxUnitCredit = roundMoney(historical.lineTotal / historical.quantity);
+      if (requested.quantity > available) {
+        throw new ConvexError(`كمية المرتجع تتجاوز المتاح للصنف ${historical.productName}`);
+      }
+      const maximumUnitCredit = roundMoney(historical.lineTotal / historical.quantity);
       const unitCredit = roundMoney(requested.unitCredit);
-      if (unitCredit > maxUnitCredit + 0.01) {
+      if (unitCredit > maximumUnitCredit + 0.01) {
         throw new ConvexError(`قيمة وحدة مرتجع ${historical.productName} تتجاوز قيمة الوحدة في مستند الشراء الأصلي`);
       }
       const product = await ctx.db.get(historical.productId);
       if (!product || product.branchId !== row.branchId) throw new ConvexError("الصنف غير موجود أو من فرع آخر");
-      let removedValue;
+      let removedValue: number;
       try {
         removedValue = inventoryValueForPurchaseReturn(
           product.stock,
@@ -460,7 +456,7 @@ export const editPurchaseReturn = mutation({
         productId: historical.productId,
         productName: historical.productName,
         quantityReturned: requested.quantity,
-        historicalUnitCost: unitCredit,
+        historicalUnitCost: historical.unitCost,
         historicalLineTotal: historical.lineTotal,
         goodsCreditAmount: credit,
         historicalLandedUnitCost: historical.landedUnitCost,
@@ -517,20 +513,18 @@ export const editPurchaseReturn = mutation({
       });
       reversedLedgerEntryId = reversal._id;
     }
-    const newSupplierLedger = totalCredit > 0
-      ? await postSupplierBalanceMovement(ctx, user, {
-          type: "purchase_return",
-          requestId: `${requestId}:new-ledger`,
-          supplierId: row.supplierId,
-          branchId: row.branchId,
-          date: args.date,
-          amountDelta: -totalCredit,
-          referenceType: "purchase_return",
-          referenceId: String(row._id),
-          referenceNumber: row.returnNumber,
-          description: `إعادة ترحيل مرتجع شراء مصحح ${row.returnNumber}`,
-        })
-      : undefined;
+    const newSupplierLedger = await postSupplierBalanceMovement(ctx, user, {
+      type: "purchase_return",
+      requestId: `${requestId}:new-ledger`,
+      supplierId: row.supplierId,
+      branchId: row.branchId,
+      date: args.date,
+      amountDelta: -totalCredit,
+      referenceType: "purchase_return",
+      referenceId: String(row._id),
+      referenceNumber: row.returnNumber,
+      description: `إعادة ترحيل مرتجع شراء مصحح ${row.returnNumber}`,
+    });
 
     const inventoryValueRemoved = roundMoney(prepared.reduce((sum, item) => sum + item.inventoryValueRemoved, 0));
     let reversalJournalId: Id<"journalEntries"> | undefined;
@@ -545,7 +539,8 @@ export const editPurchaseReturn = mutation({
         reason,
         hasAccountingImpact: row.totalCredit !== 0 || row.inventoryValueRemoved !== 0,
       });
-      reversalJournalId = reversal?._id;
+      if (!reversal) throw new ConvexError("تعذر عكس قيد مرتجع الشراء القديم؛ لا يمكن حفظ تصحيح غير متوازن");
+      reversalJournalId = reversal._id;
     }
     const newJournal = await postPurchaseReturnJournal(ctx, user, {
       branchId: row.branchId,
@@ -556,6 +551,9 @@ export const editPurchaseReturn = mutation({
       totalCredit,
       inventoryValueRemoved,
     });
+    if (row.journalEntryId && !newJournal) {
+      throw new ConvexError("تعذر إعادة ترحيل قيد مرتجع الشراء المصحح؛ تم إلغاء التعديل بالكامل");
+    }
 
     await ctx.db.patch(receipt._id, {
       creditedTotal: roundMoney((receipt.creditedTotal ?? 0) - row.totalCredit + totalCredit),
@@ -572,7 +570,7 @@ export const editPurchaseReturn = mutation({
       inventoryValueRemoved,
       debtReduction: nextState.debtReduction,
       cashRefund: nextState.cashRefund,
-      supplierLedgerEntryId: newSupplierLedger?._id,
+      supplierLedgerEntryId: newSupplierLedger._id,
       journalEntryId: newJournal?._id,
     });
 
@@ -609,7 +607,6 @@ export const editPurchaseReturn = mutation({
         reversalJournalEntryId: reversalJournalId ? String(reversalJournalId) : null,
       },
     });
-
     return {
       totalCredit,
       debtReduction: nextState.debtReduction,
