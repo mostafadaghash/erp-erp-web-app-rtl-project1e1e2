@@ -51,8 +51,9 @@ test("SUX-05 the whole compact invoice row opens its details", () => {
 });
 
 test("SUX-06 sales entry follows the referenced dense workspace division", () => {
-  assert.match(newInvoice, /className="erp-pos-summary"/);
-  assert.match(newInvoice, /className="erp-pos-rail-mode"/);
+  assert.match(newInvoice, /className="erp-pos-summary(?:\s|\")/);
+  assert.match(newInvoice, /className="erp-pos-cart pos-invoice-items-grid"/);
+  assert.match(newInvoice, /className="pos-invoice-bottom-bar"/);
   assert.match(newInvoice, /رقم الفاتورة: تلقائي/);
   assert.match(newInvoice, /className="erp-pos-save-action/);
   assert.match(css, /\.erp-pos-save-action/);

@@ -26,6 +26,9 @@ interface NewInvoicePageProps {
 interface CartItem {
   productId: Id<"products">;
   productName: string;
+  sku: string;
+  unit: string;
+  availableStock: number;
   quantity: number;
   unitPrice: number;
   discount: number;
@@ -44,6 +47,8 @@ export function NewInvoicePage({ onNavigate }: NewInvoicePageProps) {
   const { formatAmount } = useCurrency();
   const requestId = useRef(crypto.randomUUID());
   const productSearchRef = useRef<HTMLInputElement>(null);
+  const invoiceDiscountRef = useRef<HTMLInputElement>(null);
+  const paidAmountRef = useRef<HTMLInputElement>(null);
   const submitRef = useRef<() => Promise<void>>(async () => undefined);
   const [saving, setSaving] = useState(false);
 
@@ -76,6 +81,9 @@ export function NewInvoicePage({ onNavigate }: NewInvoicePageProps) {
       setCart([...cart, {
         productId: product._id,
         productName: product.name,
+        sku: product.sku,
+        unit: product.unit ?? "قطعة",
+        availableStock: product.stock,
         quantity: 1,
         unitPrice: product.sellPrice,
         discount: 0,
@@ -94,6 +102,15 @@ export function NewInvoicePage({ onNavigate }: NewInvoicePageProps) {
     setCart(cart.map(i =>
       i.productId === productId
         ? { ...i, quantity: qty, total: qty * i.unitPrice * (1 - i.discount / 100) }
+        : i
+    ));
+  };
+
+  const updateItemDiscount = (productId: string, nextDiscount: number) => {
+    const boundedDiscount = Math.max(0, Math.min(100, nextDiscount || 0));
+    setCart(cart.map(i =>
+      i.productId === productId
+        ? { ...i, discount: boundedDiscount, total: i.quantity * i.unitPrice * (1 - boundedDiscount / 100) }
         : i
     ));
   };
@@ -117,12 +134,33 @@ export function NewInvoicePage({ onNavigate }: NewInvoicePageProps) {
   }, [accountId, eligibleAccounts, paymentDefaults, selectedPaymentMethod]);
 
   const handleSelectCustomer = (id: string) => {
+    if (!id) {
+      setCustomerId("");
+      setCustomerName("");
+      setCustomerPhone("");
+      return;
+    }
     const c = customers.find(c => c._id === id);
     if (c) {
       setCustomerId(id);
       setCustomerName(c.name);
       setCustomerPhone(c.phone);
     }
+  };
+
+  const resetInvoice = () => {
+    setCart([]);
+    setCustomerName("");
+    setCustomerPhone("");
+    setCustomerId("");
+    setDiscount(0);
+    setPaid(0);
+    setAccountId("");
+    setPaymentMethodCode("cash");
+    setNotes("");
+    setProductSearch("");
+    requestId.current = crypto.randomUUID();
+    window.setTimeout(() => productSearchRef.current?.focus(), 0);
   };
 
   const handleSubmit = async () => {
@@ -167,6 +205,13 @@ export function NewInvoicePage({ onNavigate }: NewInvoicePageProps) {
 
   submitRef.current = handleSubmit;
 
+  const focusLastQuantity = () => {
+    const quantityInputs = Array.from(document.querySelectorAll<HTMLInputElement>("[data-invoice-quantity]"));
+    const lastInput = quantityInputs.at(-1);
+    lastInput?.focus();
+    lastInput?.select();
+  };
+
   useEffect(() => {
     const handleKeyboardShortcut = (event: KeyboardEvent) => {
       if (event.key === "F2") {
@@ -174,9 +219,31 @@ export function NewInvoicePage({ onNavigate }: NewInvoicePageProps) {
         productSearchRef.current?.focus();
         productSearchRef.current?.select();
       }
+      if (event.key === "F5") {
+        event.preventDefault();
+        focusLastQuantity();
+      }
+      if (event.key === "F7") {
+        event.preventDefault();
+        invoiceDiscountRef.current?.focus();
+        invoiceDiscountRef.current?.select();
+      }
+      if (event.key === "F8") {
+        event.preventDefault();
+        setCart(current => current.length > 0 ? current.slice(0, -1) : current);
+      }
       if (event.key === "F9") {
         event.preventDefault();
         void submitRef.current();
+      }
+      if (event.key === "F10") {
+        event.preventDefault();
+        resetInvoice();
+      }
+      if (event.key === "F11") {
+        event.preventDefault();
+        paidAmountRef.current?.focus();
+        paidAmountRef.current?.select();
       }
     };
 
@@ -195,49 +262,36 @@ export function NewInvoicePage({ onNavigate }: NewInvoicePageProps) {
     if (selected) addToCart(selected);
   };
 
+  const invoiceDate = new Date().toLocaleDateString("ar-EG-u-nu-latn");
+
   return (
-    <div className="erp-pos-page" data-testid="new-invoice-page">
-      <header className="erp-pos-header">
-        <div className="flex min-w-0 items-center gap-2.5">
-          <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-white/10">
-            <ShoppingCart className="h-5 w-5 text-emerald-200" />
-          </div>
+    <div className="erp-pos-page pos-invoice-v3" data-testid="new-invoice-page">
+      <header className="erp-pos-header pos-invoice-command-header">
+        <div className="pos-invoice-heading">
+          <div className="pos-invoice-title-icon"><ShoppingCart className="h-5 w-5" /></div>
           <div className="min-w-0">
-            <h1 className="truncate text-base font-black sm:text-lg">فاتورة مبيعات جديدة</h1>
-            <p className="mt-0.5 text-[11px] text-slate-300">رقم المستند يُنشأ تلقائيًا عند الإصدار</p>
+            <h1 className="truncate">فاتورة بيع جديدة</h1>
+            <div className="pos-invoice-meta-line">
+              <span>رقم الفاتورة: تلقائي</span>
+              <span>{invoiceDate}</span>
+            </div>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <span className="erp-pos-document-badge hidden sm:inline-flex">نقطة بيع سريعة · F2 بحث · F9 إصدار</span>
-          <button onClick={() => onNavigate("invoices")} className="flex items-center gap-2 rounded-lg border border-white/15 bg-white/10 px-3 py-2 text-xs font-black text-white transition hover:bg-white/15">
-            <ArrowRight className="h-4 w-4" />
-            سجل الفواتير
+        <div className="pos-invoice-header-actions">
+          <button type="button" onClick={() => onNavigate("invoices")} className="pos-header-action">
+            <ArrowRight className="h-4 w-4" /> سجل الفواتير
+          </button>
+          <button type="button" onClick={resetInvoice} className="pos-header-action">جديد <kbd>F10</kbd></button>
+          <button type="button" onClick={() => void handleSubmit()} disabled={saving || cart.length === 0} className="pos-header-action pos-header-action-primary">
+            {saving ? "جارٍ الحفظ..." : "حفظ"} <kbd>F9</kbd>
           </button>
         </div>
       </header>
 
-      <div className="erp-pos-grid">
-        <section className="erp-pos-main">
-          <div className="erp-pos-customer-strip">
-            <label>
-              <span className="form-label flex items-center gap-1.5"><UserRound className="h-4 w-4 text-[var(--erp-accent)]" />الحساب</span>
-              <select data-testid="invoice-customer-select" className="form-input" value={customerId} onChange={e => handleSelectCustomer(e.target.value)}>
-                <option value="">عميل نقدي / جديد</option>
-                {customers.map(c => <option key={c._id} value={c._id}>{c.name}</option>)}
-              </select>
-            </label>
-            <label>
-              <span className="form-label">اسم العميل *</span>
-              <input className="form-input" value={customerName} onChange={e => setCustomerName(e.target.value)} placeholder="اسم العميل" />
-            </label>
-            <label>
-              <span className="form-label">رقم الهاتف</span>
-              <input className="form-input" value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} placeholder="01xxxxxxxxx" />
-            </label>
-          </div>
-
-          <div className="erp-pos-search-area">
-            <Search className="absolute right-7 top-1/2 h-5 w-5 -translate-y-1/2 text-[var(--erp-accent)]" />
+      <div className="erp-pos-grid pos-invoice-layout">
+        <section className="erp-pos-main pos-invoice-workspace">
+          <div className="erp-pos-search-area pos-invoice-search-zone">
+            <Search className="pos-invoice-search-icon" />
             <input
               ref={productSearchRef}
               data-testid="invoice-product-search"
@@ -253,7 +307,7 @@ export function NewInvoicePage({ onNavigate }: NewInvoicePageProps) {
               }}
               autoComplete="off"
             />
-            <span className="erp-pos-search-hint"><Barcode className="ml-1 inline h-3.5 w-3.5" />بحث سريع F2</span>
+            <span className="erp-pos-search-hint"><Barcode className="h-3.5 w-3.5" />F2 بحث سريع</span>
 
             {productSearch && (
               <div className="erp-pos-results">
@@ -277,113 +331,162 @@ export function NewInvoicePage({ onNavigate }: NewInvoicePageProps) {
             )}
           </div>
 
-          <div className="erp-pos-cart">
-            {cart.length > 0 ? (
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <th className="w-14">#</th>
-                    <th>اسم الصنف</th>
-                    <th className="w-40">الكمية</th>
-                    <th className="w-32">سعر البيع</th>
-                    <th className="w-32">الإجمالي</th>
-                    <th className="w-16" aria-label="حذف" />
+          <div className="erp-pos-customer-strip pos-invoice-customer-row">
+            <label>
+              <span className="form-label flex items-center gap-1.5"><UserRound className="h-4 w-4 text-[var(--erp-accent)]" />الحساب / العميل</span>
+              <select data-testid="invoice-customer-select" className="form-input" value={customerId} onChange={e => handleSelectCustomer(e.target.value)}>
+                <option value="">عميل نقدي / جديد</option>
+                {customers.map(c => <option key={c._id} value={c._id}>{c.name}</option>)}
+              </select>
+            </label>
+            <label>
+              <span className="form-label">اسم العميل *</span>
+              <input className="form-input" value={customerName} onChange={e => setCustomerName(e.target.value)} placeholder="اسم العميل" />
+            </label>
+            <label>
+              <span className="form-label">رقم الهاتف</span>
+              <input className="form-input" value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} placeholder="01xxxxxxxxx" />
+            </label>
+            <label>
+              <span className="form-label">ملاحظات</span>
+              <input data-testid="invoice-notes" className="form-input" value={notes} onChange={e => setNotes(e.target.value)} placeholder="ملاحظات الفاتورة..." />
+            </label>
+          </div>
+
+          <div className="erp-pos-cart pos-invoice-items-grid">
+            <div className="pos-invoice-items-title">
+              <span>أصناف الفاتورة</span>
+              <span>{formatAmount(cart.length)} صنف</span>
+            </div>
+            <table className="data-table pos-invoice-table">
+              <thead>
+                <tr>
+                  <th className="w-12">#</th>
+                  <th className="w-28">رقم الصنف</th>
+                  <th>اسم الصنف</th>
+                  <th className="w-20">الوحدة</th>
+                  <th className="w-20">المتاح</th>
+                  <th className="w-36">الكمية</th>
+                  <th className="w-28">السعر</th>
+                  <th className="w-24">خصم %</th>
+                  <th className="w-32">الإجمالي</th>
+                  <th className="w-14" aria-label="حذف" />
+                </tr>
+              </thead>
+              <tbody>
+                {cart.length > 0 ? cart.map((item, index) => (
+                  <tr key={item.productId}>
+                    <td className="text-xs font-black text-slate-400">{index + 1}</td>
+                    <td className="text-xs font-bold text-slate-500">{item.sku}</td>
+                    <td><p className="font-black text-slate-800">{item.productName}</p></td>
+                    <td className="text-sm font-bold">{item.unit}</td>
+                    <td className="text-sm font-bold">{formatAmount(item.availableStock)}</td>
+                    <td>
+                      <div className="pos-invoice-quantity-control">
+                        <button type="button" onClick={() => updateQuantity(item.productId, item.quantity - 1)} aria-label={`تقليل كمية ${item.productName}`}><Minus className="h-3.5 w-3.5" /></button>
+                        <input
+                          data-invoice-quantity
+                          aria-label={`كمية ${item.productName}`}
+                          type="number"
+                          min="1"
+                          value={item.quantity}
+                          onChange={e => updateQuantity(item.productId, Number(e.target.value))}
+                        />
+                        <button type="button" onClick={() => updateQuantity(item.productId, item.quantity + 1)} aria-label={`زيادة كمية ${item.productName}`}><Plus className="h-3.5 w-3.5" /></button>
+                      </div>
+                    </td>
+                    <td className="font-bold">{formatAmount(item.unitPrice)} ج.م</td>
+                    <td>
+                      <input
+                        className="pos-line-discount"
+                        type="number"
+                        min="0"
+                        max="100"
+                        aria-label={`خصم ${item.productName}`}
+                        value={item.discount}
+                        onChange={e => updateItemDiscount(item.productId, Number(e.target.value))}
+                      />
+                    </td>
+                    <td className="font-black text-[var(--erp-accent-strong)]">{formatAmount(item.total)} ج.م</td>
+                    <td>
+                      <button type="button" onClick={() => removeFromCart(item.productId)} className="pos-line-delete" aria-label={`حذف ${item.productName}`}><Trash2 className="h-4 w-4" /></button>
+                    </td>
                   </tr>
-                </thead>
-                <tbody>
-                  {cart.map((item, index) => (
-                    <tr key={item.productId}>
-                      <td className="text-xs font-black text-slate-400">{index + 1}</td>
-                      <td><p className="font-black text-slate-800">{item.productName}</p></td>
-                      <td>
-                        <div className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white p-1">
-                          <button onClick={() => updateQuantity(item.productId, item.quantity - 1)} className="grid h-7 w-7 place-items-center rounded-md text-slate-500 hover:bg-slate-100" aria-label={`تقليل كمية ${item.productName}`}><Minus className="h-3.5 w-3.5" /></button>
-                          <span className="min-w-8 text-center font-black text-slate-800">{formatAmount(item.quantity)}</span>
-                          <button onClick={() => updateQuantity(item.productId, item.quantity + 1)} className="grid h-7 w-7 place-items-center rounded-md bg-[var(--erp-accent-soft)] text-[var(--erp-accent-strong)] hover:bg-emerald-100" aria-label={`زيادة كمية ${item.productName}`}><Plus className="h-3.5 w-3.5" /></button>
+                )) : (
+                  <tr className="pos-invoice-empty-row">
+                    <td colSpan={10}>
+                      <div className="erp-pos-empty">
+                        <div>
+                          <div className="mx-auto mb-3 grid place-items-center"><Barcode className="h-8 w-8" /></div>
+                          <p className="font-black">ابدأ بالبحث عن صنف أو امسح الباركود</p>
+                          <p className="mt-2">اكتب اسم الصنف أو الكود ثم اضغط Enter لإضافته مباشرة</p>
                         </div>
-                      </td>
-                      <td className="font-bold">{formatAmount(item.unitPrice)} ج.م</td>
-                      <td className="font-black text-[var(--erp-accent-strong)]">{formatAmount(item.total)} ج.م</td>
-                      <td>
-                        <button onClick={() => removeFromCart(item.productId)} className="grid h-8 w-8 place-items-center rounded-lg text-red-400 transition hover:bg-red-50 hover:text-red-600" aria-label={`حذف ${item.productName}`}><Trash2 className="h-4 w-4" /></button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            ) : (
-              <div className="erp-pos-empty">
-                <div>
-                  <div className="mx-auto mb-3 grid h-16 w-16 place-items-center rounded-2xl bg-[var(--erp-accent-soft)] text-[var(--erp-accent)]"><Barcode className="h-8 w-8" /></div>
-                  <p className="font-black text-slate-700">ابدأ بالبحث عن صنف أو امسح الباركود</p>
-                  <p className="mt-2 text-sm text-slate-400">اضغط Enter لإضافة أول نتيجة مباشرة إلى الفاتورة</p>
-                </div>
-              </div>
-            )}
+                      </div>
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
           </div>
         </section>
 
-        <aside className="erp-pos-summary">
-          <div className="erp-pos-rail-mode">
-            <ShoppingCart className="h-5 w-5" />
-            <div><strong>بيع جديد</strong><small>فاتورة مبيعات</small></div>
-          </div>
-          <div className="erp-pos-total">
-            <h2 className="mb-2 text-xs font-black uppercase tracking-wide text-emerald-100">ملخص الفاتورة</h2>
-            <div className="flex items-center justify-between gap-3 text-sm font-bold text-emerald-50">
-              <span>إجمالي الفاتورة</span>
+        <aside className="erp-pos-summary pos-invoice-summary-panel">
+          <div className="erp-pos-total pos-invoice-total-card">
+            <h2>ملخص الفاتورة</h2>
+            <div className="pos-invoice-total-caption">
+              <span>الإجمالي النهائي</span>
               <span>{formatAmount(cart.length)} صنف</span>
             </div>
-            <p data-testid="new-invoice-total" data-value={total} className="erp-pos-total-value">{formatAmount(total)} <span className="text-base">ج.م</span></p>
-            <div className="erp-pos-document-meta"><span>رقم الفاتورة: تلقائي</span><span>{new Date().toLocaleDateString("ar-EG-u-nu-latn")}</span></div>
+            <p data-testid="new-invoice-total" data-value={total} className="erp-pos-total-value">{formatAmount(total)} <span>ج.م</span></p>
+            <div className="erp-pos-document-meta"><span>رقم الفاتورة: تلقائي</span><span>{invoiceDate}</span></div>
           </div>
 
           <div className="erp-pos-summary-body">
-            <div className="space-y-1 border-b border-slate-100 pb-3">
-              <div className="erp-pos-summary-row"><span>المجموع الفرعي</span><strong className="text-slate-800">{formatAmount(subtotal)} ج.م</strong></div>
+            <div className="pos-invoice-summary-totals">
+              <div className="erp-pos-summary-row"><span>المجموع الفرعي</span><strong>{formatAmount(subtotal)} ج.م</strong></div>
               <div className="erp-pos-summary-row">
                 <span>خصم الفاتورة</span>
-                <label className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2">
-                  <input type="number" className="w-14 bg-transparent py-1.5 text-center text-sm font-black outline-none" value={discount} onChange={e => setDiscount(Number(e.target.value))} min="0" max="100" aria-label="نسبة خصم الفاتورة" />
-                  <span className="text-xs text-slate-400">%</span>
+                <label className="pos-summary-percent-input">
+                  <input ref={invoiceDiscountRef} type="number" value={discount} onChange={e => setDiscount(Number(e.target.value))} min="0" max="100" aria-label="نسبة خصم الفاتورة" />
+                  <span>%</span>
                 </label>
               </div>
               {discountAmount > 0 && <div className="erp-pos-summary-row text-red-500"><span>قيمة الخصم</span><strong>- {formatAmount(discountAmount)} ج.م</strong></div>}
-              <div className="erp-pos-summary-row"><span>الضريبة ({formatAmount(taxRate)}%)</span><strong className="text-slate-800">{formatAmount(taxAmount)} ج.م</strong></div>
+              <div className="erp-pos-summary-row"><span>الضريبة ({formatAmount(taxRate)}%)</span><strong>{formatAmount(taxAmount)} ج.م</strong></div>
+              <div className="pos-invoice-grand-total-row"><span>الإجمالي الكلي</span><strong>{formatAmount(total)} ج.م</strong></div>
             </div>
 
-            <div className="mt-4 space-y-3">
+            <div className="pos-invoice-payment-stack">
               <label><span className="form-label flex items-center gap-1.5"><CreditCard className="h-4 w-4 text-[var(--erp-blue)]" />طريقة السداد</span><select data-testid="invoice-payment-method" className="form-input" value={paymentMethodCode} onChange={(event) => setPaymentMethodCode(event.target.value)}>{paymentMethods.map((method) => <option key={method.code} value={method.code}>{method.name}</option>)}</select></label>
-              <label><span className="form-label">الخزنة أو الحساب المستلم</span><select data-testid="invoice-payment-account" className="form-input" value={accountId} onChange={e => setAccountId(e.target.value)} disabled={!canCollect || !selectedPaymentMethod?.requiresAccount}><option value="">{!selectedPaymentMethod?.requiresAccount ? "البيع الآجل لا يحرك أي خزنة" : canCollect ? "اختر الخزينة أو الحساب" : "يسجل مسؤول التحصيل الدفعة لاحقًا"}</option>{eligibleAccounts.map(account => <option key={account._id} value={account._id}>{account.name}</option>)}</select></label>
+              <label><span className="form-label">الخزنة / الحساب المستلم</span><select data-testid="invoice-payment-account" className="form-input" value={accountId} onChange={e => setAccountId(e.target.value)} disabled={!canCollect || !selectedPaymentMethod?.requiresAccount}><option value="">{!selectedPaymentMethod?.requiresAccount ? "البيع الآجل لا يحرك أي خزنة" : canCollect ? "اختر الخزينة أو الحساب" : "يسجل مسؤول التحصيل الدفعة لاحقًا"}</option>{eligibleAccounts.map(account => <option key={account._id} value={account._id}>{account.name}</option>)}</select></label>
               <label>
                 <span className="form-label">المبلغ المدفوع</span>
-                <input data-testid="invoice-paid-amount" type="number" className="form-input text-lg font-black" value={paid} onChange={e => setPaid(Number(e.target.value))} min="0" max={total} disabled={!selectedPaymentMethod?.requiresAccount} />
+                <input ref={paidAmountRef} data-testid="invoice-paid-amount" type="number" className="form-input pos-paid-input" value={paid} onChange={e => setPaid(Number(e.target.value))} min="0" max={total} disabled={!selectedPaymentMethod?.requiresAccount} />
               </label>
-              <div className={`rounded-xl border p-3 ${remaining > 0 ? "border-amber-200 bg-amber-50 text-amber-800" : "border-emerald-200 bg-emerald-50 text-emerald-800"}`}>
-                <div className="flex items-center justify-between gap-3 text-sm font-black">
-                  <span>{remaining > 0 ? "المتبقي على العميل" : "الفاتورة مسددة"}</span>
-                  <span>{formatAmount(Math.max(0, remaining))} ج.م</span>
-                </div>
+              <div className={`pos-invoice-balance-card ${remaining > 0 ? "is-due" : "is-settled"}`}>
+                <span>{cart.length === 0 ? "المتبقي" : remaining > 0 ? "المتبقي على العميل" : "الفاتورة مسددة"}</span>
+                <strong>{formatAmount(Math.max(0, remaining))} ج.م</strong>
               </div>
-              <label>
-                <span className="form-label">ملاحظات</span>
-                <textarea data-testid="invoice-notes" className="form-input" rows={1} value={notes} onChange={e => setNotes(e.target.value)} placeholder="ملاحظات تظهر مع المستند..." />
-              </label>
             </div>
 
-            <button data-testid="invoice-submit" onClick={handleSubmit} disabled={saving || cart.length === 0} className="erp-pos-save-action mt-4 flex w-full items-center justify-center gap-2 py-3 text-base">
+            <button data-testid="invoice-submit" onClick={handleSubmit} disabled={saving || cart.length === 0} className="erp-pos-save-action pos-invoice-issue-button">
               <CheckCircle2 className="h-5 w-5" />
               {saving ? "جارٍ إصدار الفاتورة..." : "إصدار الفاتورة"}
             </button>
-
-            <div className="erp-pos-shortcuts" aria-label="اختصارات الفاتورة">
-              <span className="erp-pos-shortcut"><kbd>F2</kbd> بحث الصنف</span>
-              <span className="erp-pos-shortcut"><kbd>Enter</kbd> إضافة</span>
-              <span className="erp-pos-shortcut"><kbd>F9</kbd> إصدار</span>
-            </div>
           </div>
         </aside>
       </div>
+
+      <nav className="pos-invoice-bottom-bar" aria-label="اختصارات فاتورة المبيعات">
+        <button type="button" onClick={() => { productSearchRef.current?.focus(); productSearchRef.current?.select(); }}><kbd>F2</kbd><span>بحث صنف</span></button>
+        <button type="button" onClick={focusLastQuantity} disabled={cart.length === 0}><kbd>F5</kbd><span>الكمية</span></button>
+        <button type="button" onClick={() => { invoiceDiscountRef.current?.focus(); invoiceDiscountRef.current?.select(); }}><kbd>F7</kbd><span>خصم</span></button>
+        <button type="button" onClick={() => setCart(current => current.length > 0 ? current.slice(0, -1) : current)} disabled={cart.length === 0}><kbd>F8</kbd><span>حذف آخر صنف</span></button>
+        <button type="button" onClick={() => void handleSubmit()} disabled={saving || cart.length === 0}><kbd>F9</kbd><span>حفظ</span></button>
+        <button type="button" onClick={resetInvoice}><kbd>F10</kbd><span>فاتورة جديدة</span></button>
+        <button type="button" onClick={() => { paidAmountRef.current?.focus(); paidAmountRef.current?.select(); }}><kbd>F11</kbd><span>سداد</span></button>
+        <button type="button" onClick={() => onNavigate("invoices")}><ArrowRight className="h-4 w-4" /><span>سجل الفواتير</span></button>
+      </nav>
     </div>
   );
 }
