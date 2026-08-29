@@ -97,8 +97,69 @@
   margin-top: 0;
 }
 
+/* Keep the global-search glyph separate from RTL placeholder text. */
+.erp-contextbar input[aria-label="البحث الشامل"] {
+  padding-right: 2.75rem !important;
+  padding-left: .85rem !important;
+}
+
+/* Desktop custom dates stay compact instead of inheriting the generic 100% form width. */
+.erp-dashboard-filter-grid .erp-dashboard-date {
+  width: 148px !important;
+  flex: 0 0 148px;
+}
+
+/* The branch selector does not need a second decorative glyph beside the native select affordance. */
+.erp-dashboard-filter--branch > svg {
+  display: none;
+}
+
+.erp-dashboard-filter--branch .form-input {
+  padding-right: .8rem !important;
+}
+
+/* Prevent long navigation labels from colliding with the signed-in user panel. */
+@media (min-width: 1024px) and (max-width: 1700px) {
+  .erp-navigation-inner {
+    gap: 4px !important;
+    padding-inline: 10px !important;
+  }
+
+  .erp-nav-brand {
+    gap: 7px !important;
+    padding-left: 10px !important;
+  }
+
+  .erp-nav-groups {
+    gap: 0 !important;
+  }
+
+  .erp-nav-group-button,
+  .erp-nav-home-button {
+    gap: 4px !important;
+    padding-inline: 6px !important;
+    font-size: 11px !important;
+  }
+
+  .erp-nav-group-button > span > svg {
+    display: none;
+  }
+
+  .erp-user-panel {
+    gap: 6px !important;
+    padding-right: 8px !important;
+  }
+}
+
 @media (max-width: 899px) {
   .erp-dashboard-secondary-grid {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 740px) {
+  .erp-dashboard-filter-grid .erp-dashboard-date {
+    width: 100% !important;
+    flex: 1 1 auto;
   }
 }
