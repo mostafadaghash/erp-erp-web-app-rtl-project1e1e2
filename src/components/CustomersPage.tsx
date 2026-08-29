@@ -10,6 +10,8 @@ import { getErrorMessage } from "../lib/errors";
 import { useCurrency } from "../lib/utils";
 import { ContactFormModal } from "./ContactFormModal";
 
+type CustomerForm = ContactFormValues;
+
 type CustomerRow = {
   _id: Id<"customers">;
   name: string;
@@ -32,7 +34,7 @@ type CustomerBalance = {
 type StatusFilter = "" | "active" | "inactive";
 type BalanceFilter = "" | "debt" | "advance" | "clear";
 
-const EMPTY_FORM: ContactFormValues = {
+const emptyForm: CustomerForm = {
   name: "",
   phone: "",
   email: "",
@@ -67,21 +69,30 @@ export function CustomersPage({
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
   const [updatingId, setUpdatingId] = useState<Id<"customers"> | null>(null);
-  const [form, setForm] = useState<ContactFormValues>(EMPTY_FORM);
+  const [form, setForm] = useState<CustomerForm>(emptyForm);
   const [categoryId, setCategoryId] = useState("");
   const [showCategoryForm, setShowCategoryForm] = useState(false);
   const [categoryName, setCategoryName] = useState("");
   const [savingCategory, setSavingCategory] = useState(false);
+  const formValidation = validateContactForm(form);
 
   const branchesQuery = useQuery(api.branches.list, canViewBranches && !me?.branchId ? {} : "skip");
   const branches = branchesQuery ?? [];
   const effectiveBranchId = me?.branchId ?? (selectedBranchId ? selectedBranchId as Id<"branches"> : null);
-  const customersQuery = useQuery(api.customers.list, me && effectiveBranchId ? { branchId: effectiveBranchId } : "skip");
+  const requiresBranchSelection = Boolean(me && !me.branchId && canViewBranches && branches.length > 0 && !selectedBranchId);
+  const noCustomerBranchAvailable = Boolean(me && !me.branchId && canViewBranches && branchesQuery !== undefined && branches.length === 0);
+  const missingCustomerBranchAccess = Boolean(me && !me.branchId && !canViewBranches);
+
+  const customerArgs = me && effectiveBranchId ? { branchId: effectiveBranchId } : "skip";
+  const customersQuery = useQuery(api.customers.list, customerArgs);
   const customers = (customersQuery ?? []) as CustomerRow[];
+  const customersLoaded = customersQuery !== undefined;
   const balances = useQuery(
     api.customerLedger.branchBalances,
     canViewLedger && effectiveBranchId ? { branchId: effectiveBranchId } : "skip",
   ) as CustomerBalance[] | undefined;
+  const balancesLoading = canViewLedger && Boolean(effectiveBranchId) && balances === undefined;
+  const hasBalanceScope = canViewLedger && Boolean(effectiveBranchId) && balances !== undefined;
   const categories = useQuery(api.contactCategories.list, { type: "customer" }) ?? [];
   const profile = useQuery(api.customers.profile, profileId ? { id: profileId } : "skip");
 
@@ -89,13 +100,6 @@ export function CustomersPage({
   const updateCustomer = useMutation(api.customers.update);
   const setCustomerActive = useMutation(api.customers.setActive);
   const createCategory = useMutation(api.contactCategories.create);
-
-  const validation = validateContactForm(form);
-  const hasBalanceScope = canViewLedger && Boolean(effectiveBranchId) && balances !== undefined;
-  const balancesLoading = canViewLedger && Boolean(effectiveBranchId) && balances === undefined;
-  const requiresBranchSelection = Boolean(me && !me.branchId && canViewBranches && branches.length > 0 && !selectedBranchId);
-  const noCustomerBranchAvailable = Boolean(me && !me.branchId && canViewBranches && branchesQuery !== undefined && branches.length === 0);
-  const missingCustomerBranchAccess = Boolean(me && !me.branchId && !canViewBranches);
 
   const balanceMap = useMemo(
     () => new Map((balances ?? []).map((row) => [row.customerId, row])),
@@ -146,17 +150,31 @@ export function CustomersPage({
     setFilterBalance("");
   };
 
-  const resetEditForm = () => {
+  const closeForm = () => {
+    if (saving) return;
     setShowForm(false);
     setEditingId(null);
-    setForm(EMPTY_FORM);
+    setForm(emptyForm);
     setCategoryId("");
   };
 
-  const openCreate = () => {
-    if (!effectiveBranchId) return toast.error("اختر فرع العميل أولًا");
+  const handleCustomerBranchChange = (value: string) => {
+    if (saving || updatingId !== null) return;
+    setSelectedBranchId(value);
+    setShowForm(false);
     setEditingId(null);
-    setForm(EMPTY_FORM);
+    setForm(emptyForm);
+    setCategoryId("");
+    resetFilters();
+  };
+
+  const openCreate = () => {
+    if (!effectiveBranchId) {
+      toast.error("اختر فرع العميل أولًا");
+      return;
+    }
+    setEditingId(null);
+    setForm(emptyForm);
     setCategoryId("");
     setShowForm(true);
   };
@@ -181,20 +199,29 @@ export function CustomersPage({
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     if (saving) return;
-    if (!editingId && !effectiveBranchId) return toast.error("اختر فرع العميل أولًا");
-    if (!validation.ok) return toast.error(validation.reason);
-
+    if (!editingId && !effectiveBranchId) {
+      toast.error("اختر فرع العميل أولًا");
+      return;
+    }
+    if (!formValidation.ok) {
+      toast.error(formValidation.reason);
+      return;
+    }
+    const { payload, normalizedForm } = formValidation;
+    setForm(normalizedForm);
     setSaving(true);
     try {
-      const category = categoryId ? categoryId as Id<"customerCategories"> : undefined;
       if (editingId) {
-        await updateCustomer({ id: editingId, ...validation.payload, categoryId: category });
+        await updateCustomer({ id: editingId, ...payload, categoryId: categoryId ? categoryId as Id<"customerCategories"> : undefined });
         toast.success("تم تحديث بيانات العميل");
       } else if (effectiveBranchId) {
-        await createCustomer({ ...validation.payload, branchId: effectiveBranchId, categoryId: category });
+        await createCustomer({ ...payload, branchId: effectiveBranchId, categoryId: categoryId ? categoryId as Id<"customerCategories"> : undefined });
         toast.success("تمت إضافة العميل");
       }
-      resetEditForm();
+      setShowForm(false);
+      setEditingId(null);
+      setForm(emptyForm);
+      setCategoryId("");
     } catch (error) {
       toast.error(getErrorMessage(error, editingId ? "تعذر تحديث العميل" : "تعذر إضافة العميل"));
     } finally {
@@ -208,7 +235,6 @@ export function CustomersPage({
       ? `هل تريد إعادة تفعيل العميل ${customer.name}؟`
       : `هل تريد تعطيل العميل ${customer.name}؟ ستظل مستنداته القديمة محفوظة.`;
     if (!window.confirm(message)) return;
-
     setUpdatingId(customer._id);
     try {
       await setCustomerActive({ id: customer._id, isActive: nextActive });
@@ -222,7 +248,10 @@ export function CustomersPage({
 
   const openLedger = (customer: CustomerRow) => {
     const branchId = customer.branchId ?? effectiveBranchId;
-    if (!onOpenLedger || !branchId) return toast.error("اختر فرع العمل قبل فتح حساب العميل");
+    if (!onOpenLedger || !branchId) {
+      toast.error("اختر فرع العمل قبل فتح حساب العميل");
+      return;
+    }
     onOpenLedger(customer._id, branchId);
   };
 
@@ -260,13 +289,7 @@ export function CustomersPage({
         <div className="flex flex-wrap gap-2">
           {canEdit && <button type="button" className="btn-secondary" onClick={() => setShowCategoryForm((value) => !value)}><Plus className="h-4 w-4" />تصنيف</button>}
           {canCreate && (
-            <button
-              data-testid="customer-create-open"
-              type="button"
-              className="btn-primary"
-              disabled={!effectiveBranchId && !onCreateCustomer}
-              onClick={() => onCreateCustomer ? onCreateCustomer() : openCreate()}
-            >
+            <button data-testid="customer-create-open" type="button" className="btn-primary" disabled={!effectiveBranchId && !onCreateCustomer} onClick={() => onCreateCustomer ? onCreateCustomer() : openCreate()}>
               <Plus className="h-4 w-4" />عميل جديد
             </button>
           )}
@@ -275,26 +298,31 @@ export function CustomersPage({
 
       {showCategoryForm && (
         <form onSubmit={handleCreateCategory} className="professional-panel flex flex-col gap-3 p-4 sm:flex-row sm:items-end">
-          <div className="flex-1">
-            <label className="form-label">اسم تصنيف العملاء</label>
-            <input autoFocus className="form-input" value={categoryName} onChange={(event) => setCategoryName(event.target.value)} maxLength={80} placeholder="مثال: عملاء جملة" />
-          </div>
+          <div className="flex-1"><label className="form-label">اسم تصنيف العملاء</label><input autoFocus className="form-input" value={categoryName} onChange={(event) => setCategoryName(event.target.value)} maxLength={80} placeholder="مثال: عملاء جملة" /></div>
           <button className="btn-primary" disabled={savingCategory || !categoryName.trim()}>{savingCategory ? "جارٍ الحفظ…" : "حفظ التصنيف"}</button>
           <button type="button" className="btn-secondary" onClick={() => { setShowCategoryForm(false); setCategoryName(""); }}>إلغاء</button>
         </form>
       )}
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Stat label="إجمالي العملاء" value={customersQuery === undefined ? "—" : formatAmount(customers.length)} tone="slate" />
-        <Stat label="العملاء النشطون" value={customersQuery === undefined ? "—" : formatAmount(customers.filter((row) => row.isActive !== false).length)} tone="indigo" />
-        <Stat label="عملاء بمديونية" value={balancesLoading ? "…" : debtCustomers === null ? "—" : formatAmount(debtCustomers)} tone="amber" />
+        <Stat label="إجمالي العملاء" value={customersLoaded ? customers.length : "—"} tone="slate" />
+        <Stat label="العملاء النشطون" value={customersLoaded ? customers.filter((row) => row.isActive !== false).length : "—"} tone="indigo" />
+        <Stat label="عملاء بمديونية" value={balancesLoading ? "…" : debtCustomers === null ? "—" : debtCustomers} tone="amber" />
         <Stat label="إجمالي المديونيات" value={balancesLoading ? "…" : totalDebt === null ? "—" : formatCurrency(totalDebt)} tone="emerald" />
       </div>
 
       <div className="erp-toolbar flex-col gap-2 lg:flex-row">
         <div className="relative min-w-0 flex-1">
           <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-          <input data-testid="customer-search" className="form-input w-full pr-10" placeholder="بحث بالاسم أو الهاتف أو البريد الإلكتروني..." value={search} disabled={customersQuery === undefined} onChange={(event) => setSearch(event.target.value)} />
+          <input
+            data-testid="customer-search"
+            className="form-input w-full pr-10"
+            placeholder="بحث بالاسم أو الهاتف أو البريد الإلكتروني..."
+            value={search}
+            disabled={!customersLoaded}
+            title={!customersLoaded ? "اختر الفرع وانتظر تحميل العملاء" : undefined}
+            onChange={(event) => setSearch(event.target.value)}
+          />
         </div>
         {canViewBranches && !me?.branchId && branches.length > 0 && (
           <select
@@ -302,11 +330,7 @@ export function CustomersPage({
             className="form-input lg:w-44"
             value={selectedBranchId}
             disabled={saving || updatingId !== null}
-            onChange={(event) => {
-              setSelectedBranchId(event.target.value);
-              resetFilters();
-              resetEditForm();
-            }}
+            onChange={(event) => handleCustomerBranchChange(event.target.value)}
           >
             <option value="">اختر الفرع</option>
             {branches.map((branch: { _id: Id<"branches">; name: string }) => <option key={branch._id} value={branch._id}>{branch.name}</option>)}
@@ -336,21 +360,7 @@ export function CustomersPage({
                 const balance = balanceMap.get(customer._id);
                 const isActive = customer.isActive !== false;
                 return (
-                  <tr
-                    key={customer._id}
-                    data-testid="customer-card"
-                    data-customer-name={customer.name}
-                    data-customer-active={String(isActive)}
-                    className={`invoice-row-compact cursor-pointer ${isActive ? "" : "opacity-70"}`}
-                    tabIndex={0}
-                    onClick={() => setProfileId(customer._id)}
-                    onKeyDown={(event) => {
-                      if (event.target === event.currentTarget && (event.key === "Enter" || event.key === " ")) {
-                        event.preventDefault();
-                        setProfileId(customer._id);
-                      }
-                    }}
-                  >
+                  <tr key={customer._id} data-testid="customer-card" data-customer-name={customer.name} data-customer-active={String(isActive)} className={`invoice-row-compact cursor-pointer ${isActive ? "" : "opacity-70"}`} tabIndex={0} onClick={() => setProfileId(customer._id)} onKeyDown={(event) => { if (event.target === event.currentTarget && (event.key === "Enter" || event.key === " ")) { event.preventDefault(); setProfileId(customer._id); } }}>
                     <td><p className="font-bold text-slate-800">{customer.name}</p>{customer.email && <p className="max-w-56 truncate text-xs text-slate-400">{customer.email}</p>}</td>
                     <td className="font-mono text-xs" dir="ltr">{customer.phone}</td>
                     <td className="text-xs">{customer.categoryId ? categoryMap.get(String(customer.categoryId)) ?? "—" : "بدون تصنيف"}</td>
@@ -362,8 +372,12 @@ export function CustomersPage({
                       <div className="flex min-w-max gap-1.5">
                         <button type="button" className="rounded-lg border px-2.5 py-1.5 text-xs font-bold" onClick={(event) => { event.stopPropagation(); setProfileId(customer._id); }}>بطاقة</button>
                         {canEdit && <button type="button" className="rounded-lg bg-indigo-50 px-2.5 py-1.5 text-xs font-bold text-indigo-700" onClick={(event) => { event.stopPropagation(); openEdit(customer); }}><span className="flex items-center gap-1"><Edit3 className="h-3.5 w-3.5" />تعديل</span></button>}
-                        {canViewLedger && <button type="button" className="rounded-lg bg-emerald-50 px-2.5 py-1.5 text-xs font-bold text-emerald-700" onClick={(event) => { event.stopPropagation(); openLedger(customer); }}><span className="flex items-center gap-1"><BookOpen className="h-3.5 w-3.5" />الحساب</span></button>}
-                        {canSetActive && <button type="button" disabled={updatingId !== null} className={`rounded-lg px-2.5 py-1.5 text-xs font-bold ${isActive ? "bg-amber-50 text-amber-800" : "bg-emerald-50 text-emerald-700"}`} onClick={(event) => { event.stopPropagation(); void handleSetActive(customer, !isActive); }}><span className="flex items-center gap-1">{isActive ? <UserX className="h-3.5 w-3.5" /> : <UserCheck className="h-3.5 w-3.5" />}{updatingId === customer._id ? "جارٍ التحديث..." : isActive ? "تعطيل" : "تفعيل"}</span></button>}
+                        {canViewLedger && <button type="button" className="rounded-lg bg-emerald-50 px-2.5 py-1.5 text-xs font-bold text-emerald-700" onClick={(event) => { event.stopPropagation(); openLedger(customer); }}><span className="flex items-center gap-1"><BookOpen className="h-3.5 w-3.5" />حساب العميل</span></button>}
+                        {canSetActive && (
+                          <button type="button" disabled={updatingId !== null} className={`rounded-lg px-2.5 py-1.5 text-xs font-bold ${isActive ? "bg-amber-50 text-amber-800" : "bg-emerald-50 text-emerald-700"}`} onClick={(event) => { event.stopPropagation(); void handleSetActive(customer, !isActive); }}>
+                            <span className="flex items-center gap-1">{isActive ? <UserX className="h-3.5 w-3.5" /> : <UserCheck className="h-3.5 w-3.5" />}{updatingId === customer._id ? "جارٍ التحديث..." : isActive ? "تعطيل" : "تفعيل"}</span>
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -376,7 +390,7 @@ export function CustomersPage({
         {requiresBranchSelection && <EmptyState text="اختر الفرع لعرض العملاء" />}
         {!requiresBranchSelection && !noCustomerBranchAvailable && !missingCustomerBranchAccess && customersQuery === undefined && <EmptyState text="جارٍ تحميل العملاء" />}
         {!requiresBranchSelection && customersQuery !== undefined && customers.length === 0 && <EmptyState text="لا يوجد عملاء في هذا الفرع" />}
-        {customers.length > 0 && filtered.length === 0 && <EmptyState text="لا توجد نتائج مطابقة للفلاتر الحالية" />}
+        {customers.length > 0 && filtered.length === 0 && <EmptyState text="لا توجد نتائج مطابقة للبحث" />}
       </div>
 
       {showForm && (
@@ -385,9 +399,9 @@ export function CustomersPage({
           nameLabel="الاسم *"
           form={form}
           saving={saving}
-          validation={validation}
+          validation={formValidation}
           onChange={setForm}
-          onClose={() => { if (!saving) resetEditForm(); }}
+          onClose={closeForm}
           onSubmit={handleSubmit}
           categoryOptions={categories}
           categoryId={categoryId}
@@ -400,20 +414,9 @@ export function CustomersPage({
           <section className="max-h-[88vh] w-full max-w-5xl overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl">
             {profile === undefined ? <p className="p-10 text-center text-slate-500">جارٍ تحميل بطاقة العميل…</p> : (
               <>
-                <header className="flex items-start justify-between border-b pb-4">
-                  <div><p className="erp-kicker">بطاقة العميل</p><h2 className="text-2xl font-black">{profile.customer.name}</h2><p className="mt-1 text-sm text-slate-500"><span dir="ltr">{profile.customer.phone}</span>{profile.customer.categoryName ? ` — ${profile.customer.categoryName}` : ""}</p></div>
-                  <button type="button" className="rounded-xl p-2 hover:bg-slate-100" onClick={() => setProfileId(null)}><X className="h-5 w-5" /></button>
-                </header>
-                <div className="my-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                  <Stat label="الرصيد الحالي" value={formatCurrency(profile.balance?.receivableBalance ?? 0)} tone="amber" />
-                  <Stat label="المبيعات" value={formatAmount(profile.invoices.length)} tone="indigo" />
-                  <Stat label="الصيانة" value={formatAmount(profile.repairs.length)} tone="emerald" />
-                  <Stat label="الشحن" value={formatAmount(profile.deliveries.length)} tone="slate" />
-                </div>
-                <div className="grid gap-5 lg:grid-cols-2">
-                  <div className="rounded-2xl border p-4"><h3 className="mb-3 font-black">البيانات والملاحظات</h3><p className="text-sm leading-7 text-slate-600">{profile.customer.address || "لا يوجد عنوان"}<br />{profile.customer.email || "لا يوجد بريد إلكتروني"}<br />{profile.customer.notes || "لا توجد ملاحظات"}</p></div>
-                  <div className="rounded-2xl border p-4"><h3 className="mb-3 font-black">آخر التعاملات</h3><div className="max-h-64 divide-y overflow-y-auto">{profile.ledger.slice(0, 20).map((entry) => <div key={entry._id} className="flex justify-between gap-3 py-2 text-sm"><span>{entry.description}</span><span className="whitespace-nowrap font-bold">{formatCurrency(entry.receivableAfter)}</span></div>)}{profile.ledger.length === 0 && <p className="text-sm text-slate-400">لا توجد حركات.</p>}</div></div>
-                </div>
+                <header className="flex items-start justify-between border-b pb-4"><div><p className="erp-kicker">بطاقة العميل</p><h2 className="text-2xl font-black">{profile.customer.name}</h2><p className="mt-1 text-sm text-slate-500"><span dir="ltr">{profile.customer.phone}</span>{profile.customer.categoryName ? ` — ${profile.customer.categoryName}` : ""}</p></div><button type="button" className="rounded-xl p-2 hover:bg-slate-100" onClick={() => setProfileId(null)}><X className="h-5 w-5" /></button></header>
+                <div className="my-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4"><Stat label="الرصيد الحالي" value={formatCurrency(profile.balance?.receivableBalance ?? 0)} tone="amber" /><Stat label="المبيعات" value={formatAmount(profile.invoices.length)} tone="indigo" /><Stat label="الصيانة" value={formatAmount(profile.repairs.length)} tone="emerald" /><Stat label="الشحن" value={formatAmount(profile.deliveries.length)} tone="slate" /></div>
+                <div className="grid gap-5 lg:grid-cols-2"><div className="rounded-2xl border p-4"><h3 className="mb-3 font-black">البيانات والملاحظات</h3><p className="text-sm leading-7 text-slate-600">{profile.customer.address || "لا يوجد عنوان"}<br />{profile.customer.email || "لا يوجد بريد إلكتروني"}<br />{profile.customer.notes || "لا توجد ملاحظات"}</p></div><div className="rounded-2xl border p-4"><h3 className="mb-3 font-black">آخر التعاملات</h3><div className="max-h-64 divide-y overflow-y-auto">{profile.ledger.slice(0, 20).map((entry) => <div key={entry._id} className="flex justify-between gap-3 py-2 text-sm"><span>{entry.description}</span><span className="whitespace-nowrap font-bold">{formatCurrency(entry.receivableAfter)}</span></div>)}{profile.ledger.length === 0 && <p className="text-sm text-slate-400">لا توجد حركات.</p>}</div></div></div>
               </>
             )}
           </section>
