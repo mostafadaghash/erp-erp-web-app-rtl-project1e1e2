@@ -43,12 +43,14 @@ const emptyForm: CustomerForm = {
 
 export function CustomersPage({
   onOpenLedger,
+  onCreateCustomer,
   createRequestToken,
 }: {
   onOpenLedger?: (
     customerId: Id<"customers">,
     branchId: Id<"branches">,
   ) => void;
+  onCreateCustomer?: () => void;
   createRequestToken?: number;
 }) {
   const canCreate = usePermission("create_customers");
@@ -150,6 +152,14 @@ export function CustomersPage({
     setEditingId(null);
     setForm(emptyForm);
     setShowForm(true);
+  };
+
+  const openStandaloneCreate = () => {
+    if (onCreateCustomer) {
+      onCreateCustomer();
+      return;
+    }
+    openCreate();
   };
 
   useEffect(() => {
@@ -298,10 +308,10 @@ export function CustomersPage({
           {canCreate && (
             <button
               data-testid="customer-create-open"
-              onClick={openCreate}
-              disabled={!effectiveBranchId}
+              onClick={openStandaloneCreate}
+              disabled={!effectiveBranchId && !onCreateCustomer}
               className="btn-primary flex items-center gap-2"
-              title={!effectiveBranchId ? "اختر فرع العميل أولًا" : undefined}
+              title={!effectiveBranchId && !onCreateCustomer ? "اختر فرع العميل أولًا" : undefined}
             >
               <Plus className="w-4 h-4" />
               عميل جديد
