@@ -1,10 +1,40 @@
-import { defineConfig } from "vite";
+import { defineConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "path";
+
+const ARABIC_INDIC_DIGITS: Record<string, string> = {
+  "٠": "0", "١": "1", "٢": "2", "٣": "3", "٤": "4",
+  "٥": "5", "٦": "6", "٧": "7", "٨": "8", "٩": "9",
+  "۰": "0", "۱": "1", "۲": "2", "۳": "3", "۴": "4",
+  "۵": "5", "۶": "6", "۷": "7", "۸": "8", "۹": "9",
+};
+
+function presentationLocalePlugin(): Plugin {
+  return {
+    name: "business-tech-presentation-locale",
+    enforce: "pre",
+    transform(code, id) {
+      const isFrontendSource =
+        (id.includes("/src/") || id.includes("\\src\\")) &&
+        /\.[cm]?[jt]sx?$/.test(id) &&
+        !id.includes("node_modules");
+      if (!isFrontendSource) return null;
+
+      let next = code
+        .replace(/(["'])ar-EG\1/g, "$1ar-EG-u-nu-latn$1")
+        .replace(/ج\.م/g, "EGP")
+        .replace(/[٠-٩۰-۹]/g, (digit) => ARABIC_INDIC_DIGITS[digit] ?? digit);
+
+      if (next === code) return null;
+      return { code: next, map: null };
+    },
+  };
+}
 
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => ({
   plugins: [
+    presentationLocalePlugin(),
     react({
       babel: {
         // Dev-only: stamp every JSX element with its source location
