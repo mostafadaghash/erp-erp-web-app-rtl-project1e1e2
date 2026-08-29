@@ -1,0 +1,57 @@
+/* Sales invoice list filters — RTL spacing and compact custom date range. */
+
+/* Keep the search placeholder on the RTL start side while the icon stays on the opposite edge. */
+[data-testid="invoices-page"] .erp-toolbar > .relative.min-w-0.flex-1 > svg {
+  right: auto !important;
+  left: 0.75rem !important;
+}
+
+[data-testid="invoices-page"] .erp-toolbar > .relative.min-w-0.flex-1 > input {
+  padding-right: 0.75rem !important;
+  padding-left: 2.5rem !important;
+}
+
+/* The native select already has its own indicator. Hiding the extra calendar prevents label/icon overlap in RTL. */
+[data-testid="invoices-page"] .erp-toolbar div:has(> select[data-testid="invoice-date-filter"]) > svg {
+  display: none !important;
+}
+
+[data-testid="invoices-page"] select[data-testid="invoice-date-filter"] {
+  padding-right: 0.75rem !important;
+  padding-left: 2rem !important;
+}
+
+/* When custom range is selected, show only compact From/To controls — no duplicate heading. */
+[data-testid="invoices-page"] .erp-toolbar > div:has([data-testid="invoice-date-from"]) > span:first-child {
+  display: none !important;
+}
+
+[data-testid="invoices-page"] .erp-toolbar > div:has([data-testid="invoice-date-from"]) {
+  gap: 0.5rem !important;
+}
+
+[data-testid="invoices-page"] [data-testid="invoice-date-from"],
+[data-testid="invoices-page"] [data-testid="invoice-date-to"] {
+  width: 9.25rem !important;
+  min-width: 0 !important;
+}
+
+@media (min-width: 1024px) {
+  [data-testid="invoices-page"] .erp-toolbar {
+    flex-wrap: nowrap !important;
+  }
+
+  [data-testid="invoices-page"] .erp-toolbar > div:has([data-testid="invoice-date-from"]) {
+    width: auto !important;
+    flex-basis: auto !important;
+    flex-wrap: nowrap !important;
+    border-top: 0 !important;
+    padding-top: 0 !important;
+  }
+}
+
+@media (max-width: 1023px) {
+  [data-testid="invoices-page"] .erp-toolbar > div:has([data-testid="invoice-date-from"]) {
+    width: 100% !important;
+  }
+}
