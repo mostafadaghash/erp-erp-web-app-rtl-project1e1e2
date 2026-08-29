@@ -1,0 +1,117 @@
+/* Sales invoice customer/account field alignment.
+   Loaded after the POS invoice stylesheet so the operating row keeps one
+   consistent baseline without changing invoice behavior. */
+
+.erp-workspace-main .pos-invoice-customer-row {
+  grid-template-columns:
+    minmax(230px, 1.18fr)
+    minmax(210px, 1fr)
+    minmax(190px, .9fr)
+    minmax(220px, 1.05fr);
+  align-items: end;
+  column-gap: 10px;
+  row-gap: 8px;
+  padding: 9px 11px 10px;
+  background: linear-gradient(180deg, #ffffff 0%, #fbfcfd 100%);
+}
+
+.erp-workspace-main .pos-invoice-customer-row > label {
+  display: grid;
+  min-width: 0;
+  align-self: stretch;
+  grid-template-rows: 20px 40px;
+  gap: 5px;
+  margin: 0;
+}
+
+.erp-workspace-main .pos-invoice-customer-row > label > .form-label {
+  min-height: 20px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin: 0;
+  padding-inline: 2px;
+  color: #34495c;
+  font-size: .69rem;
+  font-weight: 900;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.erp-workspace-main .pos-invoice-customer-row > label > .form-label svg {
+  width: 14px;
+  height: 14px;
+  flex: none;
+}
+
+.erp-workspace-main .pos-invoice-customer-row > label > .form-input {
+  width: 100%;
+  min-width: 0;
+  min-height: 40px !important;
+  height: 40px !important;
+  margin: 0;
+  border: 1px solid #b8c6cf !important;
+  border-radius: 6px !important;
+  background: #fff !important;
+  padding: 7px 10px !important;
+  color: #172b3d !important;
+  font-size: .8rem;
+  font-weight: 750;
+  line-height: 1.25;
+  box-shadow: inset 0 1px 2px rgba(18, 38, 63, .035), 0 1px 2px rgba(18, 38, 63, .025);
+}
+
+.erp-workspace-main .pos-invoice-customer-row > label > select.form-input {
+  padding-inline-start: 10px !important;
+  padding-inline-end: 30px !important;
+  font-weight: 850;
+}
+
+.erp-workspace-main .pos-invoice-customer-row > label > .form-input::placeholder {
+  color: #98a3af;
+  opacity: 1;
+  font-weight: 700;
+}
+
+.erp-workspace-main .pos-invoice-customer-row > label > .form-input:hover {
+  border-color: #8fa1ad !important;
+}
+
+.erp-workspace-main .pos-invoice-customer-row > label > .form-input:focus {
+  border-color: #27a96d !important;
+  box-shadow: 0 0 0 3px rgba(18, 165, 101, .10), inset 0 1px 2px rgba(18, 38, 63, .03) !important;
+}
+
+/* Give the account selector a subtle operating emphasis without making it
+   visually taller than the name and phone fields. */
+.erp-workspace-main .pos-invoice-customer-row > label:first-child > .form-input {
+  border-color: #9ebdad !important;
+}
+
+@media (max-width: 1280px) and (min-width: 981px) {
+  .erp-workspace-main .pos-invoice-customer-row {
+    grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr) minmax(0, .9fr);
+  }
+
+  .erp-workspace-main .pos-invoice-customer-row > label:last-child {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 980px) {
+  .erp-workspace-main .pos-invoice-customer-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 680px) {
+  .erp-workspace-main .pos-invoice-customer-row {
+    grid-template-columns: 1fr;
+    gap: 7px;
+    padding: 8px;
+  }
+
+  .erp-workspace-main .pos-invoice-customer-row > label {
+    grid-template-rows: 19px 40px;
+  }
+}
