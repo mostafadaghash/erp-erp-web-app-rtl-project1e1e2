@@ -20,6 +20,7 @@ import { EmployeesPage } from "./EmployeesPage";
 import { ExpensesPage } from "./ExpensesPage";
 import { GeneralLedgerPage } from "./GeneralLedgerPage";
 import { InvoicesPage } from "./InvoicesPage";
+import { NewCustomerPage } from "./NewCustomerPage";
 import { NewInvoicePage } from "./NewInvoicePage";
 import { NewPurchaseInvoicePage } from "./NewPurchaseInvoicePage";
 import { OrdersPage } from "./OrdersPage";
@@ -41,7 +42,7 @@ import { VouchersPage } from "./VouchersPage";
 import type { ReportKind } from "./ReportsPage";
 
 export type Page =
-  | "dashboard" | "products" | "inventory" | "customers" | "invoices" | "sales-returns" | "quotes" | "credit-invoices"
+  | "dashboard" | "products" | "inventory" | "customers" | "new-customer" | "invoices" | "sales-returns" | "quotes" | "credit-invoices"
   | "new-invoice" | "new-purchase-invoice" | "repairs" | "expenses" | "suppliers" | "orders"
   | "deliveries" | "shipments" | "branches" | "employees" | "crm"
   | "reports" | "settings" | "audit-logs" | "accounts-home" | "treasury"
@@ -52,6 +53,7 @@ const PAGE_PERMISSIONS: Partial<Record<Page, Permission>> = {
   products: "view_products",
   inventory: "view_products",
   customers: "view_customers",
+  "new-customer": "create_customers",
   invoices: "view_invoices",
   "sales-returns": "view_sales_returns",
   "new-invoice": "create_invoices",
@@ -104,7 +106,8 @@ const PAGE_META: Record<Page, { group: string; title: string }> = {
   dashboard: { group: "لوحة التحكم", title: "لوحة التحكم" },
   products: { group: "المخزون", title: "الأصناف والمخزون" },
   inventory: { group: "المخزون", title: "إدارة المخزون" },
-  customers: { group: "المبيعات", title: "العملاء" },
+  customers: { group: "العملاء", title: "قائمة العملاء" },
+  "new-customer": { group: "العملاء", title: "إضافة عميل جديد" },
   invoices: { group: "المبيعات", title: "المبيعات" },
   "sales-returns": { group: "المبيعات", title: "مرتجعات المبيعات" },
   "new-invoice": { group: "المبيعات", title: "فاتورة بيع جديدة" },
@@ -240,6 +243,10 @@ export function ERPApp() {
   };
 
   const requestCreate = (page: CreateTarget, nextVoucherKind?: "receipt" | "disbursement") => {
+    if (page === "customers") {
+      if (!canAccessPage("new-customer")) return;
+      return navigate("new-customer");
+    }
     if (!canAccessPage(page)) return;
     if (page === "new-invoice" || page === "new-purchase-invoice") return navigate(page);
     if (nextVoucherKind) setVoucherKind(nextVoucherKind);
@@ -391,7 +398,8 @@ export function ERPApp() {
             {authorized && currentPage === "accounts-home" && <AccountsHubPage onNavigate={navigate} permissions={permissions} />}
             {authorized && currentPage === "products" && <ProductsPage createRequestToken={createToken("products")} />}
             {authorized && currentPage === "inventory" && <InventoryWorkspacePage createRequestToken={createToken("inventory")} />}
-            {authorized && currentPage === "customers" && <CustomersPage onOpenLedger={openCustomerLedger} createRequestToken={createToken("customers")} />}
+            {authorized && currentPage === "customers" && <CustomersPage onOpenLedger={openCustomerLedger} onCreateCustomer={() => navigate("new-customer")} createRequestToken={createToken("customers")} />}
+            {authorized && currentPage === "new-customer" && <NewCustomerPage onClose={() => navigate("customers")} />}
             {authorized && currentPage === "invoices" && <InvoicesPage onNavigate={navigate} view="sales" />}
             {authorized && currentPage === "sales-returns" && <InvoicesPage onNavigate={navigate} view="returns" />}
             {authorized && currentPage === "credit-invoices" && <InvoicesPage onNavigate={navigate} view="sales" creditOnly />}
