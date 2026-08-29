@@ -20,6 +20,7 @@ import {
   ShoppingBag,
   Truck,
   UserCog,
+  UserPlus,
   Users,
   Wrench,
   X,
@@ -68,6 +69,7 @@ const PAGE_IDS = new Set<Page>([
   "products",
   "inventory",
   "customers",
+  "new-customer",
   "invoices",
   "sales-returns",
   "quotes",
@@ -117,7 +119,10 @@ const NAV_GROUPS: NavGroup[] = [
     key: "customers",
     label: "العملاء",
     icon: Users,
-    items: [{ id: "customers", label: "قائمة العملاء", icon: Users, permission: "view_customers" }],
+    items: [
+      { id: "new-customer", label: "إضافة عميل", icon: UserPlus, permission: "create_customers" },
+      { id: "customers", label: "قائمة العملاء", icon: Users, permission: "view_customers" },
+    ],
   },
   {
     key: "purchases",
