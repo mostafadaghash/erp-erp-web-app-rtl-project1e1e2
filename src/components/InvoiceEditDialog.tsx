@@ -28,6 +28,7 @@ export function InvoiceEditDialog({ invoice, onClose, onSaved }: InvoiceEditDial
   const { formatCurrency, formatAmount } = useCurrency();
   const requestId = useRef(crypto.randomUUID());
   const [saving, setSaving] = useState(false);
+  const [reason, setReason] = useState("");
   const [lines, setLines] = useState<EditableLine[]>(() =>
     invoice.items.map((item) => ({
       productId: item.productId,
@@ -77,6 +78,7 @@ export function InvoiceEditDialog({ invoice, onClose, onSaved }: InvoiceEditDial
 
   const save = async () => {
     if (saving || blockedReason) return;
+    if (!reason.trim()) return void toast.error("اكتب سبب التعديل");
     if (lines.some((line) => !Number.isInteger(line.quantity) || line.quantity <= 0)) {
       return toast.error("راجع الكميات؛ يجب أن تكون أرقاماً صحيحة أكبر من صفر");
     }
@@ -95,6 +97,7 @@ export function InvoiceEditDialog({ invoice, onClose, onSaved }: InvoiceEditDial
           unitPrice: line.unitPrice,
           discount: line.discount,
         })),
+        reason: reason.trim(),
         date: new Date().toISOString().slice(0, 10),
         requestId: requestId.current,
       });
@@ -124,7 +127,7 @@ export function InvoiceEditDialog({ invoice, onClose, onSaved }: InvoiceEditDial
 
         <div className="overflow-y-auto p-5">
           <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-            يمكنك تغيير <strong>الكمية</strong> و<strong>سعر الوحدة</strong> أو حذف صنف. عند الحفظ يتم تصحيح المخزون ورصيد العميل تلقائياً مع تسجيل التعديل في سجل المراجعة.
+            يمكنك تغيير <strong>الكمية</strong> و<strong>سعر الوحدة</strong> أو حذف صنف. عند الحفظ يتم تصحيح المخزون ورصيد العميل تلقائياً مع تسجيل سبب التعديل في سجل المراجعة.
           </div>
 
           {hasReturn && (
@@ -191,10 +194,22 @@ export function InvoiceEditDialog({ invoice, onClose, onSaved }: InvoiceEditDial
           </div>
 
           <div className="mt-4 grid gap-4 lg:grid-cols-[1fr_340px]">
-            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+            <div className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
               <p><strong>المدفوع يظل كما هو:</strong> {formatCurrency(invoice.paid)}</p>
-              <p className="mt-2">الخصم العام المسجل يظل كما هو: {formatCurrency(invoice.discount)}</p>
-              <p className="mt-2">إذا أصبح الإجمالي الجديد أقل من المبلغ المحصل، سيطلب النظام استرداد الفرق أولاً.</p>
+              <p>الخصم العام المسجل يظل كما هو: {formatCurrency(invoice.discount)}</p>
+              <p>إذا أصبح الإجمالي الجديد أقل من المبلغ المحصل، سيطلب النظام استرداد الفرق أولاً.</p>
+              <label className="block">
+                <span className="form-label">سبب التعديل *</span>
+                <textarea
+                  data-testid="invoice-edit-reason"
+                  className="form-input"
+                  rows={3}
+                  value={reason}
+                  disabled={saving || hasReturn}
+                  onChange={(event) => setReason(event.target.value)}
+                  placeholder="مثال: تصحيح كمية أو سعر تم إدخاله بالخطأ"
+                />
+              </label>
             </div>
             <dl className="space-y-2 rounded-xl border border-slate-200 bg-white p-4 text-sm">
               <div className="flex justify-between"><dt>المجموع الفرعي الجديد</dt><dd className="font-bold">{formatCurrency(summary.subtotal)}</dd></div>
@@ -212,7 +227,7 @@ export function InvoiceEditDialog({ invoice, onClose, onSaved }: InvoiceEditDial
 
         <footer className="flex items-center justify-end gap-3 border-t border-slate-200 bg-slate-50 px-5 py-4">
           <button type="button" className="btn-secondary" onClick={onClose} disabled={saving}>إلغاء</button>
-          <button type="button" data-testid="invoice-edit-save" className="btn-primary flex items-center gap-2" onClick={() => void save()} disabled={saving || Boolean(blockedReason)}>
+          <button type="button" data-testid="invoice-edit-save" className="btn-primary flex items-center gap-2" onClick={() => void save()} disabled={saving || Boolean(blockedReason) || !reason.trim()}>
             <Save className="h-4 w-4" />
             {saving ? "جارٍ حفظ التعديل..." : "حفظ التعديلات"}
           </button>

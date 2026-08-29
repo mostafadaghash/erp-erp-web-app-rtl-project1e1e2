@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, usePaginatedQuery, useQuery } from "convex/react";
-import { PackageOpen, Printer, RotateCcw, Undo2 } from "lucide-react";
+import { PackageOpen, Pencil, Printer, RotateCcw, Undo2 } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
@@ -12,6 +12,7 @@ import {
 } from "../../shared/purchaseReturnRules";
 import { usePermission } from "../lib/access";
 import { getErrorMessage } from "../lib/errors";
+import { PurchaseReturnEditDialog } from "./PurchaseReturnEditDialog";
 
 const newRequestId = () => crypto.randomUUID();
 const today = () => new Date().toISOString().slice(0, 10);
@@ -91,6 +92,7 @@ export function PurchaseReturnsPage() {
   const create = useMutation(api.purchaseReturns.create);
   const reverse = useMutation(api.purchaseReturns.reverse);
   const [reverseRow, setReverseRow] = useState<(typeof returns.results)[number] | null>(null);
+  const [editRow, setEditRow] = useState<(typeof returns.results)[number] | null>(null);
   const [reversalReason, setReversalReason] = useState("");
   const [reversalDate, setReversalDate] = useState(today());
   const [printId, setPrintId] = useState<Id<"purchaseReturns"> | null>(null);
@@ -266,18 +268,26 @@ export function PurchaseReturnsPage() {
       )}
 
       <section className="erp-section">
-        <div className="erp-section-header"><h2 className="erp-section-title">سجل مرتجعات المشتريات</h2><span className="text-xs text-slate-500">يمكن طباعة المستند أو عكسه حسب الصلاحيات.</span></div>
+        <div className="erp-section-header"><h2 className="erp-section-title">سجل مرتجعات المشتريات</h2><span className="text-xs text-slate-500">يمكن طباعة المستند أو تصحيحه أو عكسه حسب الصلاحيات.</span></div>
         <div className="overflow-x-auto">
           <table className="data-table">
             <thead><tr><th>رقم الإشعار</th><th>المورد</th><th>الفرع</th><th>التاريخ</th><th>الإجمالي</th><th>الحالة</th><th>الإجراءات</th></tr></thead>
             <tbody>
-              {returns.results.map((row) => <tr key={row._id}><td className="font-mono font-black text-blue-700">{row.returnNumber}</td><td>{row.supplierName}</td><td>{branches.find((branch) => branch._id === row.branchId)?.name ?? "الفرع الحالي"}</td><td>{row.date}</td><td className="font-black">{money(row.totalCredit)}</td><td><span className={`badge ${row.status === "posted" ? "badge-success" : "badge-danger"}`}>{row.status === "posted" ? "مرحل" : "معكوس"}</span></td><td><div className="flex gap-1">{canPrint && <button className="erp-action" onClick={() => handlePrint(row._id)}><Printer className="h-4 w-4" />طباعة</button>}{row.status === "posted" && canReverse && canReverseFinance && <button className="erp-action erp-action-danger" disabled={busy} onClick={() => openReverse(row)}><RotateCcw className="h-4 w-4" />عكس</button>}</div></td></tr>)}
+              {returns.results.map((row) => <tr key={row._id}><td className="font-mono font-black text-blue-700">{row.returnNumber}</td><td>{row.supplierName}</td><td>{branches.find((branch) => branch._id === row.branchId)?.name ?? "الفرع الحالي"}</td><td>{row.date}</td><td className="font-black">{money(row.totalCredit)}</td><td><span className={`badge ${row.status === "posted" ? "badge-success" : "badge-danger"}`}>{row.status === "posted" ? "مرحل" : "معكوس"}</span></td><td><div className="flex gap-1">{canPrint && <button className="erp-action" onClick={() => handlePrint(row._id)}><Printer className="h-4 w-4" />طباعة</button>}{canCreate && row.status === "posted" && <button data-testid="purchase-return-edit-open" className="erp-action erp-action-primary" onClick={() => setEditRow(row)}><Pencil className="h-4 w-4" />تعديل</button>}{row.status === "posted" && canReverse && canReverseFinance && <button className="erp-action erp-action-danger" disabled={busy} onClick={() => openReverse(row)}><RotateCcw className="h-4 w-4" />عكس</button>}</div></td></tr>)}
               {returns.results.length === 0 && <tr><td colSpan={7} className="py-10 text-center text-slate-500">لا توجد مرتجعات مشتريات في الفرع المحدد.</td></tr>}
             </tbody>
           </table>
         </div>
         {returns.status === "CanLoadMore" && <div className="border-t border-slate-300 p-3 text-center"><button className="erp-action" onClick={() => returns.loadMore(20)}>تحميل المزيد</button></div>}
       </section>
+
+      {editRow && (
+        <PurchaseReturnEditDialog
+          row={editRow}
+          onClose={() => setEditRow(null)}
+          onSaved={() => setEditRow(null)}
+        />
+      )}
 
       {reverseRow && (
         <div className="fixed inset-0 z-50 grid place-items-center bg-black/50 p-4">

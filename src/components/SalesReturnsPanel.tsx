@@ -5,32 +5,216 @@ import type { Id } from "../../convex/_generated/dataModel";
 import { usePermission } from "../lib/access";
 import { getErrorMessage } from "../lib/errors";
 import { toast } from "sonner";
-import { Printer, RotateCcw } from "lucide-react";
+import { Pencil, Printer, RotateCcw } from "lucide-react";
+import { SalesReturnEditDialog } from "./SalesReturnEditDialog";
 
 type EligibleInvoice = NonNullable<ReturnType<typeof useQuery<typeof api.salesReturns.eligibleInvoices>>>[number];
 
 export function SalesReturnsPanel() {
-  const canView = usePermission("view_sales_returns"), canCreate = usePermission("create_sales_returns"), canPrint = usePermission("print_credit_notes"), canRefund = usePermission("refund_collections"), canReverse = usePermission("reverse_financial_transactions");
+  const canView = usePermission("view_sales_returns");
+  const canCreate = usePermission("create_sales_returns");
+  const canPrint = usePermission("print_credit_notes");
+  const canRefund = usePermission("refund_collections");
+  const canReverse = usePermission("reverse_financial_transactions");
   const notes = useQuery(api.salesReturns.list, canView ? {} : "skip");
   const eligible = useQuery(api.salesReturns.eligibleInvoices, canCreate ? {} : "skip") ?? [];
   const accounts = useQuery(api.finance.collectionAccountPicker, canCreate && canRefund ? {} : "skip") ?? [];
-  const createReturn = useMutation(api.salesReturns.create), reverseReturn = useMutation(api.salesReturns.reverse);
-  const [invoice, setInvoice] = useState<EligibleInvoice | null>(null), [quantities, setQuantities] = useState<Record<string, number>>({}), [reason, setReason] = useState(""), [date, setDate] = useState(new Date().toISOString().slice(0, 10)), [accountId, setAccountId] = useState<Id<"financialAccounts"> | "">("");
-  const [busy, setBusy] = useState(false), [printId, setPrintId] = useState<Id<"salesReturns"> | null>(null), [reverseId, setReverseId] = useState<Id<"salesReturns"> | null>(null), [reverseReason, setReverseReason] = useState(""), [reverseDate, setReverseDate] = useState(new Date().toISOString().slice(0, 10));
-  const requestId = useRef(crypto.randomUUID()), reversalRequestId = useRef(crypto.randomUUID());
+  const createReturn = useMutation(api.salesReturns.create);
+  const reverseReturn = useMutation(api.salesReturns.reverse);
+  const [invoice, setInvoice] = useState<EligibleInvoice | null>(null);
+  const [quantities, setQuantities] = useState<Record<string, number>>({});
+  const [reason, setReason] = useState("");
+  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+  const [accountId, setAccountId] = useState<Id<"financialAccounts"> | "">("");
+  const [busy, setBusy] = useState(false);
+  const [printId, setPrintId] = useState<Id<"salesReturns"> | null>(null);
+  const [reverseId, setReverseId] = useState<Id<"salesReturns"> | null>(null);
+  const [reverseReason, setReverseReason] = useState("");
+  const [reverseDate, setReverseDate] = useState(new Date().toISOString().slice(0, 10));
+  const [editNote, setEditNote] = useState<NonNullable<typeof notes>[number] | null>(null);
+  const requestId = useRef(crypto.randomUUID());
+  const reversalRequestId = useRef(crypto.randomUUID());
   const printable = useQuery(api.salesReturns.getForPrint, canPrint && printId ? { id: printId } : "skip");
-  const preview = useMemo(() => !invoice ? 0 : invoice.items.reduce((sum, item) => sum + item.lineNetTotal * (quantities[String(item.productId)] ?? 0) / item.originalQuantity, 0), [invoice, quantities]);
-  const debtReduction = Math.min(invoice?.remaining ?? 0, preview), cashRefund = Math.max(0, preview - debtReduction);
-  const start = (value: EligibleInvoice) => { setInvoice(value); setQuantities({}); setReason(""); setAccountId(""); requestId.current = crypto.randomUUID(); };
-  const submit = async (event: React.FormEvent) => { event.preventDefault(); if (!invoice || busy) return; setBusy(true); try { await createReturn({ invoiceId: invoice.invoiceId, items: invoice.items.map(item => ({ productId: item.productId, quantity: quantities[String(item.productId)] ?? 0 })).filter(item => item.quantity > 0), reason, date, requestId: requestId.current, accountId: accountId || undefined }); toast.success("تم إنشاء الإشعار الدائن وإعادة المخزون"); setInvoice(null); requestId.current = crypto.randomUUID(); } catch (error) { toast.error(getErrorMessage(error, "تعذر إنشاء المرتجع")); } finally { setBusy(false); } };
-  const submitReverse = async (event: React.FormEvent) => { event.preventDefault(); if (!reverseId || busy || !reverseReason.trim()) return; setBusy(true); try { await reverseReturn({ id: reverseId, reason: reverseReason.trim(), date: reverseDate, requestId: reversalRequestId.current }); toast.success("تم عكس الإشعار الدائن"); setReverseId(null); reversalRequestId.current = crypto.randomUUID(); } catch (error) { toast.error(getErrorMessage(error, "تعذر عكس الإشعار")); } finally { setBusy(false); } };
+
+  const preview = useMemo(
+    () => !invoice ? 0 : invoice.items.reduce(
+      (sum, item) => sum + item.lineNetTotal * (quantities[String(item.productId)] ?? 0) / item.originalQuantity,
+      0,
+    ),
+    [invoice, quantities],
+  );
+  const debtReduction = Math.min(invoice?.remaining ?? 0, preview);
+  const cashRefund = Math.max(0, preview - debtReduction);
+
+  const start = (value: EligibleInvoice) => {
+    setInvoice(value);
+    setQuantities({});
+    setReason("");
+    setAccountId("");
+    requestId.current = crypto.randomUUID();
+  };
+
+  const submit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!invoice || busy) return;
+    setBusy(true);
+    try {
+      await createReturn({
+        invoiceId: invoice.invoiceId,
+        items: invoice.items
+          .map((item) => ({ productId: item.productId, quantity: quantities[String(item.productId)] ?? 0 }))
+          .filter((item) => item.quantity > 0),
+        reason,
+        date,
+        requestId: requestId.current,
+        accountId: accountId || undefined,
+      });
+      toast.success("تم إنشاء الإشعار الدائن وإعادة المخزون");
+      setInvoice(null);
+      requestId.current = crypto.randomUUID();
+    } catch (error) {
+      toast.error(getErrorMessage(error, "تعذر إنشاء المرتجع"));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const submitReverse = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!reverseId || busy || !reverseReason.trim()) return;
+    setBusy(true);
+    try {
+      await reverseReturn({
+        id: reverseId,
+        reason: reverseReason.trim(),
+        date: reverseDate,
+        requestId: reversalRequestId.current,
+      });
+      toast.success("تم عكس الإشعار الدائن");
+      setReverseId(null);
+      reversalRequestId.current = crypto.randomUUID();
+    } catch (error) {
+      toast.error(getErrorMessage(error, "تعذر عكس الإشعار"));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   if (!canView && !canCreate) return null;
-  return <section className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4" dir="rtl">
-    <h2 className="flex items-center gap-2 text-lg font-black"><RotateCcw className="h-5 w-5 text-indigo-600"/> الإشعارات الدائنة ومرتجعات البيع</h2>
-    {notes === undefined && canView ? <p>جارٍ تحميل الإشعارات...</p> : notes?.map(note => <div key={note._id} className="flex items-center justify-between rounded-xl bg-slate-50 p-3 text-sm"><div><b>{note.creditNoteNumber}</b> — {note.invoiceNumber} {note.status === "reversed" && <strong className="text-red-700">(معكوس)</strong>}<p>{note.totalCredit.toLocaleString("ar-EG")} ج.م · {note.reason}</p></div><div className="flex gap-1">{canPrint && <button aria-label="طباعة إشعار دائن" onClick={() => setPrintId(note._id)}><Printer className="h-4 w-4"/></button>}{canCreate && canReverse && note.status === "posted" && <button onClick={() => { setReverseId(note._id); setReverseReason(""); reversalRequestId.current = crypto.randomUUID(); }} className="rounded bg-red-50 px-2 py-1 text-red-700">عكس الإشعار الدائن</button>}</div></div>)}
-    {canCreate && <div><p className="mb-2 text-sm font-bold">ابدأ مرتجعاً من فاتورة مؤهلة:</p><div className="flex flex-wrap gap-2">{eligible.map(value => <button key={value.invoiceId} data-testid="sales-return-start" data-invoice-number={value.invoiceNumber} onClick={() => start(value)} className="rounded-lg bg-indigo-50 px-3 py-2 text-xs font-bold text-indigo-700">{value.invoiceNumber} — {value.customerName}</button>)}</div></div>}
-    {invoice && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"><form data-testid="sales-return-form" onSubmit={submit} className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-6"><h3 className="text-xl font-black">مرتجع الفاتورة {invoice.invoiceNumber}</h3><p className="text-sm text-slate-500">المعاينة إرشادية فقط؛ الخادم مصدر الحقيقة.</p>{invoice.items.map(item => <label key={String(item.productId)} className="my-3 grid grid-cols-4 items-center gap-3 rounded-xl bg-slate-50 p-3"><span>{item.productName}</span><span className="text-xs">الأصلية: {item.originalQuantity}</span><span className="text-xs">المرتجع سابقًا: {item.returnedQuantity}<br/>المتاح حاليًا: {item.availableQuantity}</span><input aria-label={`كمية إرجاع ${item.productName}`} className="form-input" type="number" min="0" max={item.availableQuantity} step="1" value={quantities[String(item.productId)] ?? 0} onChange={event => setQuantities(value => ({ ...value, [String(item.productId)]: Math.min(item.availableQuantity, Math.max(0, Number(event.target.value))) }))}/></label>)}<label className="form-label">سبب المرتجع *</label><textarea data-testid="sales-return-reason" className="form-input" required value={reason} onChange={event => setReason(event.target.value)}/><label className="form-label mt-3">تاريخ العملية</label><input className="form-input" type="date" required value={date} onChange={event => setDate(event.target.value)}/><p className="my-4">الائتمان {preview.toFixed(2)} · خفض المديونية {debtReduction.toFixed(2)} · رد نقدي {cashRefund.toFixed(2)}</p>{cashRefund > 0 && <select required className="form-input" value={accountId} onChange={event => setAccountId(event.target.value as Id<"financialAccounts">)}><option value="">اختر حساب الاسترداد</option>{accounts.map(account => <option key={account._id} value={account._id}>{account.name}</option>)}</select>}<div className="mt-5 flex gap-3"><button data-testid="sales-return-submit" disabled={busy || !reason.trim()} className="btn-primary flex-1">{busy ? "جارٍ التنفيذ..." : "إنشاء الإشعار الدائن"}</button><button type="button" disabled={busy} className="btn-secondary" onClick={() => setInvoice(null)}>إلغاء</button></div></form></div>}
-    {reverseId && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"><form onSubmit={submitReverse} className="w-full max-w-md rounded-2xl bg-white p-6"><h3 className="text-lg font-black">عكس الإشعار الدائن</h3><p className="my-3 rounded bg-red-50 p-3 text-sm text-red-700">سيتم عكس المخزون والفاتورة والعميل والحساب المالي.</p><textarea required className="form-input" placeholder="سبب العكس" value={reverseReason} onChange={e => setReverseReason(e.target.value)}/><input required type="date" className="form-input mt-3" value={reverseDate} onChange={e => setReverseDate(e.target.value)}/><button disabled={busy || !reverseReason.trim()} className="btn-primary mt-4">{busy ? "جارٍ العكس..." : "تأكيد العكس"}</button><button type="button" disabled={busy} className="btn-secondary mr-2" onClick={() => setReverseId(null)}>إلغاء</button></form></div>}
-    {printId && printable && <div className="fixed inset-0 z-50 bg-white p-8"><div className="mx-auto max-w-2xl border p-8"><h1 className="text-center text-2xl font-black">إشعار دائن {printable.status === "reversed" && <span className="text-red-700">— معكوس</span>}</h1><p>رقم: {printable.creditNoteNumber}</p><p>الفاتورة: {printable.invoiceNumber}</p><p>العميل: {printable.customerName}</p><p>الإجمالي: {printable.totalCredit} ج.م</p><button className="btn-primary mt-6 print:hidden" onClick={() => window.print()}>طباعة</button><button className="btn-secondary mr-2 print:hidden" onClick={() => setPrintId(null)}>إغلاق</button></div></div>}
-  </section>;
+
+  return (
+    <section className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4" dir="rtl">
+      <h2 className="flex items-center gap-2 text-lg font-black"><RotateCcw className="h-5 w-5 text-indigo-600" /> الإشعارات الدائنة ومرتجعات البيع</h2>
+
+      {notes === undefined && canView ? (
+        <p>جارٍ تحميل الإشعارات...</p>
+      ) : notes?.map((note) => (
+        <div key={note._id} className="flex items-center justify-between rounded-xl bg-slate-50 p-3 text-sm">
+          <div>
+            <b>{note.creditNoteNumber}</b> — {note.invoiceNumber} {note.status === "reversed" && <strong className="text-red-700">(معكوس)</strong>}
+            <p>{note.totalCredit.toLocaleString("ar-EG")} ج.م · {note.reason}</p>
+          </div>
+          <div className="flex gap-1">
+            {canPrint && <button aria-label="طباعة إشعار دائن" onClick={() => setPrintId(note._id)}><Printer className="h-4 w-4" /></button>}
+            {canCreate && note.status === "posted" && (
+              <button
+                type="button"
+                data-testid="sales-return-edit-open"
+                onClick={() => setEditNote(note)}
+                className="rounded bg-emerald-50 px-2 py-1 text-emerald-700"
+                title="تعديل الكمية أو قيمة المرتجع"
+              >
+                <Pencil className="ml-1 inline h-4 w-4" />تعديل
+              </button>
+            )}
+            {canCreate && canReverse && note.status === "posted" && (
+              <button
+                onClick={() => {
+                  setReverseId(note._id);
+                  setReverseReason("");
+                  reversalRequestId.current = crypto.randomUUID();
+                }}
+                className="rounded bg-red-50 px-2 py-1 text-red-700"
+              >
+                عكس الإشعار الدائن
+              </button>
+            )}
+          </div>
+        </div>
+      ))}
+
+      {canCreate && (
+        <div>
+          <p className="mb-2 text-sm font-bold">ابدأ مرتجعاً من فاتورة مؤهلة:</p>
+          <div className="flex flex-wrap gap-2">
+            {eligible.map((value) => (
+              <button key={value.invoiceId} data-testid="sales-return-start" data-invoice-number={value.invoiceNumber} onClick={() => start(value)} className="rounded-lg bg-indigo-50 px-3 py-2 text-xs font-bold text-indigo-700">
+                {value.invoiceNumber} — {value.customerName}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {invoice && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <form data-testid="sales-return-form" onSubmit={submit} className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-6">
+            <h3 className="text-xl font-black">مرتجع الفاتورة {invoice.invoiceNumber}</h3>
+            <p className="text-sm text-slate-500">المعاينة إرشادية فقط؛ الخادم مصدر الحقيقة.</p>
+            {invoice.items.map((item) => (
+              <label key={String(item.productId)} className="my-3 grid grid-cols-4 items-center gap-3 rounded-xl bg-slate-50 p-3">
+                <span>{item.productName}</span>
+                <span className="text-xs">الأصلية: {item.originalQuantity}</span>
+                <span className="text-xs">المرتجع سابقًا: {item.returnedQuantity}<br />المتاح حاليًا: {item.availableQuantity}</span>
+                <input aria-label={`كمية إرجاع ${item.productName}`} className="form-input" type="number" min="0" max={item.availableQuantity} step="1" value={quantities[String(item.productId)] ?? 0} onChange={(event) => setQuantities((value) => ({ ...value, [String(item.productId)]: Math.min(item.availableQuantity, Math.max(0, Number(event.target.value))) }))} />
+              </label>
+            ))}
+            <label className="form-label">سبب المرتجع *</label>
+            <textarea data-testid="sales-return-reason" className="form-input" required value={reason} onChange={(event) => setReason(event.target.value)} />
+            <label className="form-label mt-3">تاريخ العملية</label>
+            <input className="form-input" type="date" required value={date} onChange={(event) => setDate(event.target.value)} />
+            <p className="my-4">الائتمان {preview.toFixed(2)} · خفض المديونية {debtReduction.toFixed(2)} · رد نقدي {cashRefund.toFixed(2)}</p>
+            {cashRefund > 0 && (
+              <select required className="form-input" value={accountId} onChange={(event) => setAccountId(event.target.value as Id<"financialAccounts">)}>
+                <option value="">اختر حساب الاسترداد</option>
+                {accounts.map((account) => <option key={account._id} value={account._id}>{account.name}</option>)}
+              </select>
+            )}
+            <div className="mt-5 flex gap-3"><button data-testid="sales-return-submit" disabled={busy || !reason.trim()} className="btn-primary flex-1">{busy ? "جارٍ التنفيذ..." : "إنشاء الإشعار الدائن"}</button><button type="button" disabled={busy} className="btn-secondary" onClick={() => setInvoice(null)}>إلغاء</button></div>
+          </form>
+        </div>
+      )}
+
+      {reverseId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <form onSubmit={submitReverse} className="w-full max-w-md rounded-2xl bg-white p-6">
+            <h3 className="text-lg font-black">عكس الإشعار الدائن</h3>
+            <p className="my-3 rounded bg-red-50 p-3 text-sm text-red-700">سيتم عكس المخزون والفاتورة والعميل والحساب المالي.</p>
+            <textarea required className="form-input" placeholder="سبب العكس" value={reverseReason} onChange={(event) => setReverseReason(event.target.value)} />
+            <input required type="date" className="form-input mt-3" value={reverseDate} onChange={(event) => setReverseDate(event.target.value)} />
+            <button disabled={busy || !reverseReason.trim()} className="btn-primary mt-4">{busy ? "جارٍ العكس..." : "تأكيد العكس"}</button>
+            <button type="button" disabled={busy} className="btn-secondary mr-2" onClick={() => setReverseId(null)}>إلغاء</button>
+          </form>
+        </div>
+      )}
+
+      {editNote && (
+        <SalesReturnEditDialog
+          note={editNote}
+          onClose={() => setEditNote(null)}
+          onSaved={() => setEditNote(null)}
+        />
+      )}
+
+      {printId && printable && (
+        <div className="fixed inset-0 z-50 bg-white p-8">
+          <div className="mx-auto max-w-2xl border p-8">
+            <h1 className="text-center text-2xl font-black">إشعار دائن {printable.status === "reversed" && <span className="text-red-700">— معكوس</span>}</h1>
+            <p>رقم: {printable.creditNoteNumber}</p><p>الفاتورة: {printable.invoiceNumber}</p><p>العميل: {printable.customerName}</p><p>الإجمالي: {printable.totalCredit} ج.م</p>
+            <button className="btn-primary mt-6 print:hidden" onClick={() => window.print()}>طباعة</button><button className="btn-secondary mr-2 print:hidden" onClick={() => setPrintId(null)}>إغلاق</button>
+          </div>
+        </div>
+      )}
+    </section>
+  );
 }

@@ -137,11 +137,18 @@ export const updateItems = mutation({
       unitPrice: v.number(),
       discount: v.number(),
     })),
+    reason: v.string(),
     date: v.string(),
     requestId: v.string(),
   },
   handler: async (ctx, args) => {
     const user = await requireModulePermission(ctx, "edit_invoices", "invoices");
+    const reason = args.reason.trim();
+    if (!reason) throw new ConvexError("سبب التعديل مطلوب");
+    if (reason.length > 500) throw new ConvexError("سبب التعديل طويل جداً");
+    const requestId = args.requestId.trim();
+    if (!requestId || requestId.length > 200) throw new ConvexError("معرف طلب التعديل غير صالح");
+
     const invoice = await ctx.db.get(args.invoiceId);
     if (!invoice || !invoice.branchId) throw new ConvexError("الفاتورة غير موجودة");
     assertBranchAccess(user, invoice);
@@ -170,7 +177,7 @@ export const updateItems = mutation({
         quantityDelta: item.quantity,
         unitCost: item.unitCost,
         type: INVENTORY_MOVEMENT_TYPES.saleReversal,
-        reason: `عكس مخزون تعديل الفاتورة ${invoice.invoiceNumber}`,
+        reason: `عكس مخزون تعديل الفاتورة ${invoice.invoiceNumber}: ${reason}`,
         referenceId: String(invoice._id),
         referenceType: "invoice",
       });
@@ -182,7 +189,7 @@ export const updateItems = mutation({
         quantityDelta: -item.quantity,
         unitCost: item.unitCost,
         type: INVENTORY_MOVEMENT_TYPES.sale,
-        reason: `بيع بعد تعديل الفاتورة ${invoice.invoiceNumber}`,
+        reason: `بيع بعد تعديل الفاتورة ${invoice.invoiceNumber}: ${reason}`,
         referenceId: String(invoice._id),
         referenceType: "invoice",
       });
@@ -216,14 +223,14 @@ export const updateItems = mutation({
       if (totalDelta !== 0) {
         await postCustomerLedgerEntry(ctx, user, {
           type: "invoice_adjustment",
-          requestId: args.requestId,
+          requestId,
           customerId: invoice.customerId,
           branchId: invoice.branchId,
           date: args.date,
           receivableDelta: totalDelta,
           advanceDelta: 0,
           purchasesDelta: totalDelta,
-          description: `تعديل أصناف الفاتورة ${invoice.invoiceNumber}`,
+          description: `تصحيح أصناف الفاتورة ${invoice.invoiceNumber}: ${reason}`,
           referenceType: "invoice",
           referenceId: String(invoice._id),
           referenceNumber: invoice.invoiceNumber,
@@ -236,7 +243,7 @@ export const updateItems = mutation({
       module: "invoices",
       recordId: String(invoice._id),
       recordLabel: invoice.invoiceNumber,
-      details: `تعديل كميات/أسعار أصناف الفاتورة ${invoice.invoiceNumber}`,
+      details: `تعديل كميات/أسعار أصناف الفاتورة ${invoice.invoiceNumber}: ${reason}`,
       branchId: invoice.branchId,
       sourceType: "invoice",
       sourceId: String(invoice._id),
@@ -244,12 +251,14 @@ export const updateItems = mutation({
       relatedType: invoice.customerId ? "customer" : undefined,
       relatedId: invoice.customerId ? String(invoice.customerId) : undefined,
       before: {
+        requestId,
         total: previousTotal,
         paid: invoice.paid,
         remaining: invoice.remaining,
         itemCount: invoice.items.length,
       },
       after: {
+        correctionReason: reason,
         total: prepared.total,
         paid: prepared.paid,
         remaining: prepared.remaining,
