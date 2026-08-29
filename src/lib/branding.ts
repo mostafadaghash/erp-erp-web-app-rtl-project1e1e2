@@ -4,8 +4,8 @@ export const DEFAULT_BRAND = {
   storeName: "DAGHASH ERP",
   shortName: "DAGHASH",
   tagline: "إدارة أعمالك بوضوح",
-  primaryColor: "#4f46e5",
-  secondaryColor: "#7c3aed",
+  primaryColor: "#16a66a",
+  secondaryColor: "#12263a",
 } as const;
 
 export interface BrandingSettings {

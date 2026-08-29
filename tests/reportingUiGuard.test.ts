@@ -14,7 +14,7 @@ const reports = readFileSync(
   new URL("../src/components/ReportsPage.tsx", import.meta.url),
   "utf8",
 );
-const dashboard = readFileSync(
+const home = readFileSync(
   new URL("../src/components/Dashboard.tsx", import.meta.url),
   "utf8",
 );
@@ -48,21 +48,24 @@ test("accounting reports cannot regress to client-side list aggregation", () => 
   assert.match(reports, /api\.reporting\.overview/);
 });
 
-test("dashboard accounting cannot regress to duplicate invoice statistics", () => {
-  assert.doesNotMatch(dashboard, /invoiceStats|expenseStats|إجمالي المبيعات المدفوعة/);
-  assert.equal((dashboard.match(/title: "مستحقات العملاء"/g) ?? []).length, 1);
-  assert.match(dashboard, /api\.reporting\.overview/);
+test("dashboard remains a compact reporting summary", () => {
+  assert.match(home, /api\.reporting\.overview/);
+  assert.equal((home.match(/key: "/g) ?? []).length, 8);
+  assert.match(home, /erp-dashboard-card-grid/);
+  assert.doesNotMatch(home, /أحدث فواتير المبيعات|<table/);
 });
 
-test("profit and inventory presentation remains permission aware", () => {
+test("profit inventory and report access remain permission aware", () => {
   assert.match(reports, /canViewProfits/);
   assert.match(reports, /profitabilityAvailable/);
   assert.match(reports, /inventoryValue !== undefined/);
-  assert.match(dashboard, /canViewProfits && report\.profitability/);
+  assert.match(home, /canViewProfits = permissions\.includes\("view_profits"\)/);
+  assert.match(home, /canViewProducts = permissions\.includes\("view_products"\)/);
+  assert.match(home, /canViewReports = permissions\.includes\("view_reports"\)/);
 });
 
-test("reporting UI and backend branch picker remain read-only and typed", () => {
-  for (const source of [reports, dashboard]) {
+test("reporting UI and home launcher remain read-only and typed", () => {
+  for (const source of [reports, home]) {
     assert.doesNotMatch(source, /useMutation|as any|@ts-ignore/);
   }
 });

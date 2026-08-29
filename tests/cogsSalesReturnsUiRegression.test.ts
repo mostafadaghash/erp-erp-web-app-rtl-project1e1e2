@@ -5,7 +5,7 @@ test("UI-02 shows returned and available quantities with max",()=>{assert.match(
 test("UI-03 request id remains stable while retrying",()=>assert.match(panel,/requestId: requestId\.current/));
 test("UI-04 busy guard prevents double submit",()=>assert.match(panel,/if \(!invoice \|\| busy\) return/));
 test("UI-05 return statuses have distinct labels",()=>["partial_return","paid_returned_partial","returned"].forEach(x=>assert.match(invoices,new RegExp(x))));
-test("UI-06 totals use net total",()=>assert.match(invoices,/s \+ \(i\.netTotal \?\? i\.total\)/));
+test("UI-06 invoice rows display the net total without obsolete summary cards",()=>{assert.match(invoices,/formatCurrency\(inv\.netTotal \?\? inv\.total\)/);assert.doesNotMatch(invoices,/s \+ \(i\.netTotal \?\? i\.total\)/);});
 test("UI-07 create print and reverse are permission guarded",()=>{assert.match(panel,/canCreate && canReverse/);assert.match(panel,/canPrint &&/);});
 test("UI-08 print query and modal are guarded",()=>assert.match(panel,/canPrint && printId/));
 test("UI-09 eligible response never exposes COGS",()=>{const body=backend.slice(backend.indexOf("eligibleInvoices"),backend.indexOf("export const create"));assert.doesNotMatch(body,/unitCost|costTotal|cogsTotal/i);});

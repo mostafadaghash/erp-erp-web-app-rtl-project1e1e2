@@ -1,11 +1,12 @@
 import { FinancialHistory } from "./FinancialHistory";
 import { SalesReturnsPanel } from "./SalesReturnsPanel";
+import { InvoiceEditDialog } from "./InvoiceEditDialog";
 import { useRef, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { usePermission } from "../lib/access";
 import type { Page } from "./ERPApp";
-import { FileText, Plus, Search, Printer, RotateCcw } from "lucide-react";
+import { Eye, FileText, Pencil, Plus, Search, Printer, RotateCcw, X } from "lucide-react";
 import { PrintModal } from "./PrintTemplate";
 import { useCurrency } from "../lib/utils";
 import type { Doc, Id } from "../../convex/_generated/dataModel";
@@ -15,10 +16,12 @@ import { getErrorMessage } from "../lib/errors";
 interface InvoicesPageProps {
   onNavigate: (page: Page) => void;
   view?: "sales" | "returns";
+  creditOnly?: boolean;
 }
 
-export function InvoicesPage({ onNavigate, view = "sales" }: InvoicesPageProps) {
+export function InvoicesPage({ onNavigate, view = "sales", creditOnly = false }: InvoicesPageProps) {
   const canCreate = usePermission("create_invoices");
+  const canEdit = usePermission("edit_invoices");
   const canPrint = usePermission("print_invoices");
   const canCancel = usePermission("delete_invoices");
   const canCollect = usePermission("record_collections");
@@ -30,6 +33,8 @@ export function InvoicesPage({ onNavigate, view = "sales" }: InvoicesPageProps) 
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState("");
   const [printInvoice, setPrintInvoice] = useState<Doc<"invoices"> | null>(null);
+  const [selectedInvoice, setSelectedInvoice] = useState<Doc<"invoices"> | null>(null);
+  const [editInvoice, setEditInvoice] = useState<Doc<"invoices"> | null>(null);
   const [cancelTarget, setCancelTarget] = useState<Doc<"invoices"> | null>(null);
   const [cancelReason, setCancelReason] = useState("");
   const [isCancelling, setIsCancelling] = useState(false);
@@ -67,6 +72,7 @@ export function InvoicesPage({ onNavigate, view = "sales" }: InvoicesPageProps) 
       setIsCancelling(false);
     }
   };
+
   const collect = (invoice: Doc<"invoices">) => {
     setCollectTarget(invoice);
     setCollectionAmount("");
@@ -75,6 +81,7 @@ export function InvoicesPage({ onNavigate, view = "sales" }: InvoicesPageProps) 
     setCollectionNotes("");
     collectionRequestId.current = crypto.randomUUID();
   };
+
   const submitCollection = async (event: React.FormEvent) => {
     event.preventDefault();
     const amount = Number(collectionAmount);
@@ -102,6 +109,7 @@ export function InvoicesPage({ onNavigate, view = "sales" }: InvoicesPageProps) 
       setIsCollecting(false);
     }
   };
+
   const refund = (invoice: Doc<"invoices">) => {
     setRefundTarget(invoice);
     setRefundAmount("");
@@ -110,6 +118,7 @@ export function InvoicesPage({ onNavigate, view = "sales" }: InvoicesPageProps) 
     setRefundReason("");
     refundRequestId.current = crypto.randomUUID();
   };
+
   const submitRefund = async (event: React.FormEvent) => {
     event.preventDefault();
     const amount = Number(refundAmount);
@@ -142,14 +151,10 @@ export function InvoicesPage({ onNavigate, view = "sales" }: InvoicesPageProps) 
   const filtered = invoices.filter(inv =>
     inv.invoiceNumber.includes(search) ||
     inv.customerName.toLowerCase().includes(search.toLowerCase())
-  ).filter(inv => !filterStatus || inv.status === filterStatus);
+  ).filter(inv => !filterStatus || inv.status === filterStatus)
+    .filter(inv => !creditOnly || (inv.remaining > 0 && inv.status !== "cancelled"));
 
-  const activeFiltered = filtered.filter(invoice => invoice.status !== "cancelled");
-  const totalRevenue = activeFiltered.reduce((s, i) => s + (i.netTotal ?? i.total), 0);
-  const totalPaid = activeFiltered.reduce((s, i) => s + i.paid, 0);
-  const totalPending = activeFiltered.reduce((s, i) => s + i.remaining, 0);
-
-  const { formatCurrency } = useCurrency();
+  const { formatCurrency, formatAmount } = useCurrency();
 
   if (view === "returns") {
     return (
@@ -168,13 +173,14 @@ export function InvoicesPage({ onNavigate, view = "sales" }: InvoicesPageProps) 
 
   return (
     <div className="p-4 lg:p-6 space-y-5" data-testid="invoices-page">
-      <div className="flex items-center justify-between">
+      <div className="erp-page-header">
         <div>
-          <h1 className="text-2xl font-black text-slate-800 flex items-center gap-2">
-            <FileText className="w-6 h-6 text-indigo-600" />
-            المبيعات
+          <span className="erp-kicker">مركز الفواتير والتحصيل</span>
+          <h1 className="erp-page-title">
+            <FileText className="w-6 h-6 text-[var(--erp-accent)]" />
+            {creditOnly ? "الفواتير الآجلة" : "فواتير المبيعات"}
           </h1>
-          <p className="text-slate-500 text-sm mt-0.5">{invoices.length} فاتورة</p>
+          <p className="erp-page-subtitle">{formatAmount(filtered.length)} {creditOnly ? "فاتورة عليها مبالغ مستحقة" : "فاتورة مسجلة"}</p>
         </div>
         {canCreate && <button onClick={() => onNavigate("new-invoice")} className="btn-primary flex items-center gap-2">
           <Plus className="w-4 h-4" />
@@ -182,24 +188,7 @@ export function InvoicesPage({ onNavigate, view = "sales" }: InvoicesPageProps) 
         </button>}
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-3 gap-3">
-        <div className="bg-indigo-50 rounded-xl p-4 text-center">
-          <p className="text-xl font-black text-indigo-600">{totalRevenue.toLocaleString("ar-EG")}</p>
-          <p className="text-xs text-slate-600 mt-0.5">إجمالي المبيعات (ج.م)</p>
-        </div>
-        <div className="bg-emerald-50 rounded-xl p-4 text-center">
-          <p className="text-xl font-black text-emerald-600">{totalPaid.toLocaleString("ar-EG")}</p>
-          <p className="text-xs text-slate-600 mt-0.5">المحصل (ج.م)</p>
-        </div>
-        <div className="bg-amber-50 rounded-xl p-4 text-center">
-          <p className="text-xl font-black text-amber-600">{totalPending.toLocaleString("ar-EG")}</p>
-          <p className="text-xs text-slate-600 mt-0.5">المتبقي (ج.م)</p>
-        </div>
-      </div>
-
-      {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-3">
+      <div className="erp-toolbar flex-col sm:flex-row">
         <div className="relative flex-1">
           <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <input
@@ -221,8 +210,7 @@ export function InvoicesPage({ onNavigate, view = "sales" }: InvoicesPageProps) 
         </select>
       </div>
 
-      {/* Table */}
-      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+      <div className="erp-section">
         <div className="overflow-x-auto">
           <table className="data-table">
             <thead>
@@ -240,21 +228,46 @@ export function InvoicesPage({ onNavigate, view = "sales" }: InvoicesPageProps) 
             </thead>
             <tbody>
               {filtered.map((inv) => (
-                <tr key={inv._id} data-testid="invoice-row" data-invoice-number={inv.invoiceNumber} data-paid={inv.paid} data-remaining={inv.remaining}>
-                  <td className="font-mono text-xs text-indigo-600 font-bold">{inv.invoiceNumber}<details><summary>السجل المالي</summary><FinancialHistory referenceType="invoice" referenceId={String(inv._id)} /></details></td>
+                <tr
+                  key={inv._id}
+                  data-testid="invoice-row"
+                  data-invoice-number={inv.invoiceNumber}
+                  data-paid={inv.paid}
+                  data-remaining={inv.remaining}
+                  className="invoice-row-compact cursor-pointer"
+                  tabIndex={0}
+                  aria-label={`فتح الفاتورة ${inv.invoiceNumber}`}
+                  onClick={() => setSelectedInvoice(inv)}
+                  onKeyDown={(event) => {
+                    if (event.target !== event.currentTarget) return;
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      setSelectedInvoice(inv);
+                    }
+                  }}
+                >
                   <td>
-                    {canCollect && inv.status !== "cancelled" && inv.status !== "returned" && inv.remaining > 0 && <button data-testid="invoice-collect" className="mr-1 rounded-lg bg-emerald-50 px-2 py-1.5 text-xs font-bold text-emerald-700" onClick={() => collect(inv)}>تحصيل دفعة</button>}
-                    {canRefund && inv.status !== "cancelled" && inv.status !== "returned" && inv.paid > 0 && <button data-testid="invoice-refund" className="mr-1 rounded-lg bg-amber-50 px-2 py-1.5 text-xs font-bold text-amber-700" onClick={() => refund(inv)}>استرداد مبلغ</button>}
+                    <button
+                      data-testid="invoice-open-number"
+                      onClick={(event) => { event.stopPropagation(); setSelectedInvoice(inv); }}
+                      className="font-mono text-xs font-black text-[var(--erp-accent-strong)] underline decoration-emerald-200 underline-offset-4 hover:text-emerald-800"
+                    >
+                      {inv.invoiceNumber}
+                    </button>
+                  </td>
+                  <td>
+                    {canCollect && inv.status !== "cancelled" && inv.status !== "returned" && inv.remaining > 0 && <button data-testid="invoice-collect" className="mr-1 rounded-lg bg-emerald-50 px-2 py-1.5 text-xs font-bold text-emerald-700" onClick={(event) => { event.stopPropagation(); collect(inv); }}>تحصيل دفعة</button>}
+                    {canRefund && inv.status !== "cancelled" && inv.status !== "returned" && inv.paid > 0 && <button data-testid="invoice-refund" className="mr-1 rounded-lg bg-amber-50 px-2 py-1.5 text-xs font-bold text-amber-700" onClick={(event) => { event.stopPropagation(); refund(inv); }}>استرداد مبلغ</button>}
                     <p className="font-medium text-slate-800">{inv.customerName}</p>
                     {inv.customerPhone && <p className="text-xs text-slate-400">{inv.customerPhone}</p>}
                   </td>
                   <td className="text-slate-500 text-xs">
-                    {new Date(inv._creationTime).toLocaleDateString("ar-EG")}
+                    {new Date(inv._creationTime).toLocaleDateString("ar-EG-u-nu-latn")}
                   </td>
-                  <td className="font-bold">{inv.total.toLocaleString("ar-EG")} ج.م</td><td>{(inv.creditedTotal ?? 0).toLocaleString("ar-EG")} ج.م</td><td className="font-bold">{(inv.netTotal ?? inv.total).toLocaleString("ar-EG")} ج.م</td>
-                  <td className="text-emerald-600 font-medium">{inv.paid.toLocaleString("ar-EG")} ج.م</td>
+                  <td className="font-bold">{formatCurrency(inv.total)}</td><td>{formatCurrency(inv.creditedTotal ?? 0)}</td><td className="font-bold">{formatCurrency(inv.netTotal ?? inv.total)}</td>
+                  <td className="text-emerald-600 font-medium">{formatCurrency(inv.paid)}</td>
                   <td className={`font-medium ${inv.remaining > 0 ? "text-amber-600" : "text-slate-400"}`}>
-                    {inv.remaining.toLocaleString("ar-EG")} ج.م
+                    {formatCurrency(inv.remaining)}
                   </td>
                   <td>
                     <span className="text-xs text-slate-600">
@@ -276,8 +289,17 @@ export function InvoicesPage({ onNavigate, view = "sales" }: InvoicesPageProps) 
                     </span>
                   </td>
                   <td>
+                    <button
+                      data-testid="invoice-open"
+                      onClick={(event) => { event.stopPropagation(); setSelectedInvoice(inv); }}
+                      className="erp-action erp-action-primary"
+                      title="فتح الفاتورة"
+                    >
+                      <Eye className="h-4 w-4" />
+                      فتح
+                    </button>
                     {canPrint && inv.status !== "cancelled" && <button
-                      onClick={() => { if (canPrint) setPrintInvoice(inv); }}
+                      onClick={(event) => { event.stopPropagation(); if (canPrint) setPrintInvoice(inv); }}
                       className="p-1.5 hover:bg-indigo-50 rounded-lg transition-colors text-slate-500 hover:text-indigo-600"
                       title="طباعة الفاتورة"
                     >
@@ -285,14 +307,11 @@ export function InvoicesPage({ onNavigate, view = "sales" }: InvoicesPageProps) 
                     </button>}
                     {canCancel && ["unpaid", "partial", "paid"].includes(inv.status) && (inv.creditedTotal ?? 0) === 0 && inv.paid === 0 && (
                       <button
-                        onClick={() => { setCancelTarget(inv); setCancelReason(""); }}
+                        onClick={(event) => { event.stopPropagation(); setCancelTarget(inv); setCancelReason(""); }}
                         className="mr-1 rounded-lg bg-red-50 px-2 py-1.5 text-xs font-bold text-red-700 hover:bg-red-100"
                       >
                         إلغاء الفاتورة
                       </button>
-                    )}
-                    {canCancel && inv.status !== "cancelled" && inv.paid > 0 && (
-                      <p className="mt-1 text-xs text-amber-700">تحتاج معالجة استرداد مالي قبل الإلغاء</p>
                     )}
                   </td>
                 </tr>
@@ -310,7 +329,6 @@ export function InvoicesPage({ onNavigate, view = "sales" }: InvoicesPageProps) 
         </div>
       </div>
 
-      {/* Print Modal */}
       {canPrint && printInvoice && (
         <PrintModal
           type="invoice"
@@ -318,6 +336,87 @@ export function InvoicesPage({ onNavigate, view = "sales" }: InvoicesPageProps) 
           onClose={() => setPrintInvoice(null)}
         />
       )}
+
+      {selectedInvoice && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 p-3" dir="rtl" role="dialog" aria-modal="true" data-testid="invoice-details-modal">
+          <div className="flex max-h-[94vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
+            <header className="flex items-center justify-between gap-4 border-b border-slate-200 bg-[var(--erp-navy)] px-5 py-4 text-white">
+              <div>
+                <p className="text-xs font-bold text-emerald-200">فاتورة مبيعات محفوظة</p>
+                <h2 className="mt-1 text-xl font-black">{selectedInvoice.invoiceNumber}</h2>
+              </div>
+              <div className="flex items-center gap-2">
+                {canEdit && selectedInvoice.status !== "cancelled" && (
+                  <button
+                    type="button"
+                    data-testid="invoice-edit-open"
+                    onClick={() => setEditInvoice(selectedInvoice)}
+                    className="rounded-lg border border-white/15 bg-emerald-500/20 px-3 py-2 text-xs font-black text-emerald-50 hover:bg-emerald-500/30"
+                    title="تعديل الكمية أو السعر أو حذف صنف"
+                  >
+                    <Pencil className="ml-1 inline h-4 w-4" />تعديل
+                  </button>
+                )}
+                {canPrint && selectedInvoice.status !== "cancelled" && (
+                  <button onClick={() => setPrintInvoice(selectedInvoice)} className="rounded-lg border border-white/15 bg-white/10 px-3 py-2 text-xs font-black hover:bg-white/15">
+                    <Printer className="ml-1 inline h-4 w-4" />طباعة
+                  </button>
+                )}
+                <button onClick={() => setSelectedInvoice(null)} className="grid h-9 w-9 place-items-center rounded-lg bg-white/10 hover:bg-white/15" aria-label="إغلاق تفاصيل الفاتورة"><X className="h-5 w-5" /></button>
+              </div>
+            </header>
+
+            <div className="overflow-y-auto p-5">
+              <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <div className="rounded-xl bg-slate-50 p-3"><p className="text-xs text-slate-500">العميل</p><p className="mt-1 font-black text-slate-800">{selectedInvoice.customerName}</p><p className="text-xs text-slate-400">{selectedInvoice.customerPhone || "بدون هاتف"}</p></div>
+                <div className="rounded-xl bg-slate-50 p-3"><p className="text-xs text-slate-500">تاريخ الإنشاء</p><p className="mt-1 font-black text-slate-800">{new Date(selectedInvoice._creationTime).toLocaleString("ar-EG-u-nu-latn")}</p></div>
+                <div className="rounded-xl bg-emerald-50 p-3"><p className="text-xs text-emerald-700">صافي الفاتورة</p><p className="mt-1 text-lg font-black text-emerald-800">{formatCurrency(selectedInvoice.netTotal ?? selectedInvoice.total)}</p></div>
+                <div className="rounded-xl bg-amber-50 p-3"><p className="text-xs text-amber-700">المتبقي</p><p className="mt-1 text-lg font-black text-amber-800">{formatCurrency(selectedInvoice.remaining)}</p></div>
+              </div>
+
+              <div className="overflow-x-auto rounded-xl border border-slate-200">
+                <table className="data-table min-w-[720px]">
+                  <thead><tr><th>#</th><th>الصنف</th><th>الكمية</th><th>سعر الوحدة</th><th>الخصم</th><th>الإجمالي</th></tr></thead>
+                  <tbody>
+                    {selectedInvoice.items.map((item, index) => (
+                      <tr key={`${item.productName}-${index}`}>
+                        <td>{formatAmount(index + 1)}</td><td className="font-bold">{item.productName}</td><td>{formatAmount(item.quantity)}</td><td>{formatCurrency(item.unitPrice)}</td><td>{formatAmount(item.discount)}٪</td><td className="font-black">{formatCurrency(item.total)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="mt-4 grid gap-4 lg:grid-cols-[1fr_360px]">
+                <div className="rounded-xl border border-slate-200 p-4">
+                  <h3 className="mb-3 font-black text-slate-800">السجل المالي للفاتورة</h3>
+                  <FinancialHistory referenceType="invoice" referenceId={String(selectedInvoice._id)} />
+                </div>
+                <dl className="space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm">
+                  <div className="flex justify-between"><dt>المجموع الفرعي</dt><dd className="font-bold">{formatCurrency(selectedInvoice.subtotal)}</dd></div>
+                  <div className="flex justify-between"><dt>الخصم</dt><dd className="font-bold text-red-600">{formatCurrency(selectedInvoice.discount)}</dd></div>
+                  <div className="flex justify-between"><dt>الضريبة</dt><dd className="font-bold">{formatCurrency(selectedInvoice.tax)}</dd></div>
+                  <div className="flex justify-between border-t border-slate-200 pt-2 text-base"><dt className="font-black">الإجمالي</dt><dd className="font-black text-[var(--erp-accent-strong)]">{formatCurrency(selectedInvoice.total)}</dd></div>
+                  <div className="flex justify-between"><dt>المدفوع</dt><dd className="font-bold text-emerald-700">{formatCurrency(selectedInvoice.paid)}</dd></div>
+                  {selectedInvoice.notes && <div className="border-t border-slate-200 pt-2"><dt className="text-slate-500">ملاحظات</dt><dd className="mt-1 font-medium text-slate-700">{selectedInvoice.notes}</dd></div>}
+                </dl>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {canEdit && editInvoice && (
+        <InvoiceEditDialog
+          invoice={editInvoice}
+          onClose={() => setEditInvoice(null)}
+          onSaved={() => {
+            setEditInvoice(null);
+            setSelectedInvoice(null);
+          }}
+        />
+      )}
+
       {cancelTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" dir="rtl">
           <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
@@ -335,6 +434,7 @@ export function InvoicesPage({ onNavigate, view = "sales" }: InvoicesPageProps) 
           </div>
         </div>
       )}
+
       {collectTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" dir="rtl">
           <form data-testid="invoice-collection-form" onSubmit={submitCollection} className="w-full max-w-md space-y-4 rounded-2xl bg-white p-6 shadow-2xl">
@@ -353,6 +453,7 @@ export function InvoicesPage({ onNavigate, view = "sales" }: InvoicesPageProps) 
           </form>
         </div>
       )}
+
       {refundTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" dir="rtl">
           <form data-testid="invoice-refund-form" onSubmit={submitRefund} className="w-full max-w-md space-y-4 rounded-2xl bg-white p-6 shadow-2xl">

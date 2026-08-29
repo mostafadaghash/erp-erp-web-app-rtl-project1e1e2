@@ -986,3 +986,48 @@ test("reporting branch options exclude inactive branches without writing data", 
     before,
   );
 });
+
+test("detailed sales require both report and invoice permissions", async () => {
+  const e = await fixture();
+  await addInvoice(e);
+  await assert.rejects(
+    e.reportOnly.query(api.reporting.salesDetails, {
+      from: "2026-01-01",
+      to: "2026-01-31",
+      paginationOpts: { numItems: 20, cursor: null },
+    }),
+    /view_invoices|صلاحية|permission/i,
+  );
+});
+
+test("detailed sales are branch-scoped paginated and preserve customer identity", async () => {
+  const e = await fixture();
+  await addInvoice(e, { number: "INV-DETAIL-1" });
+  await addInvoice(e, { number: "INV-DETAIL-2" });
+  await assert.rejects(
+    e.admin.query(api.reporting.salesDetails, {
+      from: "2026-01-01",
+      to: "2026-01-31",
+      paginationOpts: { numItems: 1, cursor: null },
+    }),
+    /اختر فرعًا واحدًا/,
+  );
+  const first = await e.admin.query(api.reporting.salesDetails, {
+    branchId: e.branchId,
+    from: "2026-01-01",
+    to: "2026-01-31",
+    paginationOpts: { numItems: 1, cursor: null },
+  });
+  assert.equal(first.page.length, 1);
+  assert.equal(first.isDone, false);
+  assert.equal(first.page[0].customerId, String(e.customerId));
+  assert.equal(first.page[0].branchId, String(e.branchId));
+  const second = await e.admin.query(api.reporting.salesDetails, {
+    branchId: e.branchId,
+    from: "2026-01-01",
+    to: "2026-01-31",
+    paginationOpts: { numItems: 1, cursor: first.continueCursor },
+  });
+  assert.equal(second.page.length, 1);
+  assert.notEqual(second.page[0]._id, first.page[0]._id);
+});

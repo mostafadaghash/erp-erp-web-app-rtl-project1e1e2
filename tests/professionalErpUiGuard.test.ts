@@ -10,37 +10,52 @@ const settingsPage = read("src/components/SettingsPage.tsx");
 const settingsApi = read("convex/settings.ts");
 const schema = read("convex/schema.ts");
 const styles = read("src/index.css");
+const professionalStyles = read("src/professional-ui.css");
+const navigationStyles = read("src/professional-navigation.css");
+const branding = read("src/lib/branding.ts");
+const newInvoice = read("src/components/NewInvoicePage.tsx");
 const signOut = read("src/SignOutButton.tsx");
 const purchases = read("src/components/ShipmentsPage.tsx");
 const orders = read("src/components/OrdersPage.tsx");
 const deliveries = read("src/components/DeliveriesPage.tsx");
 const repairs = read("src/components/RepairsPage.tsx");
 const purchaseReturns = read("src/components/PurchaseReturnsPage.tsx");
+const reports = read("src/components/ReportsPage.tsx");
 
 test("professional ERP navigation uses conventional Arabic information architecture", () => {
   for (const label of [
+    "لوحة التحكم",
     "المبيعات",
+    "فواتير المبيعات",
     "مرتجعات المبيعات",
-    "أوامر البيع",
+    "عروض الأسعار",
+    "طلبات البيع",
+    "العملاء",
     "المشتريات",
+    "فواتير المشتريات",
     "مرتجعات المشتريات",
-    "الأصناف",
-    "عمليات الشحن",
+    "إدارة المخزون",
+    "الشحن",
+    "طلبات الشحن والتسويات",
     "أوامر الصيانة",
     "الحسابات",
-    "الخزائن والبنوك",
+    "الخزائن والحسابات",
+    "سندات القبض والصرف",
     "حسابات العملاء",
     "حسابات الموردين",
+    "الشيكات والأقساط",
     "المستخدمون والصلاحيات",
-    "سجل المراجعة",
+    "سجل العمليات",
   ]) assert.match(sidebar, new RegExp(label));
 
   for (const legacy of [
     "المبيعات والفواتير",
+    "المبيعات والعملاء",
     "الأوردرات",
     "الشحنات الواردة",
+    "المشتريات والموردون",
     "الموظفون والصلاحيات",
-    "سجل العمليات",
+    "سجل التدقيق",
   ]) assert.doesNotMatch(sidebar, new RegExp(legacy));
 });
 
@@ -53,8 +68,8 @@ test("sales returns are a first-class protected page", () => {
 });
 
 test("shell exposes one permission-aware quick creation menu", () => {
-  assert.equal((app.match(/>إجراء جديد</g) ?? []).length, 1);
-  assert.match(app, /data-testid="quick-action-menu"/);
+  assert.equal((app.match(/data-testid="quick-action-menu"/g) ?? []).length, 1);
+  assert.match(app, />إنشاء جديد</);
   assert.match(app, /permission: "create_invoices"/);
   assert.match(app, /permission: "create_shipments"/);
   assert.doesNotMatch(read("src/components/Dashboard.tsx"), />فاتورة جديدة</);
@@ -71,6 +86,69 @@ test("white-label identity can be changed without source edits", () => {
   assert.match(settingsPage, /غيّر الاسم والشعار والألوان في أي وقت بدون تعديل الكود/);
   assert.match(styles, /--brand-primary/);
   assert.match(styles, /--brand-secondary/);
+});
+
+test("default visual system uses the approved emerald and navy ERP identity", () => {
+  for (const source of [styles, branding, settingsPage, settingsApi]) {
+    assert.match(source, /#16a66a/i);
+    assert.match(source, /#12263a/i);
+  }
+  for (const token of [
+    "--erp-accent",
+    "--erp-navy",
+    "--erp-warning",
+    "--erp-danger",
+    "--erp-border",
+  ]) assert.match(professionalStyles, new RegExp(token));
+  assert.match(navigationStyles, /erp-navigation::before/);
+});
+
+test("every operational page inherits the Sahl clarity design system", () => {
+  assert.match(app, /className="erp-workspace-main/);
+  for (const marker of [
+    "Sahl-inspired clarity layer",
+    ".erp-workspace-main :where(.data-table, table) th",
+    "border: 1px solid var(--erp-border-strong)",
+    ".erp-workspace-main .btn-primary",
+    ".erp-workspace-main :where(input, select, textarea)",
+  ]) assert.match(professionalStyles, new RegExp(marker.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  assert.match(navigationStyles, /border-radius: 5px/);
+  assert.match(purchaseReturns, /className="erp-section" data-testid="purchase-return-form"/);
+  assert.match(purchaseReturns, /سجل مرتجعات المشتريات/);
+});
+
+test("sales invoice is a fast keyboard and barcode-ready document workspace", () => {
+  for (const marker of [
+    "erp-pos-page",
+    "erp-pos-grid",
+    "erp-pos-cart",
+    "invoice-product-search",
+    "invoice-submit",
+    "ملخص الفاتورة",
+  ]) assert.match(newInvoice, new RegExp(marker));
+  assert.match(newInvoice, /product\.barcode\?\.toLowerCase\(\)/);
+  assert.match(newInvoice, /event\.key === "F2"/);
+  assert.match(newInvoice, /event\.key === "F9"/);
+  assert.match(newInvoice, /event\.key === "Enter"/);
+  assert.match(professionalStyles, /\.erp-pos-page[\s\S]*height: 100%[\s\S]*overflow: hidden/);
+});
+
+test("historical sales and purchase documents can always be reopened", () => {
+  assert.match(invoices, /data-testid="invoice-open"/);
+  assert.match(invoices, /data-testid="invoice-details-modal"/);
+  assert.match(purchases, /data-testid="purchase-open"/);
+  assert.match(purchases, /data-testid="purchase-details-modal"/);
+  assert.match(read("convex/shipments.ts"), /export const purchaseDocument = query/);
+});
+
+test("reports expose a clickable catalog, explicit filters and printable output", () => {
+  for (const marker of [
+    'id: "sales"',
+    'id: "purchases"',
+    'id: "profit"',
+    "report-apply-filters",
+    "طباعة التقرير",
+  ]) assert.match(reports, new RegExp(marker));
 });
 
 test("authentication and session controls use professional Arabic copy", () => {
@@ -107,8 +185,8 @@ test("sales orders use one professional document name and item terminology", () 
 
 test("shipping creation refers to sales orders consistently", () => {
   for (const label of [
-    "إنشاء من أمر بيع وفاتورة",
-    "اختر أمر بيع جاهزًا",
+    "شحنة جديدة",
+    "اختر أمر البيع",
     "جارٍ تحميل أوامر البيع الجاهزة",
     "لا توجد أوامر بيع جاهزة مؤهلة للشحن",
   ]) assert.match(deliveries, new RegExp(label));

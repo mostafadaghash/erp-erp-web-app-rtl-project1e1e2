@@ -1,4 +1,4 @@
-import { Authenticated, Unauthenticated, useQuery } from "convex/react";
+import { Authenticated, AuthLoading, Unauthenticated, useQuery } from "convex/react";
 import { api } from "../convex/_generated/api";
 import { CustomSignInForm } from "./CustomSignInForm";
 import { Toaster } from "sonner";
@@ -30,7 +30,22 @@ export default function App() {
       <Unauthenticated>
         <LoginPage publicSettings={publicSettings} />
       </Unauthenticated>
+      <AuthLoading>
+        <StartupScreen />
+      </AuthLoading>
       <Toaster position="top-center" richColors />
+    </div>
+  );
+}
+
+function StartupScreen() {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-slate-950 px-6" dir="rtl">
+      <div className="text-center">
+        <div className="brand-spinner mx-auto mb-4" />
+        <p className="text-sm font-bold text-slate-200">جاري تشغيل النظام...</p>
+        <p className="mt-2 text-xs text-slate-500">يتم التحقق من الاتصال والجلسة.</p>
+      </div>
     </div>
   );
 }
@@ -114,8 +129,7 @@ function LoginPage({
 
         <div className="auth-card rounded-3xl p-7 sm:p-8">
           <div className="mb-6 text-center">
-            <p className="text-xs font-bold tracking-[0.18em] text-slate-400">بوابة النظام</p>
-            <h2 className="mt-2 text-xl font-black text-white">
+            <h2 className="text-xl font-black text-white">
               {allowSignUp ? "إنشاء الحساب" : "تسجيل الدخول"}
             </h2>
           </div>

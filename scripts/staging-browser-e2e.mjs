@@ -27,21 +27,23 @@ const navigationByRole = {
   admin: {
     visible: [
       "لوحة التحكم",
-      "المبيعات",
+      "فواتير المبيعات",
+      "مرتجعات المبيعات",
       "أوامر البيع",
-      "عمليات الشحن",
-      "الأصناف",
-      "المشتريات",
-      "الموردون",
-      "مرتجعات المشتريات",
       "العملاء",
-      "أوامر الصيانة",
       "إدارة علاقات العملاء",
-      "المصروفات",
+      "فواتير المشتريات",
+      "مرتجعات المشتريات",
+      "الموردون",
+      "دليل الأصناف",
+      "إدارة الشحن",
+      "أوامر الصيانة",
+      "نظرة عامة",
       "الخزائن والبنوك",
       "حسابات العملاء",
-      "الأستاذ العام",
       "حسابات الموردين",
+      "المصروفات",
+      "المحاسبة العامة",
       "مركز التقارير",
       "الفروع",
       "المستخدمون والصلاحيات",
@@ -54,21 +56,21 @@ const navigationByRole = {
   },
   manager: {
     visible: [
-      "المبيعات",
-      "الأصناف",
-      "عمليات الشحن",
+      "فواتير المبيعات",
+      "دليل الأصناف",
+      "إدارة الشحن",
       "الموردون",
       "مركز التقارير",
       "الفروع",
     ],
     hidden: ["المستخدمون والصلاحيات", "سجل المراجعة", "إعدادات النظام"],
-    smoke: ["المبيعات", "الأصناف", "مركز التقارير"],
+    smoke: ["فواتير المبيعات", "دليل الأصناف", "مركز التقارير"],
   },
   sales: {
     visible: [
-      "الأصناف",
+      "دليل الأصناف",
       "العملاء",
-      "المبيعات",
+      "فواتير المبيعات",
       "أوامر البيع",
     ],
     hidden: [
@@ -77,7 +79,7 @@ const navigationByRole = {
       "المستخدمون والصلاحيات",
       "إعدادات النظام",
     ],
-    smoke: ["المبيعات", "أوامر البيع", "العملاء"],
+    smoke: ["فواتير المبيعات", "أوامر البيع", "العملاء"],
   },
   customer_service: {
     visible: ["العملاء", "أوامر البيع", "أوامر الصيانة"],
@@ -90,45 +92,45 @@ const navigationByRole = {
     smoke: ["أوامر البيع", "أوامر الصيانة", "العملاء"],
   },
   technician: {
-    visible: ["الأصناف", "أوامر الصيانة"],
+    visible: ["دليل الأصناف", "أوامر الصيانة"],
     hidden: [
-      "المبيعات",
+      "فواتير المبيعات",
       "مركز التقارير",
       "الخزائن والبنوك",
       "المستخدمون والصلاحيات",
     ],
-    smoke: ["أوامر الصيانة", "الأصناف"],
+    smoke: ["أوامر الصيانة", "دليل الأصناف"],
   },
   accountant: {
     visible: [
-      "الأصناف",
+      "دليل الأصناف",
       "العملاء",
-      "المبيعات",
+      "فواتير المبيعات",
       "المصروفات",
       "الخزائن والبنوك",
-      "الأستاذ العام",
+      "المحاسبة العامة",
       "مركز التقارير",
     ],
     hidden: ["المستخدمون والصلاحيات", "سجل المراجعة", "إعدادات النظام"],
-    smoke: ["الخزائن والبنوك", "الأستاذ العام", "مركز التقارير"],
+    smoke: ["الخزائن والبنوك", "المحاسبة العامة", "مركز التقارير"],
   },
   shipping: {
-    visible: ["أوامر البيع", "المشتريات", "عمليات الشحن"],
+    visible: ["أوامر البيع", "فواتير المشتريات", "إدارة الشحن"],
     hidden: [
-      "المبيعات",
+      "فواتير المبيعات",
       "مركز التقارير",
       "الخزائن والبنوك",
       "المستخدمون والصلاحيات",
     ],
-    smoke: ["أوامر البيع", "المشتريات", "عمليات الشحن"],
+    smoke: ["أوامر البيع", "فواتير المشتريات", "إدارة الشحن"],
   },
   viewer: {
     visible: [
-      "الأصناف",
+      "دليل الأصناف",
       "العملاء",
       "أوامر البيع",
       "أوامر الصيانة",
-      "المبيعات",
+      "فواتير المبيعات",
     ],
     hidden: [
       "مركز التقارير",
@@ -136,8 +138,35 @@ const navigationByRole = {
       "المستخدمون والصلاحيات",
       "إعدادات النظام",
     ],
-    smoke: ["الأصناف", "العملاء", "المبيعات"],
+    smoke: ["دليل الأصناف", "العملاء", "فواتير المبيعات"],
   },
+};
+
+const navigationGroupByLabel = {
+  "لوحة التحكم": "home",
+  "فواتير المبيعات": "sales",
+  "مرتجعات المبيعات": "sales",
+  "أوامر البيع": "sales",
+  "العملاء": "sales",
+  "إدارة علاقات العملاء": "sales",
+  "فواتير المشتريات": "purchases",
+  "مرتجعات المشتريات": "purchases",
+  "الموردون": "purchases",
+  "دليل الأصناف": "inventory",
+  "إدارة الشحن": "shipping",
+  "أوامر الصيانة": "service",
+  "نظرة عامة": "accounting",
+  "الخزائن والبنوك": "accounting",
+  "حسابات العملاء": "accounting",
+  "حسابات الموردين": "accounting",
+  "المصروفات": "accounting",
+  "المحاسبة العامة": "accounting",
+  "مركز التقارير": "reports",
+  "الفروع": "administration",
+  "المستخدمون والصلاحيات": "administration",
+  "سجل المراجعة": "administration",
+  "تصدير البيانات": "administration",
+  "إعدادات النظام": "administration",
 };
 
 const outputRoot = resolve("test-results/staging-e2e");
@@ -355,20 +384,53 @@ export async function signIn(page, baseUrl, account) {
     .waitFor({ timeout: 45_000 });
 }
 
+async function openNavigationGroup(navigation, groupKey, required) {
+  const groupButton = navigation.getByTestId(`nav-group-${groupKey}`);
+  if (!(await groupButton.count())) {
+    if (required) throw new Error(`Missing navigation group: ${groupKey}`);
+    return false;
+  }
+  if ((await groupButton.getAttribute("aria-expanded")) !== "true") {
+    await groupButton.click();
+  }
+  return true;
+}
+
+export async function sidebarNavigationButton(page, label, { required = true } = {}) {
+  const groupKey = navigationGroupByLabel[label];
+  assert.ok(groupKey, `Missing navigation group mapping for: ${label}`);
+  const navigation = page.getByRole("navigation", { name: "القائمة الرئيسية" });
+  const available = await openNavigationGroup(navigation, groupKey, required);
+  if (!available) return null;
+  const button = navigation.getByRole("button", { name: label, exact: true });
+  if (required) await button.waitFor({ state: "visible", timeout: 30_000 });
+  return button;
+}
+
+export async function navigateSidebar(page, label) {
+  const groupKey = navigationGroupByLabel[label];
+  assert.ok(groupKey, `Missing navigation group mapping for: ${label}`);
+  const button = await sidebarNavigationButton(page, label);
+  assert.ok(button);
+  await button.click();
+  await page.waitForFunction(
+    (key) => document.querySelector(`[data-testid="nav-group-${key}"]`)?.getAttribute("aria-expanded") === "false",
+    groupKey,
+    { timeout: 30_000 },
+  );
+}
+
 async function assertRoleNavigation(page, role) {
   const rule = navigationByRole[role];
   assert.ok(rule, `Missing navigation rule for ${role}`);
-  const navigation = page.getByRole("navigation", { name: "القائمة الرئيسية" });
-  await navigation
-    .getByRole("button", { name: "لوحة التحكم", exact: true })
-    .waitFor();
 
   for (const label of rule.visible) {
-    await navigation.getByRole("button", { name: label, exact: true }).waitFor();
+    await sidebarNavigationButton(page, label);
   }
   for (const label of rule.hidden) {
+    const button = await sidebarNavigationButton(page, label, { required: false });
     assert.equal(
-      await navigation.getByRole("button", { name: label, exact: true }).count(),
+      button ? await button.count() : 0,
       0,
       `${role} unexpectedly sees ${label}`,
     );
@@ -376,20 +438,10 @@ async function assertRoleNavigation(page, role) {
 
   const pages = [];
   for (const label of rule.smoke) {
-    const button = navigation.getByRole("button", { name: label, exact: true });
-    await button.click();
+    await navigateSidebar(page, label);
     await page.locator("main h1").first().waitFor({ timeout: 30_000 });
-    await page.waitForFunction(
-      (text) =>
-        [...document.querySelectorAll('nav[aria-label="القائمة الرئيسية"] button')].some(
-          (element) =>
-            element.textContent?.trim() === text &&
-            element.getAttribute("aria-current") === "page",
-        ),
-      label,
-      { timeout: 30_000 },
-    );
-    assert.equal(await button.getAttribute("aria-current"), "page");
+    const activeButton = await sidebarNavigationButton(page, label);
+    assert.equal(await activeButton.getAttribute("aria-current"), "page");
     pages.push({
       navigation: label,
       heading: await page.locator("main h1").first().innerText(),
@@ -412,7 +464,22 @@ export function observeRuntimeFailures(page, baseUrl) {
   );
   page.on("console", (message) => {
     if (message.type() === "error") {
-      failures.push(`console.error: ${redactEvidence(message.text())}`);
+      const location = message.location().url;
+      let source = "";
+      if (location) {
+        try {
+          const target = new URL(location);
+          source =
+            target.origin === baseUrl
+              ? ` ${target.pathname}`
+              : ` ${target.origin}`;
+        } catch {
+          source = "";
+        }
+      }
+      failures.push(
+        `console.error${source}: ${redactEvidence(message.text())}`,
+      );
     }
   });
   page.on("requestfailed", (request) => {

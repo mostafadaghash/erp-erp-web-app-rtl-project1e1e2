@@ -98,7 +98,7 @@ A restore plan verifies the source package and prints the exact target/command w
 
 ```bash
 npm run restore:plan -- \
-  --deployment staging \
+  --deployment restore-drill \
   --environment staging \
   --snapshot-manifest backups/known-good.zip.manifest.json
 ```
@@ -111,15 +111,15 @@ Immediately before executing a destructive restore, create a new backup of the t
 
 ```bash
 npm run backup:create -- \
-  --deployment staging \
+  --deployment restore-drill \
   --environment staging \
-  --output backups/staging-pre-restore.zip
+  --output backups/restore-drill-pre-restore.zip
 ```
 
 Verify it:
 
 ```bash
-npm run backup:verify -- backups/staging-pre-restore.zip.manifest.json
+npm run backup:verify -- backups/restore-drill-pre-restore.zip.manifest.json
 ```
 
 This snapshot is the escape path if the chosen recovery point was wrong or the incident analysis changes after restoration begins.
@@ -128,10 +128,10 @@ This snapshot is the escape path if the chosen recovery point was wrong or the i
 
 ```bash
 npm run restore:execute -- \
-  --deployment staging \
+  --deployment restore-drill \
   --environment staging \
   --snapshot-manifest backups/known-good.zip.manifest.json \
-  --pre-restore-manifest backups/staging-pre-restore.zip.manifest.json
+  --pre-restore-manifest backups/restore-drill-pre-restore.zip.manifest.json
 ```
 
 After the CLI finishes, the environment must remain closed to normal users until the post-restore checks below pass.
@@ -158,8 +158,21 @@ A successful CLI exit is not sufficient. Complete all of the following before re
 4. Compare branch and consolidated control totals for inventory quantity/value, customer receivables/advances, supplier payables, financial accounts, and COD.
 5. Confirm finance/customer/supplier/general-ledger opening and operational balances remain internally consistent.
 6. Verify critical document reads and one controlled write flow in each enabled module.
-7. Verify login/logout and required security headers on the restored deployment.
-8. Record actual recovery duration and the newest transaction timestamp represented by the recovery point.
+7. Verify the required Auth environment variables `SITE_URL`, `JWT_PRIVATE_KEY`, and `JWKS` are present on the restored deployment. Record presence and the controlled configuration version only; never copy secret values into drill evidence.
+8. Verify login/logout and required security headers on the restored deployment.
+
+Copy `release/restore-drill.evidence.template.json`, fill it only from observed results, and validate the completed drill together with both verified manifests:
+
+```bash
+npm run restore:verify -- \
+  --evidence test-results/restore/restore-drill.json \
+  --source-manifest backups/staging-source.zip.manifest.json \
+  --pre-restore-manifest backups/restore-drill-pre-restore.zip.manifest.json
+```
+
+The verifier refuses a same-deployment drill, a backup without File Storage, a missing environment-configuration check, a failed mandatory check, RPO above 24 hours, or RTO above 4 hours.
+
+9. Record actual recovery duration and the newest transaction timestamp represented by the recovery point.
 
 Only then mark the recovery drill successful.
 
@@ -193,6 +206,7 @@ Rollback is a coordinated recovery of **data + code + configuration**, not only 
 ### E. Restore configuration separately
 
 - Compare Auth settings, site URL, allowed hosts/origins, security policy, and all required deployment environment variables with the known-good configuration record.
+- For the password-authentication configuration, explicitly verify `SITE_URL`, `JWT_PRIVATE_KEY`, and `JWKS` as one matched recovery set.
 - Restore missing/changed values through the controlled Convex/dashboard process.
 - Never assume a database snapshot restored environment variables or application code.
 

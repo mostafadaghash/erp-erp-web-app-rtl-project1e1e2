@@ -20,6 +20,7 @@ type SystemKey =
   | "accounts_receivable"
   | "accounts_payable"
   | "other_liabilities"
+  | "other_revenue"
   | "sales_returns"
   | "general_operating_expenses"
   | "shipping_fees"
@@ -33,6 +34,7 @@ export const FINANCIAL_POSTING_SYSTEM_KEYS: readonly SystemKey[] = [
   "accounts_receivable",
   "accounts_payable",
   "other_liabilities",
+  "other_revenue",
   "sales_returns",
   "general_operating_expenses",
   "shipping_fees",
@@ -199,6 +201,26 @@ async function financialLines(
       assertFlow(assets.debitCents, amount, "رد المورد");
       assertFlow(assets.creditCents, 0, "رد المورد");
       await add("accounts_payable", 0, amount, "رد نقدي من المورد");
+      break;
+    case "receipt_voucher":
+      assertFlow(assets.debitCents, amount, "سند القبض");
+      assertFlow(assets.creditCents, 0, "سند القبض");
+      await add(
+        transaction.customerId ? "accounts_receivable" : "other_revenue",
+        0,
+        amount,
+        transaction.customerId ? "تخفيض مديونية العميل" : "إيراد سند قبض",
+      );
+      break;
+    case "disbursement_voucher":
+      assertFlow(assets.creditCents, amount, "سند الصرف");
+      assertFlow(assets.debitCents, 0, "سند الصرف");
+      await add(
+        transaction.supplierId ? "accounts_payable" : "general_operating_expenses",
+        amount,
+        0,
+        transaction.supplierId ? "تخفيض مستحقات المورد" : "مصروف سند صرف",
+      );
       break;
     case "delivery_cod_collection":
       assertFlow(assets.debitCents, amount, "تحصيل COD");

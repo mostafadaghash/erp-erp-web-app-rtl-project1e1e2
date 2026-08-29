@@ -1,11 +1,52 @@
 import { useMemo, useState } from "react";
 import { useMutation, usePaginatedQuery, useQuery } from "convex/react";
+import { toast } from "sonner";
+import {
+  ArrowLeftRight,
+  Banknote,
+  Building2,
+  CheckCircle2,
+  CircleDollarSign,
+  Landmark,
+  Plus,
+  RotateCcw,
+  WalletCards,
+  X,
+} from "lucide-react";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import { usePermission } from "../lib/access";
-import { toast } from "sonner";
 
-const labels: Record<string, string> = { cash: "نقدي", instapay: "Instapay", vodafone_cash: "Vodafone Cash", fawry_clearing: "Fawry (معلق)", paymob_clearing: "Paymob (معلق)", card_clearing: "بطاقات (معلق)", cod_clearing: "COD (معلق)", bank: "بنك", other: "أخرى" };
+const accountTypeLabels: Record<string, string> = {
+  cash: "خزينة نقدية",
+  instapay: "InstaPay",
+  vodafone_cash: "Vodafone Cash",
+  fawry_clearing: "فوري - مبالغ قيد التسوية",
+  paymob_clearing: "Paymob - مبالغ قيد التسوية",
+  card_clearing: "بطاقات - مبالغ قيد التسوية",
+  cod_clearing: "شركات الشحن - مبالغ قيد التحصيل",
+  bank: "حساب بنكي",
+  other: "حساب آخر",
+};
+
+const transactionLabels: Record<string, string> = {
+  opening_balance: "رصيد افتتاحي",
+  account_transfer: "تحويل بين الحسابات",
+  paymob_settlement: "تسوية مدفوعات إلكترونية",
+  clearing_settlement: "تسوية حساب وسيط",
+  invoice_payment: "تحصيل فاتورة",
+  invoice_refund: "استرداد عميل",
+  expense_payment: "سداد مصروف",
+  supplier_payment: "سداد مورد",
+  delivery_cod_collection: "تحصيل شحنة",
+  cod_settlement: "تسوية تحصيل شحن",
+  receipt_voucher: "سند قبض",
+  disbursement_voucher: "سند صرف",
+};
+
+const money = new Intl.NumberFormat("ar-EG", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+type Dialog = "opening" | "transfer" | "settlement" | "reverse" | "initialize" | null;
 
 export function TreasuryPage() {
   const accounts = useQuery(api.finance.accounts, {});
@@ -19,24 +60,212 @@ export function TreasuryPage() {
   const settleClearingAccount = useMutation(api.finance.settleClearingAccount);
   const reverseTransaction = useMutation(api.finance.reverseTransaction);
   const initialization = useQuery(api.finance.initializationStatus, {});
-  const reportDate = new Date().toISOString().slice(0, 10);
   const branches = useQuery(api.branches.list, canManage ? {} : "skip");
-  const [branchId, setBranchId] = useState(""); const [name, setName] = useState(""); const [code, setCode] = useState(""); const [type, setType] = useState<keyof typeof labels>("cash");
-  const [cutoverDate, setCutoverDate] = useState(new Date().toISOString().slice(0, 10));
+
+  const today = new Date().toISOString().slice(0, 10);
+  const [branchId, setBranchId] = useState("");
+  const [name, setName] = useState("");
+  const [code, setCode] = useState("");
+  const [type, setType] = useState<keyof typeof accountTypeLabels>("cash");
+  const [cutoverDate, setCutoverDate] = useState(today);
+  const [dialog, setDialog] = useState<Dialog>(null);
+  const [selectedAccountId, setSelectedAccountId] = useState<Id<"financialAccounts"> | null>(null);
+  const [openingAmount, setOpeningAmount] = useState("0");
+  const [transferSourceId, setTransferSourceId] = useState("");
+  const [transferDestinationId, setTransferDestinationId] = useState("");
+  const [transferAmount, setTransferAmount] = useState("");
+  const [settlementSourceId, setSettlementSourceId] = useState("");
+  const [settlementDestinationId, setSettlementDestinationId] = useState("");
+  const [settlementGross, setSettlementGross] = useState("");
+  const [settlementFee, setSettlementFee] = useState("0");
+  const [reverseTransactionId, setReverseTransactionId] = useState<Id<"financialTransactions"> | null>(null);
+  const [reverseReason, setReverseReason] = useState("");
+  const [busy, setBusy] = useState(false);
+
   const selectedBranch = useMemo(() => branchId as Id<"branches">, [branchId]);
-  const dailySummary = useQuery(api.finance.dailySummary, branchId ? { branchId: selectedBranch, date: reportDate } : "skip");
-  const collectionSummary = useQuery(api.finance.collectionSummary, branchId ? { branchId: selectedBranch, date: reportDate } : "skip");
+  const dailySummary = useQuery(api.finance.dailySummary, branchId ? { branchId: selectedBranch, date: today } : "skip");
+  const collectionSummary = useQuery(api.finance.collectionSummary, branchId ? { branchId: selectedBranch, date: today } : "skip");
   const { results, status, loadMore } = usePaginatedQuery(api.finance.ledger, branchId ? { branchId: selectedBranch } : "skip", { initialNumItems: 25 });
-  const add = async () => { try { await createAccount({ branchId: selectedBranch, name, code, type }); setName(""); setCode(""); toast.success("تم إنشاء الحساب برصيد صفر"); } catch (error) { toast.error(error instanceof Error ? error.message : "تعذر إنشاء الحساب"); } };
-  const opening = async (accountId: Id<"financialAccounts">) => { const amount = Number(prompt("الرصيد الافتتاحي (يسمح بصفر)") ?? ""); if (!Number.isFinite(amount) || amount < 0) return; try { await postOpeningBalance({ accountId, amount, date: cutoverDate, requestId: crypto.randomUUID() }); toast.success("تم تسجيل الرصيد الافتتاحي"); } catch (error) { toast.error(error instanceof Error ? error.message : "تعذر التسجيل"); } };
-  const transfer = async () => { if (!accounts || accounts.length < 2) return toast.error("يلزم حسابان"); const amount = Number(prompt("مبلغ التحويل")); if (!amount) return; try { await transferFunds({ sourceAccountId: accounts[0]._id, destinationAccountId: accounts[1]._id, amount, date: new Date().toISOString().slice(0, 10), requestId: crypto.randomUUID() }); toast.success("تم التحويل"); } catch (error) { toast.error(error instanceof Error ? error.message : "تعذر التحويل"); } };
-  const settle = async () => { const source = accounts?.find(a => ["paymob_clearing", "fawry_clearing", "card_clearing"].includes(a.type)); const destination = accounts?.find(a => a.branchId === source?.branchId && ["cash", "bank"].includes(a.type)); const grossAmount = Number(prompt("إجمالي التسوية")); const feeAmount = Number(prompt("الرسوم") ?? 0); if (!source || !destination || !grossAmount) return toast.error("اختر حساب تسوية ووجهة صالحين"); try { await settleClearingAccount({ sourceAccountId: source._id, destinationAccountId: destination._id, grossAmount, feeAmount, settlementDate: new Date().toISOString().slice(0, 10), requestId: crypto.randomUUID() }); toast.success(`تمت التسوية، الصافي ${grossAmount - feeAmount}`); } catch (error) { toast.error(error instanceof Error ? error.message : "تعذر التسوية"); } };
-  return <div data-testid="treasury-page" className="p-6 space-y-6" dir="rtl">
-    <div><h1 className="text-2xl font-bold text-slate-900">الخزائن والبنوك</h1><p className="text-sm text-slate-500">إدارة الخزائن والحسابات البنكية والأرصدة وحركات التحويل والتسوية.</p></div>
-    {canInitialize && <section data-testid="finance-initialization" data-state={initialization?.state ?? "loading"} className="card p-5"><h2 className="font-bold mb-3">تهيئة النظام المالي — {initialization?.state === "initialized" ? "مفعل" : initialization?.state === "configuring" ? "تحت الإعداد" : "غير مهيأ"}</h2><div className="flex flex-wrap gap-2"><input data-testid="finance-cutover-date" type="date" disabled={initialization?.state === "initialized"} className="input" value={cutoverDate} onChange={e => setCutoverDate(e.target.value)} /><button data-testid="finance-configure" className="btn-secondary" onClick={() => void configure({ cutoverDate, defaultClearingDelayDays: 1 })}>حفظ تاريخ القطع</button><button data-testid="finance-confirm" className="btn-primary" onClick={() => { if (window.confirm("التأكيد نهائي ولا يمكن بعده تعديل تاريخ القطع أو الأرصدة الافتتاحية")) void confirmInitialization(); }}>تأكيد التشغيل نهائياً</button></div><p className="text-xs text-amber-700 mt-2">متبقٍ {initialization?.openingBalancesRemaining ?? 0} أرصدة افتتاحية. أنشئ خزينة نقدية لكل فرع وسجّل رصيد كل حساب حتى إن كان صفراً.</p></section>}
-    {canManage && <section className="card p-5"><h2 className="font-bold mb-3">إنشاء حساب</h2><div className="grid md:grid-cols-5 gap-2"><select data-testid="finance-account-branch" className="input" value={branchId} onChange={e => setBranchId(e.target.value)}><option value="">اختر الفرع</option>{branches?.map(b => <option key={b._id} value={b._id}>{b.name}</option>)}</select><input data-testid="finance-account-name" className="input" placeholder="اسم الحساب" value={name} onChange={e => setName(e.target.value)} /><input data-testid="finance-account-code" className="input" placeholder="الكود" value={code} onChange={e => setCode(e.target.value)} /><select data-testid="finance-account-type" className="input" value={type} onChange={e => setType(e.target.value as keyof typeof labels)}>{Object.entries(labels).map(([value,label]) => <option key={value} value={value}>{label}</option>)}</select><button data-testid="finance-account-create" className="btn-primary" disabled={!branchId || !name || !code} onClick={() => void add()}>إنشاء حساب</button></div><div className="flex gap-2 mt-3"><button className="btn-secondary" onClick={() => void transfer()}>تحويل بين الحسابات</button><button className="btn-secondary" onClick={() => void settle()}>تسوية حساب وسيط</button></div></section>}
-    <section className="card overflow-hidden"><div className="p-4 font-bold">الحسابات</div><div className="overflow-x-auto"><table className="w-full text-sm"><thead className="bg-slate-50"><tr><th className="p-3">الحساب</th><th>النوع</th><th>الرصيد الحالي</th><th>المتاح</th><th>المعلق</th><th>الحالة</th><th>الافتتاحي</th></tr></thead><tbody>{accounts?.map(a => <tr key={a._id} data-testid="finance-account-row" data-account-name={a.name} data-account-branch-id={a.branchId} data-account-type={a.type} data-account-active={String(a.isActive)} data-account-balance={String(a.currentBalance)} data-opening-posted={String(Boolean(a.openingBalancePostedAt))} className="border-t"><td className="p-3 font-medium">{a.name}</td><td>{labels[a.type]}</td><td>{a.currentBalance.toFixed(2)}</td><td>{a.availableBalance.toFixed(2)}</td><td>{a.pendingBalance.toFixed(2)}</td><td>{a.isActive ? "نشط" : "معطل"}</td><td>{a.openingBalancePostedAt ? "مسجل" : <button data-testid="finance-opening-balance" className="btn-secondary text-xs" onClick={() => void opening(a._id)}>تسجيل رصيد افتتاحي</button>}</td></tr>)}</tbody></table></div></section>
-    {dailySummary && collectionSummary && <section className="grid md:grid-cols-2 gap-4"><div className="card p-4"><h2 className="font-bold">ملخص اليوم</h2><p>أول اليوم: {dailySummary.openingBalance.toFixed(2)}</p><p className="text-emerald-700">الداخل: {dailySummary.incoming.toFixed(2)}</p><p className="text-red-700">الخارج: {dailySummary.outgoing.toFixed(2)}</p><p>آخر اليوم: {dailySummary.closingBalance.toFixed(2)}</p><p>المعلق: {dailySummary.pending.toFixed(2)} — المتاح: {dailySummary.availableForSettlement.toFixed(2)}</p></div><div className="card p-4"><h2 className="font-bold">ملخص التحصيل</h2><p>التحصيل: {collectionSummary.totalCollections.toFixed(2)}</p><p>الاسترداد: {collectionSummary.totalRefunds.toFixed(2)}</p><p className="font-bold">الصافي: {collectionSummary.netCollections.toFixed(2)}</p></div></section>}
-    <section className="card overflow-hidden"><div className="p-4 flex justify-between"><span className="font-bold">دفتر الحركة</span><span className="text-xs text-slate-500">اختر فرعاً لعرض السجل المفهرس</span></div><table className="w-full text-sm"><thead className="bg-slate-50"><tr><th className="p-3">التاريخ</th><th>الحساب</th><th>النوع</th><th>الداخل</th><th>الخارج</th><th>الرصيد بعد</th><th>إجراء</th></tr></thead><tbody>{results.map(m => <tr key={m._id} className="border-t"><td className="p-3">{m.date}</td><td>{m.accountName}</td><td>{m.transactionType}</td><td className="text-emerald-600">{m.incoming ? m.incoming.toFixed(2) : "—"}</td><td className="text-red-600">{m.outgoing ? m.outgoing.toFixed(2) : "—"}</td><td>{m.balanceAfter.toFixed(2)}</td><td>{["opening_balance","account_transfer","paymob_settlement","clearing_settlement"].includes(m.transactionType) && <button className="text-xs text-red-700" onClick={() => { const reason=prompt("سبب العكس")?.trim(); if(reason) void reverseTransaction({ transactionId:m.transactionId, reason, date:new Date().toISOString().slice(0,10), requestId:crypto.randomUUID() }); }}>عكس</button>}</td></tr>)}</tbody></table>{status === "CanLoadMore" && <button className="m-4 btn-secondary" onClick={() => loadMore(25)}>تحميل المزيد</button>}</section>
-  </div>;
+
+  const branchAccounts = useMemo(() => (accounts ?? []).filter(account => !branchId || String(account.branchId) === branchId), [accounts, branchId]);
+  const activeAccounts = branchAccounts.filter(account => account.isActive);
+  const cashAndBankAccounts = activeAccounts.filter(account => ["cash", "bank"].includes(account.type));
+  const clearingAccounts = activeAccounts.filter(account => ["paymob_clearing", "fawry_clearing", "card_clearing"].includes(account.type));
+  const totalBalance = branchAccounts.reduce((sum, account) => sum + account.currentBalance, 0);
+  const totalAvailable = branchAccounts.reduce((sum, account) => sum + account.availableBalance, 0);
+  const totalPending = branchAccounts.reduce((sum, account) => sum + account.pendingBalance, 0);
+
+  const run = async (action: () => Promise<unknown>, success: string) => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      await action();
+      toast.success(success);
+      setDialog(null);
+      setReverseReason("");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "تعذر إتمام العملية");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const addAccount = async () => {
+    if (!branchId || !name.trim() || !code.trim()) return;
+    await run(
+      () => createAccount({ branchId: selectedBranch, name: name.trim(), code: code.trim(), type }),
+      "تم إنشاء الحساب بنجاح",
+    );
+    setName("");
+    setCode("");
+  };
+
+  const openOpeningBalance = (accountId: Id<"financialAccounts">) => {
+    setSelectedAccountId(accountId);
+    setOpeningAmount("0");
+    setDialog("opening");
+  };
+
+  const openTransfer = () => {
+    const first = cashAndBankAccounts[0];
+    const second = cashAndBankAccounts.find(account => account._id !== first?._id);
+    setTransferSourceId(first?._id ?? "");
+    setTransferDestinationId(second?._id ?? "");
+    setTransferAmount("");
+    setDialog("transfer");
+  };
+
+  const openSettlement = () => {
+    setSettlementSourceId(clearingAccounts[0]?._id ?? "");
+    setSettlementDestinationId(cashAndBankAccounts[0]?._id ?? "");
+    setSettlementGross("");
+    setSettlementFee("0");
+    setDialog("settlement");
+  };
+
+  const openReverse = (transactionId: Id<"financialTransactions">) => {
+    setReverseTransactionId(transactionId);
+    setReverseReason("");
+    setDialog("reverse");
+  };
+
+  const canReverseType = (typeName: string) => ["opening_balance", "account_transfer", "paymob_settlement", "clearing_settlement"].includes(typeName);
+
+  return (
+    <div data-testid="treasury-page" className="space-y-6 p-4 lg:p-6" dir="rtl">
+      <header className="erp-page-header">
+        <div>
+          <h1 className="erp-page-title"><Landmark className="h-6 w-6 text-emerald-600" />الخزينة والبنوك</h1>
+          <p className="erp-page-subtitle">إدارة الحسابات النقدية والبنكية والأرصدة والتحويلات بطريقة واضحة ومباشرة</p>
+        </div>
+        {canManage && branches && (
+          <select className="form-input min-w-56" value={branchId} onChange={event => setBranchId(event.target.value)} aria-label="الفرع">
+            <option value="">جميع الفروع</option>
+            {branches.filter(branch => branch.isActive).map(branch => <option key={branch._id} value={branch._id}>{branch.name}</option>)}
+          </select>
+        )}
+      </header>
+
+      <section className="erp-metric-grid">
+        <div className="erp-metric-card"><div className="flex items-start justify-between"><div><p className="erp-metric-label">إجمالي الأرصدة</p><p className="erp-metric-value text-emerald-700">{money.format(totalBalance)}</p></div><div className="rounded-xl bg-emerald-50 p-2.5 text-emerald-700"><CircleDollarSign className="h-5 w-5" /></div></div></div>
+        <div className="erp-metric-card"><div className="flex items-start justify-between"><div><p className="erp-metric-label">المتاح للاستخدام</p><p className="erp-metric-value">{money.format(totalAvailable)}</p></div><div className="rounded-xl bg-blue-50 p-2.5 text-blue-700"><Banknote className="h-5 w-5" /></div></div></div>
+        <div className="erp-metric-card"><div className="flex items-start justify-between"><div><p className="erp-metric-label">مبالغ قيد التسوية</p><p className="erp-metric-value">{money.format(totalPending)}</p></div><div className="rounded-xl bg-amber-50 p-2.5 text-amber-700"><WalletCards className="h-5 w-5" /></div></div></div>
+        <div className="erp-metric-card"><div className="flex items-start justify-between"><div><p className="erp-metric-label">الحسابات النشطة</p><p className="erp-metric-value">{activeAccounts.length.toLocaleString("ar-EG")}</p></div><div className="rounded-xl bg-violet-50 p-2.5 text-violet-700"><Building2 className="h-5 w-5" /></div></div></div>
+      </section>
+
+      {canInitialize && initialization?.state !== "initialized" && (
+        <section data-testid="finance-initialization" data-state={initialization?.state ?? "loading"} className="erp-section">
+          <div className="erp-section-header">
+            <div>
+              <h2 className="erp-section-title">إعداد الأرصدة الافتتاحية</h2>
+              <p className="mt-1 text-xs text-slate-500">أكمل أرصدة البداية لكل حساب قبل اعتماد التشغيل المالي.</p>
+            </div>
+            <span className="badge badge-warning">متبقي {initialization?.openingBalancesRemaining ?? 0}</span>
+          </div>
+          <div className="grid gap-3 p-4 md:grid-cols-[220px_1fr_auto] md:items-end">
+            <div><label className="form-label">تاريخ بدء التسجيل المالي</label><input data-testid="finance-cutover-date" type="date" disabled={initialization?.state === "initialized"} className="form-input" value={cutoverDate} onChange={event => setCutoverDate(event.target.value)} /></div>
+            <p className="rounded-xl bg-slate-50 p-3 text-sm leading-6 text-slate-600">بعد الاعتماد يبدأ النظام في اعتبار الحركات التالية لهذا التاريخ ضمن الدورة المالية الرسمية. راجع الأرصدة الافتتاحية أولًا.</p>
+            <div className="flex flex-wrap gap-2"><button data-testid="finance-configure" className="erp-action" onClick={() => void run(() => configure({ cutoverDate, defaultClearingDelayDays: 1 }), "تم حفظ تاريخ بدء التسجيل المالي")}>حفظ التاريخ</button><button data-testid="finance-confirm" className="btn-primary" disabled={(initialization?.openingBalancesRemaining ?? 1) > 0 || busy} onClick={() => setDialog("initialize")}>اعتماد التشغيل المالي</button></div>
+          </div>
+        </section>
+      )}
+
+      {canManage && (
+        <section className="erp-section">
+          <div className="erp-section-header"><div><h2 className="erp-section-title">الحسابات المالية</h2><p className="mt-1 text-xs text-slate-500">أضف خزينة أو حسابًا بنكيًا أو حسابًا وسيطًا، ثم تابع رصيده من مكان واحد.</p></div><div className="erp-actions"><button className="erp-action" onClick={openTransfer} disabled={cashAndBankAccounts.length < 2}><ArrowLeftRight className="h-4 w-4" />تحويل بين الحسابات</button><button className="erp-action" onClick={openSettlement} disabled={clearingAccounts.length === 0 || cashAndBankAccounts.length === 0}><CheckCircle2 className="h-4 w-4" />تسوية حساب وسيط</button></div></div>
+          <div className="grid gap-3 border-b border-slate-100 p-4 md:grid-cols-5">
+            <select data-testid="finance-account-branch" className="form-input" value={branchId} onChange={event => setBranchId(event.target.value)}><option value="">اختر الفرع</option>{branches?.filter(branch => branch.isActive).map(branch => <option key={branch._id} value={branch._id}>{branch.name}</option>)}</select>
+            <input data-testid="finance-account-name" className="form-input" placeholder="اسم الحساب" value={name} onChange={event => setName(event.target.value)} />
+            <input data-testid="finance-account-code" className="form-input" placeholder="رقم أو كود الحساب" value={code} onChange={event => setCode(event.target.value)} />
+            <select data-testid="finance-account-type" className="form-input" value={type} onChange={event => setType(event.target.value as keyof typeof accountTypeLabels)}>{Object.entries(accountTypeLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
+            <button data-testid="finance-account-create" className="btn-primary" disabled={!branchId || !name.trim() || !code.trim() || busy} onClick={() => void addAccount()}><Plus className="h-4 w-4" />حساب جديد</button>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="data-table min-w-[920px]">
+              <thead><tr><th>اسم الحساب</th><th>النوع</th><th>الرصيد الحالي</th><th>المتاح</th><th>قيد التسوية</th><th>الحالة</th><th>الرصيد الافتتاحي</th></tr></thead>
+              <tbody>{branchAccounts.map(account => <tr key={account._id} data-testid="finance-account-row" data-account-name={account.name} data-account-branch-id={account.branchId} data-account-type={account.type} data-account-active={String(account.isActive)} data-account-balance={String(account.currentBalance)} data-opening-posted={String(Boolean(account.openingBalancePostedAt))}>
+                <td className="font-bold text-slate-800">{account.name}<div className="mt-0.5 text-[11px] text-slate-400">{account.code}</div></td>
+                <td>{accountTypeLabels[account.type] ?? "حساب مالي"}</td>
+                <td className="font-black">{money.format(account.currentBalance)}</td>
+                <td className="text-emerald-700">{money.format(account.availableBalance)}</td>
+                <td className={account.pendingBalance ? "text-amber-700" : "text-slate-400"}>{money.format(account.pendingBalance)}</td>
+                <td><span className={`badge ${account.isActive ? "badge-success" : "badge-danger"}`}>{account.isActive ? "نشط" : "غير نشط"}</span></td>
+                <td>{account.openingBalancePostedAt ? <span className="badge badge-success">مسجل</span> : <button data-testid="finance-opening-balance" className="erp-action" onClick={() => openOpeningBalance(account._id)}>تسجيل الرصيد</button>}</td>
+              </tr>)}</tbody>
+            </table>
+          </div>
+        </section>
+      )}
+
+      {dailySummary && collectionSummary && (
+        <section className="grid gap-4 md:grid-cols-2">
+          <div className="erp-section p-5"><h2 className="mb-4 font-black text-slate-800">حركة اليوم</h2><div className="grid grid-cols-2 gap-3 text-sm"><div className="rounded-xl bg-slate-50 p-3"><span className="text-slate-500">رصيد بداية اليوم</span><strong className="mt-1 block text-lg">{money.format(dailySummary.openingBalance)}</strong></div><div className="rounded-xl bg-emerald-50 p-3"><span className="text-slate-500">إجمالي الداخل</span><strong className="mt-1 block text-lg text-emerald-700">{money.format(dailySummary.incoming)}</strong></div><div className="rounded-xl bg-rose-50 p-3"><span className="text-slate-500">إجمالي الخارج</span><strong className="mt-1 block text-lg text-rose-700">{money.format(dailySummary.outgoing)}</strong></div><div className="rounded-xl bg-blue-50 p-3"><span className="text-slate-500">رصيد نهاية اليوم</span><strong className="mt-1 block text-lg text-blue-700">{money.format(dailySummary.closingBalance)}</strong></div></div></div>
+          <div className="erp-section p-5"><h2 className="mb-4 font-black text-slate-800">تحصيلات اليوم</h2><div className="space-y-3 text-sm"><div className="flex justify-between rounded-xl bg-slate-50 p-3"><span>إجمالي التحصيل</span><strong className="text-emerald-700">{money.format(collectionSummary.totalCollections)}</strong></div><div className="flex justify-between rounded-xl bg-slate-50 p-3"><span>إجمالي الاسترداد</span><strong className="text-rose-700">{money.format(collectionSummary.totalRefunds)}</strong></div><div className="flex justify-between rounded-xl bg-emerald-50 p-3"><span className="font-bold">صافي التحصيل</span><strong className="text-emerald-800">{money.format(collectionSummary.netCollections)}</strong></div></div></div>
+        </section>
+      )}
+
+      <section className="erp-section">
+        <div className="erp-section-header"><div><h2 className="erp-section-title">دفتر الحركة</h2><p className="mt-1 text-xs text-slate-500">سجل الحركات المالية حسب الفرع المحدد.</p></div></div>
+        <div className="overflow-x-auto"><table className="data-table min-w-[900px]"><thead><tr><th>التاريخ</th><th>الحساب</th><th>نوع الحركة</th><th>الداخل</th><th>الخارج</th><th>الرصيد بعد الحركة</th><th>إجراء</th></tr></thead><tbody>{results.map(movement => <tr key={movement._id}><td>{movement.date}</td><td className="font-bold">{movement.accountName}</td><td>{transactionLabels[movement.transactionType] ?? "حركة مالية"}</td><td className="text-emerald-700">{movement.incoming ? money.format(movement.incoming) : "—"}</td><td className="text-rose-700">{movement.outgoing ? money.format(movement.outgoing) : "—"}</td><td className="font-bold">{money.format(movement.balanceAfter)}</td><td>{canReverseType(movement.transactionType) && <button className="erp-action erp-action-danger" onClick={() => openReverse(movement.transactionId)}><RotateCcw className="h-4 w-4" />إلغاء الحركة</button>}</td></tr>)}</tbody></table></div>
+        {(status === "CanLoadMore" || status === "LoadingMore") && <div className="border-t border-slate-100 p-3 text-center"><button className="erp-action" disabled={status === "LoadingMore"} onClick={() => loadMore(25)}>{status === "LoadingMore" ? "جارٍ تحميل المزيد…" : "عرض المزيد"}</button></div>}
+      </section>
+
+      {dialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4 backdrop-blur-sm">
+          <div className="w-[min(96vw,560px)] space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl">
+            <div className="flex items-start justify-between border-b border-slate-100 pb-4"><div><h2 className="text-xl font-black">{dialog === "opening" ? "تسجيل الرصيد الافتتاحي" : dialog === "transfer" ? "تحويل بين الحسابات" : dialog === "settlement" ? "تسوية حساب وسيط" : dialog === "initialize" ? "اعتماد التشغيل المالي" : "إلغاء حركة مالية"}</h2>{dialog === "reverse" && <p className="mt-1 text-sm text-slate-500">سيتم إنشاء حركة عكسية موثقة بدل حذف الحركة الأصلية.</p>}</div><button className="rounded-xl p-2 hover:bg-slate-100" onClick={() => setDialog(null)} aria-label="إغلاق"><X className="h-5 w-5" /></button></div>
+
+            {dialog === "initialize" && <div data-testid="finance-confirmation-dialog" className="space-y-3"><p className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm leading-7 text-amber-900">هذا الاعتماد نهائي. بعد تفعيل التشغيل المالي لن تتمكن من تعديل تاريخ بدء التسجيل أو الأرصدة الافتتاحية من شاشة الإعداد.</p><div className="rounded-xl bg-slate-50 p-3 text-sm text-slate-700"><span className="text-slate-500">تاريخ بدء التسجيل المالي:</span> <strong>{cutoverDate}</strong></div></div>}
+            {dialog === "opening" && <div><label className="form-label">الرصيد الافتتاحي</label><input className="form-input" type="number" min="0" step="0.01" value={openingAmount} onChange={event => setOpeningAmount(event.target.value)} /></div>}
+            {dialog === "transfer" && <div className="space-y-3"><div><label className="form-label">من حساب</label><select className="form-input" value={transferSourceId} onChange={event => setTransferSourceId(event.target.value)}><option value="">اختر الحساب</option>{cashAndBankAccounts.map(account => <option key={account._id} value={account._id}>{account.name} — {money.format(account.availableBalance)}</option>)}</select></div><div><label className="form-label">إلى حساب</label><select className="form-input" value={transferDestinationId} onChange={event => setTransferDestinationId(event.target.value)}><option value="">اختر الحساب</option>{cashAndBankAccounts.map(account => <option key={account._id} value={account._id}>{account.name}</option>)}</select></div><div><label className="form-label">المبلغ</label><input className="form-input" type="number" min="0" step="0.01" value={transferAmount} onChange={event => setTransferAmount(event.target.value)} /></div></div>}
+            {dialog === "settlement" && <div className="space-y-3"><div><label className="form-label">الحساب الوسيط</label><select className="form-input" value={settlementSourceId} onChange={event => setSettlementSourceId(event.target.value)}><option value="">اختر الحساب</option>{clearingAccounts.map(account => <option key={account._id} value={account._id}>{account.name}</option>)}</select></div><div><label className="form-label">الإيداع في</label><select className="form-input" value={settlementDestinationId} onChange={event => setSettlementDestinationId(event.target.value)}><option value="">اختر الخزينة أو البنك</option>{cashAndBankAccounts.map(account => <option key={account._id} value={account._id}>{account.name}</option>)}</select></div><div className="grid grid-cols-2 gap-3"><div><label className="form-label">إجمالي التسوية</label><input className="form-input" type="number" min="0" step="0.01" value={settlementGross} onChange={event => setSettlementGross(event.target.value)} /></div><div><label className="form-label">الرسوم</label><input className="form-input" type="number" min="0" step="0.01" value={settlementFee} onChange={event => setSettlementFee(event.target.value)} /></div></div></div>}
+            {dialog === "reverse" && <div><label className="form-label">سبب إلغاء الحركة</label><textarea className="form-input min-h-24" value={reverseReason} onChange={event => setReverseReason(event.target.value)} placeholder="اكتب السبب بوضوح" /></div>}
+
+            <div className="flex justify-end gap-2 border-t border-slate-100 pt-4"><button className="erp-action" onClick={() => setDialog(null)} disabled={busy}>إلغاء</button><button data-testid={dialog === "initialize" ? "finance-confirm-final" : undefined} className="btn-primary" disabled={busy} onClick={() => {
+              if (dialog === "initialize") {
+                void run(() => confirmInitialization(), "تم اعتماد التشغيل المالي");
+              }
+              if (dialog === "opening" && selectedAccountId) {
+                const amount = Number(openingAmount); if (!Number.isFinite(amount) || amount < 0) return toast.error("أدخل رصيدًا صحيحًا");
+                void run(() => postOpeningBalance({ accountId: selectedAccountId, amount, date: cutoverDate, requestId: crypto.randomUUID() }), "تم تسجيل الرصيد الافتتاحي");
+              }
+              if (dialog === "transfer") {
+                const amount = Number(transferAmount); if (!transferSourceId || !transferDestinationId || transferSourceId === transferDestinationId || !Number.isFinite(amount) || amount <= 0) return toast.error("راجع الحسابات والمبلغ");
+                void run(() => transferFunds({ sourceAccountId: transferSourceId as Id<"financialAccounts">, destinationAccountId: transferDestinationId as Id<"financialAccounts">, amount, date: today, requestId: crypto.randomUUID() }), "تم التحويل بين الحسابات");
+              }
+              if (dialog === "settlement") {
+                const grossAmount = Number(settlementGross); const feeAmount = Number(settlementFee || 0); if (!settlementSourceId || !settlementDestinationId || !Number.isFinite(grossAmount) || grossAmount <= 0 || !Number.isFinite(feeAmount) || feeAmount < 0 || feeAmount > grossAmount) return toast.error("راجع بيانات التسوية");
+                void run(() => settleClearingAccount({ sourceAccountId: settlementSourceId as Id<"financialAccounts">, destinationAccountId: settlementDestinationId as Id<"financialAccounts">, grossAmount, feeAmount, settlementDate: today, requestId: crypto.randomUUID() }), "تمت تسوية الحساب الوسيط");
+              }
+              if (dialog === "reverse" && reverseTransactionId) {
+                if (!reverseReason.trim()) return toast.error("اكتب سبب إلغاء الحركة");
+                void run(() => reverseTransaction({ transactionId: reverseTransactionId, reason: reverseReason.trim(), date: today, requestId: crypto.randomUUID() }), "تم إلغاء الحركة وتسجيل الحركة العكسية");
+              }
+            }}>{busy ? "جارٍ الحفظ…" : dialog === "initialize" ? "اعتماد نهائي" : "حفظ"}</button></div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }

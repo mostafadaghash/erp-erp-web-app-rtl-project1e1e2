@@ -12,6 +12,7 @@ import {
   describeSnapshot,
   manifestPathForSnapshot,
   productionConfirmation,
+  validateRestoreDrillEvidence,
   verifySnapshotManifest,
 } from "../scripts/backup/lib.mjs";
 
@@ -115,4 +116,77 @@ test("restore script is plan-only by default and execution requires pre-restore 
   assert.match(source, /PLAN ONLY: no restore command was executed/);
   assert.match(source, /--pre-restore-manifest is required before executing a destructive restore/);
   assert.match(source, /runConvexCli\(restoreArgs\)/);
+});
+
+test("restore drill evidence proves isolated recovery, mandatory checks, RPO and RTO", () => {
+  const sourceManifest = {
+    deployment: "academic-puma-235",
+    environment: "staging",
+    includeFileStorage: true,
+    createdAt: "2026-08-21T10:00:00.000Z",
+    sha256: "a".repeat(64),
+    sourceCommit: "b".repeat(40),
+  };
+  const preRestoreManifest = {
+    deployment: "restore-sandbox-123",
+    environment: "staging",
+    sha256: "c".repeat(64),
+  };
+  const evidence = {
+    schemaVersion: 1,
+    environment: "staging",
+    sourceDeployment: sourceManifest.deployment,
+    targetDeployment: preRestoreManifest.deployment,
+    sourceSnapshotSha256: sourceManifest.sha256,
+    preRestoreSnapshotSha256: preRestoreManifest.sha256,
+    releaseCommit: sourceManifest.sourceCommit,
+    startedAt: "2026-08-21T11:00:00.000Z",
+    completedAt: "2026-08-21T12:30:00.000Z",
+    operator: "release-owner",
+    checks: {
+      importCompleted: true,
+      authentication: true,
+      environmentConfiguration: true,
+      dataCounts: true,
+      inventory: true,
+      financialAccounts: true,
+      customerLedger: true,
+      supplierLedger: true,
+      criticalWrites: true,
+      securityHeaders: true,
+    },
+    evidenceRefs: ["test-results/restore/drill.json"],
+  };
+  const result = validateRestoreDrillEvidence({ evidence, sourceManifest, preRestoreManifest });
+  assert.equal(result.observedRpoHours, 1);
+  assert.equal(result.observedRtoMinutes, 90);
+  assert.throws(
+    () => validateRestoreDrillEvidence({ evidence: { ...evidence, checks: { ...evidence.checks, inventory: false } }, sourceManifest, preRestoreManifest }),
+    /inventory/,
+  );
+  assert.throws(
+    () => validateRestoreDrillEvidence({
+      evidence: {
+        ...evidence,
+        checks: { ...evidence.checks, environmentConfiguration: false },
+      },
+      sourceManifest,
+      preRestoreManifest,
+    }),
+    /environmentConfiguration/,
+  );
+  assert.throws(
+    () => validateRestoreDrillEvidence({ evidence: { ...evidence, targetDeployment: sourceManifest.deployment }, sourceManifest, preRestoreManifest }),
+    /isolated/,
+  );
+});
+
+test("restore drill runbook targets a deployment isolated from source Staging", async () => {
+  const runbook = await readFile("docs/BACKUP_RESTORE.md", "utf8");
+  assert.match(runbook, /--deployment restore-drill/);
+  assert.match(runbook, /restore-drill-pre-restore\.zip\.manifest\.json/);
+  for (const variable of ["SITE_URL", "JWT_PRIVATE_KEY", "JWKS"]) {
+    assert.match(runbook, new RegExp(variable));
+  }
+  assert.doesNotMatch(runbook, /restore:execute -- \\\n+  --deployment staging/);
 });

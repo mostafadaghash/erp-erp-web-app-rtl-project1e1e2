@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 
-export const MIGRATION_SCHEMA_VERSION = 1;
+export const MIGRATION_SCHEMA_VERSION = 2;
 export const ACCOUNT_TYPES = new Set([
   "cash", "instapay", "vodafone_cash", "fawry_clearing", "paymob_clearing",
   "card_clearing", "cod_clearing", "bank", "other",
@@ -130,6 +130,7 @@ function canonicalProduct(row) {
     : Number(row.inventoryValue);
   return {
     legacyId: normalizeText(row.legacyId),
+    branchCode: normalizeCode(row.branchCode),
     sku: normalizeCode(row.sku),
     barcode: normalizeText(row.barcode) || undefined,
     name: normalizeText(row.name),
@@ -193,6 +194,7 @@ export function prepareMigration(input) {
 
   const duplicateBranchIndexes = uniqueCheck(branchesRaw, (r) => normalizeCode(r.code), "branch code", rejected, "branches");
   uniqueCheck(branchesRaw, (r) => normalizeText(r.legacyId), "legacyId", rejected, "branches");
+  uniqueCheck(branchesRaw, (r) => normalizeText(r.name).toLocaleLowerCase(), "branch name", rejected, "branches");
   const branches = [];
   branchesRaw.forEach((raw, index) => {
     if (duplicateBranchIndexes.has(index) || rejected.some((r) => r.entity === "branches" && r.index === index)) return;
@@ -213,7 +215,7 @@ export function prepareMigration(input) {
     const balanceCodes = new Set();
     row.balances.forEach((balance) => {
       if (!branchCodes.has(balance.branchCode)) errors.push(`unknown branchCode in balances: ${balance.branchCode}`);
-      if (!isFiniteMoney(balance.balance, { allowNegative: true })) errors.push(`invalid supplier balance for ${balance.branchCode}`);
+      if (!isFiniteMoney(balance.balance)) errors.push(`supplier balance must be non-negative money for ${balance.branchCode}`);
       if (balanceCodes.has(balance.branchCode)) errors.push(`duplicate supplier balance branchCode: ${balance.branchCode}`);
       balanceCodes.add(balance.branchCode);
     });
@@ -242,12 +244,14 @@ export function prepareMigration(input) {
   productsRaw.forEach((raw, index) => {
     if (rejected.some((r) => r.entity === "products" && r.index === index)) return;
     const row = canonicalProduct(raw);
-    const errors = validateBase(row, ["legacyId", "sku", "name"]);
+    const errors = validateBase(row, ["legacyId", "branchCode", "sku", "name"]);
+    if (!branchCodes.has(row.branchCode)) errors.push(`unknown branchCode: ${row.branchCode}`);
     if (!Number.isInteger(row.stock) || row.stock < 0) errors.push("stock must be a non-negative integer");
     if (!Number.isInteger(row.minStock) || row.minStock < 0) errors.push("minStock must be a non-negative integer");
     if (!isFiniteMoney(row.costPrice, { decimals: 4 })) errors.push("costPrice must be non-negative with at most 4 decimals");
     if (!isFiniteMoney(row.sellPrice)) errors.push("sellPrice must be non-negative money");
     if (!isFiniteMoney(row.inventoryValue)) errors.push("inventoryValue must be non-negative money");
+    if (row.stock === 0 && row.inventoryValue !== 0) errors.push("zero-stock product cannot carry inventoryValue");
     if (row.supplierLegacyId && !supplierIds.has(row.supplierLegacyId)) errors.push(`unknown supplierLegacyId: ${row.supplierLegacyId}`);
     if (errors.length) pushRejected(rejected, "products", index, row.legacyId, errors, raw); else products.push(row);
   });
@@ -261,9 +265,9 @@ export function prepareMigration(input) {
     const errors = validateBase(row, ["legacyId", "branchCode", "code", "name", "type"]);
     if (!branchCodes.has(row.branchCode)) errors.push(`unknown branchCode: ${row.branchCode}`);
     if (!ACCOUNT_TYPES.has(row.type)) errors.push(`unsupported account type: ${row.type}`);
-    if (!isFiniteMoney(row.balance, { allowNegative: true })) errors.push("balance must be money");
+    if (!isFiniteMoney(row.balance)) errors.push("balance must be non-negative money");
     if (!Number.isInteger(row.settlementDelayDays) || row.settlementDelayDays < 0 || row.settlementDelayDays > 365) errors.push("settlementDelayDays must be 0-365");
-    if (row.balance < 0 && !row.allowNegative) errors.push("negative opening balance requires allowNegative=true");
+    if (!row.isActive && row.balance !== 0) errors.push("inactive financial account cannot carry an opening balance");
     if (errors.length) pushRejected(rejected, "financialAccounts", index, row.legacyId, errors, raw); else financialAccounts.push(row);
   });
 
@@ -301,7 +305,7 @@ export function prepareMigration(input) {
     branches: Object.fromEntries(branches.map((row) => [row.legacyId, row.code])),
     customers: Object.fromEntries(customers.map((row) => [row.legacyId, `${row.branchCode}|${row.phone}`])),
     suppliers: Object.fromEntries(suppliers.map((row) => [row.legacyId, row.phone])),
-    products: Object.fromEntries(products.map((row) => [row.legacyId, row.sku])),
+    products: Object.fromEntries(products.map((row) => [row.legacyId, `${row.branchCode}|${row.sku}`])),
     financialAccounts: Object.fromEntries(financialAccounts.map((row) => [row.legacyId, `${row.branchCode}|${row.code}`])),
     cod: Object.fromEntries(cod.map((row) => [row.legacyId, `${row.branchCode}|${row.referenceNumber ?? row.legacyId}`])),
   };

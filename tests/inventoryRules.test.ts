@@ -26,6 +26,8 @@ test("inventory movement types are centralized and stable", () => {
     "repair_part_reversal",
     "shipment_receipt",
     "purchase_return",
+    "transfer_out",
+    "transfer_in",
   ]);
 });
 

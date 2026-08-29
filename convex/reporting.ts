@@ -2,8 +2,10 @@ import { query } from "./_generated/server.js";
 import type { QueryCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import { ConvexError, v } from "convex/values";
+import { paginationOptsValidator } from "convex/server";
 import {
   hasPermission,
+  requireModulePermission,
   requirePermission,
   type AuthUser,
 } from "./lib/auth.ts";
@@ -101,6 +103,78 @@ async function resolveReportBranches(
   }
   return [user.branchId];
 }
+
+export const salesDetails = query({
+  args: {
+    branchId: v.optional(v.id("branches")),
+    from: v.string(),
+    to: v.string(),
+    paginationOpts: paginationOptsValidator,
+  },
+  handler: async (ctx, args) => {
+    const user = await requirePermission(ctx, "view_reports");
+    await requireModulePermission(ctx, "view_invoices", "invoices");
+    const range = normalizedRange(args.from, args.to);
+    const branchIds = await resolveReportBranches(ctx, user, args.branchId);
+    if (branchIds.length !== 1) {
+      throw new ConvexError("اختر فرعًا واحدًا لعرض فواتير المبيعات التفصيلية");
+    }
+    const branchId = branchIds[0];
+    const [page, branch] = await Promise.all([
+      ctx.db
+        .query("invoices")
+        .withIndex("by_branch_date", (q) =>
+          q
+            .eq("branchId", branchId)
+            .gte("date", range.from)
+            .lte("date", range.to),
+        )
+        .order("desc")
+        .paginate(args.paginationOpts),
+      ctx.db.get(branchId),
+    ]);
+    const canViewProfits = hasPermission(user, "view_profits");
+    return {
+      ...page,
+      page: page.page.map((invoice) => ({
+        _id: String(invoice._id),
+        invoiceNumber: invoice.invoiceNumber,
+        date: invoice.date!,
+        branchId: String(branchId),
+        branchName: branch?.name ?? "فرع غير معروف",
+        customerId: invoice.customerId ? String(invoice.customerId) : undefined,
+        customerName: invoice.customerName,
+        customerPhone: invoice.customerPhone,
+        itemCount: invoice.items.length,
+        totalQuantity: invoice.items.reduce((sum, item) => sum + item.quantity, 0),
+        subtotal: invoice.subtotal,
+        discount: invoice.discount,
+        tax: invoice.tax,
+        total: invoice.total,
+        creditedTotal: invoice.creditedTotal ?? 0,
+        netTotal: invoice.netTotal ?? invoice.total,
+        paid: invoice.paid,
+        remaining: invoice.remaining,
+        paymentMethod: invoice.paymentMethod,
+        status: invoice.status,
+        items: invoice.items.map((item) => ({
+          productId: String(item.productId),
+          productName: item.productName,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          discount: item.discount,
+          total: item.total,
+          ...(canViewProfits && item.costTotal !== undefined
+            ? {
+                costTotal: item.costTotal,
+                grossProfit: roundMoney(item.total - item.costTotal),
+              }
+            : {}),
+        })),
+      })),
+    };
+  },
+});
 
 async function loadBranchData(
   ctx: QueryCtx,

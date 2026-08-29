@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "environment": "staging",
+  "sourceDeployment": "academic-puma-235",
+  "targetDeployment": "replace-with-isolated-restore-deployment",
+  "sourceSnapshotSha256": "replace-with-source-backup-sha256",
+  "preRestoreSnapshotSha256": "replace-with-pre-restore-backup-sha256",
+  "releaseCommit": "replace-with-40-character-git-sha",
+  "startedAt": "2026-08-21T00:00:00.000Z",
+  "completedAt": "2026-08-21T00:00:00.000Z",
+  "operator": "",
+  "checks": {
+    "importCompleted": false,
+    "authentication": false,
+    "environmentConfiguration": false,
+    "dataCounts": false,
+    "inventory": false,
+    "financialAccounts": false,
+    "customerLedger": false,
+    "supplierLedger": false,
+    "criticalWrites": false,
+    "securityHeaders": false
+  },
+  "evidenceRefs": [],
+  "notes": ""
+}

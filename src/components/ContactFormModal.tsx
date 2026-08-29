@@ -14,6 +14,9 @@ type ContactFormModalProps = {
   onChange: (form: ContactFormValues) => void;
   onClose: () => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  categoryOptions?: Array<{ _id: string; name: string }>;
+  categoryId?: string;
+  onCategoryChange?: (categoryId: string) => void;
 };
 
 export function ContactFormModal({
@@ -25,6 +28,9 @@ export function ContactFormModal({
   onChange,
   onClose,
   onSubmit,
+  categoryOptions,
+  categoryId,
+  onCategoryChange,
 }: ContactFormModalProps) {
   const errors = validation.ok ? undefined : validation.errors;
   const submitLock = useRef(false);
@@ -66,6 +72,7 @@ export function ContactFormModal({
             error={errors?.name}
             onChange={(name) => onChange({ ...form, name })}
           />
+          {categoryOptions && onCategoryChange && <label className="block"><span className="form-label">التصنيف</span><select className="form-input" value={categoryId ?? ""} onChange={event => onCategoryChange(event.target.value)}><option value="">بدون تصنيف</option>{categoryOptions.map(option => <option key={option._id} value={option._id}>{option.name}</option>)}</select></label>}
           <ContactField
             id="contact-phone"
             label="رقم الهاتف *"

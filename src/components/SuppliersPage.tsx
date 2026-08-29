@@ -36,6 +36,7 @@ type SupplierCard = {
   address?: string;
   notes?: string;
   isActive?: boolean;
+  categoryId?: Id<"supplierCategories">;
 };
 
 const emptyForm: SupplierForm = {
@@ -80,8 +81,17 @@ export function SuppliersPage() {
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
   const [updatingId, setUpdatingId] = useState<Id<"suppliers"> | null>(null);
+  const [profileId, setProfileId] = useState<Id<"suppliers"> | null>(null);
+  const [categoryId, setCategoryId] = useState("");
+  const [filterCategory, setFilterCategory] = useState("");
+  const [showCategoryForm, setShowCategoryForm] = useState(false);
+  const [categoryName, setCategoryName] = useState("");
+  const [savingCategory, setSavingCategory] = useState(false);
   const [form, setForm] = useState<SupplierForm>(emptyForm);
   const formValidation = validateContactForm(form);
+  const profile = useQuery(api.suppliers.profile, profileId ? { id: profileId } : "skip");
+  const categories = useQuery(api.contactCategories.list, { type: "supplier" }) ?? [];
+  const createCategory = useMutation(api.contactCategories.create);
 
   const effectiveBranch = me?.branchId ?? selectedBranch;
   const requiresLedgerBranchSelection = Boolean(
@@ -123,7 +133,7 @@ export function SuppliersPage() {
     (supplier) =>
       supplier.name.toLowerCase().includes(search.trim().toLowerCase()) ||
       supplier.phone.includes(search.trim()),
-  );
+  ).filter(supplier => !filterCategory || supplier.categoryId === filterCategory);
   const supplierBranchStatus = (() => {
     if (!canViewSupplierLedger) return null;
     if (me === undefined || (!me.branchId && branches === undefined)) {
@@ -151,11 +161,13 @@ export function SuppliersPage() {
     setShowForm(false);
     setEditingId(null);
     setForm(emptyForm);
+    setCategoryId("");
   };
 
   const openCreate = () => {
     setEditingId(null);
     setForm(emptyForm);
+    setCategoryId("");
     setShowForm(true);
   };
 
@@ -168,6 +180,7 @@ export function SuppliersPage() {
       address: supplier.address ?? "",
       notes: supplier.notes ?? "",
     });
+    setCategoryId(supplier.categoryId ? String(supplier.categoryId) : "");
     setShowForm(true);
   };
 
@@ -183,10 +196,10 @@ export function SuppliersPage() {
     setSaving(true);
     try {
       if (editingId) {
-        await updateSupplier({ id: editingId, ...payload });
+        await updateSupplier({ id: editingId, ...payload, categoryId: categoryId ? categoryId as Id<"supplierCategories"> : undefined });
         toast.success("تم تحديث بيانات المورد");
       } else {
-        await createSupplier(payload);
+        await createSupplier({ ...payload, categoryId: categoryId ? categoryId as Id<"supplierCategories"> : undefined });
         toast.success("تمت إضافة المورد");
       }
       setShowForm(false);
@@ -230,6 +243,23 @@ export function SuppliersPage() {
     }
   };
 
+  const handleCreateCategory = async (event: React.FormEvent) => {
+    event.preventDefault();
+    const name = categoryName.trim();
+    if (!name || savingCategory) return;
+    setSavingCategory(true);
+    try {
+      await createCategory({ type: "supplier", name });
+      setCategoryName("");
+      setShowCategoryForm(false);
+      toast.success("تمت إضافة التصنيف");
+    } catch (error) {
+      toast.error(getErrorMessage(error, "تعذر إضافة التصنيف"));
+    } finally {
+      setSavingCategory(false);
+    }
+  };
+
   return (
     <div data-testid="suppliers-page" className="p-4 lg:p-6 space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -244,7 +274,7 @@ export function SuppliersPage() {
               : `${suppliers.length} مورد`}
           </p>
         </div>
-        {canCreate && (
+        <div className="flex gap-2">{canEdit && <button className="btn-secondary" onClick={() => setShowCategoryForm(value => !value)}><Plus className="h-4 w-4" />تصنيف</button>}{canCreate && (
           <button
             data-testid="supplier-create-open"
             onClick={openCreate}
@@ -253,8 +283,21 @@ export function SuppliersPage() {
             <Plus className="w-4 h-4" />
             مورد جديد
           </button>
-        )}
+        )}</div>
       </div>
+      {showCategoryForm && (
+        <form onSubmit={handleCreateCategory} className="professional-panel flex flex-col gap-3 p-4 sm:flex-row sm:items-end">
+          <div className="flex-1">
+            <label className="form-label">اسم تصنيف الموردين</label>
+            <input autoFocus className="form-input" value={categoryName} onChange={event => setCategoryName(event.target.value)} maxLength={80} placeholder="مثال: موردون محليون" />
+          </div>
+          <div className="flex gap-2">
+            <button className="btn-primary" disabled={savingCategory || !categoryName.trim()}>{savingCategory ? "جارٍ الحفظ…" : "حفظ التصنيف"}</button>
+            <button type="button" className="btn-secondary" onClick={() => { setShowCategoryForm(false); setCategoryName(""); }}>إلغاء</button>
+          </div>
+        </form>
+      )}
+      {categories.length > 0 && <select className="form-input max-w-xs" value={filterCategory} onChange={event => setFilterCategory(event.target.value)}><option value="">كل التصنيفات</option>{categories.map(category => <option key={category._id} value={category._id}>{category.name}</option>)}</select>}
 
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1">
@@ -354,6 +397,7 @@ export function SuppliersPage() {
               </div>
             )}
             <div className="mt-4 grid grid-cols-2 gap-2">
+              <button onClick={() => setProfileId(supplier._id)} className="btn-secondary text-xs flex items-center justify-center gap-1"><Truck className="w-3.5 h-3.5" />بطاقة المورد</button>
               {canEdit && (
                 <button
                   onClick={() => openEdit(supplier)}
@@ -428,6 +472,9 @@ export function SuppliersPage() {
           onChange={setForm}
           onClose={closeForm}
           onSubmit={handleSubmit}
+          categoryOptions={categories}
+          categoryId={categoryId}
+          onCategoryChange={setCategoryId}
         />
       )}
 
@@ -527,6 +574,7 @@ export function SuppliersPage() {
           </section>
         </div>
       )}
+      {profileId && <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/50 p-4"><section className="max-h-[88vh] w-full max-w-5xl overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl">{profile === undefined ? <p className="p-10 text-center text-slate-500">جارٍ تحميل بطاقة المورد…</p> : <><header className="flex items-start justify-between border-b pb-4"><div><p className="erp-kicker">بطاقة المورد</p><h2 className="text-2xl font-black">{profile.supplier.name}</h2><p className="mt-1 text-sm text-slate-500">{profile.supplier.phone} {profile.supplier.categoryName ? `— ${profile.supplier.categoryName}` : ""}</p></div><button className="rounded-xl p-2 hover:bg-slate-100" onClick={() => setProfileId(null)}><X className="h-5 w-5" /></button></header><div className="my-5 grid gap-3 sm:grid-cols-3"><div className="rounded-xl bg-amber-50 p-4 text-center"><strong className="block text-xl text-amber-700">{profile.balances.reduce((sum, row) => sum + row.balance, 0).toLocaleString("ar-EG")} ج.م</strong><span className="text-xs text-slate-600">إجمالي المستحق</span></div><div className="rounded-xl bg-blue-50 p-4 text-center"><strong className="block text-xl text-blue-700">{profile.receipts.length}</strong><span className="text-xs text-slate-600">فواتير المشتريات</span></div><div className="rounded-xl bg-emerald-50 p-4 text-center"><strong className="block text-xl text-emerald-700">{profile.payments.length}</strong><span className="text-xs text-slate-600">الدفعات</span></div></div><div className="grid gap-5 lg:grid-cols-2"><div className="rounded-2xl border p-4"><h3 className="mb-3 font-black">البيانات والأسعار السابقة</h3><p className="text-sm leading-7 text-slate-600">{profile.supplier.address || "لا يوجد عنوان"}<br />{profile.supplier.email || "لا يوجد بريد إلكتروني"}<br />{profile.supplier.notes || "لا توجد ملاحظات"}</p><p className="mt-4 text-xs text-slate-500">المرتجعات: {profile.returns.length}</p></div><div className="rounded-2xl border p-4"><h3 className="mb-3 font-black">آخر التعاملات</h3><div className="max-h-64 divide-y overflow-y-auto">{profile.ledger.slice(0, 20).map(entry => <div key={entry._id} className="flex justify-between gap-3 py-2 text-sm"><span>{entry.description}</span><span className="whitespace-nowrap font-bold">{entry.balanceAfter.toLocaleString("ar-EG")} ج.م</span></div>)}{profile.ledger.length === 0 && <p className="text-sm text-slate-400">لا توجد حركات.</p>}</div></div></div></>}</section></div>}
     </div>
   );
 }

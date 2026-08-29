@@ -36,14 +36,33 @@ const applicationTables = {
     createdBy: v.string(), updatedAt: v.number(), openingBalancePostedAt: v.optional(v.number()),
   }).index("by_branch", ["branchId"]).index("by_type", ["type"]).index("by_unique_key", ["uniqueKey"]).index("by_active", ["isActive"]),
 
+  paymentMethods: defineTable({
+    code: v.string(), name: v.string(),
+    kind: v.union(v.literal("cash"), v.literal("wallet"), v.literal("bank"), v.literal("gateway"), v.literal("credit"), v.literal("other")),
+    requiresAccount: v.boolean(), allowedAccountTypes: v.array(v.string()), isSystem: v.boolean(), isActive: v.boolean(), sortOrder: v.number(),
+    createdAt: v.number(), createdBy: v.string(), updatedAt: v.number(), updatedBy: v.string(),
+  }).index("by_code", ["code"]).index("by_active_order", ["isActive", "sortOrder"]),
+
+  paymentAccountDefaults: defineTable({
+    key: v.string(), paymentMethodCode: v.string(), branchId: v.id("branches"), accountId: v.id("financialAccounts"), updatedAt: v.number(), updatedBy: v.string(),
+  }).index("by_key", ["key"]).index("by_branch", ["branchId"]).index("by_method_branch", ["paymentMethodCode", "branchId"]),
+
+  paymentSchedules: defineTable({
+    scheduleNumber: v.string(), kind: v.union(v.literal("check"), v.literal("installment")), direction: v.union(v.literal("receivable"), v.literal("payable")),
+    branchId: v.id("branches"), customerId: v.optional(v.id("customers")), supplierId: v.optional(v.id("suppliers")), counterpartyName: v.string(), amount: v.number(), dueDate: v.string(), referenceNumber: v.optional(v.string()), notes: v.optional(v.string()),
+    status: v.union(v.literal("pending"), v.literal("settled"), v.literal("cancelled")), settlementTransactionId: v.optional(v.id("financialTransactions")), settledAt: v.optional(v.number()), settledBy: v.optional(v.string()),
+    cancelledAt: v.optional(v.number()), cancelledBy: v.optional(v.string()), cancellationReason: v.optional(v.string()), createdAt: v.number(), createdBy: v.string(),
+  }).index("by_number", ["scheduleNumber"]).index("by_branch_due", ["branchId", "dueDate"]).index("by_status_due", ["status", "dueDate"]).index("by_customer", ["customerId"]).index("by_supplier", ["supplierId"]),
+
   financialTransactions: defineTable({
     transactionNumber: v.string(), idempotencyKey: v.string(), requestFingerprint: v.optional(v.string()),
-    type: v.union(v.literal("opening_balance"), v.literal("invoice_payment"), v.literal("order_deposit"), v.literal("repair_payment"), v.literal("expense_payment"), v.literal("supplier_payment"), v.literal("supplier_refund"), v.literal("account_transfer"), v.literal("paymob_settlement"), v.literal("clearing_settlement"), v.literal("delivery_cod_collection"), v.literal("cod_settlement"), v.literal("invoice_refund"), v.literal("sales_return_refund"), v.literal("order_refund"), v.literal("repair_refund"), v.literal("reversal")),
+    type: v.union(v.literal("opening_balance"), v.literal("invoice_payment"), v.literal("order_deposit"), v.literal("repair_payment"), v.literal("expense_payment"), v.literal("supplier_payment"), v.literal("supplier_refund"), v.literal("receipt_voucher"), v.literal("disbursement_voucher"), v.literal("account_transfer"), v.literal("paymob_settlement"), v.literal("clearing_settlement"), v.literal("delivery_cod_collection"), v.literal("cod_settlement"), v.literal("invoice_refund"), v.literal("sales_return_refund"), v.literal("order_refund"), v.literal("repair_refund"), v.literal("reversal")),
     status: v.union(v.literal("posted"), v.literal("reversed")), date: v.string(), amount: v.number(), feeAmount: v.number(), netAmount: v.number(),
     description: v.string(), referenceType: v.optional(v.string()), referenceId: v.optional(v.string()), referenceNumber: v.optional(v.string()),
     customerId: v.optional(v.id("customers")), supplierId: v.optional(v.id("suppliers")), branchId: v.id("branches"), destinationBranchId: v.optional(v.id("branches")), userId: v.string(), createdAt: v.number(),
     reversedAt: v.optional(v.number()), reversedBy: v.optional(v.string()), reversalReason: v.optional(v.string()),
     reversalTransactionId: v.optional(v.id("financialTransactions")), originalTransactionId: v.optional(v.id("financialTransactions")),
+    customerLedgerEntryId: v.optional(v.id("customerLedgerEntries")), supplierLedgerEntryId: v.optional(v.id("supplierLedgerEntries")),
   }).index("by_transaction_number", ["transactionNumber"]).index("by_idempotency_key", ["idempotencyKey"]).index("by_branch_date", ["branchId", "date"]).index("by_branch_type_status", ["branchId", "type", "status"]).index("by_reference", ["referenceType", "referenceId"]).index("by_status", ["status"]).index("by_type", ["type"]),
 
   financialMovements: defineTable({
@@ -86,12 +105,13 @@ const applicationTables = {
 
   // الفروع
   branches: defineTable({
+    code: v.optional(v.string()),
     name: v.string(),
     address: v.string(),
     phone: v.optional(v.string()),
     managerId: v.optional(v.string()),
     isActive: v.boolean(),
-  }),
+  }).index("by_code", ["code"]),
 
   // الموردين
   suppliers: defineTable({
@@ -101,8 +121,10 @@ const applicationTables = {
     address: v.optional(v.string()),
     balance: v.number(),
     notes: v.optional(v.string()),
-    isActive: v.optional(v.boolean()),
+    isActive: v.optional(v.boolean()), categoryId: v.optional(v.id("supplierCategories")),
   }).index("by_phone", ["phone"]),
+
+  supplierCategories: defineTable({ name: v.string(), normalizedName: v.string(), createdAt: v.number(), createdBy: v.string() }).index("by_name", ["normalizedName"]),
 
   supplierBalances: defineTable({
     key: v.string(), supplierId: v.id("suppliers"), branchId: v.id("branches"), balance: v.number(), updatedAt: v.number(),
@@ -203,7 +225,13 @@ const applicationTables = {
   })
     .index("by_product", ["productId"])
     .index("by_branch", ["branchId"])
+    .index("by_branch_created", ["branchId", "createdAt"])
+    .index("by_reference", ["referenceType", "referenceId"])
     .index("by_type", ["type"]),
+
+  productSerials: defineTable({
+    productId: v.id("products"), productName: v.string(), branchId: v.id("branches"), serialNumber: v.string(), normalizedSerial: v.string(), status: v.union(v.literal("available"), v.literal("sold"), v.literal("service"), v.literal("returned")), notes: v.optional(v.string()), createdAt: v.number(), createdBy: v.string(), updatedAt: v.number(), updatedBy: v.string(),
+  }).index("by_serial", ["normalizedSerial"]).index("by_product", ["productId"]).index("by_branch_status", ["branchId", "status"]),
 
   // العملاء
   customers: defineTable({
@@ -215,11 +243,13 @@ const applicationTables = {
     totalPurchases: v.number(),
     notes: v.optional(v.string()),
     branchId: v.optional(v.id("branches")),
-    isActive: v.optional(v.boolean()),
+    isActive: v.optional(v.boolean()), categoryId: v.optional(v.id("customerCategories")),
   })
     .index("by_phone", ["phone"])
     .index("by_branch", ["branchId"])
     .index("by_branch_phone", ["branchId", "phone"]),
+
+  customerCategories: defineTable({ name: v.string(), normalizedName: v.string(), createdAt: v.number(), createdBy: v.string() }).index("by_name", ["normalizedName"]),
 
   // الفواتير / المبيعات
   invoices: defineTable({
@@ -254,6 +284,13 @@ const applicationTables = {
     journalEntryId: v.optional(v.id("journalEntries")), lastAdjustmentJournalEntryId: v.optional(v.id("journalEntries")), cancellationJournalEntryId: v.optional(v.id("journalEntries")),
     cancelledAt: v.optional(v.number()), cancelledBy: v.optional(v.string()), cancellationReason: v.optional(v.string()),
   }).index("by_invoice_number", ["invoiceNumber"]).index("by_customer", ["customerId"]).index("by_branch_status", ["branchId", "status"]).index("by_branch_date", ["branchId", "date"]).index("by_status", ["status"]).index("by_creation_request", ["creationRequestId"]),
+
+  quotes: defineTable({
+    quoteNumber: v.string(), customerId: v.optional(v.id("customers")), customerName: v.string(), customerPhone: v.optional(v.string()),
+    items: v.array(v.object({ productId: v.id("products"), productName: v.string(), quantity: v.number(), unitPrice: v.number(), discount: v.number(), total: v.number() })),
+    subtotal: v.number(), discount: v.number(), tax: v.number(), total: v.number(), status: v.union(v.literal("draft"), v.literal("sent"), v.literal("accepted"), v.literal("rejected"), v.literal("expired"), v.literal("cancelled")),
+    validUntil: v.optional(v.string()), notes: v.optional(v.string()), date: v.string(), branchId: v.id("branches"), creationRequestId: v.string(), createdBy: v.string(), createdAt: v.number(), updatedAt: v.number(),
+  }).index("by_number", ["quoteNumber"]).index("by_branch_date", ["branchId", "date"]).index("by_customer", ["customerId"]).index("by_status", ["status"]).index("by_creation_request", ["creationRequestId"]),
 
   salesReturns: defineTable({
     creditNoteNumber: v.string(), invoiceId: v.id("invoices"), invoiceNumber: v.string(),
@@ -380,6 +417,8 @@ const applicationTables = {
     branchId: v.id("branches"),
     fromStatus: v.optional(v.union(
       v.literal("received"),
+      v.literal("under_inspection"),
+      v.literal("awaiting_approval"),
       v.literal("in_progress"),
       v.literal("ready"),
       v.literal("delivered"),
@@ -387,6 +426,8 @@ const applicationTables = {
     )),
     toStatus: v.union(
       v.literal("received"),
+      v.literal("under_inspection"),
+      v.literal("awaiting_approval"),
       v.literal("in_progress"),
       v.literal("ready"),
       v.literal("delivered"),

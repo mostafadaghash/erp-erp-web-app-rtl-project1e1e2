@@ -1,363 +1,57 @@
+import { useMemo, useState } from "react";
 import { useQuery } from "convex/react";
+import { ArrowDownLeft, ArrowUpLeft, Boxes, Building2, CircleDollarSign, Landmark, PackageSearch, ReceiptText, RefreshCcw, ShoppingBag, TrendingUp, Truck, Users } from "lucide-react";
 import { api } from "../../convex/_generated/api";
-import type { Page } from "./ERPApp";
-import {
-  TrendingUp, Users, Package,
-  Wrench, AlertTriangle, ArrowUpRight,
-  Clock, CheckCircle, UserPlus, Target, PhoneCall, Star,
-  Truck, WalletCards
-} from "lucide-react";
-import { useCurrency } from "../lib/utils";
+import type { Id } from "../../convex/_generated/dataModel";
 import type { Permission } from "../../convex/lib/permissions";
+import { validateReportingRange } from "../../shared/reportingRules";
 import type { ReportingOverview } from "../../shared/reportingView";
+import { useCurrency } from "../lib/utils";
+import type { ReportKind } from "./ReportsPage";
 
-interface DashboardProps {
-  onNavigate: (page: Page) => void;
-  permissions: Permission[];
-  modules: Record<string, boolean | undefined>;
-}
+interface DashboardProps { onOpenReport: (report: ReportKind) => void; permissions: Permission[]; }
+type Period = "today" | "week" | "month" | "year" | "custom";
+type DashboardCard = { key: string; title: string; value: number | null | undefined; note: string; report: ReportKind; icon: React.ElementType; tone: string; comparisonValue?: number | null; protected?: boolean; };
 
-export function Dashboard({ onNavigate, permissions, modules }: DashboardProps) {
-  const can = (permission: Permission) => permissions.includes(permission);
-  const enabled = (moduleName: string) => modules[moduleName] !== false;
-  const canViewInvoices = can("view_invoices") && enabled("invoices");
-  const canViewRepairs = can("view_repairs") && enabled("repairs");
-  const canViewProducts = can("view_products");
-  const canViewLeads = can("view_leads") && enabled("crm");
-  const canViewReports = can("view_reports");
-  const canViewProfits = can("view_profits");
+const periodLabels: Record<Period, string> = { today: "اليوم", week: "آخر 7 أيام", month: "هذا الشهر", year: "هذه السنة", custom: "فترة مخصصة" };
+function isoDate(date: Date) { const year = date.getFullYear(); const month = String(date.getMonth() + 1).padStart(2, "0"); const day = String(date.getDate()).padStart(2, "0"); return `${year}-${month}-${day}`; }
+function periodStart(period: Exclude<Period, "custom">, now = new Date()) { const start = new Date(now); if (period === "today") return isoDate(start); if (period === "week") { start.setDate(start.getDate() - 6); return isoDate(start); } if (period === "month") { start.setDate(1); return isoDate(start); } return `${start.getFullYear()}-01-01`; }
+function previousRange(from: string, to: string) { const fromDate = new Date(`${from}T00:00:00.000Z`); const toDate = new Date(`${to}T00:00:00.000Z`); const days = Math.max(1, Math.round((toDate.valueOf() - fromDate.valueOf()) / 86_400_000) + 1); const previousTo = new Date(fromDate); previousTo.setUTCDate(previousTo.getUTCDate() - 1); const previousFrom = new Date(previousTo); previousFrom.setUTCDate(previousFrom.getUTCDate() - days + 1); return { from: previousFrom.toISOString().slice(0, 10), to: previousTo.toISOString().slice(0, 10) }; }
+function validRange(from: string, to: string) { try { validateReportingRange(from, to); return true; } catch { return false; } }
+function comparisonPercent(current: number | null | undefined, previous: number | null | undefined) { if (current == null || previous == null || previous === 0) return null; return Math.round(((current - previous) / Math.abs(previous)) * 1000) / 10; }
 
-  const now = new Date();
-  const today = [
-    now.getFullYear(),
-    String(now.getMonth() + 1).padStart(2, "0"),
-    String(now.getDate()).padStart(2, "0"),
-  ].join("-");
-  const monthFrom = `${today.slice(0, 7)}-01`;
-  const report = useQuery(
-    api.reporting.overview,
-    canViewReports ? { from: monthFrom, to: today } : "skip",
-  ) as ReportingOverview | undefined;
-  const repairStats = useQuery(api.repairs.getStats, canViewRepairs ? {} : "skip");
-  const lowStockProducts = useQuery(api.products.list, canViewProducts ? { lowStock: true } : "skip");
-  const recentInvoices = useQuery(api.invoices.list, canViewInvoices ? {} : "skip");
-  const recentRepairs = useQuery(api.repairs.list, canViewRepairs ? {} : "skip");
-  const crmStats = useQuery(api.leads.stats, canViewLeads ? {} : "skip");
-
-  const { formatCurrency } = useCurrency();
-
-  const statCards = report ? [{
-      title: "صافي مبيعات الشهر",
-      value: formatCurrency(report.sales.netSales),
-      sub: `${report.sales.invoiceCount.toLocaleString("ar-EG")} فاتورة بعد المرتجعات`,
-      badge: "هذا الشهر",
-      icon: TrendingUp,
-      color: "from-indigo-500 to-indigo-600",
-      bg: "bg-indigo-50",
-      text: "text-indigo-600",
-    },
-    {
-      title: "صافي تحصيل الشهر",
-      value: formatCurrency(report.collections.netCollections),
-      sub: `رد واسترداد ${formatCurrency(report.collections.refunds)}`,
-      badge: "هذا الشهر",
-      icon: ArrowUpRight,
-      color: "from-emerald-500 to-emerald-600",
-      bg: "bg-emerald-50",
-      text: "text-emerald-600",
-    },
-    {
-      title: "مستحقات العملاء",
-      value: formatCurrency(report.currentBalances.customerReceivables),
-      sub: `مقدمات ${formatCurrency(report.currentBalances.customerAdvances)}`,
-      badge: "رصيد حالي",
-      icon: Users,
-      color: "from-amber-500 to-amber-600",
-      bg: "bg-amber-50",
-      text: "text-amber-600",
-    },
-    {
-      title: "مصروفات ورسوم الشهر",
-      value: formatCurrency(report.expenses.totalExpenses),
-      sub: `رسوم شحن ${formatCurrency(report.expenses.carrierFees)}`,
-      badge: "هذا الشهر",
-      icon: WalletCards,
-      color: "from-red-500 to-red-600",
-      bg: "bg-red-50",
-      text: "text-red-600",
-    },
-    {
-      title: "COD لدى شركات الشحن",
-      value: formatCurrency(report.cod.currentOutstanding),
-      sub: `المسوى ${formatCurrency(report.cod.settled)}`,
-      badge: "رصيد حالي",
-      icon: Truck,
-      color: "from-sky-500 to-sky-600",
-      bg: "bg-sky-50",
-      text: "text-sky-600",
-    },
-    ...(canViewProfits && report.profitability ? [{
-      title: "صافي ربح الشهر",
-      value: report.profitability.netProfit === null
-        ? "بيانات COGS غير مكتملة"
-        : formatCurrency(report.profitability.netProfit),
-      sub: report.profitability.netMargin === null
-        ? `${report.profitability.incompleteCogsInvoices} فاتورة تحتاج مراجعة`
-        : `هامش ${report.profitability.netMargin.toLocaleString("ar-EG")}٪`,
-      badge: "هذا الشهر",
-      icon: TrendingUp,
-      color: "from-violet-500 to-violet-600",
-      bg: "bg-violet-50",
-      text: "text-violet-600",
-    }] : []),
+export function Dashboard({ onOpenReport, permissions }: DashboardProps) {
+  const canViewReports = permissions.includes("view_reports"); const canViewProfits = permissions.includes("view_profits"); const canViewProducts = permissions.includes("view_products");
+  const now = useMemo(() => new Date(), []); const today = isoDate(now);
+  const [period, setPeriod] = useState<Period>("month"); const [from, setFrom] = useState(periodStart("month", now)); const [to, setTo] = useState(today); const [branchId, setBranchId] = useState<Id<"branches"> | "">(""); const [compare, setCompare] = useState(true); const [refreshedAt, setRefreshedAt] = useState(Date.now());
+  const me = useQuery(api.employees.me); const branches = useQuery(api.reporting.availableBranches, canViewReports ? {} : "skip") ?? []; const canSelectBranch = me?.role === "admin" || me?.role === "accountant"; const rangeIsValid = validRange(from, to);
+  const reportArgs = rangeIsValid ? { from, to, branchId: canSelectBranch && branchId ? branchId : undefined } : null;
+  const report = useQuery(api.reporting.overview, canViewReports && reportArgs ? reportArgs : "skip") as ReportingOverview | undefined;
+  const comparisonRange = rangeIsValid ? previousRange(from, to) : null;
+  const previousReport = useQuery(api.reporting.overview, canViewReports && compare && comparisonRange ? { ...comparisonRange, branchId: canSelectBranch && branchId ? branchId : undefined } : "skip") as ReportingOverview | undefined;
+  const lowStockProducts = useQuery(api.products.list, canViewProducts ? { lowStock: true } : "skip"); const { formatCurrency, formatAmount } = useCurrency();
+  const changePeriod = (next: Period) => { setPeriod(next); if (next === "custom") return; setFrom(periodStart(next, new Date())); setTo(isoDate(new Date())); };
+  const cards: DashboardCard[] = report ? [
+    { key: "sales", title: "إجمالي المبيعات", value: report.sales.netSales, comparisonValue: previousReport?.sales.netSales, note: `${formatAmount(report.sales.invoiceCount)} فاتورة بعد المرتجعات`, report: "sales", icon: ReceiptText, tone: "emerald" },
+    { key: "purchases", title: "إجمالي المشتريات", value: report.purchases.landedPurchases, comparisonValue: previousReport?.purchases.landedPurchases, note: `${formatAmount(report.purchases.receiptCount)} مستند شراء`, report: "purchases", icon: ShoppingBag, tone: "blue" },
+    { key: "profit", title: "صافي الربح", value: report.profitability?.netProfit, comparisonValue: previousReport?.profitability?.netProfit, note: report.completeness.profitabilityAvailable ? `هامش ${formatAmount(report.profitability?.netMargin ?? 0)}٪` : "تحتاج بعض التكاليف التاريخية للمراجعة", report: "profit", icon: TrendingUp, tone: "violet", protected: !canViewProfits },
+    { key: "expenses", title: "إجمالي المصروفات", value: report.expenses.totalExpenses, comparisonValue: previousReport?.expenses.totalExpenses, note: "مصروفات التشغيل ورسوم الشحن", report: "treasury", icon: CircleDollarSign, tone: "rose" },
+    { key: "treasury", title: "أرصدة الخزائن", value: report.currentBalances.liquidAccounts, note: "الخزائن النقدية والبنوك والحسابات", report: "treasury", icon: Landmark, tone: "cyan" },
+    { key: "customers", title: "مديونيات العملاء", value: report.currentBalances.customerReceivables, note: "إجمالي الأرصدة المطلوب تحصيلها", report: "customers", icon: Users, tone: "amber" },
+    { key: "suppliers", title: "مستحقات الموردين", value: report.currentBalances.supplierPayables, note: "إجمالي الالتزامات الحالية للموردين", report: "suppliers", icon: Truck, tone: "orange" },
+    { key: "inventory", title: "قيمة المخزون", value: report.currentBalances.inventoryValue, note: canViewProducts ? `${formatAmount(lowStockProducts?.length ?? 0)} صنف تحت حد الطلب` : "التنبيهات حسب صلاحية المخزون", report: "inventory", icon: Boxes, tone: "slate", protected: !canViewProfits },
   ] : [];
-
-  const repairStatusCards = [
-    { label: "مستلمة", value: repairStats?.received ?? 0, color: "text-blue-600", bg: "bg-blue-50", icon: Clock },
-    { label: "قيد الإصلاح", value: repairStats?.inProgress ?? 0, color: "text-amber-600", bg: "bg-amber-50", icon: Wrench },
-    { label: "جاهزة", value: repairStats?.ready ?? 0, color: "text-emerald-600", bg: "bg-emerald-50", icon: CheckCircle },
-    { label: "مسلمة", value: repairStats?.delivered ?? 0, color: "text-slate-600", bg: "bg-slate-50", icon: CheckCircle },
-  ];
-
-  return (
-    <div className="p-4 lg:p-6 space-y-6">
-      {/* Header */}
-      <div>
-        <div>
-          <h1 className="text-2xl font-black text-slate-800">لوحة التحكم</h1>
-          <p className="text-slate-500 text-sm mt-0.5">
-            {new Date().toLocaleDateString("ar-EG", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
-          </p>
-        </div>
-      </div>
-
-      {/* Accounting overview — sourced exclusively from reporting.overview */}
-      {canViewReports && report === undefined && (
-        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-          {Array.from({ length: 4 }, (_, index) => (
-            <div key={index} className="h-32 animate-pulse rounded-2xl bg-slate-100" />
-          ))}
-        </div>
-      )}
-      {statCards.length > 0 && <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {statCards.map((card, i) => {
-          const Icon = card.icon;
-          return (
-            <div
-              key={i}
-              className="stat-card"
-              style={{ animationDelay: `${i * 0.1}s` }}
-            >
-              <div className="flex items-start justify-between mb-3">
-                <div className={`w-10 h-10 ${card.bg} rounded-xl flex items-center justify-center`}>
-                  <Icon className={`w-5 h-5 ${card.text}`} />
-                </div>
-                <span className={`text-xs font-medium ${card.text} ${card.bg} px-2 py-0.5 rounded-full`}>
-                  {card.badge}
-                </span>
-              </div>
-              <p className="text-xl font-black text-slate-800 leading-tight">{card.value}</p>
-              <p className="text-xs text-slate-500 mt-1">{card.title}</p>
-              <p className="text-xs text-slate-400 mt-0.5">{card.sub}</p>
-            </div>
-          );
-        })}
-      </div>}
-      {report && canViewProfits && !report.completeness.profitabilityAvailable && (
-        <div className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-          <AlertTriangle className="h-4 w-4 shrink-0" />
-          الربحية غير معروضة لأن {report.completeness.incompleteCogsInvoices.toLocaleString("ar-EG")} فاتورة
-          لا تملك COGS تاريخيًا مكتملًا.
-        </div>
-      )}
-
-      {/* CRM Quick Stats */}
-      {canViewLeads && <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="font-bold text-slate-800 flex items-center gap-2">
-            <Target className="w-4 h-4 text-purple-500" />
-            مؤشرات العملاء المحتملين
-          </h2>
-          <button
-            onClick={() => onNavigate("crm")}
-            className="text-purple-600 text-sm font-medium hover:text-purple-700 transition-colors"
-          >
-            إدارة علاقات العملاء
-          </button>
-        </div>
-        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
-          {[
-            { label: "إجمالي", value: crmStats?.total ?? 0, color: "text-slate-700", bg: "bg-slate-50", icon: UserPlus },
-            { label: "جديد", value: crmStats?.new ?? 0, color: "text-blue-600", bg: "bg-blue-50", icon: UserPlus },
-            { label: "تم التواصل", value: crmStats?.contacted ?? 0, color: "text-indigo-600", bg: "bg-indigo-50", icon: PhoneCall },
-            { label: "مهتم", value: crmStats?.interested ?? 0, color: "text-amber-600", bg: "bg-amber-50", icon: Star },
-            { label: "تفاوض", value: crmStats?.negotiating ?? 0, color: "text-orange-600", bg: "bg-orange-50", icon: Target },
-            { label: "مكتسب ✓", value: crmStats?.won ?? 0, color: "text-emerald-600", bg: "bg-emerald-50", icon: CheckCircle },
-            { label: "خسارة", value: crmStats?.lost ?? 0, color: "text-red-600", bg: "bg-red-50", icon: AlertTriangle },
-          ].map((s, i) => {
-            const Icon = s.icon;
-            return (
-              <div key={i} className={`${s.bg} rounded-xl p-3 text-center`}>
-                <Icon className={`w-4 h-4 ${s.color} mx-auto mb-1`} />
-                <p className={`text-xl font-black ${s.color}`}>{s.value}</p>
-                <p className="text-xs text-slate-500 mt-0.5">{s.label}</p>
-              </div>
-            );
-          })}
-        </div>
-        {(crmStats?.total ?? 0) > 0 && (
-          <div className="mt-4 pt-4 border-t border-slate-100 flex items-center justify-between">
-            <span className="text-sm text-slate-500">معدل التحويل</span>
-            <div className="flex items-center gap-3">
-              <div className="w-32 bg-slate-100 rounded-full h-2">
-                <div
-                  className="bg-emerald-500 h-2 rounded-full transition-all"
-                  style={{ width: `${crmStats?.conversionRate ?? 0}%` }}
-                />
-              </div>
-              <span className="text-sm font-bold text-emerald-600">{crmStats?.conversionRate ?? 0}%</span>
-            </div>
-          </div>
-        )}
-      </div>}
-
-      {(canViewInvoices || canViewRepairs || canViewProducts) && <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Recent Invoices */}
-        {canViewInvoices && <div className="lg:col-span-2 bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-          <div className="flex items-center justify-between p-5 border-b border-slate-100">
-            <h2 className="font-bold text-slate-800 flex items-center gap-2">
-              <FileTextIcon />
-              آخر الفواتير
-            </h2>
-            <button
-              onClick={() => onNavigate("invoices")}
-              className="text-indigo-600 text-sm font-medium hover:text-indigo-700 transition-colors"
-            >
-              عرض الكل
-            </button>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>رقم الفاتورة</th>
-                  <th>العميل</th>
-                  <th>المبلغ</th>
-                  <th>الحالة</th>
-                </tr>
-              </thead>
-              <tbody>
-                {(recentInvoices ?? []).slice(0, 5).map((inv) => (
-                  <tr key={inv._id}>
-                    <td className="font-mono text-xs text-indigo-600">{inv.invoiceNumber}</td>
-                    <td className="font-medium">{inv.customerName}</td>
-                    <td className="font-bold">{formatCurrency(inv.total)}</td>
-                    <td>
-                      <span className={`badge ${inv.status === "paid" ? "badge-success" : inv.status === "partial" ? "badge-warning" : "badge-danger"}`}>
-                        {inv.status === "paid" ? "مدفوعة" : inv.status === "partial" ? "جزئي" : "معلقة"}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-                {(recentInvoices ?? []).length === 0 && (
-                  <tr>
-                    <td colSpan={4} className="text-center py-8 text-slate-400">لا توجد فواتير بعد</td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>}
-
-        {/* Right column */}
-        {(canViewRepairs || canViewProducts) && <div className="space-y-4">
-          {/* Repair Status */}
-          {canViewRepairs && <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="font-bold text-slate-800 flex items-center gap-2">
-                <Wrench className="w-4 h-4 text-slate-500" />
-                حالة الصيانة
-              </h2>
-              <button
-                onClick={() => onNavigate("repairs")}
-                className="text-indigo-600 text-sm font-medium hover:text-indigo-700"
-              >
-                عرض الكل
-              </button>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              {repairStatusCards.map((card, i) => {
-                const Icon = card.icon;
-                return (
-                  <div key={i} className={`${card.bg} rounded-xl p-3 text-center`}>
-                    <p className={`text-2xl font-black ${card.color}`}>{card.value}</p>
-                    <p className="text-xs text-slate-600 mt-0.5">{card.label}</p>
-                  </div>
-                );
-              })}
-            </div>
-          </div>}
-
-          {/* Low Stock Alert */}
-          {canViewProducts && (lowStockProducts ?? []).length > 0 && (
-            <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5">
-              <div className="flex items-center gap-2 mb-3">
-                <AlertTriangle className="w-4 h-4 text-amber-600" />
-                <h2 className="font-bold text-amber-800 text-sm">تنبيه المخزون</h2>
-              </div>
-              <div className="space-y-2">
-                {(lowStockProducts ?? []).slice(0, 4).map((p) => (
-                  <div key={p._id} className="flex items-center justify-between">
-                    <span className="text-xs text-amber-800 font-medium truncate">{p.name}</span>
-                    <span className="badge badge-warning text-xs">{p.stock} متبقي</span>
-                  </div>
-                ))}
-              </div>
-              <button
-                onClick={() => onNavigate("products")}
-                className="mt-3 text-xs text-amber-700 font-medium hover:text-amber-800"
-              >
-                إدارة المخزون ←
-              </button>
-            </div>
-          )}
-
-          {/* Recent Repairs */}
-          {canViewRepairs && <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
-            <h2 className="font-bold text-slate-800 mb-3 flex items-center gap-2">
-              <Wrench className="w-4 h-4 text-slate-500" />
-              آخر أوامر الصيانة
-            </h2>
-            <div className="space-y-2">
-              {(recentRepairs ?? []).slice(0, 3).map((r) => (
-                <div key={r._id} className="flex items-center justify-between py-2 border-b border-slate-50 last:border-0">
-                  <div>
-                    <p className="text-xs font-medium text-slate-800">{r.customerName}</p>
-                    <p className="text-xs text-slate-500">{r.deviceBrand} {r.deviceModel}</p>
-                  </div>
-                  <span className={`badge ${
-                    r.status === "ready" ? "badge-success" :
-                    r.status === "in_progress" ? "badge-warning" :
-                    r.status === "delivered" ? "badge-info" : "badge-purple"
-                  }`}>
-                    {r.status === "received" ? "مستلم" :
-                     r.status === "in_progress" ? "قيد الإصلاح" :
-                     r.status === "ready" ? "جاهز" : "مسلم"}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>}
-        </div>}
-      </div>}
-    </div>
-  );
-}
-
-function FileTextIcon() {
-  return (
-    <svg className="w-4 h-4 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-    </svg>
-  );
+  return <div className="erp-dashboard-compact p-4 lg:p-5" data-refreshed-at={refreshedAt}>
+    <section className="erp-dashboard-controls" aria-label="فلاتر لوحة التحكم"><div className="min-w-0"><p className="erp-kicker">ملخص الإدارة</p><h1 className="erp-page-title">لوحة التحكم</h1></div><div className="erp-dashboard-filter-grid">
+      <label><span className="sr-only">الفترة</span><select className="form-input" value={period} onChange={(event) => changePeriod(event.target.value as Period)} aria-label="اختيار الفترة">{(Object.keys(periodLabels) as Period[]).map((value) => <option key={value} value={value}>{periodLabels[value]}</option>)}</select></label>
+      {period === "custom" && <><input className="form-input" type="date" value={from} onChange={(event) => setFrom(event.target.value)} aria-label="من تاريخ" /><input className="form-input" type="date" value={to} onChange={(event) => setTo(event.target.value)} aria-label="إلى تاريخ" /></>}
+      <label className="relative"><Building2 className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><select className="form-input pr-9" value={branchId} onChange={(event) => setBranchId(event.target.value as Id<"branches"> | "")} disabled={!canSelectBranch} aria-label="اختيار الفرع"><option value="">{canSelectBranch ? "كل الفروع" : branches[0]?.name ?? "فرع المستخدم"}</option>{canSelectBranch && branches.map((branch) => <option key={branch._id} value={branch._id}>{branch.name}</option>)}</select></label>
+      <label className="erp-dashboard-compare"><input type="checkbox" checked={compare} onChange={(event) => setCompare(event.target.checked)} /><span>مقارنة بالفترة السابقة</span></label>
+      <button type="button" className="btn-secondary inline-flex items-center justify-center gap-2" onClick={() => setRefreshedAt(Date.now())} title="البيانات تتحدث لحظيًا"><RefreshCcw className="h-4 w-4" />تحديث البيانات</button>
+    </div></section>
+    {!rangeIsValid && <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">اختر فترة صحيحة لا تتجاوز 366 يومًا لعرض مؤشرات لوحة التحكم.</div>}
+    {!canViewReports && <div className="erp-empty-state mt-4">لا تملك صلاحية عرض مؤشرات الإدارة والتقارير.</div>}
+    {canViewReports && report === undefined && rangeIsValid && <div className="erp-dashboard-card-grid mt-4" aria-label="جارٍ تحميل المؤشرات">{Array.from({ length: 8 }, (_, index) => <div key={index} className="h-36 animate-pulse rounded-2xl border border-slate-200 bg-slate-100" />)}</div>}
+    {cards.length > 0 && <section className="erp-dashboard-card-grid mt-4" aria-label="المؤشرات الرئيسية">{cards.map((card) => { const Icon = card.icon; const change = compare ? comparisonPercent(card.value, card.comparisonValue) : null; const ChangeIcon = change !== null && change < 0 ? ArrowDownLeft : ArrowUpLeft; return <button key={card.key} type="button" data-testid={`dashboard-card-${card.key}`} className={`erp-dashboard-card tone-${card.tone}`} onClick={() => onOpenReport(card.report)}><div className="flex items-start justify-between gap-3"><div className="min-w-0 text-right"><p className="erp-metric-label">{card.title}</p><p className="erp-dashboard-card-value">{card.protected || card.value == null ? "غير متاح" : formatCurrency(card.value)}</p></div><span className="erp-dashboard-card-icon"><Icon className="h-5 w-5" /></span></div><div className="mt-auto flex items-end justify-between gap-2 pt-4"><p className="line-clamp-2 text-right text-xs leading-5 text-slate-500">{card.note}</p>{change !== null && <span className={`erp-dashboard-change ${change < 0 ? "down" : "up"}`}><ChangeIcon className="h-3.5 w-3.5" />{formatAmount(Math.abs(change))}٪</span>}</div><span className="erp-dashboard-card-link"><PackageSearch className="h-3.5 w-3.5" />فتح التقرير</span></button>; })}</section>}
+  </div>;
 }

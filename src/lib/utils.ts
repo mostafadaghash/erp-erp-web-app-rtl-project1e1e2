@@ -11,9 +11,10 @@ export function cn(...inputs: ClassValue[]) {
 
 export function useCurrency() {
   const currency = "EGP";
+  const locale = "ar-EG-u-nu-latn";
 
   const formatCurrency = (amount: number): string => {
-    return new Intl.NumberFormat("ar-EG", {
+    return new Intl.NumberFormat(locale, {
       style: "currency",
       currency,
       minimumFractionDigits: 0,
@@ -22,7 +23,7 @@ export function useCurrency() {
   };
 
   const formatAmount = (amount: number): string => {
-    return new Intl.NumberFormat("ar-EG").format(amount);
+    return new Intl.NumberFormat(locale).format(amount);
   };
 
   return { currency, formatCurrency, formatAmount };

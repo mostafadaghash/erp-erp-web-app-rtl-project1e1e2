@@ -40,6 +40,25 @@ export const get = query({
   },
 });
 
+/** Read-only document view for reopening any historical purchase operation. */
+export const purchaseDocument = query({
+  args: { id: v.id("shipments") },
+  handler: async (ctx, args) => {
+    const user = await requireModulePermission(ctx, "view_shipments", "shipments");
+    const shipment = await ctx.db.get(args.id);
+    if (!shipment) return null;
+    assertBranchAccess(user, shipment);
+    const receipt = shipment.purchaseReceiptId
+      ? await ctx.db.get(shipment.purchaseReceiptId)
+      : await ctx.db
+          .query("purchaseReceipts")
+          .withIndex("by_shipment", (q) => q.eq("shipmentId", shipment._id))
+          .unique();
+    if (receipt) assertBranchAccess(user, receipt);
+    return { shipment, receipt };
+  },
+});
+
 export const stats = query({
   args: {},
   handler: async (ctx) => {

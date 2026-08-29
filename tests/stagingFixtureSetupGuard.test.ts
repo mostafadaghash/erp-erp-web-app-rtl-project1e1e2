@@ -81,6 +81,6 @@ test("initialized finance is rejected before creating an unusable zero-balance f
 
 test("COD clearing can be created through the same validated finance path", () => {
   assert.match(finance, /v\.literal\("cod_clearing"\)/);
-  assert.match(treasuryPage, /cod_clearing: "COD \(معلق\)"/);
+  assert.match(treasuryPage, /cod_clearing: "شركات الشحن - مبالغ قيد التحصيل"/);
   assert.match(fixtureScript, /"cod_clearing"/);
 });

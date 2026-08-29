@@ -23,7 +23,7 @@ test("CUAT-02 customer list and balances use the same branch scope", () => {
 });
 
 test("CUAT-03 customer creation and ledger navigation preserve the visible branch", () => {
-  assert.match(customers, /createCustomer\(\{ \.\.\.payload, branchId: effectiveBranchId \}\)/);
+  assert.match(customers, /createCustomer\(\{ \.\.\.payload, branchId: effectiveBranchId, categoryId:/);
   assert.match(customers, /customer\.branchId \?\? effectiveBranchId/);
 });
 
