@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Page } from "./ERPApp";
 import {
   BarChart3,
@@ -62,6 +62,43 @@ interface NavGroup {
 }
 
 const HOME_ITEM: NavItem = { id: "dashboard", label: "لوحة التحكم", icon: Home };
+const PAGE_SESSION_KEY = "business-tech-erp.current-page";
+const PAGE_IDS = new Set<Page>([
+  "dashboard",
+  "products",
+  "inventory",
+  "customers",
+  "invoices",
+  "sales-returns",
+  "quotes",
+  "credit-invoices",
+  "new-invoice",
+  "new-purchase-invoice",
+  "repairs",
+  "expenses",
+  "suppliers",
+  "orders",
+  "deliveries",
+  "shipments",
+  "branches",
+  "employees",
+  "crm",
+  "reports",
+  "settings",
+  "audit-logs",
+  "accounts-home",
+  "treasury",
+  "supplier-payments",
+  "purchase-returns",
+  "customer-ledger",
+  "general-ledger",
+  "data-export",
+  "vouchers",
+  "payment-schedules",
+]);
+
+const isPage = (value: string | null): value is Page =>
+  value !== null && PAGE_IDS.has(value as Page);
 
 const NAV_GROUPS: NavGroup[] = [
   {
@@ -167,6 +204,24 @@ export function Sidebar({
   brand,
 }: SidebarProps) {
   const [openGroup, setOpenGroup] = useState<string | null>(null);
+  const restoreAttemptedRef = useRef(false);
+
+  useEffect(() => {
+    try {
+      if (!restoreAttemptedRef.current) {
+        restoreAttemptedRef.current = true;
+        const storedPage = window.sessionStorage.getItem(PAGE_SESSION_KEY);
+        if (isPage(storedPage) && storedPage !== currentPage) {
+          window.sessionStorage.removeItem(PAGE_SESSION_KEY);
+          onNavigate(storedPage);
+          return;
+        }
+      }
+      window.sessionStorage.setItem(PAGE_SESSION_KEY, currentPage);
+    } catch {
+      // Navigation must remain usable even when browser storage is unavailable.
+    }
+  }, [currentPage, onNavigate]);
 
   useEffect(() => {
     if (!openGroup) return;
