@@ -52,6 +52,8 @@ test("DOC-CORRECTION-03 posted sales returns support quantity and credit correct
   assert.match(corrections, /returnedElsewhere/);
   assert.match(corrections, /postCustomerLedgerEntry/);
   assert.match(corrections, /sales_return_correction/);
+  assert.match(corrections, /unitPrice: original\.unitPrice/);
+  assert.match(corrections, /historicalUnitCost: original\.unitCost/);
   assert.match(salesReturns, /data-testid="sales-return-edit-open"/);
   assert.match(salesReturnDialog, /sales-return-edit-price-/);
   assert.match(salesReturnDialog, /data-testid="sales-return-edit-reason"/);
