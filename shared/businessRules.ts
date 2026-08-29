@@ -56,14 +56,19 @@ export const SHIPMENT_TRANSITIONS: Readonly<Record<ShipmentStatus, readonly Ship
   cancelled: [],
 };
 
-export const REPAIR_STATUSES = ["received", "in_progress", "ready", "delivered", "cancelled"] as const;
+export const REPAIR_STATUSES = ["received", "under_inspection", "awaiting_approval", "in_progress", "ready", "delivered", "cancelled"] as const;
 export type RepairStatus = (typeof REPAIR_STATUSES)[number];
 export function isRepairStatus(value: string): value is RepairStatus {
   return (REPAIR_STATUSES as readonly string[]).includes(value);
 }
 export const REPAIR_TRANSITIONS: Readonly<Record<RepairStatus, readonly RepairStatus[]>> = {
-  received: ["in_progress", "cancelled"], in_progress: ["ready", "cancelled"],
-  ready: ["delivered", "cancelled"], delivered: [], cancelled: [],
+  received: ["under_inspection", "cancelled"],
+  under_inspection: ["awaiting_approval", "in_progress", "cancelled"],
+  awaiting_approval: ["in_progress", "cancelled"],
+  in_progress: ["ready", "awaiting_approval", "cancelled"],
+  ready: ["delivered", "in_progress", "cancelled"],
+  delivered: [],
+  cancelled: [],
 };
 
 export const DELIVERY_STATUSES = ["pending", "shipped", "delivered", "returned", "cancelled"] as const;

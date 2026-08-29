@@ -24,23 +24,28 @@ const reports = read("src/components/ReportsPage.tsx");
 
 test("professional ERP navigation uses conventional Arabic information architecture", () => {
   for (const label of [
+    "لوحة التحكم",
     "المبيعات",
     "فواتير المبيعات",
     "مرتجعات المبيعات",
-    "أوامر البيع",
+    "عروض الأسعار",
+    "طلبات البيع",
+    "العملاء",
     "المشتريات",
     "فواتير المشتريات",
     "مرتجعات المشتريات",
-    "دليل الأصناف",
+    "إدارة المخزون",
     "الشحن",
-    "إدارة الشحن",
+    "طلبات الشحن والتسويات",
     "أوامر الصيانة",
     "الحسابات",
-    "الخزائن والبنوك",
+    "الخزائن والحسابات",
+    "سندات القبض والصرف",
     "حسابات العملاء",
     "حسابات الموردين",
+    "الشيكات والأقساط",
     "المستخدمون والصلاحيات",
-    "سجل المراجعة",
+    "سجل العمليات",
   ]) assert.match(sidebar, new RegExp(label));
 
   for (const legacy of [
@@ -49,9 +54,7 @@ test("professional ERP navigation uses conventional Arabic information architect
     "الأوردرات",
     "الشحنات الواردة",
     "المشتريات والموردون",
-    "الشحن والتوصيل",
     "الموظفون والصلاحيات",
-    "سجل العمليات",
     "سجل التدقيق",
   ]) assert.doesNotMatch(sidebar, new RegExp(legacy));
 });

@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
-import { BookOpen, Edit3, Mail, MapPin, Phone, Plus, Search, Users } from "lucide-react";
+import { BookOpen, Edit3, Mail, MapPin, Phone, Plus, Search, Users, X } from "lucide-react";
 import { toast } from "sonner";
 import { usePermission } from "../lib/access";
 import { getErrorMessage } from "../lib/errors";
@@ -23,6 +23,7 @@ type CustomerCard = {
   notes?: string;
   branchId?: Id<"branches">;
   isActive?: boolean;
+  categoryId?: Id<"customerCategories">;
 };
 
 type CustomerBalance = {
@@ -63,6 +64,12 @@ export function CustomersPage({
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
   const [updatingId, setUpdatingId] = useState<Id<"customers"> | null>(null);
+  const [profileId, setProfileId] = useState<Id<"customers"> | null>(null);
+  const [categoryId, setCategoryId] = useState("");
+  const [filterCategory, setFilterCategory] = useState("");
+  const [showCategoryForm, setShowCategoryForm] = useState(false);
+  const [categoryName, setCategoryName] = useState("");
+  const [savingCategory, setSavingCategory] = useState(false);
   const [form, setForm] = useState<CustomerForm>(emptyForm);
   const formValidation = validateContactForm(form);
 
@@ -97,6 +104,9 @@ export function CustomersPage({
   const createCustomer = useMutation(api.customers.create);
   const updateCustomer = useMutation(api.customers.update);
   const setCustomerActive = useMutation(api.customers.setActive);
+  const profile = useQuery(api.customers.profile, profileId ? { id: profileId } : "skip");
+  const categories = useQuery(api.contactCategories.list, { type: "customer" }) ?? [];
+  const createCategory = useMutation(api.contactCategories.create);
 
   const balanceFor = (id: Id<"customers">) =>
     balances?.find((balance) => balance.customerId === id);
@@ -112,7 +122,7 @@ export function CustomersPage({
     (customer) =>
       customer.name.toLowerCase().includes(search.trim().toLowerCase()) ||
       customer.phone.includes(search.trim()),
-  );
+  ).filter(customer => !filterCategory || customer.categoryId === filterCategory);
 
   const handleCustomerBranchChange = (value: string) => {
     if (saving || updatingId !== null) return;
@@ -120,6 +130,7 @@ export function CustomersPage({
     setShowForm(false);
     setEditingId(null);
     setForm(emptyForm);
+    setCategoryId("");
     setSearch("");
   };
 
@@ -128,6 +139,7 @@ export function CustomersPage({
     setShowForm(false);
     setEditingId(null);
     setForm(emptyForm);
+    setCategoryId("");
   };
 
   const openCreate = () => {
@@ -153,6 +165,7 @@ export function CustomersPage({
       address: customer.address ?? "",
       notes: customer.notes ?? "",
     });
+    setCategoryId(customer.categoryId ? String(customer.categoryId) : "");
     setShowForm(true);
   };
 
@@ -172,10 +185,10 @@ export function CustomersPage({
     setSaving(true);
     try {
       if (editingId) {
-        await updateCustomer({ id: editingId, ...payload });
+        await updateCustomer({ id: editingId, ...payload, categoryId: categoryId ? categoryId as Id<"customerCategories"> : undefined });
         toast.success("تم تحديث بيانات العميل");
       } else if (effectiveBranchId) {
-        await createCustomer({ ...payload, branchId: effectiveBranchId });
+        await createCustomer({ ...payload, branchId: effectiveBranchId, categoryId: categoryId ? categoryId as Id<"customerCategories"> : undefined });
         toast.success("تمت إضافة العميل");
       }
       setShowForm(false);
@@ -228,6 +241,23 @@ export function CustomersPage({
     onOpenLedger(customer._id, branchId);
   };
 
+  const handleCreateCategory = async (event: React.FormEvent) => {
+    event.preventDefault();
+    const name = categoryName.trim();
+    if (!name || savingCategory) return;
+    setSavingCategory(true);
+    try {
+      await createCategory({ type: "customer", name });
+      setCategoryName("");
+      setShowCategoryForm(false);
+      toast.success("تمت إضافة التصنيف");
+    } catch (error) {
+      toast.error(getErrorMessage(error, "تعذر إضافة التصنيف"));
+    } finally {
+      setSavingCategory(false);
+    }
+  };
+
   return (
     <div data-testid="customers-page" className="p-4 lg:p-6 space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -249,6 +279,7 @@ export function CustomersPage({
           </p>
         </div>
         <div className="flex items-center gap-2">
+          {canEdit && <button className="btn-secondary" onClick={() => setShowCategoryForm(value => !value)}><Plus className="h-4 w-4" />تصنيف</button>}
           {canViewBranches && !me?.branchId && branches.length > 0 && (
             <select
               data-testid="customer-branch-select"
@@ -278,6 +309,19 @@ export function CustomersPage({
           )}
         </div>
       </div>
+
+      {showCategoryForm && (
+        <form onSubmit={handleCreateCategory} className="professional-panel flex flex-col gap-3 p-4 sm:flex-row sm:items-end">
+          <div className="flex-1">
+            <label className="form-label">اسم تصنيف العملاء</label>
+            <input autoFocus className="form-input" value={categoryName} onChange={event => setCategoryName(event.target.value)} maxLength={80} placeholder="مثال: عملاء جملة" />
+          </div>
+          <div className="flex gap-2">
+            <button className="btn-primary" disabled={savingCategory || !categoryName.trim()}>{savingCategory ? "جارٍ الحفظ…" : "حفظ التصنيف"}</button>
+            <button type="button" className="btn-secondary" onClick={() => { setShowCategoryForm(false); setCategoryName(""); }}>إلغاء</button>
+          </div>
+        </form>
+      )}
 
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
         <StatCard
@@ -329,6 +373,7 @@ export function CustomersPage({
           onChange={(event) => setSearch(event.target.value)}
         />
       </div>
+      {categories.length > 0 && <select className="form-input max-w-xs" value={filterCategory} onChange={event => setFilterCategory(event.target.value)}><option value="">كل التصنيفات</option>{categories.map(category => <option key={category._id} value={category._id}>{category.name}</option>)}</select>}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {filtered.map((customer) => {
@@ -407,6 +452,7 @@ export function CustomersPage({
                 )}
               </div>
               <div className="mt-4 grid grid-cols-2 gap-2">
+                <button onClick={() => setProfileId(customer._id)} className="btn-secondary text-xs flex items-center justify-center gap-1"><Users className="w-3.5 h-3.5" />بطاقة العميل</button>
                 {canEdit && (
                   <button
                     onClick={() => openEdit(customer)}
@@ -494,8 +540,12 @@ export function CustomersPage({
           onChange={setForm}
           onClose={closeForm}
           onSubmit={handleSubmit}
+          categoryOptions={categories}
+          categoryId={categoryId}
+          onCategoryChange={setCategoryId}
         />
       )}
+      {profileId && <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/50 p-4"><section className="max-h-[88vh] w-full max-w-5xl overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl">{profile === undefined ? <p className="p-10 text-center text-slate-500">جارٍ تحميل بطاقة العميل…</p> : <><header className="flex items-start justify-between border-b pb-4"><div><p className="erp-kicker">بطاقة العميل</p><h2 className="text-2xl font-black">{profile.customer.name}</h2><p className="mt-1 text-sm text-slate-500">{profile.customer.phone} {profile.customer.categoryName ? `— ${profile.customer.categoryName}` : ""}</p></div><button className="rounded-xl p-2 hover:bg-slate-100" onClick={() => setProfileId(null)}><X className="h-5 w-5" /></button></header><div className="my-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4"><StatCard label="الرصيد الحالي" value={`${(profile.balance?.receivableBalance ?? 0).toLocaleString("ar-EG")} ج.م`} color="amber" /><StatCard label="المبيعات" value={profile.invoices.length} color="indigo" /><StatCard label="الصيانة" value={profile.repairs.length} color="emerald" /><StatCard label="الشحن" value={profile.deliveries.length} color="indigo" /></div><div className="grid gap-5 lg:grid-cols-2"><div className="rounded-2xl border p-4"><h3 className="mb-3 font-black">البيانات والملاحظات</h3><p className="text-sm leading-7 text-slate-600">{profile.customer.address || "لا يوجد عنوان"}<br />{profile.customer.email || "لا يوجد بريد إلكتروني"}<br />{profile.customer.notes || "لا توجد ملاحظات"}</p></div><div className="rounded-2xl border p-4"><h3 className="mb-3 font-black">آخر التعاملات</h3><div className="max-h-64 divide-y overflow-y-auto">{profile.ledger.slice(0, 20).map(entry => <div key={entry._id} className="flex justify-between gap-3 py-2 text-sm"><span>{entry.description}</span><span className="whitespace-nowrap font-bold">{entry.receivableAfter.toLocaleString("ar-EG")} ج.م</span></div>)}{profile.ledger.length === 0 && <p className="text-sm text-slate-400">لا توجد حركات.</p>}</div></div></div></>}</section></div>}
     </div>
   );
 }

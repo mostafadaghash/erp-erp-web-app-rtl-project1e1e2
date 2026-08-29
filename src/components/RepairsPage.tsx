@@ -22,9 +22,11 @@ const isMoney = (value: number) =>
   Number.isFinite(value) && value >= 0 && Math.round(value * 100) / 100 === value;
 
 const statusConfig: Record<RepairStatus, { label: string; badge: string; icon: LucideIcon }> = {
-  received: { label: "مستلم", badge: "badge-info", icon: Clock },
-  in_progress: { label: "قيد الإصلاح", badge: "badge-warning", icon: Wrench },
-  ready: { label: "جاهز للاستلام", badge: "badge-success", icon: CheckCircle },
+  received: { label: "تم الاستلام", badge: "badge-info", icon: Clock },
+  under_inspection: { label: "تحت الفحص", badge: "badge-info", icon: Search },
+  awaiting_approval: { label: "بانتظار موافقة العميل", badge: "badge-warning", icon: Clock },
+  in_progress: { label: "جاري الإصلاح", badge: "badge-warning", icon: Wrench },
+  ready: { label: "جاهز للتسليم", badge: "badge-success", icon: CheckCircle },
   delivered: { label: "تم التسليم", badge: "badge-purple", icon: CheckCircle },
   cancelled: { label: "ملغي", badge: "badge-danger", icon: AlertCircle },
 };
@@ -884,7 +886,7 @@ export function RepairsPage({ createRequestToken }: { createRequestToken?: numbe
                     استرداد مبلغ
                   </button>
                 )}
-                {canEdit && ["received", "in_progress"].includes(r.status) && (
+                {canEdit && !["delivered", "cancelled"].includes(r.status) && (
                   <button className="btn-secondary text-xs" onClick={() => openEdit(r)}>
                     التفاصيل
                   </button>

@@ -153,48 +153,46 @@ test("RUI-20 reports have explicit loading invalid-range and unauthorized states
   assert.match(reports, /لا تملك صلاحية عرض التقارير/);
 });
 
-test("RUI-21 home launcher has no accounting or invoice data queries", () => {
-  assert.doesNotMatch(home, /useQuery|usePaginatedQuery|api\./);
-  assert.doesNotMatch(home, /أحدث فواتير المبيعات|صافي ربح الشهر|قيد التحصيل/);
+test("RUI-21 dashboard loads only protected reporting and low-stock summaries", () => {
+  assert.match(home, /api\.reporting\.overview/);
+  assert.match(home, /canViewReports && reportArgs/);
+  assert.match(home, /api\.products\.list, canViewProducts \? \{ lowStock: true \} : "skip"/);
+  assert.doesNotMatch(home, /api\.(?:invoices|expenses|customers|repairs)\.(?:list|stats|getStats)/);
 });
 
-test("RUI-22 home launcher exposes main business modules", () => {
-  for (const label of ["المبيعات", "المشتريات", "المخزون", "الحسابات", "التقارير"]) {
+test("RUI-22 dashboard exposes exactly the eight approved management indicators", () => {
+  for (const label of ["إجمالي المبيعات", "إجمالي المشتريات", "صافي الربح", "إجمالي المصروفات", "أرصدة الخزائن", "مديونيات العملاء", "مستحقات الموردين", "قيمة المخزون"]) {
     assert.match(home, new RegExp(label));
   }
-  assert.match(home, /erp-home-module-strip/);
+  assert.equal((home.match(/key: "/g) ?? []).length, 8);
+  assert.match(home, /erp-dashboard-card-grid/);
 });
 
-test("RUI-23 home launcher exposes quick creation actions", () => {
-  assert.match(home, /فاتورة بيع جديدة/);
-  assert.match(home, /عملية شراء/);
-  assert.match(home, /إضافة صنف/);
-  assert.match(home, /عميل جديد/);
-  assert.match(home, /onRequestCreate/);
+test("RUI-23 dashboard exposes period branch comparison and refresh controls", () => {
+  assert.match(home, /aria-label="اختيار الفترة"/);
+  assert.match(home, /aria-label="اختيار الفرع"/);
+  assert.match(home, /مقارنة بالفترة السابقة/);
+  assert.match(home, /تحديث البيانات/);
 });
 
-test("RUI-24 home launcher keeps permissions and module gates", () => {
-  assert.match(home, /permissions\.includes\(permission\)/);
-  assert.match(home, /modules\[moduleName\] !== false/);
-  assert.match(home, /can\("view_invoices"\)/);
-  assert.match(home, /can\("view_finance"\)/);
-  assert.match(home, /can\("view_reports"\)/);
+test("RUI-24 dashboard keeps reporting profit and inventory permissions", () => {
+  assert.match(home, /permissions\.includes\("view_reports"\)/);
+  assert.match(home, /permissions\.includes\("view_profits"\)/);
+  assert.match(home, /permissions\.includes\("view_products"\)/);
+  assert.match(home, /لا تملك صلاحية عرض مؤشرات الإدارة والتقارير/);
 });
 
-test("RUI-25 home launcher has document and management shortcuts", () => {
-  assert.match(home, /erp-home-doc-grid/);
-  assert.match(home, /erp-home-management-grid/);
-  assert.match(home, /مرتجعات المبيعات/);
-  assert.match(home, /مرتجعات المشتريات/);
-  assert.match(home, /الخزائن والبنوك/);
-  assert.match(home, /الصيانة/);
+test("RUI-25 each dashboard indicator opens its detailed report", () => {
+  assert.match(home, /onOpenReport: \(report: ReportKind\) => void/);
+  assert.match(home, /onClick=\{\(\) => onOpenReport\(card\.report\)\}/);
+  assert.match(home, /فتح التقرير/);
 });
 
-test("RUI-26 home launcher uses full clickable controls and no dashboard label", () => {
-  assert.match(home, /onClick=\{action\.onClick\}/);
+test("RUI-26 dashboard uses full clickable cards and the approved title", () => {
+  assert.match(home, /data-testid=\{`dashboard-card-\$\{card\.key\}`\}/);
   assert.match(home, /<button/);
-  assert.match(home, /ابدأ من الرئيسية/);
-  assert.doesNotMatch(home, /لوحة التحكم/);
+  assert.match(home, /لوحة التحكم/);
+  assert.doesNotMatch(home, /erp-home-quick-grid|erp-home-doc-grid/);
 });
 
 test("RUI-27 reporting backend protects branch and sales-detail queries", () => {

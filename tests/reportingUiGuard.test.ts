@@ -48,20 +48,20 @@ test("accounting reports cannot regress to client-side list aggregation", () => 
   assert.match(reports, /api\.reporting\.overview/);
 });
 
-test("home launcher cannot regress to dashboard accounting statistics", () => {
-  assert.doesNotMatch(home, /invoiceStats|expenseStats|إجمالي المبيعات المدفوعة/);
-  assert.doesNotMatch(home, /useQuery|usePaginatedQuery|api\.reporting\.overview|report\.cod/);
-  assert.match(home, /title: "الحسابات"/);
-  assert.match(home, /visible: can\("view_finance"\)/);
+test("dashboard remains a compact reporting summary", () => {
+  assert.match(home, /api\.reporting\.overview/);
+  assert.equal((home.match(/key: "/g) ?? []).length, 8);
+  assert.match(home, /erp-dashboard-card-grid/);
+  assert.doesNotMatch(home, /أحدث فواتير المبيعات|<table/);
 });
 
 test("profit inventory and report access remain permission aware", () => {
   assert.match(reports, /canViewProfits/);
   assert.match(reports, /profitabilityAvailable/);
   assert.match(reports, /inventoryValue !== undefined/);
-  assert.match(home, /title: "المخزون"[\s\S]*?visible: can\("view_products"\)/);
-  assert.match(home, /title: "الحسابات"[\s\S]*?visible: can\("view_finance"\)/);
-  assert.match(home, /title: "التقارير"[\s\S]*?visible: can\("view_reports"\)/);
+  assert.match(home, /canViewProfits = permissions\.includes\("view_profits"\)/);
+  assert.match(home, /canViewProducts = permissions\.includes\("view_products"\)/);
+  assert.match(home, /canViewReports = permissions\.includes\("view_reports"\)/);
 });
 
 test("reporting UI and home launcher remain read-only and typed", () => {

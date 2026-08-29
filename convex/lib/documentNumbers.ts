@@ -1,15 +1,17 @@
 import type { MutationCtx } from "../_generated/server";
 import { ConvexError } from "convex/values";
 
-export type DocumentType = "invoice" | "order" | "shipment" | "repair" | "delivery" | "codSettlement" | "finance" | "creditNote" | "purchaseReceipt" | "purchaseReturn" | "supplierLedger" | "supplierPayment" | "customerLedger" | "journal";
+export type DocumentType = "invoice" | "quote" | "order" | "shipment" | "repair" | "delivery" | "codSettlement" | "finance" | "paymentSchedule" | "creditNote" | "purchaseReceipt" | "purchaseReturn" | "supplierLedger" | "supplierPayment" | "customerLedger" | "journal";
 const config = {
   invoice: { prefix: "INV", table: "invoices", field: "invoiceNumber" },
+  quote: { prefix: "QTN", table: "quotes", field: "quoteNumber" },
   order: { prefix: "ORD", table: "orders", field: "orderNumber" },
   shipment: { prefix: "SHP", table: "shipments", field: "shipmentNumber" },
   repair: { prefix: "REP", table: "repairs", field: "repairNumber" },
   delivery: { prefix: "DEL", table: "deliveries", field: "deliveryNumber" },
   codSettlement: { prefix: "COD", table: "codSettlements", field: "settlementNumber" },
   finance: { prefix: "FIN", table: "financialTransactions", field: "transactionNumber" },
+  paymentSchedule: { prefix: "DUE", table: "paymentSchedules", field: "scheduleNumber" },
   creditNote: { prefix: "CRN", table: "salesReturns", field: "creditNoteNumber" },
   purchaseReceipt: { prefix: "PUR", table: "purchaseReceipts", field: "receiptNumber" },
   purchaseReturn: { prefix: "PRN", table: "purchaseReturns", field: "returnNumber" },
@@ -36,12 +38,14 @@ async function legacyNumbersForYear(ctx: MutationCtx, type: DocumentType, year: 
   const upper = `${config[type].prefix}-${year}.`;
   switch (type) {
     case "invoice": return (await ctx.db.query("invoices").withIndex("by_invoice_number", q => q.gte("invoiceNumber", lower).lt("invoiceNumber", upper)).collect()).map(x => x.invoiceNumber);
+    case "quote": return (await ctx.db.query("quotes").withIndex("by_number", q => q.gte("quoteNumber", lower).lt("quoteNumber", upper)).collect()).map(x => x.quoteNumber);
     case "order": return (await ctx.db.query("orders").withIndex("by_order_number", q => q.gte("orderNumber", lower).lt("orderNumber", upper)).collect()).map(x => x.orderNumber);
     case "shipment": return (await ctx.db.query("shipments").withIndex("by_shipment_number", q => q.gte("shipmentNumber", lower).lt("shipmentNumber", upper)).collect()).map(x => x.shipmentNumber);
     case "repair": return (await ctx.db.query("repairs").withIndex("by_repair_number", q => q.gte("repairNumber", lower).lt("repairNumber", upper)).collect()).map(x => x.repairNumber);
     case "delivery": return (await ctx.db.query("deliveries").withIndex("by_delivery_number", q => q.gte("deliveryNumber", lower).lt("deliveryNumber", upper)).collect()).map(x => x.deliveryNumber);
     case "codSettlement": return (await ctx.db.query("codSettlements").withIndex("by_number", q => q.gte("settlementNumber", lower).lt("settlementNumber", upper)).collect()).map(x => x.settlementNumber);
     case "finance": return (await ctx.db.query("financialTransactions").withIndex("by_transaction_number", q => q.gte("transactionNumber", lower).lt("transactionNumber", upper)).collect()).map(x => x.transactionNumber);
+    case "paymentSchedule": return (await ctx.db.query("paymentSchedules").withIndex("by_number", q => q.gte("scheduleNumber", lower).lt("scheduleNumber", upper)).collect()).map(x => x.scheduleNumber);
     case "creditNote": return (await ctx.db.query("salesReturns").withIndex("by_credit_note_number", q => q.gte("creditNoteNumber", lower).lt("creditNoteNumber", upper)).collect()).map(x => x.creditNoteNumber);
     case "purchaseReceipt": return (await ctx.db.query("purchaseReceipts").withIndex("by_receipt_number", q => q.gte("receiptNumber", lower).lt("receiptNumber", upper)).collect()).map(x => x.receiptNumber);
     case "purchaseReturn": return (await ctx.db.query("purchaseReturns").withIndex("by_return_number", q => q.gte("returnNumber", lower).lt("returnNumber", upper)).collect()).map(x => x.returnNumber);
@@ -55,12 +59,14 @@ async function legacyNumbersForYear(ctx: MutationCtx, type: DocumentType, year: 
 export async function documentNumberExists(ctx: MutationCtx, type: DocumentType, number: string): Promise<boolean> {
   switch (type) {
     case "invoice": return (await ctx.db.query("invoices").withIndex("by_invoice_number", q => q.eq("invoiceNumber", number)).first()) !== null;
+    case "quote": return (await ctx.db.query("quotes").withIndex("by_number", q => q.eq("quoteNumber", number)).first()) !== null;
     case "order": return (await ctx.db.query("orders").withIndex("by_order_number", q => q.eq("orderNumber", number)).first()) !== null;
     case "shipment": return (await ctx.db.query("shipments").withIndex("by_shipment_number", q => q.eq("shipmentNumber", number)).first()) !== null;
     case "repair": return (await ctx.db.query("repairs").withIndex("by_repair_number", q => q.eq("repairNumber", number)).first()) !== null;
     case "delivery": return (await ctx.db.query("deliveries").withIndex("by_delivery_number", q => q.eq("deliveryNumber", number)).first()) !== null;
     case "codSettlement": return (await ctx.db.query("codSettlements").withIndex("by_number", q => q.eq("settlementNumber", number)).first()) !== null;
     case "finance": return (await ctx.db.query("financialTransactions").withIndex("by_transaction_number", q => q.eq("transactionNumber", number)).first()) !== null;
+    case "paymentSchedule": return (await ctx.db.query("paymentSchedules").withIndex("by_number", q => q.eq("scheduleNumber", number)).first()) !== null;
     case "creditNote": return (await ctx.db.query("salesReturns").withIndex("by_credit_note_number", q => q.eq("creditNoteNumber", number)).first()) !== null;
     case "purchaseReceipt": return (await ctx.db.query("purchaseReceipts").withIndex("by_receipt_number", q => q.eq("receiptNumber", number)).first()) !== null;
     case "purchaseReturn": return (await ctx.db.query("purchaseReturns").withIndex("by_return_number", q => q.eq("returnNumber", number)).first()) !== null;

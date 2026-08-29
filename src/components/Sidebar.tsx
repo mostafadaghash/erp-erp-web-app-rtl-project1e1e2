@@ -8,7 +8,8 @@ import {
   ChevronDown,
   CircleDollarSign,
   ClipboardList,
-  DatabaseBackup,
+  CalendarClock,
+  FileText,
   Home,
   Landmark,
   Package,
@@ -17,11 +18,9 @@ import {
   Settings,
   ShieldCheck,
   ShoppingBag,
-  Target,
   Truck,
   UserCog,
   Users,
-  WalletCards,
   Wrench,
   X,
 } from "lucide-react";
@@ -62,7 +61,7 @@ interface NavGroup {
   items: NavItem[];
 }
 
-const HOME_ITEM: NavItem = { id: "dashboard", label: "الرئيسية", icon: Home };
+const HOME_ITEM: NavItem = { id: "dashboard", label: "لوحة التحكم", icon: Home };
 
 const NAV_GROUPS: NavGroup[] = [
   {
@@ -70,12 +69,18 @@ const NAV_GROUPS: NavGroup[] = [
     label: "المبيعات",
     icon: ShoppingBag,
     items: [
+      { id: "new-invoice", label: "فاتورة بيع جديدة", icon: ReceiptText, moduleKey: "invoices", permission: "create_invoices" },
       { id: "invoices", label: "فواتير المبيعات", icon: ReceiptText, moduleKey: "invoices", permission: "view_invoices" },
       { id: "sales-returns", label: "مرتجعات المبيعات", icon: RotateCcw, moduleKey: "invoices", permission: "view_sales_returns" },
-      { id: "orders", label: "أوامر البيع", icon: ClipboardList, moduleKey: "orders", permission: "view_orders" },
-      { id: "customers", label: "العملاء", icon: Users, permission: "view_customers" },
-      { id: "crm", label: "إدارة علاقات العملاء", icon: Target, moduleKey: "crm", permission: "view_leads" },
+      { id: "quotes", label: "عروض الأسعار", icon: FileText, permission: "view_quotes" },
+      { id: "orders", label: "طلبات البيع", icon: ClipboardList, moduleKey: "orders", permission: "view_orders" },
     ],
+  },
+  {
+    key: "customers",
+    label: "العملاء",
+    icon: Users,
+    items: [{ id: "customers", label: "قائمة العملاء", icon: Users, permission: "view_customers" }],
   },
   {
     key: "purchases",
@@ -91,15 +96,7 @@ const NAV_GROUPS: NavGroup[] = [
     key: "inventory",
     label: "المخزون",
     icon: Boxes,
-    items: [{ id: "products", label: "دليل الأصناف", icon: Package, permission: "view_products" }],
-  },
-  {
-    key: "shipping",
-    label: "الشحن",
-    icon: Truck,
-    items: [
-      { id: "deliveries", label: "إدارة الشحن", icon: Truck, moduleKey: "deliveries", permission: "view_deliveries" },
-    ],
+    items: [{ id: "inventory", label: "إدارة المخزون", icon: Package, permission: "view_products" }],
   },
   {
     key: "service",
@@ -108,16 +105,24 @@ const NAV_GROUPS: NavGroup[] = [
     items: [{ id: "repairs", label: "أوامر الصيانة", icon: Wrench, moduleKey: "repairs", permission: "view_repairs" }],
   },
   {
+    key: "shipping",
+    label: "الشحن",
+    icon: Truck,
+    items: [{ id: "deliveries", label: "طلبات الشحن والتسويات", icon: Truck, moduleKey: "deliveries", permission: "view_deliveries" }],
+  },
+  {
     key: "accounting",
     label: "الحسابات",
     icon: Landmark,
     items: [
       { id: "accounts-home", label: "نظرة عامة", icon: Landmark, permission: "view_finance" },
-      { id: "treasury", label: "الخزائن والبنوك", icon: Landmark, permission: "view_finance" },
+      { id: "treasury", label: "الخزائن والحسابات", icon: Landmark, permission: "view_finance" },
+      { id: "vouchers", label: "سندات القبض والصرف", icon: ReceiptText, permission: "view_finance" },
       { id: "customer-ledger", label: "حسابات العملاء", icon: BookOpen, permission: "view_customer_ledger" },
-      { id: "supplier-payments", label: "حسابات الموردين", icon: WalletCards, permission: "view_supplier_ledger" },
+      { id: "supplier-payments", label: "حسابات الموردين", icon: Truck, permission: "view_supplier_ledger" },
+      { id: "credit-invoices", label: "الفواتير الآجلة", icon: ClipboardList, permission: "view_invoices" },
+      { id: "payment-schedules", label: "الشيكات والأقساط", icon: CalendarClock, permission: "view_finance" },
       { id: "expenses", label: "المصروفات", icon: CircleDollarSign, moduleKey: "expenses", permission: "view_expenses" },
-      { id: "general-ledger", label: "المحاسبة العامة", icon: BookOpen, permission: "view_general_ledger" },
     ],
   },
   {
@@ -128,13 +133,12 @@ const NAV_GROUPS: NavGroup[] = [
   },
   {
     key: "administration",
-    label: "الإدارة",
+    label: "الإدارة والإعدادات",
     icon: Settings,
     items: [
       { id: "branches", label: "الفروع", icon: Building2, moduleKey: "branches", permission: "view_branches" },
       { id: "employees", label: "المستخدمون والصلاحيات", icon: UserCog, moduleKey: "employees", permission: "view_employees" },
-      { id: "audit-logs", label: "سجل المراجعة", icon: ShieldCheck, permission: "view_audit_logs" },
-      { id: "data-export", label: "تصدير البيانات", icon: DatabaseBackup, permission: "export_data" },
+      { id: "audit-logs", label: "سجل العمليات", icon: ShieldCheck, permission: "view_audit_logs" },
       { id: "settings", label: "إعدادات النظام", icon: Settings, permission: "manage_settings" },
     ],
   },

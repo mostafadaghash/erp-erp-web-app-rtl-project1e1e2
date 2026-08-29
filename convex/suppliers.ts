@@ -77,6 +77,24 @@ export const get = query({
   },
 });
 
+export const profile = query({
+  args: { id: v.id("suppliers") },
+  handler: async (ctx, args) => {
+    await requireModulePermission(ctx, "view_suppliers", "suppliers");
+    const supplier = await ctx.db.get(args.id);
+    if (!supplier) throw new ConvexError("المورد غير موجود");
+    const [receipts, returns, payments, ledger, balances, category] = await Promise.all([
+      ctx.db.query("purchaseReceipts").collect().then(rows => rows.filter(row => row.supplierId === supplier._id)),
+      ctx.db.query("purchaseReturns").collect().then(rows => rows.filter(row => row.supplierId === supplier._id)),
+      ctx.db.query("supplierPayments").collect().then(rows => rows.filter(row => row.supplierId === supplier._id)),
+      ctx.db.query("supplierLedgerEntries").collect().then(rows => rows.filter(row => row.supplierId === supplier._id).sort((a, b) => b.date.localeCompare(a.date)).slice(0, 200)),
+      ctx.db.query("supplierBalances").withIndex("by_supplier", q => q.eq("supplierId", supplier._id)).collect(),
+      supplier.categoryId ? ctx.db.get(supplier.categoryId) : Promise.resolve(null),
+    ]);
+    return { supplier: { ...publicSupplier(supplier), categoryName: category?.name }, receipts, returns, payments, ledger, balances };
+  },
+});
+
 export const branchBalances = query({
   args: { branchId: v.id("branches") },
   handler: async (ctx, args) => {
@@ -151,12 +169,13 @@ export const create = mutation({
     email: v.optional(v.string()),
     address: v.optional(v.string()),
     notes: v.optional(v.string()),
+    categoryId: v.optional(v.id("supplierCategories")),
   },
   handler: async (ctx, args) => {
     const user = await requireModulePermission(ctx, "create_suppliers", "suppliers");
     const normalized = supplierData(args);
     await assertUniqueSupplierPhone(ctx, normalized.phone);
-    const id = await ctx.db.insert("suppliers", { ...normalized, balance: 0, isActive: true });
+    const id = await ctx.db.insert("suppliers", { ...normalized, balance: 0, isActive: true, categoryId: args.categoryId });
     await logAction(ctx, user, {
       action: "create",
       module: "suppliers",
@@ -178,26 +197,31 @@ export const update = mutation({
     email: v.optional(v.string()),
     address: v.optional(v.string()),
     notes: v.optional(v.string()),
+    categoryId: v.optional(v.id("supplierCategories")),
   },
   handler: async (ctx, args) => {
     const user = await requireModulePermission(ctx, "edit_suppliers", "suppliers");
     const { id } = args;
     const supplier = await ctx.db.get(id);
     if (!supplier) throw new ConvexError("المورد غير موجود");
-    const normalized = supplierData({
+    const normalized = {
+      ...supplierData({
       name: args.name ?? supplier.name,
       phone: args.phone ?? supplier.phone,
       email: args.email !== undefined ? args.email : supplier.email,
       address: args.address !== undefined ? args.address : supplier.address,
       notes: args.notes !== undefined ? args.notes : supplier.notes,
-    });
+      }),
+      categoryId: args.categoryId ?? supplier.categoryId,
+    };
     await assertUniqueSupplierPhone(ctx, normalized.phone, supplier._id);
     const supplierUnchanged =
       normalized.name === supplier.name &&
       normalized.phone === supplier.phone &&
       normalized.email === supplier.email &&
       normalized.address === supplier.address &&
-      normalized.notes === supplier.notes;
+      normalized.notes === supplier.notes &&
+      normalized.categoryId === supplier.categoryId;
     if (supplierUnchanged) return;
     await ctx.db.patch(id, normalized);
     await logAction(ctx, user, {

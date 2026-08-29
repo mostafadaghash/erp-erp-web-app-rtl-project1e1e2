@@ -980,6 +980,8 @@ export const transitionStatus = mutation({
     id: v.id("repairs"),
     status: v.union(
       v.literal("received"),
+      v.literal("under_inspection"),
+      v.literal("awaiting_approval"),
       v.literal("in_progress"),
       v.literal("ready"),
       v.literal("delivered"),
@@ -1004,6 +1006,8 @@ export const updateStatus = mutation({
     id: v.id("repairs"),
     status: v.union(
       v.literal("received"),
+      v.literal("under_inspection"),
+      v.literal("awaiting_approval"),
       v.literal("in_progress"),
       v.literal("ready"),
       v.literal("delivered"),
@@ -1038,6 +1042,8 @@ export const getStats = query({
     return {
       total: repairs.length,
       received: repairs.filter(r => r.status === "received").length,
+      underInspection: repairs.filter(r => r.status === "under_inspection").length,
+      awaitingApproval: repairs.filter(r => r.status === "awaiting_approval").length,
       inProgress: repairs.filter(r => r.status === "in_progress").length,
       ready: repairs.filter(r => r.status === "ready").length,
       delivered: repairs.filter(r => r.status === "delivered").length,

@@ -1,386 +1,57 @@
-import type { Page } from "./ERPApp";
-import {
-  ArrowLeft,
-  BarChart3,
-  Boxes,
-  Building2,
-  CircleDollarSign,
-  ClipboardList,
-  Landmark,
-  PackagePlus,
-  ReceiptText,
-  RotateCcw,
-  ShoppingBag,
-  Target,
-  Truck,
-  UserPlus,
-  Users,
-  WalletCards,
-  Wrench,
-} from "lucide-react";
+import { useMemo, useState } from "react";
+import { useQuery } from "convex/react";
+import { ArrowDownLeft, ArrowUpLeft, Boxes, Building2, CircleDollarSign, Landmark, PackageSearch, ReceiptText, RefreshCcw, ShoppingBag, TrendingUp, Truck, Users } from "lucide-react";
+import { api } from "../../convex/_generated/api";
+import type { Id } from "../../convex/_generated/dataModel";
 import type { Permission } from "../../convex/lib/permissions";
+import { validateReportingRange } from "../../shared/reportingRules";
+import type { ReportingOverview } from "../../shared/reportingView";
+import { useCurrency } from "../lib/utils";
+import type { ReportKind } from "./ReportsPage";
 
-interface DashboardProps {
-  onNavigate: (page: Page) => void;
-  onRequestCreate: (page: "new-invoice" | "shipments" | "products" | "customers") => void;
-  permissions: Permission[];
-  modules: Record<string, boolean | undefined>;
-}
+interface DashboardProps { onOpenReport: (report: ReportKind) => void; permissions: Permission[]; }
+type Period = "today" | "week" | "month" | "year" | "custom";
+type DashboardCard = { key: string; title: string; value: number | null | undefined; note: string; report: ReportKind; icon: React.ElementType; tone: string; comparisonValue?: number | null; protected?: boolean; };
 
-type HomeAction = {
-  key: string;
-  title: string;
-  subtitle?: string;
-  icon: React.ElementType;
-  tone: string;
-  featured?: boolean;
-  visible: boolean;
-  onClick: () => void;
-};
+const periodLabels: Record<Period, string> = { today: "اليوم", week: "آخر 7 أيام", month: "هذا الشهر", year: "هذه السنة", custom: "فترة مخصصة" };
+function isoDate(date: Date) { const year = date.getFullYear(); const month = String(date.getMonth() + 1).padStart(2, "0"); const day = String(date.getDate()).padStart(2, "0"); return `${year}-${month}-${day}`; }
+function periodStart(period: Exclude<Period, "custom">, now = new Date()) { const start = new Date(now); if (period === "today") return isoDate(start); if (period === "week") { start.setDate(start.getDate() - 6); return isoDate(start); } if (period === "month") { start.setDate(1); return isoDate(start); } return `${start.getFullYear()}-01-01`; }
+function previousRange(from: string, to: string) { const fromDate = new Date(`${from}T00:00:00.000Z`); const toDate = new Date(`${to}T00:00:00.000Z`); const days = Math.max(1, Math.round((toDate.valueOf() - fromDate.valueOf()) / 86_400_000) + 1); const previousTo = new Date(fromDate); previousTo.setUTCDate(previousTo.getUTCDate() - 1); const previousFrom = new Date(previousTo); previousFrom.setUTCDate(previousFrom.getUTCDate() - days + 1); return { from: previousFrom.toISOString().slice(0, 10), to: previousTo.toISOString().slice(0, 10) }; }
+function validRange(from: string, to: string) { try { validateReportingRange(from, to); return true; } catch { return false; } }
+function comparisonPercent(current: number | null | undefined, previous: number | null | undefined) { if (current == null || previous == null || previous === 0) return null; return Math.round(((current - previous) / Math.abs(previous)) * 1000) / 10; }
 
-export function Dashboard({ onNavigate, onRequestCreate, permissions, modules }: DashboardProps) {
-  const can = (permission: Permission) => permissions.includes(permission);
-  const enabled = (moduleName: string) => modules[moduleName] !== false;
-
-  const mainModules: HomeAction[] = [
-    {
-      key: "sales",
-      title: "المبيعات",
-      subtitle: "الفواتير والعملاء وأوامر البيع",
-      icon: ReceiptText,
-      tone: "emerald",
-      visible: can("view_invoices") && enabled("invoices"),
-      onClick: () => onNavigate("invoices"),
-    },
-    {
-      key: "purchases",
-      title: "المشتريات",
-      subtitle: "الموردون وفواتير الشراء",
-      icon: ShoppingBag,
-      tone: "cyan",
-      visible: can("view_shipments") && enabled("shipments"),
-      onClick: () => onNavigate("shipments"),
-    },
-    {
-      key: "inventory",
-      title: "المخزون",
-      subtitle: "الأصناف والكميات والحركة",
-      icon: Boxes,
-      tone: "violet",
-      visible: can("view_products"),
-      onClick: () => onNavigate("products"),
-    },
-    {
-      key: "accounts",
-      title: "الحسابات",
-      subtitle: "الخزائن والبنوك والحسابات",
-      icon: Landmark,
-      tone: "amber",
-      visible: can("view_finance"),
-      onClick: () => onNavigate("accounts-home"),
-    },
-    {
-      key: "reports",
-      title: "التقارير",
-      subtitle: "تقارير المبيعات والمخزون والحسابات",
-      icon: BarChart3,
-      tone: "blue",
-      visible: can("view_reports") && enabled("reports"),
-      onClick: () => onNavigate("reports"),
-    },
-  ].filter((action) => action.visible);
-
-  const quickActions: HomeAction[] = [
-    {
-      key: "new-sale",
-      title: "فاتورة بيع جديدة",
-      subtitle: "ابدأ عملية بيع مباشرة",
-      icon: ReceiptText,
-      tone: "emerald",
-      featured: true,
-      visible: can("create_invoices") && enabled("invoices"),
-      onClick: () => onRequestCreate("new-invoice"),
-    },
-    {
-      key: "new-purchase",
-      title: "عملية شراء",
-      subtitle: "إضافة فاتورة أو توريد جديد",
-      icon: ShoppingBag,
-      tone: "orange",
-      featured: true,
-      visible: can("create_shipments") && enabled("shipments"),
-      onClick: () => onRequestCreate("shipments"),
-    },
-    {
-      key: "new-product",
-      title: "إضافة صنف",
-      subtitle: "تعريف صنف جديد بالمخزون",
-      icon: PackagePlus,
-      tone: "cyan",
-      visible: can("create_products"),
-      onClick: () => onRequestCreate("products"),
-    },
-    {
-      key: "new-customer",
-      title: "عميل جديد",
-      subtitle: "إضافة عميل إلى الدليل",
-      icon: UserPlus,
-      tone: "violet",
-      visible: can("create_customers"),
-      onClick: () => onRequestCreate("customers"),
-    },
-  ].filter((action) => action.visible);
-
-  const documentActions: HomeAction[] = [
-    {
-      key: "sales-list",
-      title: "فواتير المبيعات",
-      icon: ReceiptText,
-      tone: "emerald",
-      visible: can("view_invoices") && enabled("invoices"),
-      onClick: () => onNavigate("invoices"),
-    },
-    {
-      key: "sales-return",
-      title: "مرتجعات المبيعات",
-      icon: RotateCcw,
-      tone: "rose",
-      visible: can("view_sales_returns") && enabled("invoices"),
-      onClick: () => onNavigate("sales-returns"),
-    },
-    {
-      key: "purchase-list",
-      title: "فواتير المشتريات",
-      icon: ShoppingBag,
-      tone: "orange",
-      visible: can("view_shipments") && enabled("shipments"),
-      onClick: () => onNavigate("shipments"),
-    },
-    {
-      key: "purchase-return",
-      title: "مرتجعات المشتريات",
-      icon: RotateCcw,
-      tone: "plum",
-      visible: can("view_purchase_returns"),
-      onClick: () => onNavigate("purchase-returns"),
-    },
-    {
-      key: "orders",
-      title: "أوامر البيع",
-      icon: ClipboardList,
-      tone: "blue",
-      visible: can("view_orders") && enabled("orders"),
-      onClick: () => onNavigate("orders"),
-    },
-    {
-      key: "shipping",
-      title: "الشحن والتوصيل",
-      icon: Truck,
-      tone: "cyan",
-      visible: can("view_deliveries") && enabled("deliveries"),
-      onClick: () => onNavigate("deliveries"),
-    },
-    {
-      key: "expenses",
-      title: "المصروفات",
-      icon: CircleDollarSign,
-      tone: "red",
-      visible: can("view_expenses") && enabled("expenses"),
-      onClick: () => onNavigate("expenses"),
-    },
-    {
-      key: "treasury",
-      title: "الخزائن والبنوك",
-      icon: WalletCards,
-      tone: "gold",
-      visible: can("view_finance"),
-      onClick: () => onNavigate("treasury"),
-    },
-  ].filter((action) => action.visible);
-
-  const managementActions: HomeAction[] = [
-    {
-      key: "customers",
-      title: "العملاء",
-      subtitle: "الدليل والأرصدة والمتابعة",
-      icon: Users,
-      tone: "teal",
-      visible: can("view_customers"),
-      onClick: () => onNavigate("customers"),
-    },
-    {
-      key: "suppliers",
-      title: "الموردون",
-      subtitle: "الدليل والحسابات والمدفوعات",
-      icon: Truck,
-      tone: "slate",
-      visible: can("view_suppliers") && enabled("suppliers"),
-      onClick: () => onNavigate("suppliers"),
-    },
-    {
-      key: "repairs",
-      title: "الصيانة",
-      subtitle: "أوامر الصيانة وحالة الأجهزة",
-      icon: Wrench,
-      tone: "indigo",
-      visible: can("view_repairs") && enabled("repairs"),
-      onClick: () => onNavigate("repairs"),
-    },
-    {
-      key: "crm",
-      title: "متابعة العملاء",
-      subtitle: "الفرص والعملاء المحتملون",
-      icon: Target,
-      tone: "purple",
-      visible: can("view_leads") && enabled("crm"),
-      onClick: () => onNavigate("crm"),
-    },
-    {
-      key: "branches",
-      title: "الفروع",
-      subtitle: "إدارة فروع المنشأة",
-      icon: Building2,
-      tone: "navy",
-      visible: can("view_branches") && enabled("branches"),
-      onClick: () => onNavigate("branches"),
-    },
-  ].filter((action) => action.visible);
-
-  return (
-    <div className="erp-home">
-      <section className="erp-home-intro" aria-labelledby="home-heading">
-        <div>
-          <p className="erp-home-eyebrow">مساحة العمل</p>
-          <h2 id="home-heading">ابدأ من الرئيسية</h2>
-          <p>اختر القسم أو العملية التي تريد تنفيذها مباشرة.</p>
-        </div>
-        <div className="erp-home-orbit" aria-hidden="true">
-          <span />
-          <span />
-          <span />
-        </div>
-      </section>
-
-      {mainModules.length > 0 && (
-        <section className="erp-home-section" aria-labelledby="home-modules-title">
-          <div className="erp-home-section-head">
-            <div>
-              <p className="erp-home-section-kicker">الأقسام الرئيسية</p>
-              <h3 id="home-modules-title">انتقل إلى القسم</h3>
-            </div>
-          </div>
-          <div className="erp-home-module-strip">
-            {mainModules.map((action) => {
-              const Icon = action.icon;
-              return (
-                <button
-                  key={action.key}
-                  type="button"
-                  className={`erp-home-module erp-home-tone--${action.tone}`}
-                  onClick={action.onClick}
-                >
-                  <span className="erp-home-module-icon"><Icon /></span>
-                  <span className="erp-home-module-copy">
-                    <strong>{action.title}</strong>
-                    <small>{action.subtitle}</small>
-                  </span>
-                  <ArrowLeft className="erp-home-arrow" aria-hidden="true" />
-                </button>
-              );
-            })}
-          </div>
-        </section>
-      )}
-
-      {quickActions.length > 0 && (
-        <section className="erp-home-section" aria-labelledby="home-quick-title">
-          <div className="erp-home-section-head">
-            <div>
-              <p className="erp-home-section-kicker">وصول سريع</p>
-              <h3 id="home-quick-title">ابدأ عملية جديدة</h3>
-            </div>
-          </div>
-          <div className="erp-home-quick-grid">
-            {quickActions.map((action) => {
-              const Icon = action.icon;
-              return (
-                <button
-                  key={action.key}
-                  type="button"
-                  className={`erp-home-quick ${action.featured ? "erp-home-quick--featured" : ""} erp-home-tone--${action.tone}`}
-                  onClick={action.onClick}
-                >
-                  <span className="erp-home-quick-icon"><Icon /></span>
-                  <span>
-                    <strong>{action.title}</strong>
-                    <small>{action.subtitle}</small>
-                  </span>
-                  <ArrowLeft className="erp-home-arrow" aria-hidden="true" />
-                </button>
-              );
-            })}
-          </div>
-        </section>
-      )}
-
-      {documentActions.length > 0 && (
-        <section className="erp-home-section" aria-labelledby="home-documents-title">
-          <div className="erp-home-section-head">
-            <div>
-              <p className="erp-home-section-kicker">المستندات والحركة</p>
-              <h3 id="home-documents-title">اختر نوع العملية</h3>
-            </div>
-          </div>
-          <div className="erp-home-doc-grid">
-            {documentActions.map((action, index) => {
-              const Icon = action.icon;
-              return (
-                <button
-                  key={action.key}
-                  type="button"
-                  className={`erp-home-doc erp-home-doc--${(index % 4) + 1} erp-home-tone--${action.tone}`}
-                  onClick={action.onClick}
-                >
-                  <span className="erp-home-doc-icon"><Icon /></span>
-                  <strong>{action.title}</strong>
-                  <ArrowLeft className="erp-home-arrow" aria-hidden="true" />
-                </button>
-              );
-            })}
-          </div>
-        </section>
-      )}
-
-      {managementActions.length > 0 && (
-        <section className="erp-home-section erp-home-section--last" aria-labelledby="home-management-title">
-          <div className="erp-home-section-head">
-            <div>
-              <p className="erp-home-section-kicker">الإدارة والمتابعة</p>
-              <h3 id="home-management-title">اختصارات العمل اليومي</h3>
-            </div>
-          </div>
-          <div className="erp-home-management-grid">
-            {managementActions.map((action) => {
-              const Icon = action.icon;
-              return (
-                <button
-                  key={action.key}
-                  type="button"
-                  className={`erp-home-management erp-home-tone--${action.tone}`}
-                  onClick={action.onClick}
-                >
-                  <span className="erp-home-management-icon"><Icon /></span>
-                  <span>
-                    <strong>{action.title}</strong>
-                    <small>{action.subtitle}</small>
-                  </span>
-                  <ArrowLeft className="erp-home-arrow" aria-hidden="true" />
-                </button>
-              );
-            })}
-          </div>
-        </section>
-      )}
-    </div>
-  );
+export function Dashboard({ onOpenReport, permissions }: DashboardProps) {
+  const canViewReports = permissions.includes("view_reports"); const canViewProfits = permissions.includes("view_profits"); const canViewProducts = permissions.includes("view_products");
+  const now = useMemo(() => new Date(), []); const today = isoDate(now);
+  const [period, setPeriod] = useState<Period>("month"); const [from, setFrom] = useState(periodStart("month", now)); const [to, setTo] = useState(today); const [branchId, setBranchId] = useState<Id<"branches"> | "">(""); const [compare, setCompare] = useState(true); const [refreshedAt, setRefreshedAt] = useState(Date.now());
+  const me = useQuery(api.employees.me); const branches = useQuery(api.reporting.availableBranches, canViewReports ? {} : "skip") ?? []; const canSelectBranch = me?.role === "admin" || me?.role === "accountant"; const rangeIsValid = validRange(from, to);
+  const reportArgs = rangeIsValid ? { from, to, branchId: canSelectBranch && branchId ? branchId : undefined } : null;
+  const report = useQuery(api.reporting.overview, canViewReports && reportArgs ? reportArgs : "skip") as ReportingOverview | undefined;
+  const comparisonRange = rangeIsValid ? previousRange(from, to) : null;
+  const previousReport = useQuery(api.reporting.overview, canViewReports && compare && comparisonRange ? { ...comparisonRange, branchId: canSelectBranch && branchId ? branchId : undefined } : "skip") as ReportingOverview | undefined;
+  const lowStockProducts = useQuery(api.products.list, canViewProducts ? { lowStock: true } : "skip"); const { formatCurrency, formatAmount } = useCurrency();
+  const changePeriod = (next: Period) => { setPeriod(next); if (next === "custom") return; setFrom(periodStart(next, new Date())); setTo(isoDate(new Date())); };
+  const cards: DashboardCard[] = report ? [
+    { key: "sales", title: "إجمالي المبيعات", value: report.sales.netSales, comparisonValue: previousReport?.sales.netSales, note: `${formatAmount(report.sales.invoiceCount)} فاتورة بعد المرتجعات`, report: "sales", icon: ReceiptText, tone: "emerald" },
+    { key: "purchases", title: "إجمالي المشتريات", value: report.purchases.landedPurchases, comparisonValue: previousReport?.purchases.landedPurchases, note: `${formatAmount(report.purchases.receiptCount)} مستند شراء`, report: "purchases", icon: ShoppingBag, tone: "blue" },
+    { key: "profit", title: "صافي الربح", value: report.profitability?.netProfit, comparisonValue: previousReport?.profitability?.netProfit, note: report.completeness.profitabilityAvailable ? `هامش ${formatAmount(report.profitability?.netMargin ?? 0)}٪` : "تحتاج بعض التكاليف التاريخية للمراجعة", report: "profit", icon: TrendingUp, tone: "violet", protected: !canViewProfits },
+    { key: "expenses", title: "إجمالي المصروفات", value: report.expenses.totalExpenses, comparisonValue: previousReport?.expenses.totalExpenses, note: "مصروفات التشغيل ورسوم الشحن", report: "treasury", icon: CircleDollarSign, tone: "rose" },
+    { key: "treasury", title: "أرصدة الخزائن", value: report.currentBalances.liquidAccounts, note: "الخزائن النقدية والبنوك والحسابات", report: "treasury", icon: Landmark, tone: "cyan" },
+    { key: "customers", title: "مديونيات العملاء", value: report.currentBalances.customerReceivables, note: "إجمالي الأرصدة المطلوب تحصيلها", report: "customers", icon: Users, tone: "amber" },
+    { key: "suppliers", title: "مستحقات الموردين", value: report.currentBalances.supplierPayables, note: "إجمالي الالتزامات الحالية للموردين", report: "suppliers", icon: Truck, tone: "orange" },
+    { key: "inventory", title: "قيمة المخزون", value: report.currentBalances.inventoryValue, note: canViewProducts ? `${formatAmount(lowStockProducts?.length ?? 0)} صنف تحت حد الطلب` : "التنبيهات حسب صلاحية المخزون", report: "inventory", icon: Boxes, tone: "slate", protected: !canViewProfits },
+  ] : [];
+  return <div className="erp-dashboard-compact p-4 lg:p-5" data-refreshed-at={refreshedAt}>
+    <section className="erp-dashboard-controls" aria-label="فلاتر لوحة التحكم"><div className="min-w-0"><p className="erp-kicker">ملخص الإدارة</p><h1 className="erp-page-title">لوحة التحكم</h1></div><div className="erp-dashboard-filter-grid">
+      <label><span className="sr-only">الفترة</span><select className="form-input" value={period} onChange={(event) => changePeriod(event.target.value as Period)} aria-label="اختيار الفترة">{(Object.keys(periodLabels) as Period[]).map((value) => <option key={value} value={value}>{periodLabels[value]}</option>)}</select></label>
+      {period === "custom" && <><input className="form-input" type="date" value={from} onChange={(event) => setFrom(event.target.value)} aria-label="من تاريخ" /><input className="form-input" type="date" value={to} onChange={(event) => setTo(event.target.value)} aria-label="إلى تاريخ" /></>}
+      <label className="relative"><Building2 className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><select className="form-input pr-9" value={branchId} onChange={(event) => setBranchId(event.target.value as Id<"branches"> | "")} disabled={!canSelectBranch} aria-label="اختيار الفرع"><option value="">{canSelectBranch ? "كل الفروع" : branches[0]?.name ?? "فرع المستخدم"}</option>{canSelectBranch && branches.map((branch) => <option key={branch._id} value={branch._id}>{branch.name}</option>)}</select></label>
+      <label className="erp-dashboard-compare"><input type="checkbox" checked={compare} onChange={(event) => setCompare(event.target.checked)} /><span>مقارنة بالفترة السابقة</span></label>
+      <button type="button" className="btn-secondary inline-flex items-center justify-center gap-2" onClick={() => setRefreshedAt(Date.now())} title="البيانات تتحدث لحظيًا"><RefreshCcw className="h-4 w-4" />تحديث البيانات</button>
+    </div></section>
+    {!rangeIsValid && <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">اختر فترة صحيحة لا تتجاوز 366 يومًا لعرض مؤشرات لوحة التحكم.</div>}
+    {!canViewReports && <div className="erp-empty-state mt-4">لا تملك صلاحية عرض مؤشرات الإدارة والتقارير.</div>}
+    {canViewReports && report === undefined && rangeIsValid && <div className="erp-dashboard-card-grid mt-4" aria-label="جارٍ تحميل المؤشرات">{Array.from({ length: 8 }, (_, index) => <div key={index} className="h-36 animate-pulse rounded-2xl border border-slate-200 bg-slate-100" />)}</div>}
+    {cards.length > 0 && <section className="erp-dashboard-card-grid mt-4" aria-label="المؤشرات الرئيسية">{cards.map((card) => { const Icon = card.icon; const change = compare ? comparisonPercent(card.value, card.comparisonValue) : null; const ChangeIcon = change !== null && change < 0 ? ArrowDownLeft : ArrowUpLeft; return <button key={card.key} type="button" data-testid={`dashboard-card-${card.key}`} className={`erp-dashboard-card tone-${card.tone}`} onClick={() => onOpenReport(card.report)}><div className="flex items-start justify-between gap-3"><div className="min-w-0 text-right"><p className="erp-metric-label">{card.title}</p><p className="erp-dashboard-card-value">{card.protected || card.value == null ? "غير متاح" : formatCurrency(card.value)}</p></div><span className="erp-dashboard-card-icon"><Icon className="h-5 w-5" /></span></div><div className="mt-auto flex items-end justify-between gap-2 pt-4"><p className="line-clamp-2 text-right text-xs leading-5 text-slate-500">{card.note}</p>{change !== null && <span className={`erp-dashboard-change ${change < 0 ? "down" : "up"}`}><ChangeIcon className="h-3.5 w-3.5" />{formatAmount(Math.abs(change))}٪</span>}</div><span className="erp-dashboard-card-link"><PackageSearch className="h-3.5 w-3.5" />فتح التقرير</span></button>; })}</section>}
+  </div>;
 }

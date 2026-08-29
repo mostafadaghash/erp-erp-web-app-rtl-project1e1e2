@@ -8,9 +8,9 @@ import { INVENTORY_MOVEMENT_TYPES } from "../shared/inventoryRules";
 import { redactProductFinancials, visibleProductStats } from "./lib/productVisibility";
 import { validateOpeningStock, validateProductInput } from "../shared/productRules";
 
-async function assertUniqueSku(ctx: QueryCtx | MutationCtx, sku: string, currentId?: Id<"products">) {
-  const existing = await ctx.db.query("products").withIndex("by_sku", (q) => q.eq("sku", sku)).first();
-  if (existing && existing._id !== currentId) throw new ConvexError("رمز SKU مستخدم لمنتج آخر");
+async function assertUniqueSku(ctx: QueryCtx | MutationCtx, sku: string, branchId?: Id<"branches">, currentId?: Id<"products">) {
+  const matches = await ctx.db.query("products").withIndex("by_sku", (q) => q.eq("sku", sku)).collect();
+  if (matches.some(existing => existing._id !== currentId && existing.branchId === branchId)) throw new ConvexError("رمز SKU مستخدم لمنتج آخر داخل الفرع");
 }
 
 async function validateRelations(ctx: MutationCtx, categoryId?: Id<"categories">, supplierId?: Id<"suppliers">) {
@@ -59,9 +59,9 @@ export const create = mutation({
     await requirePermission(ctx, "view_profits");
     let normalized;
     try { normalized = validateProductInput(args); validateOpeningStock(args.stock); } catch (error) { throw new ConvexError(error instanceof Error ? error.message : "بيانات المنتج غير صالحة"); }
-    await assertUniqueSku(ctx, normalized.sku);
     await validateRelations(ctx, args.categoryId, args.supplierId);
     const branchId = resolveWriteBranch(user, args.branchId);
+    await assertUniqueSku(ctx, normalized.sku, branchId);
     const id = await ctx.db.insert("products", {
       name: normalized.name, sku: normalized.sku, barcode: args.barcode?.trim() || undefined,
       categoryId: args.categoryId, supplierId: args.supplierId, warrantyMonths: args.warrantyMonths,
@@ -90,9 +90,9 @@ export const update = mutation({
     if (args.costPrice !== product.costPrice) await requirePermission(ctx, "view_profits");
     let normalized;
     try { normalized = validateProductInput(args); } catch (error) { throw new ConvexError(error instanceof Error ? error.message : "بيانات المنتج غير صالحة"); }
-    await assertUniqueSku(ctx, normalized.sku, args.id);
     await validateRelations(ctx, args.categoryId, args.supplierId);
     const branchId = resolveWriteBranch(user, args.branchId ?? product.branchId);
+    await assertUniqueSku(ctx, normalized.sku, branchId, args.id);
     await ctx.db.patch(args.id, {
       name: normalized.name, sku: normalized.sku, barcode: args.barcode?.trim() || undefined,
       categoryId: args.categoryId, supplierId: args.supplierId, warrantyMonths: args.warrantyMonths,
@@ -123,6 +123,84 @@ export const movements = query({
     const movements = await ctx.db.query("inventoryMovements").withIndex("by_product", (q) => q.eq("productId", args.productId)).order("desc").collect();
     if (user.permissions.includes("view_profits")) return movements;
     return movements.map(({ unitCost: _unit, valueDelta: _delta, inventoryValueBefore: _before, inventoryValueAfter: _after, averageCostBefore: _averageBefore, averageCostAfter: _averageAfter, ...movement }) => movement);
+  },
+});
+
+export const allMovements = query({
+  args: { branchId: v.optional(v.id("branches")), type: v.optional(v.string()) },
+  handler: async (ctx, args) => {
+    const user = await requirePermission(ctx, "view_products");
+    const branchId = user.role === "admin" ? args.branchId ?? user.branchId : user.branchId;
+    if (!branchId) throw new ConvexError("اختر الفرع");
+    assertBranchAccess(user, { branchId });
+    let rows = await ctx.db.query("inventoryMovements").withIndex("by_branch_created", q => q.eq("branchId", branchId)).order("desc").take(500);
+    if (args.type) rows = rows.filter(row => row.type === args.type);
+    if (user.permissions.includes("view_profits")) return rows;
+    return rows.map(({ unitCost: _unit, valueDelta: _delta, inventoryValueBefore: _before, inventoryValueAfter: _after, averageCostBefore: _averageBefore, averageCostAfter: _averageAfter, ...movement }) => movement);
+  },
+});
+
+export const transferStock = mutation({
+  args: { sourceProductId: v.id("products"), destinationProductId: v.id("products"), quantity: v.number(), reason: v.string(), requestId: v.string() },
+  handler: async (ctx, args) => {
+    const user = await requirePermission(ctx, "edit_products");
+    if (args.sourceProductId === args.destinationProductId) throw new ConvexError("اختر مخزون مصدر ووجهة مختلفين");
+    const [source, destination] = await Promise.all([ctx.db.get(args.sourceProductId), ctx.db.get(args.destinationProductId)]);
+    if (!source || !destination || !source.branchId || !destination.branchId) throw new ConvexError("صنف المصدر أو الوجهة غير صالح للتحويل");
+    if (source.sku !== destination.sku) throw new ConvexError("التحويل يتطلب اختيار نفس الصنف في المصدر والوجهة");
+    if (source.branchId === destination.branchId) throw new ConvexError("اختر فرعين مختلفين");
+    if (user.role !== "admin" && user.role !== "accountant") { assertBranchAccess(user, source); assertBranchAccess(user, destination); }
+    if (!Number.isInteger(args.quantity) || args.quantity <= 0 || args.quantity > source.stock) throw new ConvexError("كمية التحويل غير صالحة");
+    const reason = args.reason.trim();
+    if (!reason) throw new ConvexError("سبب التحويل مطلوب");
+    const requestId = args.requestId.trim();
+    if (!requestId) throw new ConvexError("معرف التحويل مطلوب");
+    await changeProductStock(ctx, user, { productId: source._id, quantityDelta: -args.quantity, unitCost: source.costPrice, type: INVENTORY_MOVEMENT_TYPES.transferOut, reason, referenceType: "inventory_transfer", referenceId: requestId });
+    await changeProductStock(ctx, user, { productId: destination._id, quantityDelta: args.quantity, unitCost: source.costPrice, type: INVENTORY_MOVEMENT_TYPES.transferIn, reason, referenceType: "inventory_transfer", referenceId: requestId });
+    await logAction(ctx, user, { action: "transfer", module: "products", recordId: requestId, recordLabel: source.name, details: `تحويل ${args.quantity} ${source.unit} من ${source.branchId} إلى ${destination.branchId}`, sourceType: "inventory_transfer", sourceId: requestId, before: { sourceStock: source.stock, destinationStock: destination.stock }, after: { sourceStock: source.stock - args.quantity, destinationStock: destination.stock + args.quantity } });
+    return requestId;
+  },
+});
+
+export const serials = query({
+  args: { productId: v.optional(v.id("products")), branchId: v.optional(v.id("branches")), search: v.optional(v.string()) },
+  handler: async (ctx, args) => {
+    const user = await requirePermission(ctx, "view_products");
+    let rows = args.productId
+      ? await ctx.db.query("productSerials").withIndex("by_product", q => q.eq("productId", args.productId!)).collect()
+      : await ctx.db.query("productSerials").collect();
+    rows = rows.filter(row => user.role === "admin" || user.role === "accountant" || row.branchId === user.branchId);
+    if (args.branchId) rows = rows.filter(row => row.branchId === args.branchId);
+    const search = args.search?.trim().toUpperCase();
+    if (search) rows = rows.filter(row => row.normalizedSerial.includes(search) || row.productName.toUpperCase().includes(search));
+    return rows.sort((a, b) => b.updatedAt - a.updatedAt);
+  },
+});
+
+export const registerSerial = mutation({
+  args: { productId: v.id("products"), serialNumber: v.string(), notes: v.optional(v.string()) },
+  handler: async (ctx, args) => {
+    const user = await requirePermission(ctx, "edit_products");
+    const product = await ctx.db.get(args.productId);
+    if (!product || !product.branchId || product.isActive === false) throw new ConvexError("الصنف غير موجود أو غير مرتبط بفرع");
+    assertBranchAccess(user, product);
+    const serialNumber = args.serialNumber.trim();
+    const normalizedSerial = serialNumber.toUpperCase().replace(/\s+/g, "");
+    if (!normalizedSerial) throw new ConvexError("الرقم المسلسل مطلوب");
+    if (await ctx.db.query("productSerials").withIndex("by_serial", q => q.eq("normalizedSerial", normalizedSerial)).unique()) throw new ConvexError("الرقم المسلسل مسجل من قبل");
+    const now = Date.now();
+    return await ctx.db.insert("productSerials", { productId: product._id, productName: product.name, branchId: product.branchId, serialNumber, normalizedSerial, status: "available", notes: args.notes?.trim() || undefined, createdAt: now, createdBy: user.userId, updatedAt: now, updatedBy: user.userId });
+  },
+});
+
+export const updateSerialStatus = mutation({
+  args: { serialId: v.id("productSerials"), status: v.union(v.literal("available"), v.literal("sold"), v.literal("service"), v.literal("returned")), notes: v.optional(v.string()) },
+  handler: async (ctx, args) => {
+    const user = await requirePermission(ctx, "edit_products");
+    const serial = await ctx.db.get(args.serialId);
+    if (!serial) throw new ConvexError("الرقم المسلسل غير موجود");
+    assertBranchAccess(user, serial);
+    await ctx.db.patch(serial._id, { status: args.status, notes: args.notes?.trim() || serial.notes, updatedAt: Date.now(), updatedBy: user.userId });
   },
 });
 

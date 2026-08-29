@@ -13,6 +13,7 @@ import { requireActiveBranch, requireActiveCustomer } from "./lib/references";
 import { postCustomerLedgerEntry } from "./lib/customerLedger.ts";
 import { assertInvoiceNotLockedByActiveDelivery } from "./lib/deliveryLocks.ts";
 import { businessDate } from "../shared/businessDate.ts";
+import { assertPaymentMethodAccount, resolvePaymentMethod } from "./paymentMethods.ts";
 
 type InvoiceItemInput = {
   productId: Id<"products">;
@@ -154,6 +155,7 @@ export const create = mutation({
     tax: v.number(),
     total: v.number(),
     creationRequestId: v.string(),
+    paymentMethodCode: v.optional(v.string()),
     initialPayment: v.optional(v.object({ amount: v.number(), accountId: v.id("financialAccounts"), paymentDate: v.optional(v.string()), requestId: v.string(), notes: v.optional(v.string()) })),
     notes: v.optional(v.string()),
     branchId: v.optional(v.id("branches")),
@@ -180,7 +182,18 @@ export const create = mutation({
     if (prepared.remaining > 0 && !args.customerId) throw new ConvexError("الفاتورة الآجلة تتطلب عميلاً مسجلاً");
     const transactionDate = args.initialPayment?.paymentDate ?? businessDate();
     let paymentAccount;
-    if (args.initialPayment) { await requirePermission(ctx, "record_collections"); paymentAccount = await requireActiveFinancialAccount(ctx, args.initialPayment.accountId); assertFinancialAccountBranch(paymentAccount, branchId!); }
+    const selectedPaymentMethod = args.paymentMethodCode ? await resolvePaymentMethod(ctx, args.paymentMethodCode) : undefined;
+    if (args.initialPayment) {
+      await requirePermission(ctx, "record_collections");
+      paymentAccount = await requireActiveFinancialAccount(ctx, args.initialPayment.accountId);
+      assertFinancialAccountBranch(paymentAccount, branchId!);
+      if (selectedPaymentMethod) {
+        if (!selectedPaymentMethod.requiresAccount) throw new ConvexError("لا يمكن تسجيل مبلغ مدفوع على طريقة الدفع الآجل");
+        assertPaymentMethodAccount(selectedPaymentMethod, paymentAccount);
+      }
+    } else if (selectedPaymentMethod?.requiresAccount) {
+      throw new ConvexError("أدخل المبلغ المدفوع واختر الخزنة أو الحساب");
+    }
 
     const invoiceNumber = await nextDocumentNumber(ctx, "invoice");
 
@@ -197,7 +210,7 @@ export const create = mutation({
       cogsTotal: prepared.cogsTotal, creditedTotal: 0, netTotal: prepared.total, costingVersion: 1,
       paid: prepared.paid,
       remaining: prepared.remaining,
-      paymentMethod: paymentAccount?.type ?? "unpaid",
+      paymentMethod: selectedPaymentMethod?.code ?? paymentAccount?.type ?? "unpaid",
       status: deriveInvoiceStatus({ netTotal: prepared.total, creditedTotal: 0, paid: prepared.paid, remaining: prepared.remaining }),
       notes: args.notes,
       date: transactionDate,

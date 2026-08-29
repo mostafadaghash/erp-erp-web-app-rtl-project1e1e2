@@ -3,14 +3,13 @@ import type { Page } from "./ERPApp";
 import {
   ArrowLeftRight,
   Banknote,
-  BookOpen,
+  CalendarClock,
   Building2,
   CircleDollarSign,
   FileBarChart,
   Landmark,
   ReceiptText,
   Users,
-  WalletCards,
 } from "lucide-react";
 
 interface AccountsHubPageProps {
@@ -48,7 +47,7 @@ const MODULES: AccountModule[] = [
     page: "supplier-payments",
     title: "حسابات الموردين",
     description: "المستحقات والمدفوعات ومتابعة رصيد كل مورد في مكان واحد.",
-    icon: WalletCards,
+    icon: Building2,
     permission: "view_supplier_ledger",
     tone: "amber",
   },
@@ -61,13 +60,14 @@ const MODULES: AccountModule[] = [
     tone: "rose",
   },
   {
-    page: "general-ledger",
-    title: "المحاسبة العامة",
-    description: "دليل الحسابات والقيود اليومية ودفتر الحساب وميزان المراجعة.",
-    icon: BookOpen,
-    permission: "view_general_ledger",
+    page: "vouchers",
+    title: "سندات القبض والصرف",
+    description: "تسجيل القبض والصرف وربط الحركة بالخزنة والعميل أو المورد تلقائيًا.",
+    icon: ReceiptText,
+    permission: "view_finance",
     tone: "violet",
   },
+  { page: "payment-schedules", title: "الشيكات والأقساط", description: "متابعة الاستحقاقات القادمة والمتأخرة وتسويتها على الخزنة.", icon: CalendarClock, permission: "view_finance", tone: "cyan" },
   {
     page: "reports",
     title: "التقارير المالية",
@@ -107,11 +107,7 @@ export function AccountsHubPage({ onNavigate, permissions }: AccountsHubPageProp
       label: "حركة خزينة أو بنك",
       icon: Banknote,
     },
-    can("view_general_ledger") && {
-      page: "general-ledger" as Page,
-      label: "دليل الحسابات والقيود",
-      icon: BookOpen,
-    },
+    can("view_finance") && { page: "vouchers" as Page, label: "سند قبض أو صرف", icon: ReceiptText },
     can("view_finance") && {
       page: "treasury" as Page,
       label: "تحويل بين الحسابات",
@@ -189,7 +185,7 @@ export function AccountsHubPage({ onNavigate, permissions }: AccountsHubPageProp
           <div>
             <h2 className="font-black text-slate-900">طريقة العمل المقترحة</h2>
             <p className="mt-1 text-sm leading-7 text-slate-600">
-              استخدم الخزائن والبنوك للحركة النقدية اليومية، وحسابات العملاء والموردين للمتابعة والتحصيل والسداد، ثم استخدم المحاسبة العامة للمراجعة والقيود والتقارير المحاسبية.
+              استخدم الخزائن والحسابات للحركة اليومية، وحسابات العملاء والموردين للمتابعة والتحصيل والسداد، وتقارير الحركة للمراجعة والطباعة.
             </p>
           </div>
         </div>

@@ -39,6 +39,8 @@ export function NewInvoicePage({ onNavigate }: NewInvoicePageProps) {
   const createInvoice = useMutation(api.invoices.create);
   const canCollect = usePermission("record_collections");
   const accounts = useQuery(api.finance.collectionAccountPicker, canCollect ? {} : "skip") ?? [];
+  const paymentMethods = useQuery(api.paymentMethods.listActive) ?? [];
+  const paymentDefaults = useQuery(api.paymentMethods.defaultsForBranch, canCollect ? {} : "skip") ?? [];
   const { formatAmount } = useCurrency();
   const requestId = useRef(crypto.randomUUID());
   const productSearchRef = useRef<HTMLInputElement>(null);
@@ -52,6 +54,7 @@ export function NewInvoicePage({ onNavigate }: NewInvoicePageProps) {
   const [discount, setDiscount] = useState(0);
   const [paid, setPaid] = useState(0);
   const [accountId, setAccountId] = useState("");
+  const [paymentMethodCode, setPaymentMethodCode] = useState("cash");
   const [notes, setNotes] = useState("");
   const [productSearch, setProductSearch] = useState("");
   const taxRate = settings?.taxRate ?? 14;
@@ -101,6 +104,17 @@ export function NewInvoicePage({ onNavigate }: NewInvoicePageProps) {
   const taxAmount = (afterDiscount * taxRate) / 100;
   const total = afterDiscount + taxAmount;
   const remaining = total - paid;
+  const selectedPaymentMethod = paymentMethods.find((method) => method.code === paymentMethodCode);
+  const eligibleAccounts = selectedPaymentMethod?.requiresAccount ? accounts.filter((account) => selectedPaymentMethod.allowedAccountTypes.length === 0 || selectedPaymentMethod.allowedAccountTypes.includes(account.type)) : [];
+
+  useEffect(() => {
+    if (!selectedPaymentMethod) return;
+    if (!selectedPaymentMethod.requiresAccount) { setPaid(0); setAccountId(""); return; }
+    if (eligibleAccounts.some((account) => account._id === accountId)) return;
+    const configuredDefault = paymentDefaults.find((item) => item.paymentMethodCode === selectedPaymentMethod.code);
+    const nextAccount = eligibleAccounts.find((account) => account._id === configuredDefault?.accountId) ?? eligibleAccounts[0];
+    setAccountId(nextAccount?._id ?? "");
+  }, [accountId, eligibleAccounts, paymentDefaults, selectedPaymentMethod]);
 
   const handleSelectCustomer = (id: string) => {
     const c = customers.find(c => c._id === id);
@@ -114,6 +128,8 @@ export function NewInvoicePage({ onNavigate }: NewInvoicePageProps) {
   const handleSubmit = async () => {
     if (cart.length === 0) return toast.error("أضف منتجاً واحداً على الأقل");
     if (!customerName) return toast.error("أدخل اسم العميل");
+    if (!selectedPaymentMethod) return toast.error("اختر طريقة السداد");
+    if (selectedPaymentMethod.requiresAccount && paid <= 0) return toast.error("أدخل المبلغ المدفوع أو اختر آجل");
     if (paid > 0 && !accountId) return toast.error("اختر الحساب المالي");
     if (saving) return;
     setSaving(true);
@@ -135,6 +151,7 @@ export function NewInvoicePage({ onNavigate }: NewInvoicePageProps) {
         tax: taxAmount,
         total,
         creationRequestId: requestId.current,
+        paymentMethodCode,
         initialPayment: paid > 0 ? { amount: paid, accountId: accountId as Id<"financialAccounts">, requestId: requestId.current } : undefined,
         notes: notes || undefined,
       });
@@ -336,16 +353,11 @@ export function NewInvoicePage({ onNavigate }: NewInvoicePageProps) {
             </div>
 
             <div className="mt-4 space-y-3">
-              <label>
-                <span className="form-label flex items-center gap-1.5"><CreditCard className="h-4 w-4 text-[var(--erp-blue)]" />حساب التحصيل</span>
-                <select className="form-input" value={accountId} onChange={e => setAccountId(e.target.value)} disabled={!canCollect || paid <= 0}>
-                  <option value="">{canCollect ? "اختر الخزينة أو الحساب" : "يسجل مسؤول التحصيل الدفعة لاحقًا"}</option>
-                  {accounts.map(account => <option key={account._id} value={account._id}>{account.name}</option>)}
-                </select>
-              </label>
+              <label><span className="form-label flex items-center gap-1.5"><CreditCard className="h-4 w-4 text-[var(--erp-blue)]" />طريقة السداد</span><select data-testid="invoice-payment-method" className="form-input" value={paymentMethodCode} onChange={(event) => setPaymentMethodCode(event.target.value)}>{paymentMethods.map((method) => <option key={method.code} value={method.code}>{method.name}</option>)}</select></label>
+              <label><span className="form-label">الخزنة أو الحساب المستلم</span><select data-testid="invoice-payment-account" className="form-input" value={accountId} onChange={e => setAccountId(e.target.value)} disabled={!canCollect || !selectedPaymentMethod?.requiresAccount}><option value="">{!selectedPaymentMethod?.requiresAccount ? "البيع الآجل لا يحرك أي خزنة" : canCollect ? "اختر الخزينة أو الحساب" : "يسجل مسؤول التحصيل الدفعة لاحقًا"}</option>{eligibleAccounts.map(account => <option key={account._id} value={account._id}>{account.name}</option>)}</select></label>
               <label>
                 <span className="form-label">المبلغ المدفوع</span>
-                <input type="number" className="form-input text-lg font-black" value={paid} onChange={e => setPaid(Number(e.target.value))} min="0" max={total} />
+                <input data-testid="invoice-paid-amount" type="number" className="form-input text-lg font-black" value={paid} onChange={e => setPaid(Number(e.target.value))} min="0" max={total} disabled={!selectedPaymentMethod?.requiresAccount} />
               </label>
               <div className={`rounded-xl border p-3 ${remaining > 0 ? "border-amber-200 bg-amber-50 text-amber-800" : "border-emerald-200 bg-emerald-50 text-emerald-800"}`}>
                 <div className="flex items-center justify-between gap-3 text-sm font-black">

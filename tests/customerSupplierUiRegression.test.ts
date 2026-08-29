@@ -25,7 +25,7 @@ const customerLedger = readFileSync(
 
 test("CSU-01 customer edit is wired to the real update mutation", () => {
   assert.match(customers, /useMutation\(api\.customers\.update\)/);
-  assert.match(customers, /await updateCustomer\(\{ id: editingId, \.\.\.payload \}\)/);
+  assert.match(customers, /await updateCustomer\(\{ id: editingId, \.\.\.payload, categoryId:/);
 });
 
 test("CSU-02 customer modal supports create and edit with one trusted form", () => {
@@ -80,7 +80,7 @@ test("CSU-09 customer ledger honors an initial branch and customer target", () =
 
 test("CSU-10 supplier edit is wired to the real update mutation", () => {
   assert.match(suppliers, /useMutation\(api\.suppliers\.update\)/);
-  assert.match(suppliers, /await updateSupplier\(\{ id: editingId, \.\.\.payload \}\)/);
+  assert.match(suppliers, /await updateSupplier\(\{ id: editingId, \.\.\.payload, categoryId:/);
 });
 
 test("CSU-11 supplier activation UI uses delete_suppliers like the backend", () => {

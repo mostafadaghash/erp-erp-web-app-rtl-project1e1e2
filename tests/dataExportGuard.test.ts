@@ -63,11 +63,8 @@ test("EXP-10 CSV cells neutralize spreadsheet formula prefixes", () => {
   assert.match(page, /\\uFEFF/);
 });
 
-test("EXP-11 export navigation is permission-gated and exposes active-page state", () => {
-  assert.match(
-    sidebar,
-    /id: "data-export"[\s\S]{0,140}permission: "export_data"/,
-  );
+test("EXP-11 export remains permission-gated but is kept out of the simplified main menu", () => {
+  assert.doesNotMatch(sidebar, /id: "data-export"/);
   assert.match(sidebar, /aria-current=\{isActive \? "page" : undefined\}/);
   assert.match(app, /"data-export": "export_data"/);
   assert.match(app, /currentPage === "data-export"/);

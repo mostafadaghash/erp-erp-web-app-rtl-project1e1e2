@@ -1,4 +1,4 @@
-import { Fragment, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { usePaginatedQuery, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
@@ -27,7 +27,7 @@ import type {
 } from "../../shared/reportingView";
 
 type Period = "today" | "week" | "month" | "year" | "custom";
-type ReportKind =
+export type ReportKind =
   | "overview"
   | "sales"
   | "purchases"
@@ -283,13 +283,14 @@ function SalesDetailsTable({ invoices, salesView, canViewProfits }: { invoices: 
   );
 }
 
-export function ReportsPage() {
+export function ReportsPage({ initialReport }: { initialReport?: ReportKind }) {
   const canViewReports = usePermission("view_reports");
   const canViewInvoices = usePermission("view_invoices");
   const canViewProfits = usePermission("view_profits");
   const now = new Date();
   const today = isoDate(now);
-  const [activeReport, setActiveReport] = useState<ReportKind>("sales");
+  const [activeReport, setActiveReport] = useState<ReportKind>(initialReport ?? "sales");
+  useEffect(() => { if (initialReport) setActiveReport(initialReport); }, [initialReport]);
   const [period, setPeriod] = useState<Period>("month");
   const [from, setFrom] = useState(startOfPeriod("month", now));
   const [to, setTo] = useState(today);

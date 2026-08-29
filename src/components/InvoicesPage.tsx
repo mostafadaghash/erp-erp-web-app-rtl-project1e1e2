@@ -16,9 +16,10 @@ import { getErrorMessage } from "../lib/errors";
 interface InvoicesPageProps {
   onNavigate: (page: Page) => void;
   view?: "sales" | "returns";
+  creditOnly?: boolean;
 }
 
-export function InvoicesPage({ onNavigate, view = "sales" }: InvoicesPageProps) {
+export function InvoicesPage({ onNavigate, view = "sales", creditOnly = false }: InvoicesPageProps) {
   const canCreate = usePermission("create_invoices");
   const canEdit = usePermission("edit_invoices");
   const canPrint = usePermission("print_invoices");
@@ -150,7 +151,8 @@ export function InvoicesPage({ onNavigate, view = "sales" }: InvoicesPageProps) 
   const filtered = invoices.filter(inv =>
     inv.invoiceNumber.includes(search) ||
     inv.customerName.toLowerCase().includes(search.toLowerCase())
-  ).filter(inv => !filterStatus || inv.status === filterStatus);
+  ).filter(inv => !filterStatus || inv.status === filterStatus)
+    .filter(inv => !creditOnly || (inv.remaining > 0 && inv.status !== "cancelled"));
 
   const { formatCurrency, formatAmount } = useCurrency();
 
@@ -176,9 +178,9 @@ export function InvoicesPage({ onNavigate, view = "sales" }: InvoicesPageProps) 
           <span className="erp-kicker">مركز الفواتير والتحصيل</span>
           <h1 className="erp-page-title">
             <FileText className="w-6 h-6 text-[var(--erp-accent)]" />
-            فواتير المبيعات
+            {creditOnly ? "الفواتير الآجلة" : "فواتير المبيعات"}
           </h1>
-          <p className="erp-page-subtitle">{formatAmount(invoices.length)} فاتورة مسجلة</p>
+          <p className="erp-page-subtitle">{formatAmount(filtered.length)} {creditOnly ? "فاتورة عليها مبالغ مستحقة" : "فاتورة مسجلة"}</p>
         </div>
         {canCreate && <button onClick={() => onNavigate("new-invoice")} className="btn-primary flex items-center gap-2">
           <Plus className="w-4 h-4" />

@@ -12,6 +12,7 @@ import {
   ToggleRight,
   Trash2,
   Upload,
+  WalletCards,
 } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "../../convex/_generated/api";
@@ -76,6 +77,9 @@ export function SettingsPage() {
   const generateUploadUrl = useMutation(api.settings.generateBrandAssetUploadUrl);
   const setBrandAsset = useMutation(api.settings.setBrandAsset);
   const removeBrandAsset = useMutation(api.settings.removeBrandAsset);
+  const paymentConfiguration = useQuery(api.paymentMethods.configuration);
+  const upsertPaymentMethod = useMutation(api.paymentMethods.upsert);
+  const setDefaultPaymentAccount = useMutation(api.paymentMethods.setDefaultAccount);
   const [form, setForm] = useState(emptyForm);
   const [modules, setModules] = useState<Record<ModuleKey, boolean>>(defaultModules);
   const [initialized, setInitialized] = useState(false);
@@ -195,6 +199,13 @@ export function SettingsPage() {
   const faviconPreview = settings?.faviconPreviewUrl ?? form.faviconUrl;
   const enabledCount = Object.values(modules).filter(Boolean).length;
 
+  const togglePaymentMethod = async (method: NonNullable<typeof paymentConfiguration>["methods"][number]) => {
+    try {
+      await upsertPaymentMethod({ code: method.code, name: method.name, kind: method.kind, requiresAccount: method.requiresAccount, allowedAccountTypes: method.allowedAccountTypes, isActive: !method.isActive, sortOrder: method.sortOrder });
+      toast.success(!method.isActive ? "تم تفعيل طريقة الدفع" : "تم تعطيل طريقة الدفع");
+    } catch (error) { toast.error(getErrorMessage(error, "تعذر تعديل طريقة الدفع")); }
+  };
+
   return (
     <div className="space-y-6 p-4 lg:p-6" data-testid="settings-page">
       <div>
@@ -282,6 +293,8 @@ export function SettingsPage() {
           })}
         </div>
       </section>
+
+      {paymentConfiguration && <section className="settings-section" data-testid="payment-method-settings"><div className="mb-5 flex items-center gap-2"><WalletCards className="h-5 w-5 text-[var(--brand-primary)]" /><div><h2 className="font-black text-slate-800">طرق الدفع والخزائن الافتراضية</h2><p className="text-xs text-slate-500">حدد الطرق المتاحة والحساب الذي يستقبل كل طريقة داخل كل فرع.</p></div></div><div className="space-y-3">{paymentConfiguration.methods.map(method => <div key={method.code} className="rounded-2xl border border-slate-200 bg-white p-4"><div className="flex items-center justify-between gap-3"><div><p className="font-black text-slate-800">{method.name}</p><p className="mt-0.5 text-xs text-slate-500">{method.kind === "credit" ? "آجل — لا يحرك خزنة" : `الرمز: ${method.code}`}</p></div><button type="button" className={`erp-action ${method.isActive ? "text-emerald-700" : "text-slate-500"}`} onClick={() => void togglePaymentMethod(method)}>{method.isActive ? <ToggleRight className="h-5 w-5" /> : <ToggleLeft className="h-5 w-5" />}{method.isActive ? "مفعلة" : "معطلة"}</button></div>{method.requiresAccount && method.isActive && <div className="mt-4 grid gap-3 md:grid-cols-2">{paymentConfiguration.branches.map(branch => { const current = paymentConfiguration.defaults.find(item => item.paymentMethodCode === method.code && item.branchId === branch._id)?.accountId; const eligible = paymentConfiguration.accounts.filter(account => account.branchId === branch._id && method.allowedAccountTypes.includes(account.type)); return <label key={branch._id} className="form-label">{branch.name}<select className="form-input" value={current ?? ""} onChange={event => { if (!event.target.value) return; void setDefaultPaymentAccount({ paymentMethodCode: method.code, branchId: branch._id, accountId: event.target.value as Id<"financialAccounts"> }).then(() => toast.success("تم حفظ الخزنة الافتراضية")).catch(error => toast.error(getErrorMessage(error, "تعذر حفظ الخزنة الافتراضية"))); }}><option value="">اختر الخزنة الافتراضية</option>{eligible.map(account => <option key={account._id} value={account._id}>{account.name}</option>)}</select></label>; })}</div>}</div>)}</div></section>}
     </div>
   );
 }

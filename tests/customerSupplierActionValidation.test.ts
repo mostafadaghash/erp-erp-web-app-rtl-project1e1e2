@@ -16,10 +16,10 @@ test("CSA-01 optional contact fields remain explicit in normalized mutation payl
 });
 
 test("CSA-02 customer and supplier create and update actions share the validated payload", () => {
-  assert.match(customersPage, /await updateCustomer\(\{ id: editingId, \.\.\.payload \}\)/);
-  assert.match(customersPage, /await createCustomer\(\{ \.\.\.payload, branchId: effectiveBranchId \}\)/);
-  assert.match(suppliersPage, /await updateSupplier\(\{ id: editingId, \.\.\.payload \}\)/);
-  assert.match(suppliersPage, /await createSupplier\(payload\)/);
+  assert.match(customersPage, /await updateCustomer\(\{ id: editingId, \.\.\.payload, categoryId:/);
+  assert.match(customersPage, /await createCustomer\(\{ \.\.\.payload, branchId: effectiveBranchId, categoryId:/);
+  assert.match(suppliersPage, /await updateSupplier\(\{ id: editingId, \.\.\.payload, categoryId:/);
+  assert.match(suppliersPage, /await createSupplier\(\{ \.\.\.payload, categoryId:/);
 });
 
 test("CSA-03 explicit empty update fields are normalized and removed by the backend patch", () => {
@@ -28,6 +28,7 @@ test("CSA-03 explicit empty update fields are normalized and removed by the back
     assert.match(source, /address: args\.address !== undefined \? args\.address :/);
     assert.match(source, /notes: args\.notes !== undefined \? args\.notes :/);
     assert.match(source, /await ctx\.db\.patch\(id, normalized\)/);
+    assert.match(source, /normalized\.categoryId ===/);
   }
 });
 

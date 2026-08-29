@@ -34,12 +34,14 @@ const transactionLabels: Record<string, string> = {
   account_transfer: "تحويل بين الحسابات",
   paymob_settlement: "تسوية مدفوعات إلكترونية",
   clearing_settlement: "تسوية حساب وسيط",
-  invoice_collection: "تحصيل فاتورة",
+  invoice_payment: "تحصيل فاتورة",
   invoice_refund: "استرداد عميل",
   expense_payment: "سداد مصروف",
   supplier_payment: "سداد مورد",
-  cod_collection: "تحصيل شحنة",
+  delivery_cod_collection: "تحصيل شحنة",
   cod_settlement: "تسوية تحصيل شحن",
+  receipt_voucher: "سند قبض",
+  disbursement_voucher: "سند صرف",
 };
 
 const money = new Intl.NumberFormat("ar-EG", { minimumFractionDigits: 2, maximumFractionDigits: 2 });

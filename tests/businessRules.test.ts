@@ -32,16 +32,19 @@ test("document number formats are separated by type and year", () => {
 });
 
 test("repair and delivery state machines enforce terminal states", () => {
-  assert.equal(canTransition(REPAIR_TRANSITIONS, "received", "in_progress"), true);
+  assert.equal(canTransition(REPAIR_TRANSITIONS, "received", "under_inspection"), true);
+  assert.equal(canTransition(REPAIR_TRANSITIONS, "received", "in_progress"), false);
   assert.equal(canTransition(REPAIR_TRANSITIONS, "delivered", "ready"), false);
   assert.equal(canTransition(DELIVERY_TRANSITIONS, "shipped", "returned"), true);
   assert.equal(canTransition(DELIVERY_TRANSITIONS, "cancelled", "pending"), false);
 });
 
 test("repair transitions expose only approved next states", () => {
-  assert.deepEqual(REPAIR_TRANSITIONS.received, ["in_progress", "cancelled"]);
-  assert.deepEqual(REPAIR_TRANSITIONS.in_progress, ["ready", "cancelled"]);
-  assert.deepEqual(REPAIR_TRANSITIONS.ready, ["delivered", "cancelled"]);
+  assert.deepEqual(REPAIR_TRANSITIONS.received, ["under_inspection", "cancelled"]);
+  assert.deepEqual(REPAIR_TRANSITIONS.under_inspection, ["awaiting_approval", "in_progress", "cancelled"]);
+  assert.deepEqual(REPAIR_TRANSITIONS.awaiting_approval, ["in_progress", "cancelled"]);
+  assert.deepEqual(REPAIR_TRANSITIONS.in_progress, ["ready", "awaiting_approval", "cancelled"]);
+  assert.deepEqual(REPAIR_TRANSITIONS.ready, ["delivered", "in_progress", "cancelled"]);
   assert.deepEqual(REPAIR_TRANSITIONS.delivered, []);
   assert.deepEqual(REPAIR_TRANSITIONS.cancelled, []);
   assert.equal(isRepairStatus("ready"), true);

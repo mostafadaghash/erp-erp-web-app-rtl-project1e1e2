@@ -180,14 +180,20 @@ async function createRepair(
 async function startAndReady(e: Fixture, repairId: Id<"repairs">, prefix: string) {
   await e.admin.mutation(api.repairs.transitionStatus, {
     id: repairId,
-    status: "in_progress",
+    status: "under_inspection",
     date: "2026-01-11",
+    requestId: `${prefix}-inspection`,
+  });
+  await e.admin.mutation(api.repairs.transitionStatus, {
+    id: repairId,
+    status: "in_progress",
+    date: "2026-01-12",
     requestId: `${prefix}-start`,
   });
   await e.admin.mutation(api.repairs.transitionStatus, {
     id: repairId,
     status: "ready",
-    date: "2026-01-12",
+    date: "2026-01-13",
     requestId: `${prefix}-ready`,
     diagnosis: "تغيير دائرة الباور",
     qualityCheckNotes: "تم الاختبار لمدة ساعتين",
@@ -275,11 +281,17 @@ test("RWF-06 details lock after the repair reaches ready", async () => {
 test("RWF-07 starting repair requires an assigned technician and rolls back", async () => {
   const e = await fixture();
   const id = await createRepair(e, "rwf-07");
+  await e.admin.mutation(api.repairs.transitionStatus, {
+    id,
+    status: "under_inspection",
+    date: "2026-01-11",
+    requestId: "rwf-07-inspection",
+  });
   await assert.rejects(
     () => e.admin.mutation(api.repairs.transitionStatus, {
       id,
       status: "in_progress",
-      date: "2026-01-11",
+      date: "2026-01-12",
       requestId: "rwf-07-start",
     }),
     /تعيين فني/,
@@ -288,8 +300,8 @@ test("RWF-07 starting repair requires an assigned technician and rolls back", as
     repair: await ctx.db.get(id),
     history: await ctx.db.query("repairStatusHistory").collect(),
   }));
-  assert.equal(state.repair?.status, "received");
-  assert.equal(state.history.length, 1);
+  assert.equal(state.repair?.status, "under_inspection");
+  assert.equal(state.history.length, 2);
 });
 
 test("RWF-08 starting repair posts one immutable status-history entry", async () => {
@@ -297,17 +309,23 @@ test("RWF-08 starting repair posts one immutable status-history entry", async ()
   const id = await createRepair(e, "rwf-08", { technicianId: e.technicianId });
   await e.technician.mutation(api.repairs.transitionStatus, {
     id,
-    status: "in_progress",
+    status: "under_inspection",
     date: "2026-01-11",
+    requestId: "rwf-08-inspection",
+  });
+  await e.technician.mutation(api.repairs.transitionStatus, {
+    id,
+    status: "in_progress",
+    date: "2026-01-12",
     requestId: "rwf-08-start",
   });
   const history = await e.raw.run(async (ctx) =>
     ctx.db.query("repairStatusHistory").collect(),
   );
-  assert.equal(history.length, 2);
-  assert.equal(history[1].fromStatus, "received");
-  assert.equal(history[1].toStatus, "in_progress");
-  assert.equal(history[1].technicianNameSnapshot, "فني الفرع");
+  assert.equal(history.length, 3);
+  assert.equal(history[2].fromStatus, "under_inspection");
+  assert.equal(history[2].toStatus, "in_progress");
+  assert.equal(history[2].technicianNameSnapshot, "فني الفرع");
 });
 
 test("RWF-09 ready status requires diagnosis and preserves the in-progress snapshot", async () => {
@@ -315,8 +333,14 @@ test("RWF-09 ready status requires diagnosis and preserves the in-progress snaps
   const id = await createRepair(e, "rwf-09", { technicianId: e.technicianId });
   await e.admin.mutation(api.repairs.transitionStatus, {
     id,
-    status: "in_progress",
+    status: "under_inspection",
     date: "2026-01-11",
+    requestId: "rwf-09-inspection",
+  });
+  await e.admin.mutation(api.repairs.transitionStatus, {
+    id,
+    status: "in_progress",
+    date: "2026-01-12",
     requestId: "rwf-09-start",
   });
   const before = await e.raw.run(async (ctx) => ctx.db.get(id));
@@ -324,7 +348,7 @@ test("RWF-09 ready status requires diagnosis and preserves the in-progress snaps
     () => e.admin.mutation(api.repairs.transitionStatus, {
       id,
       status: "ready",
-      date: "2026-01-12",
+      date: "2026-01-13",
       requestId: "rwf-09-ready",
     }),
     /التشخيص مطلوب/,
@@ -417,10 +441,16 @@ test("RWF-13 delivery rejects fractional negative and excessive warranty days", 
 test("RWF-14 matching status retry returns the same repair without duplicate history", async () => {
   const e = await fixture();
   const id = await createRepair(e, "rwf-14", { technicianId: e.technicianId });
+  await e.admin.mutation(api.repairs.transitionStatus, {
+    id,
+    status: "under_inspection",
+    date: "2026-01-11",
+    requestId: "rwf-14-inspection",
+  });
   const args = {
     id,
     status: "in_progress" as const,
-    date: "2026-01-11",
+    date: "2026-01-12",
     requestId: "rwf-14-start",
   };
   assert.equal(await e.admin.mutation(api.repairs.transitionStatus, args), id);
@@ -429,7 +459,7 @@ test("RWF-14 matching status retry returns the same repair without duplicate his
     await e.raw.run(async (ctx) =>
       (await ctx.db.query("repairStatusHistory").collect()).length,
     ),
-    2,
+    3,
   );
 });
 
@@ -438,15 +468,21 @@ test("RWF-15 same status request id with a changed fingerprint is rejected", asy
   const id = await createRepair(e, "rwf-15", { technicianId: e.technicianId });
   await e.admin.mutation(api.repairs.transitionStatus, {
     id,
-    status: "in_progress",
+    status: "under_inspection",
     date: "2026-01-11",
+    requestId: "rwf-15-inspection",
+  });
+  await e.admin.mutation(api.repairs.transitionStatus, {
+    id,
+    status: "in_progress",
+    date: "2026-01-12",
     requestId: "rwf-15-start",
   });
   await assert.rejects(
     () => e.admin.mutation(api.repairs.transitionStatus, {
       id,
       status: "in_progress",
-      date: "2026-01-12",
+      date: "2026-01-13",
       requestId: "rwf-15-start",
     }),
     /بيانات مختلفة/,
