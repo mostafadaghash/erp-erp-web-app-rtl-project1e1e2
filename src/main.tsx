@@ -7,6 +7,7 @@ import "./professional-ui.css";
 import "./professional-navigation.css";
 import "./dashboard-reference.css";
 import "./dashboard-final-fixes.css";
+import "./new-invoice-redesign.css";
 import App from "./App";
 
 class RuntimeErrorBoundary extends Component<
