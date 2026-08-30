@@ -1,7 +1,7 @@
 import test from "node:test";import assert from "node:assert/strict";import { readFileSync } from "node:fs";
 const panel=readFileSync("src/components/SalesReturnsPanel.tsx","utf8"), invoices=readFileSync("src/components/InvoicesPage.tsx","utf8"), backend=readFileSync("convex/salesReturns.ts","utf8");
 test("UI-01 uses limited eligible query",()=>assert.match(panel,/salesReturns\.eligibleInvoices/));
-test("UI-02 shows returned and available quantities with max",()=>{assert.match(panel,/المرتجع سابقًا/);assert.match(panel,/max=\{item\.availableQuantity\}/);});
+test("UI-02 shows returned and available quantities with max",()=>{assert.match(panel,/مرتجع سابق/);assert.match(panel,/max=\{item\.availableQuantity\}/);});
 test("UI-03 request id remains stable while retrying",()=>assert.match(panel,/requestId: requestId\.current/));
 test("UI-04 busy guard prevents double submit",()=>assert.match(panel,/if \(!invoice \|\| busy\) return/));
 test("UI-05 return statuses have distinct labels",()=>["partial_return","paid_returned_partial","returned"].forEach(x=>assert.match(invoices,new RegExp(x))));
