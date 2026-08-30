@@ -1,4 +1,6 @@
 import { query, mutation } from "./_generated/server";
+import type { Id } from "./_generated/dataModel";
+import type { MutationCtx } from "./_generated/server";
 import { v } from "convex/values";
 import { ConvexError } from "convex/values";
 import { assertBranchAccess, requireModulePermission, requirePermission, filterByBranch, resolveWriteBranch, logAction } from "./lib/auth";
@@ -12,16 +14,22 @@ import { applyOrderStatsChange, getOrderStatsRebuildState, readOrderStats, rebui
 
 const editableStatuses = new Set(["pending", "confirmed"]);
 
-function normalizeOrderItems(items: Array<{ productName: string; quantity: number; unitPrice: number; notes?: string }>) {
-  if (items.length === 0) throw new ConvexError("أضف منتجاً واحداً على الأقل");
-  return items.map((item) => {
-    const productName = item.productName.trim();
-    if (!productName) throw new ConvexError("اسم المنتج مطلوب");
+async function normalizeOrderItems(ctx: MutationCtx, branchId: Id<"branches"> | undefined, items: Array<{ productId?: Id<"products">; productName: string; quantity: number; unitPrice: number; notes?: string }>) {
+  if (items.length === 0) throw new ConvexError("أضف صنفاً واحداً على الأقل");
+  return await Promise.all(items.map(async (item) => {
+    let productName = item.productName.trim();
+    if (item.productId) {
+      const product = await ctx.db.get(item.productId);
+      if (!product || product.isActive === false) throw new ConvexError("أحد الأصناف غير موجود أو غير متاح للبيع");
+      if (branchId && product.branchId && product.branchId !== branchId) throw new ConvexError("أحد الأصناف يتبع فرعاً آخر");
+      productName = product.name;
+    }
+    if (!productName) throw new ConvexError("اسم الصنف مطلوب");
     if (!Number.isInteger(item.quantity) || item.quantity <= 0) throw new ConvexError("الكمية يجب أن تكون عدداً صحيحاً أكبر من صفر");
-    if (!Number.isFinite(item.unitPrice) || item.unitPrice < 0) throw new ConvexError("سعر المنتج غير صالح");
+    if (!Number.isFinite(item.unitPrice) || item.unitPrice < 0) throw new ConvexError("سعر الصنف غير صالح");
     const notes = item.notes?.trim() || undefined;
-    return { productName, quantity: item.quantity, unitPrice: roundMoney(item.unitPrice), notes };
-  });
+    return { productId: item.productId, productName, quantity: item.quantity, unitPrice: roundMoney(item.unitPrice), notes };
+  }));
 }
 
 export const get = query({
@@ -173,6 +181,7 @@ export const create = mutation({
     customerPhone: v.optional(v.string()),
     customerId: v.optional(v.id("customers")),
     items: v.array(v.object({
+      productId: v.optional(v.id("products")),
       productName: v.string(),
       quantity: v.number(),
       unitPrice: v.number(),
@@ -200,7 +209,7 @@ export const create = mutation({
       customerName = customer.name;
       customerPhone = customer.phone;
     }
-    const items = normalizeOrderItems(args.items);
+    const items = await normalizeOrderItems(ctx, branchId, args.items);
     const total = roundMoney(items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0));
     const initialAmount = args.initialDeposit?.amount ?? 0;
     if (args.initialDeposit && !args.customerId) throw new ConvexError("العربون يتطلب عميلاً مسجلاً");
@@ -239,7 +248,7 @@ export const update = mutation({
     customerId: v.optional(v.id("customers")),
     customerName: v.string(),
     customerPhone: v.optional(v.string()),
-    items: v.array(v.object({ productName: v.string(), quantity: v.number(), unitPrice: v.number(), notes: v.optional(v.string()) })),
+    items: v.array(v.object({ productId: v.optional(v.id("products")), productName: v.string(), quantity: v.number(), unitPrice: v.number(), notes: v.optional(v.string()) })),
     expectedDate: v.optional(v.string()),
     notes: v.optional(v.string()),
   },
@@ -271,7 +280,7 @@ export const update = mutation({
       customerPhone = customer.phone;
     }
 
-    const items = normalizeOrderItems(args.items);
+    const items = await normalizeOrderItems(ctx, order.branchId, args.items);
     const total = roundMoney(items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0));
     if (total < order.deposit) throw new ConvexError("لا يمكن خفض إجمالي الطلب عن قيمة العربون المسجل");
     const remaining = roundMoney(total - order.deposit);
