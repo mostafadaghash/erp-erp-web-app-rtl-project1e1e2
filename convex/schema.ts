@@ -594,6 +594,50 @@ const applicationTables = {
     deliveryId:v.id("deliveries"),deliveryNumber:v.string(),attemptNumber:v.number(),branchId:v.id("branches"),invoiceId:v.id("invoices"),orderId:v.id("orders"),customerId:v.id("customers"),codAmount:v.number(),codClearingAccountId:v.optional(v.id("financialAccounts")),status:v.union(v.literal("posted"),v.literal("reversed")),date:v.string(),requestId:v.string(),idempotencyKey:v.string(),requestFingerprint:v.string(),financialTransactionId:v.optional(v.id("financialTransactions")),customerLedgerEntryId:v.optional(v.id("customerLedgerEntries")),reversalRequestId:v.optional(v.string()),reversalFingerprint:v.optional(v.string()),reversalFinancialTransactionId:v.optional(v.id("financialTransactions")),reversalCustomerLedgerEntryId:v.optional(v.id("customerLedgerEntries")),reversalReason:v.optional(v.string()),reversalDate:v.optional(v.string()),reversedAt:v.optional(v.number()),reversedBy:v.optional(v.string()),createdBy:v.string(),createdAt:v.number()
   }).index("by_delivery_status",["deliveryId","status"]).index("by_delivery",["deliveryId"]).index("by_idempotency",["idempotencyKey"]).index("by_branch_date",["branchId","date"]).index("by_branch_reversal_date",["branchId","reversalDate"]).index("by_financial_transaction",["financialTransactionId"]),
 
+  // قلب نظام متابعة العملاء
+  customerFollowUps: defineTable({
+    branchId: v.id("branches"),
+    customerId: v.optional(v.id("customers")),
+    customerName: v.string(),
+    phone: v.string(),
+    sourceType: v.union(
+      v.literal("lead"),
+      v.literal("order"),
+      v.literal("repair"),
+      v.literal("delivery"),
+      v.literal("delivered_operation"),
+      v.literal("manual"),
+    ),
+    sourceId: v.optional(v.string()),
+    sourceNumber: v.optional(v.string()),
+    sourceStatus: v.optional(v.string()),
+    followUpType: v.string(),
+    followUpDate: v.string(),
+    assignedToProfileId: v.id("userProfiles"),
+    assignedToName: v.string(),
+    status: v.union(v.literal("pending"), v.literal("follow_up_later"), v.literal("completed")),
+    lastContactAt: v.optional(v.number()),
+    result: v.optional(v.string()),
+    notes: v.optional(v.string()),
+    creationRequestId: v.string(),
+    creationKey: v.string(),
+    createdBy: v.string(),
+    createdAt: v.number(),
+    updatedBy: v.string(),
+    updatedAt: v.number(),
+    completedBy: v.optional(v.string()),
+    completedAt: v.optional(v.number()),
+  })
+    .index("by_date", ["followUpDate"])
+    .index("by_status_date", ["status", "followUpDate"])
+    .index("by_branch_date", ["branchId", "followUpDate"])
+    .index("by_branch_status_date", ["branchId", "status", "followUpDate"])
+    .index("by_assignee_date", ["assignedToProfileId", "followUpDate"])
+    .index("by_assignee_status_date", ["assignedToProfileId", "status", "followUpDate"])
+    .index("by_customer_date", ["customerId", "followUpDate"])
+    .index("by_source", ["sourceType", "sourceId"])
+    .index("by_creation_key", ["creationKey"]),
+
   // سجل المراجعة
   auditLogs: defineTable({
     userId: v.optional(v.string()),

@@ -53,6 +53,7 @@ interface NavItem {
   icon: React.ElementType;
   moduleKey?: string;
   permission?: Permission;
+  roleFallback?: string[];
 }
 
 interface NavGroup {
@@ -63,6 +64,7 @@ interface NavGroup {
 }
 
 const HOME_ITEM: NavItem = { id: "dashboard", label: "لوحة التحكم", icon: Home };
+const FOLLOW_UP_ROLES = ["admin", "manager", "sales", "customer_service", "technician", "shipping"];
 const PAGE_SESSION_KEY = "business-tech-erp.current-page";
 const PAGE_IDS = new Set<Page>([
   "dashboard",
@@ -70,6 +72,7 @@ const PAGE_IDS = new Set<Page>([
   "inventory",
   "customers",
   "new-customer",
+  "follow-ups",
   "invoices",
   "sales-returns",
   "quotes",
@@ -122,6 +125,7 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { id: "new-customer", label: "إضافة عميل", icon: UserPlus, permission: "create_customers" },
       { id: "customers", label: "قائمة العملاء", icon: Users, permission: "view_customers" },
+      { id: "follow-ups", label: "متابعة العملاء", icon: CalendarClock, permission: "view_follow_ups", roleFallback: FOLLOW_UP_ROLES },
     ],
   },
   {
@@ -250,7 +254,11 @@ export function Sidebar({
     items: group.items.filter(
       (item) =>
         isModuleEnabled(item.moduleKey) &&
-        (!item.permission || permissions.includes(item.permission)),
+        (
+          !item.permission ||
+          permissions.includes(item.permission) ||
+          Boolean(item.roleFallback?.includes(role))
+        ),
     ),
   })).filter((group) => group.items.length > 0);
 

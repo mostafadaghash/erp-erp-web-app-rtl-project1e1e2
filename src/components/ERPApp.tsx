@@ -11,6 +11,7 @@ import { AccountsHubPage } from "./AccountsHubPage";
 import { AuditLogsPage } from "./AuditLogsPage";
 import { BranchesPage } from "./BranchesPage";
 import { CRMPage } from "./CRMPage";
+import { CustomerFollowUpsPage } from "./CustomerFollowUpsPage";
 import { CustomerLedgerPage } from "./CustomerLedgerPage";
 import { CustomersPage } from "./CustomersPage";
 import { Dashboard } from "./Dashboard";
@@ -42,18 +43,21 @@ import { VouchersPage } from "./VouchersPage";
 import type { ReportKind } from "./ReportsPage";
 
 export type Page =
-  | "dashboard" | "products" | "inventory" | "customers" | "new-customer" | "invoices" | "sales-returns" | "quotes" | "credit-invoices"
+  | "dashboard" | "products" | "inventory" | "customers" | "new-customer" | "follow-ups" | "invoices" | "sales-returns" | "quotes" | "credit-invoices"
   | "new-invoice" | "new-purchase-invoice" | "repairs" | "expenses" | "suppliers" | "orders"
   | "deliveries" | "shipments" | "branches" | "employees" | "crm"
   | "reports" | "settings" | "audit-logs" | "accounts-home" | "treasury"
   | "supplier-payments" | "purchase-returns" | "customer-ledger"
   | "general-ledger" | "data-export" | "vouchers" | "payment-schedules";
 
+const FOLLOW_UP_ROLE_FALLBACK = new Set(["admin", "manager", "sales", "customer_service", "technician", "shipping"]);
+
 const PAGE_PERMISSIONS: Partial<Record<Page, Permission>> = {
   products: "view_products",
   inventory: "view_products",
   customers: "view_customers",
   "new-customer": "create_customers",
+  "follow-ups": "view_follow_ups",
   invoices: "view_invoices",
   "sales-returns": "view_sales_returns",
   "new-invoice": "create_invoices",
@@ -108,6 +112,7 @@ const PAGE_META: Record<Page, { group: string; title: string }> = {
   inventory: { group: "المخزون", title: "إدارة المخزون" },
   customers: { group: "العملاء", title: "قائمة العملاء" },
   "new-customer": { group: "العملاء", title: "إضافة عميل جديد" },
+  "follow-ups": { group: "العملاء", title: "متابعة العملاء" },
   invoices: { group: "المبيعات", title: "المبيعات" },
   "sales-returns": { group: "المبيعات", title: "مرتجعات المبيعات" },
   "new-invoice": { group: "المبيعات", title: "فاتورة بيع جديدة" },
@@ -213,7 +218,9 @@ export function ERPApp() {
 
   const canAccessPage = (page: Page) => {
     const required = PAGE_PERMISSIONS[page];
-    return isModuleEnabled(page) && (!required || can(required));
+    const hasPermission = !required || can(required);
+    const hasFollowUpFallback = page === "follow-ups" && Boolean(me && FOLLOW_UP_ROLE_FALLBACK.has(me.role));
+    return isModuleEnabled(page) && (hasPermission || hasFollowUpFallback);
   };
 
   const canSelectWorkingBranch =
@@ -400,6 +407,7 @@ export function ERPApp() {
             {authorized && currentPage === "inventory" && <InventoryWorkspacePage createRequestToken={createToken("inventory")} />}
             {authorized && currentPage === "customers" && <CustomersPage onOpenLedger={openCustomerLedger} onCreateCustomer={() => navigate("new-customer")} createRequestToken={createToken("customers")} />}
             {authorized && currentPage === "new-customer" && <NewCustomerPage onClose={() => navigate("customers")} />}
+            {authorized && currentPage === "follow-ups" && <CustomerFollowUpsPage />}
             {authorized && currentPage === "invoices" && <InvoicesPage onNavigate={navigate} view="sales" />}
             {authorized && currentPage === "sales-returns" && <InvoicesPage onNavigate={navigate} view="returns" />}
             {authorized && currentPage === "credit-invoices" && <InvoicesPage onNavigate={navigate} view="sales" creditOnly />}
