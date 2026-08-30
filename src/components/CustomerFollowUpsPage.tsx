@@ -29,6 +29,7 @@ import {
   type FollowUpOutcome,
 } from "../../shared/customerFollowUpOutcomeRules";
 import { buildEgyptWhatsAppUrl, formatAppDate, formatAppNumber } from "../lib/utils";
+import { CustomerTrackingLinkActions } from "./CustomerTrackingLinkActions";
 
 const BUSINESS_TIME_ZONE = "Africa/Cairo";
 
@@ -609,6 +610,13 @@ export function CustomerFollowUpsPage() {
                     <button type="button" disabled={details.followUp.status === "completed"} onClick={() => void startChannel("whatsapp")} className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-3 py-2 text-xs font-black text-white disabled:cursor-not-allowed disabled:opacity-40">
                       <MessageCircle className="h-4 w-4" /> واتساب
                     </button>
+                    <CustomerTrackingLinkActions
+                      followUpId={details.followUp._id}
+                      customerName={details.customer.name}
+                      phone={details.customer.contactNumbers[0]}
+                      sourceNumber={details.source?.sourceNumber ?? details.followUp.sourceNumber}
+                      sourceType={details.followUp.sourceType}
+                    />
                     <button type="button" onClick={() => openDialog({ type: "note" })} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-700">
                       <StickyNote className="h-4 w-4" /> ملاحظة
                     </button>
