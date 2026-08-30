@@ -23,6 +23,11 @@ import {
 import { toast } from "sonner";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
+import {
+  FOLLOW_UP_OUTCOME_DESCRIPTIONS,
+  FOLLOW_UP_OUTCOME_LABELS,
+  type FollowUpOutcome,
+} from "../../shared/customerFollowUpOutcomeRules";
 import { buildEgyptWhatsAppUrl, formatAppDate, formatAppNumber } from "../lib/utils";
 
 const BUSINESS_TIME_ZONE = "Africa/Cairo";
@@ -44,6 +49,13 @@ type DialogState =
   | { type: "reopen" }
   | null;
 
+const COMPLETION_OUTCOMES: FollowUpOutcome[] = [
+  "satisfied",
+  "problem",
+  "follow_up",
+  "no_answer",
+];
+
 function cairoDate(): string {
   const parts = new Intl.DateTimeFormat("en-US", {
     timeZone: BUSINESS_TIME_ZONE,
@@ -54,6 +66,12 @@ function cairoDate(): string {
   const value = (type: "year" | "month" | "day") =>
     parts.find((part) => part.type === type)?.value ?? "";
   return `${value("year")}-${value("month")}-${value("day")}`;
+}
+
+function addDaysIso(value: string, days: number): string {
+  const [year, month, day] = value.split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day + days));
+  return date.toISOString().slice(0, 10);
 }
 
 function formatDateTime(value: number): string {
@@ -106,8 +124,19 @@ function timelineIcon(type: string, channel?: string) {
   return Clock3;
 }
 
+function outcomeCardStyle(outcome: FollowUpOutcome, selected: boolean): string {
+  if (selected) {
+    if (outcome === "satisfied") return "border-emerald-300 bg-emerald-50 ring-2 ring-emerald-100";
+    if (outcome === "problem") return "border-rose-300 bg-rose-50 ring-2 ring-rose-100";
+    if (outcome === "no_answer") return "border-amber-300 bg-amber-50 ring-2 ring-amber-100";
+    return "border-sky-300 bg-sky-50 ring-2 ring-sky-100";
+  }
+  return "border-slate-200 bg-white hover:bg-slate-50";
+}
+
 export function CustomerFollowUpsPage() {
   const today = useMemo(() => cairoDate(), []);
+  const tomorrow = useMemo(() => addDaysIso(today, 1), [today]);
   const me = useQuery(api.employees.me);
   const branchId = me?.branchId;
   const [scope, setScope] = useState<Scope>("active");
@@ -118,6 +147,7 @@ export function CustomerFollowUpsPage() {
   const [dialog, setDialog] = useState<DialogState>(null);
   const [dialogText, setDialogText] = useState("");
   const [dialogDate, setDialogDate] = useState(today);
+  const [completionOutcome, setCompletionOutcome] = useState<FollowUpOutcome>("satisfied");
   const [moreOpen, setMoreOpen] = useState(false);
   const [manualOpen, setManualOpen] = useState(false);
   const [manualForm, setManualForm] = useState({
@@ -149,7 +179,7 @@ export function CustomerFollowUpsPage() {
   const recordContact = useMutation(api.customerFollowUpWorkspace.recordContact);
   const addNote = useMutation(api.customerFollowUpWorkspace.addNote);
   const reschedule = useMutation(api.customerFollowUpWorkspace.reschedule);
-  const complete = useMutation(api.customerFollowUpWorkspace.complete);
+  const applyOutcome = useMutation(api.customerFollowUpOutcomes.apply);
   const reopen = useMutation(api.customerFollowUpWorkspace.reopen);
 
   useEffect(() => {
@@ -238,7 +268,12 @@ export function CustomerFollowUpsPage() {
 
   const openDialog = (next: Exclude<DialogState, null>) => {
     setDialogText("");
-    setDialogDate(details?.followUp.followUpDate ?? today);
+    if (next.type === "complete") {
+      setCompletionOutcome("satisfied");
+      setDialogDate(tomorrow);
+    } else {
+      setDialogDate(details?.followUp.followUpDate ?? today);
+    }
     setDialog(next);
   };
 
@@ -257,9 +292,30 @@ export function CustomerFollowUpsPage() {
         await reschedule({ id: selectedId, followUpDate: dialogDate, notes: dialogText.trim() || undefined });
         toast.success("تم تحديد موعد المتابعة");
       } else if (dialog.type === "complete") {
-        if (!dialogText.trim()) return toast.error("اكتب نتيجة المتابعة قبل إتمامها");
-        await complete({ id: selectedId, result: dialogText.trim() });
-        toast.success("تم إتمام المتابعة");
+        if (completionOutcome === "problem" && !dialogText.trim()) {
+          return toast.error("اكتب تفاصيل مشكلة العميل");
+        }
+        if ((completionOutcome === "follow_up" || completionOutcome === "no_answer") && !dialogDate) {
+          return toast.error("حدد موعد المتابعة القادمة");
+        }
+        const result = await applyOutcome({
+          id: selectedId,
+          outcome: completionOutcome,
+          details: dialogText.trim() || undefined,
+          nextFollowUpDate:
+            completionOutcome === "follow_up" || completionOutcome === "no_answer"
+              ? dialogDate
+              : undefined,
+        });
+        if (result.completed) {
+          toast.success("تم إتمام المتابعة — العميل راضٍ");
+        } else if (completionOutcome === "problem") {
+          toast.success("تم تحويلها إلى متابعة مشكلة عميل");
+        } else if (completionOutcome === "no_answer") {
+          toast.success("تم تسجيل «لم يرد» وتحديد المحاولة القادمة");
+        } else {
+          toast.success("تم تحديد المتابعة القادمة");
+        }
       } else if (dialog.type === "reopen") {
         await reopen({ id: selectedId, followUpDate: dialogDate, notes: dialogText.trim() || undefined });
         toast.success("تمت إعادة فتح المتابعة");
@@ -560,7 +616,7 @@ export function CustomerFollowUpsPage() {
                       <CalendarClock className="h-4 w-4" /> موعد متابعة
                     </button>
                     <button type="button" disabled={details.followUp.status === "completed"} onClick={() => openDialog({ type: "complete" })} className="inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-black text-emerald-700 disabled:opacity-40">
-                      <CheckCircle2 className="h-4 w-4" /> إتمام
+                      <CheckCircle2 className="h-4 w-4" /> إتمام المتابعة
                     </button>
                     <div className="relative" ref={moreRef}>
                       <button type="button" onClick={() => setMoreOpen((value) => !value)} className="grid h-9 w-10 place-items-center rounded-xl border border-slate-200 bg-white text-slate-600" aria-label="إجراءات إضافية">
@@ -696,30 +752,94 @@ export function CustomerFollowUpsPage() {
                   ? "تحديد موعد متابعة"
                   : dialog.type === "reopen"
                     ? "إعادة فتح المتابعة"
-                    : "إتمام المتابعة"
+                    : "نتيجة المتابعة"
           }
           onClose={() => setDialog(null)}
         >
-          {(dialog.type === "schedule" || dialog.type === "reopen") && (
-            <Field label="تاريخ المتابعة">
-              <input type="date" className="field-input" value={dialogDate} onChange={(event) => setDialogDate(event.target.value)} />
-            </Field>
+          {dialog.type === "complete" ? (
+            <div className="space-y-4">
+              <div>
+                <p className="mb-2 text-xs font-black text-slate-600">اختر نتيجة المتابعة</p>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {COMPLETION_OUTCOMES.map((outcome) => (
+                    <button
+                      key={outcome}
+                      type="button"
+                      onClick={() => {
+                        setCompletionOutcome(outcome);
+                        if (outcome === "follow_up" || outcome === "no_answer") {
+                          setDialogDate((value) => value && value >= today ? value : tomorrow);
+                        }
+                      }}
+                      className={`rounded-xl border p-3 text-right transition ${outcomeCardStyle(outcome, completionOutcome === outcome)}`}
+                    >
+                      <span className="block text-sm font-black text-slate-900">{FOLLOW_UP_OUTCOME_LABELS[outcome]}</span>
+                      <span className="mt-1 block text-[11px] leading-5 text-slate-500">{FOLLOW_UP_OUTCOME_DESCRIPTIONS[outcome]}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {(completionOutcome === "follow_up" || completionOutcome === "no_answer") && (
+                <Field label={completionOutcome === "no_answer" ? "موعد محاولة التواصل القادمة" : "موعد المتابعة القادمة"}>
+                  <input
+                    type="date"
+                    min={today}
+                    className="field-input"
+                    value={dialogDate}
+                    onChange={(event) => setDialogDate(event.target.value)}
+                  />
+                </Field>
+              )}
+
+              <Field label={completionOutcome === "problem" ? "تفاصيل المشكلة *" : "ملاحظة اختيارية"}>
+                <textarea
+                  autoFocus={completionOutcome === "problem"}
+                  rows={3}
+                  className="field-input resize-none"
+                  value={dialogText}
+                  onChange={(event) => setDialogText(event.target.value)}
+                  placeholder={
+                    completionOutcome === "problem"
+                      ? "اكتب المشكلة التي ذكرها العميل وما المطلوب متابعته"
+                      : completionOutcome === "no_answer"
+                        ? "مثال: الهاتف مغلق أو لا توجد إجابة"
+                        : undefined
+                  }
+                />
+              </Field>
+
+              <div className="rounded-xl bg-slate-50 px-3 py-2 text-xs text-slate-600">
+                {completionOutcome === "satisfied" && "سيتم إغلاق هذه المتابعة."}
+                {completionOutcome === "problem" && "ستظل مفتوحة ويصبح نوعها «مشكلة عميل» وتظهر ضمن عمل اليوم."}
+                {completionOutcome === "follow_up" && "ستظل مفتوحة وتنتقل تلقائيًا إلى الموعد الذي اخترته."}
+                {completionOutcome === "no_answer" && "ستُسجل محاولة التواصل وتظل المتابعة مفتوحة حتى موعد المحاولة القادمة."}
+              </div>
+            </div>
+          ) : (
+            <>
+              {(dialog.type === "schedule" || dialog.type === "reopen") && (
+                <Field label="تاريخ المتابعة">
+                  <input type="date" className="field-input" value={dialogDate} onChange={(event) => setDialogDate(event.target.value)} />
+                </Field>
+              )}
+              <div className={(dialog.type === "schedule" || dialog.type === "reopen") ? "mt-3" : ""}>
+                <Field label={dialog.type === "note" ? "الملاحظة" : dialog.type === "schedule" || dialog.type === "reopen" ? "ملاحظة اختيارية" : "النتيجة"}>
+                  <textarea
+                    autoFocus
+                    rows={4}
+                    className="field-input resize-none"
+                    value={dialogText}
+                    onChange={(event) => setDialogText(event.target.value)}
+                    placeholder={dialog.type === "contact" ? "مثال: تم التواصل وسيحضر العميل غدًا" : undefined}
+                  />
+                </Field>
+              </div>
+            </>
           )}
-          <div className={(dialog.type === "schedule" || dialog.type === "reopen") ? "mt-3" : ""}>
-            <Field label={dialog.type === "note" ? "الملاحظة" : dialog.type === "schedule" || dialog.type === "reopen" ? "ملاحظة اختيارية" : "النتيجة"}>
-              <textarea
-                autoFocus
-                rows={4}
-                className="field-input resize-none"
-                value={dialogText}
-                onChange={(event) => setDialogText(event.target.value)}
-                placeholder={dialog.type === "contact" ? "مثال: تم التواصل وسيحضر العميل غدًا" : undefined}
-              />
-            </Field>
-          </div>
           <div className="mt-4 flex justify-end gap-2">
             <button type="button" className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-bold text-slate-600" onClick={() => setDialog(null)}>إلغاء</button>
-            <button type="button" className="btn-primary" onClick={() => void submitDialog()}>حفظ</button>
+            <button type="button" className="btn-primary" onClick={() => void submitDialog()}>{dialog.type === "complete" ? "حفظ النتيجة" : "حفظ"}</button>
           </div>
         </ModalShell>
       )}
