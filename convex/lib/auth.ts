@@ -4,10 +4,12 @@
  */
 import type { QueryCtx, MutationCtx } from "../_generated/server";
 import type { Id } from "../_generated/dataModel";
+import { internal } from "../_generated/api";
 import { ConvexError } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { PERMISSIONS, ROLE_PERMISSIONS } from "./permissions.ts";
 import type { Permission } from "./permissions.ts";
+import { isPostDeliveryAuditTrigger } from "../../shared/postDeliveryFollowUpRules.ts";
 
 // ──────────────────────────────────────────────
 // Types
@@ -253,7 +255,7 @@ export async function logAction(
   const beforeSnapshot = createAuditSnapshot(params.before);
   const afterSnapshot = createAuditSnapshot(params.after);
   const hasBranchOverride = Object.prototype.hasOwnProperty.call(params, "branchId");
-  await ctx.db.insert("auditLogs", {
+  const auditLogId = await ctx.db.insert("auditLogs", {
     userId: user.userId,
     userName: user.name,
     branchId: hasBranchOverride ? params.branchId ?? undefined : user.branchId,
@@ -277,6 +279,22 @@ export async function logAction(
     reversalOfId: safeAuditLink(params.reversalOfId),
     timestamp: Date.now(),
   });
+
+  const rawStatus = params.after?.status;
+  const status = typeof rawStatus === "string" ? rawStatus : undefined;
+  if (
+    isPostDeliveryAuditTrigger({
+      module: params.module,
+      action: params.action,
+      status,
+    })
+  ) {
+    await ctx.scheduler.runAfter(
+      0,
+      internal.postDeliveryFollowUps.processAuditEvent,
+      { auditLogId },
+    );
+  }
 }
 
 // ──────────────────────────────────────────────
