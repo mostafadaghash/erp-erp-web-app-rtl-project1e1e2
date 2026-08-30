@@ -314,6 +314,7 @@ const applicationTables = {
     customerName: v.string(),
     customerPhone: v.optional(v.string()),
     items: v.array(v.object({
+      productId: v.optional(v.id("products")),
       productName: v.string(),
       quantity: v.number(),
       unitPrice: v.number(),

@@ -12,6 +12,7 @@ import {
 import { PrintModal } from "./PrintTemplate";
 import { buildEgyptWhatsAppUrl } from "../lib/utils";
 import { getErrorMessage } from "../lib/errors";
+import { SearchableCombobox, type SearchableComboboxOption } from "./SearchableCombobox";
 
 function buildWhatsAppLink(phone: string, message: string) {
   return buildEgyptWhatsAppUrl(phone, message);
@@ -31,7 +32,7 @@ function getWhatsAppMessage(status: string, orderNumber: string, customerName: s
 }
 
 type OrderStatus = "pending" | "confirmed" | "ready" | "delivered" | "cancelled";
-type OrderItem = { productName: string; quantity: number; unitPrice: number; notes?: string };
+type OrderItem = { productId?: string; productName: string; quantity: number; unitPrice: number; notes?: string };
 
 const statusConfig: Record<OrderStatus, { label: string; badge: string; icon: React.ElementType }> = {
   pending: { label: "قيد الانتظار", badge: "badge badge-warning", icon: Clock },
@@ -50,7 +51,7 @@ const orderFilters: Array<{ v: OrderStatus | "all"; l: string }> = [
   { v: "delivered", l: "مُسلَّم" },
   { v: "cancelled", l: "ملغي" },
 ];
-const emptyItem = (): OrderItem => ({ productName: "", quantity: 1, unitPrice: 0 });
+const emptyItem = (): OrderItem => ({ productId: "", productName: "", quantity: 1, unitPrice: 0 });
 const money = (value: number) => `${value.toLocaleString("ar-EG")} ج.م`;
 
 export function OrdersPage({ createRequestToken }: { createRequestToken?: number }) {
@@ -285,16 +286,79 @@ function Info({ label, value }: { label: string; value: string }) {
   return <div className="bg-slate-50 rounded-xl p-3"><p className="text-xs text-slate-400">{label}</p><p className="font-bold text-slate-800 mt-1">{value}</p></div>;
 }
 
-function OrderItemsEditor({ items, setItems }: { items: OrderItem[]; setItems: (items: OrderItem[]) => void }) {
+type OrderProduct = { _id: Id<"products">; name: string; sku: string; barcode?: string; stock: number; sellPrice?: number; isActive?: boolean };
+
+function OrderItemsEditor({ items, setItems, products }: { items: OrderItem[]; setItems: (items: OrderItem[]) => void; products: OrderProduct[] }) {
+  const activeProducts = products.filter((product) => product.isActive !== false);
   const addItem = () => setItems([...items, emptyItem()]);
-  const removeItem = (index: number) => setItems(items.filter((_, itemIndex) => itemIndex !== index));
+  const removeItem = (index: number) => setItems(items.length === 1 ? items : items.filter((_, itemIndex) => itemIndex !== index));
   const updateItem = (index: number, field: keyof OrderItem, value: string | number) => setItems(items.map((item, itemIndex) => itemIndex === index ? { ...item, [field]: value } : item));
-  return <div className="space-y-3"><div className="flex items-center justify-between"><p className="text-sm font-semibold text-slate-700">الأصناف المطلوبة</p><button type="button" onClick={addItem} className="flex items-center gap-1.5 text-indigo-600 text-sm font-medium"><Plus className="w-4 h-4" />إضافة صنف</button></div>{items.map((item, index) => <div key={index} data-testid="order-item-row" data-item-index={index} className="bg-slate-50 rounded-xl p-3 space-y-2"><div className="flex items-center justify-between"><span className="text-xs font-medium text-slate-500">صنف {index + 1}</span>{items.length > 1 && <button type="button" onClick={() => removeItem(index)} className="p-1 hover:bg-red-100 rounded-lg text-slate-400 hover:text-red-500"><X className="w-3.5 h-3.5" /></button>}</div><div className="grid grid-cols-3 gap-2"><input data-testid="order-item-name" className="form-input col-span-3 sm:col-span-1" placeholder="اسم الصنف *" value={item.productName} onChange={(event) => updateItem(index, "productName", event.target.value)} /><input data-testid="order-item-quantity" className="form-input text-center" type="number" min="1" value={item.quantity} onChange={(event) => updateItem(index, "quantity", Number(event.target.value))} /><input data-testid="order-item-price" className="form-input text-center" type="number" min="0" step="0.01" value={item.unitPrice || ""} onChange={(event) => updateItem(index, "unitPrice", Number(event.target.value))} /></div><input className="form-input text-sm" placeholder="ملاحظات (اختياري)" value={item.notes ?? ""} onChange={(event) => updateItem(index, "notes", event.target.value)} /><div className="text-left text-sm font-bold text-indigo-600">{money(item.quantity * item.unitPrice)}</div></div>)}</div>;
+  const chooseProduct = (index: number, productId: string) => {
+    if (!productId) {
+      setItems(items.map((item, itemIndex) => itemIndex === index ? emptyItem() : item));
+      return;
+    }
+    const product = activeProducts.find((row) => String(row._id) === productId);
+    if (!product) return;
+    const duplicateIndex = items.findIndex((item, itemIndex) => itemIndex !== index && item.productId === productId);
+    if (duplicateIndex >= 0) {
+      const next = items
+        .map((item, itemIndex) => itemIndex === duplicateIndex ? { ...item, quantity: item.quantity + Math.max(1, items[index]?.quantity ?? 1) } : item)
+        .filter((_, itemIndex) => itemIndex !== index || items.length === 1);
+      setItems(next.length ? next : [emptyItem()]);
+      toast.info("الصنف موجود بالفعل وتمت زيادة الكمية");
+      return;
+    }
+    const next = items.map((item, itemIndex) => itemIndex === index ? {
+      ...item,
+      productId,
+      productName: product.name,
+      unitPrice: product.sellPrice ?? item.unitPrice ?? 0,
+    } : item);
+    if (index === items.length - 1) next.push(emptyItem());
+    setItems(next);
+  };
+
+  return <section className="rounded-2xl border border-slate-200 bg-white overflow-visible" data-testid="order-items-editor">
+    <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-4 py-3">
+      <div><p className="font-black text-slate-800">الأصناف</p><p className="mt-0.5 text-xs text-slate-500">ابحث باسم الصنف أو SKU أو الباركود، وسيظهر سطر جديد تلقائيًا بعد الاختيار.</p></div>
+      <button type="button" onClick={addItem} className="erp-action shrink-0"><Plus className="w-4 h-4" />إضافة صنف</button>
+    </div>
+    <div className="hidden lg:grid grid-cols-[minmax(280px,1fr)_100px_140px_140px_44px] gap-2 px-4 py-2 text-[11px] font-black text-slate-500 bg-slate-50/80">
+      <span>الصنف</span><span>الكمية</span><span>سعر الوحدة</span><span>الإجمالي</span><span />
+    </div>
+    <div className="divide-y divide-slate-100 px-3">
+      {items.map((item, index) => {
+        const selectedProduct = activeProducts.find((row) => String(row._id) === item.productId);
+        const options: SearchableComboboxOption[] = activeProducts.map((product) => ({
+          value: String(product._id),
+          label: product.name,
+          description: `${product.sku}${product.barcode ? ` — ${product.barcode}` : ""} — متاح ${product.stock}${typeof product.sellPrice === "number" ? ` — ${money(product.sellPrice)}` : ""}`,
+          searchText: `${product.name} ${product.sku} ${product.barcode ?? ""}`,
+        }));
+        if (!item.productId && item.productName) options.unshift({ value: `legacy:${index}`, label: item.productName, description: "صنف محفوظ سابقًا — اختر الصنف المقابل من المخزون عند الحاجة", disabled: true });
+        const pickerValue = item.productId || (item.productName ? `legacy:${index}` : "");
+        return <div key={index} data-testid="order-item-row" data-item-index={index} className="grid gap-2 py-3 lg:grid-cols-[minmax(280px,1fr)_100px_140px_140px_44px] lg:items-start">
+          <div>
+            <label className="form-label lg:hidden">الصنف</label>
+            <SearchableCombobox testId="order-item-product" value={pickerValue} onChange={(value) => chooseProduct(index, value.startsWith("legacy:") ? "" : value)} options={options} placeholder="ابحث عن صنف..." emptyText="لا يوجد صنف مطابق" />
+            {selectedProduct && <p className="mt-1 text-[11px] text-slate-500">SKU: {selectedProduct.sku} · المتاح: <span className={selectedProduct.stock > 0 ? "font-bold text-emerald-700" : "font-bold text-red-600"}>{selectedProduct.stock}</span></p>}
+          </div>
+          <div><label className="form-label lg:hidden">الكمية</label><input data-testid="order-item-quantity" className="form-input text-center" type="number" min="1" value={item.quantity} onChange={(event) => updateItem(index, "quantity", Number(event.target.value))} /></div>
+          <div><label className="form-label lg:hidden">سعر الوحدة</label><input data-testid="order-item-price" className="form-input text-center font-bold" type="number" min="0" step="0.01" value={item.unitPrice || ""} onChange={(event) => updateItem(index, "unitPrice", Number(event.target.value))} /></div>
+          <div><label className="form-label lg:hidden">الإجمالي</label><div className="flex h-10 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 px-2 text-sm font-black text-indigo-700">{money(item.quantity * item.unitPrice)}</div></div>
+          <button type="button" disabled={items.length === 1} onClick={() => removeItem(index)} className="grid h-10 w-10 place-items-center rounded-lg text-slate-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-30" aria-label="حذف الصنف"><Trash2 className="w-4 h-4" /></button>
+          <div className="lg:col-span-5"><input className="form-input text-sm" placeholder="ملاحظات الصنف (اختياري)" value={item.notes ?? ""} onChange={(event) => updateItem(index, "notes", event.target.value)} /></div>
+        </div>;
+      })}
+    </div>
+  </section>;
 }
 
 function NewOrderForm({ onClose }: { onClose: () => void }) {
   const createOrder = useMutation(api.orders.create);
   const customers = useQuery(api.customers.list, {});
+  const products = (useQuery(api.products.list, {}) ?? []) as OrderProduct[];
   const canCollect = usePermission("record_collections");
   const accounts = useQuery(api.finance.collectionAccountPicker, canCollect ? {} : "skip") ?? [];
   const [accountId, setAccountId] = useState("");
@@ -302,12 +366,12 @@ function NewOrderForm({ onClose }: { onClose: () => void }) {
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({ customerName: "", customerPhone: "", customerId: "", expectedDate: "", notes: "", deposit: "" });
   const [items, setItems] = useState<OrderItem[]>([emptyItem()]);
-  const total = items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
+  const selectedItems = items.filter((item) => Boolean(item.productId || item.productName.trim()));
+  const total = selectedItems.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
 
-  const handleCustomerSelect = (event: React.ChangeEvent<HTMLSelectElement>) => {
-    const id = event.target.value;
+  const handleCustomerSelect = (id: string) => {
     if (!id) return setForm({ ...form, customerId: "", customerName: "", customerPhone: "" });
-    const customer = customers?.find((row) => row._id === id);
+    const customer = customers?.find((row) => String(row._id) === id);
     if (customer) setForm({ ...form, customerId: id, customerName: customer.name, customerPhone: customer.phone });
   };
 
@@ -315,14 +379,15 @@ function NewOrderForm({ onClose }: { onClose: () => void }) {
     event.preventDefault();
     if (saving) return;
     if (!form.customerName.trim()) return toast.error("أدخل اسم العميل");
-    if (items.some((item) => !item.productName.trim() || !Number.isInteger(item.quantity) || item.quantity <= 0 || item.unitPrice < 0)) return toast.error("راجع بيانات الأصناف والكميات والأسعار");
+    if (!selectedItems.length) return toast.error("اختر صنفًا واحدًا على الأقل");
+    if (selectedItems.some((item) => !item.productName.trim() || !Number.isInteger(item.quantity) || item.quantity <= 0 || item.unitPrice < 0)) return toast.error("راجع بيانات الأصناف والكميات والأسعار");
     const deposit = Number(form.deposit) || 0;
     if (deposit > total) return toast.error("العربون أكبر من الإجمالي");
     if (deposit > 0 && !form.customerId) return toast.error("العربون يتطلب عميلاً مسجلاً");
     if (deposit > 0 && !accountId) return toast.error("اختر حساب تحصيل العربون");
     setSaving(true);
     try {
-      await createOrder({ customerName: form.customerName, customerPhone: form.customerPhone || undefined, customerId: form.customerId ? form.customerId as Id<"customers"> : undefined, items: items.map((item) => ({ ...item, notes: item.notes?.trim() || undefined })), total, creationRequestId: requestId, initialDeposit: deposit > 0 ? { amount: deposit, accountId: accountId as Id<"financialAccounts">, paymentDate: new Date().toISOString().slice(0, 10), requestId, notes: undefined } : undefined, expectedDate: form.expectedDate || undefined, notes: form.notes || undefined });
+      await createOrder({ customerName: form.customerName, customerPhone: form.customerPhone || undefined, customerId: form.customerId ? form.customerId as Id<"customers"> : undefined, items: selectedItems.map((item) => ({ productId: item.productId ? item.productId as Id<"products"> : undefined, productName: item.productName, quantity: item.quantity, unitPrice: item.unitPrice, notes: item.notes?.trim() || undefined })), total, creationRequestId: requestId, initialDeposit: deposit > 0 ? { amount: deposit, accountId: accountId as Id<"financialAccounts">, paymentDate: new Date().toISOString().slice(0, 10), requestId, notes: undefined } : undefined, expectedDate: form.expectedDate || undefined, notes: form.notes || undefined });
       toast.success("تم إنشاء أمر البيع بنجاح");
       setRequestId(crypto.randomUUID());
       onClose();
@@ -333,22 +398,24 @@ function NewOrderForm({ onClose }: { onClose: () => void }) {
     }
   };
 
-  return <OrderFormShell title="أمر بيع جديد" onClose={onClose}><form data-testid="order-create-form" onSubmit={handleSubmit} className="p-6 space-y-5"><CustomerEditor form={form} setForm={setForm} customers={customers ?? []} onSelect={handleCustomerSelect} /><OrderItemsEditor items={items} setItems={setItems} /><div className="bg-indigo-50 rounded-xl p-4 space-y-3"><div className="flex justify-between"><span className="font-semibold">الإجمالي</span><span data-testid="order-total" data-value={total} className="font-black text-xl text-indigo-700">{money(total)}</span></div><div><label className="form-label">العربون / الدفعة الأولى</label><input data-testid="order-deposit" className="form-input" type="number" min="0" step="0.01" disabled={!canCollect} value={form.deposit} onChange={(event) => setForm({ ...form, deposit: event.target.value })} />{canCollect && Number(form.deposit) > 0 && <select className="form-input mt-2" value={accountId} onChange={(event) => setAccountId(event.target.value)}><option value="">اختر حساب التحصيل</option>{accounts.map((account) => <option key={account._id} value={account._id}>{account.name}</option>)}</select>}</div></div><DateNotesEditor form={form} setForm={setForm} /><div className="flex gap-3"><button type="button" disabled={saving} onClick={onClose} className="btn-secondary flex-1">إلغاء</button><button data-testid="order-submit" type="submit" disabled={saving} className="btn-primary flex-1 disabled:opacity-50">{saving ? "جارٍ الحفظ..." : "حفظ أمر البيع"}</button></div></form></OrderFormShell>;
+  const accountOptions: SearchableComboboxOption[] = accounts.map((account) => ({ value: String(account._id), label: account.name, searchText: account.name }));
+  return <OrderFormShell title="أمر بيع جديد" subtitle="اختر العميل والأصناف وسجل العربون وموعد التسليم من شاشة واحدة." onClose={onClose}><form data-testid="order-create-form" onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col"><div className="min-h-0 flex-1 overflow-y-auto p-4 lg:p-5 space-y-4"><CustomerEditor form={form} setForm={setForm} customers={customers ?? []} onSelect={handleCustomerSelect} /><OrderItemsEditor items={items} setItems={setItems} products={products} /><div className="grid gap-4 lg:grid-cols-[1fr_320px]"><DateNotesEditor form={form} setForm={setForm} /><div className="rounded-2xl border border-indigo-100 bg-indigo-50 p-4 space-y-3"><div className="flex items-center justify-between"><span className="font-bold text-slate-700">إجمالي أمر البيع</span><span data-testid="order-total" data-value={total} className="font-black text-xl text-indigo-700">{money(total)}</span></div><div><label className="form-label">العربون / الدفعة الأولى</label><input data-testid="order-deposit" className="form-input bg-white" type="number" min="0" step="0.01" disabled={!canCollect} value={form.deposit} onChange={(event) => setForm({ ...form, deposit: event.target.value })} />{canCollect && Number(form.deposit) > 0 && <div className="mt-2"><SearchableCombobox value={accountId} onChange={setAccountId} options={accountOptions} placeholder="ابحث عن حساب التحصيل..." emptyText="لا توجد حسابات تحصيل" /></div>}</div><div className="flex justify-between border-t border-indigo-100 pt-2 text-sm"><span>المتبقي</span><strong className="text-amber-700">{money(Math.max(0, total - (Number(form.deposit) || 0)))}</strong></div></div></div></div><div className="flex items-center justify-end gap-2 border-t border-slate-200 bg-slate-50 px-4 py-3 lg:px-5"><button type="button" disabled={saving} onClick={onClose} className="btn-secondary">إلغاء</button><button data-testid="order-submit" type="submit" disabled={saving} className="btn-primary min-w-40 disabled:opacity-50">{saving ? "جارٍ الحفظ..." : "حفظ أمر البيع"}</button></div></form></OrderFormShell>;
 }
 
 function EditOrderForm({ order, onClose }: { order: Doc<"orders">; onClose: () => void }) {
   const updateOrder = useMutation(api.orders.update);
   const customers = useQuery(api.customers.list, {});
+  const products = (useQuery(api.products.list, {}) ?? []) as OrderProduct[];
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({ customerName: order.customerName, customerPhone: order.customerPhone ?? "", customerId: order.customerId ? String(order.customerId) : "", expectedDate: order.expectedDate ?? "", notes: order.notes ?? "", deposit: String(order.deposit) });
-  const [items, setItems] = useState<OrderItem[]>(order.items.map((item) => ({ ...item })));
-  const total = items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
+  const [items, setItems] = useState<OrderItem[]>(order.items.map((item) => ({ ...item, productId: "productId" in item && item.productId ? String(item.productId) : undefined })));
+  const selectedItems = items.filter((item) => Boolean(item.productId || item.productName.trim()));
+  const total = selectedItems.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
 
-  const handleCustomerSelect = (event: React.ChangeEvent<HTMLSelectElement>) => {
-    const id = event.target.value;
+  const handleCustomerSelect = (id: string) => {
     if (order.deposit > 0) return;
     if (!id) return setForm({ ...form, customerId: "", customerName: "", customerPhone: "" });
-    const customer = customers?.find((row) => row._id === id);
+    const customer = customers?.find((row) => String(row._id) === id);
     if (customer) setForm({ ...form, customerId: id, customerName: customer.name, customerPhone: customer.phone });
   };
 
@@ -356,11 +423,12 @@ function EditOrderForm({ order, onClose }: { order: Doc<"orders">; onClose: () =
     event.preventDefault();
     if (saving) return;
     if (!form.customerName.trim()) return toast.error("اسم العميل مطلوب");
-    if (items.some((item) => !item.productName.trim() || !Number.isInteger(item.quantity) || item.quantity <= 0 || item.unitPrice < 0)) return toast.error("راجع بيانات الأصناف والكميات والأسعار");
+    if (!selectedItems.length) return toast.error("اختر صنفًا واحدًا على الأقل");
+    if (selectedItems.some((item) => !item.productName.trim() || !Number.isInteger(item.quantity) || item.quantity <= 0 || item.unitPrice < 0)) return toast.error("راجع بيانات الأصناف والكميات والأسعار");
     if (total < order.deposit) return toast.error("الإجمالي الجديد أقل من العربون المسجل");
     setSaving(true);
     try {
-      await updateOrder({ id: order._id, customerId: form.customerId ? form.customerId as Id<"customers"> : undefined, customerName: form.customerName, customerPhone: form.customerPhone || undefined, items: items.map((item) => ({ ...item, notes: item.notes?.trim() || undefined })), expectedDate: form.expectedDate || undefined, notes: form.notes || undefined });
+      await updateOrder({ id: order._id, customerId: form.customerId ? form.customerId as Id<"customers"> : undefined, customerName: form.customerName, customerPhone: form.customerPhone || undefined, items: selectedItems.map((item) => ({ productId: item.productId ? item.productId as Id<"products"> : undefined, productName: item.productName, quantity: item.quantity, unitPrice: item.unitPrice, notes: item.notes?.trim() || undefined })), expectedDate: form.expectedDate || undefined, notes: form.notes || undefined });
       toast.success("تم تحديث أمر البيع");
       onClose();
     } catch (error) {
@@ -370,19 +438,25 @@ function EditOrderForm({ order, onClose }: { order: Doc<"orders">; onClose: () =
     }
   };
 
-  return <OrderFormShell title={`تعديل ${order.orderNumber}`} onClose={onClose}><form onSubmit={handleSubmit} className="p-6 space-y-5"><CustomerEditor form={form} setForm={setForm} customers={customers ?? []} onSelect={handleCustomerSelect} disabledCustomer={order.deposit > 0} /><OrderItemsEditor items={items} setItems={setItems} /><div className="bg-indigo-50 rounded-xl p-4"><div className="flex justify-between"><span className="font-semibold">الإجمالي الجديد</span><span className="font-black text-xl text-indigo-700">{money(total)}</span></div><div className="flex justify-between text-sm mt-2"><span>العربون المحفوظ</span><span>{money(order.deposit)}</span></div><div className="flex justify-between text-sm mt-1"><span>المتبقي بعد الحفظ</span><span className="font-bold text-amber-700">{money(Math.max(0, total - order.deposit))}</span></div></div><DateNotesEditor form={form} setForm={setForm} /><div className="flex gap-3"><button type="button" disabled={saving} onClick={onClose} className="btn-secondary flex-1">إلغاء</button><button type="submit" disabled={saving} className="btn-primary flex-1 disabled:opacity-50">{saving ? "جارٍ الحفظ..." : "حفظ التعديلات"}</button></div></form></OrderFormShell>;
+  return <OrderFormShell title={`تعديل ${order.orderNumber}`} subtitle="تعديل العميل والأصناف مسموح قبل تجهيز الطلب وربطه بالفاتورة." onClose={onClose}><form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col"><div className="min-h-0 flex-1 overflow-y-auto p-4 lg:p-5 space-y-4"><CustomerEditor form={form} setForm={setForm} customers={customers ?? []} onSelect={handleCustomerSelect} disabledCustomer={order.deposit > 0} /><OrderItemsEditor items={items} setItems={setItems} products={products} /><div className="grid gap-4 lg:grid-cols-[1fr_320px]"><DateNotesEditor form={form} setForm={setForm} /><div className="rounded-2xl border border-indigo-100 bg-indigo-50 p-4"><div className="flex justify-between"><span className="font-semibold">الإجمالي</span><span className="font-black text-xl text-indigo-700">{money(total)}</span></div><div className="flex justify-between text-sm mt-3"><span>العربون المحفوظ</span><span>{money(order.deposit)}</span></div><div className="flex justify-between text-sm mt-1"><span>المتبقي</span><span className="font-bold text-amber-700">{money(Math.max(0, total - order.deposit))}</span></div></div></div></div><div className="flex items-center justify-end gap-2 border-t border-slate-200 bg-slate-50 px-4 py-3 lg:px-5"><button type="button" disabled={saving} onClick={onClose} className="btn-secondary">إلغاء</button><button type="submit" disabled={saving} className="btn-primary min-w-40 disabled:opacity-50">{saving ? "جارٍ الحفظ..." : "حفظ التعديلات"}</button></div></form></OrderFormShell>;
 }
 
 type FormState = { customerName: string; customerPhone: string; customerId: string; expectedDate: string; notes: string; deposit: string };
 
-function CustomerEditor({ form, setForm, customers, onSelect, disabledCustomer = false }: { form: FormState; setForm: (form: FormState) => void; customers: Array<{ _id: Id<"customers">; name: string; phone: string }>; onSelect: (event: React.ChangeEvent<HTMLSelectElement>) => void; disabledCustomer?: boolean }) {
-  return <div className="bg-slate-50 rounded-xl p-4 space-y-3"><p className="text-sm font-semibold text-slate-700">بيانات العميل</p><div><label className="form-label">اختر عميلاً (اختياري)</label><select data-testid="order-customer-select" disabled={disabledCustomer} className="form-input disabled:bg-slate-100" value={form.customerId} onChange={onSelect}><option value="">— بدون ربط —</option>{customers.map((customer) => <option key={customer._id} value={customer._id}>{customer.name} — {customer.phone}</option>)}</select>{disabledCustomer && <p className="text-xs text-amber-700 mt-1">لا يمكن تغيير العميل بعد تسجيل عربون.</p>}</div><div className="grid grid-cols-2 gap-3"><div><label className="form-label">اسم العميل *</label><input disabled={disabledCustomer} className="form-input disabled:bg-slate-100" value={form.customerName} onChange={(event) => setForm({ ...form, customerName: event.target.value })} /></div><div><label className="form-label">رقم الهاتف</label><input disabled={disabledCustomer} className="form-input disabled:bg-slate-100" value={form.customerPhone} onChange={(event) => setForm({ ...form, customerPhone: event.target.value })} /></div></div></div>;
+function CustomerEditor({ form, setForm, customers, onSelect, disabledCustomer = false }: { form: FormState; setForm: (form: FormState) => void; customers: Array<{ _id: Id<"customers">; name: string; phone: string }>; onSelect: (value: string) => void; disabledCustomer?: boolean }) {
+  const customerOptions: SearchableComboboxOption[] = customers.map((customer) => ({ value: String(customer._id), label: customer.name, description: customer.phone, searchText: `${customer.name} ${customer.phone}` }));
+  return <section className="rounded-2xl border border-slate-200 bg-white p-4" data-testid="order-customer-editor">
+    <div className="mb-3 flex items-center justify-between gap-3"><div><p className="font-black text-slate-800">العميل</p><p className="mt-0.5 text-xs text-slate-500">اكتب جزءًا من الاسم أو رقم الهاتف للوصول للعميل مباشرة.</p></div>{form.customerId && <span className="badge badge-success">عميل مسجل</span>}</div>
+    <SearchableCombobox testId="order-customer-combobox" disabled={disabledCustomer} value={form.customerId} onChange={onSelect} options={customerOptions} placeholder="ابحث باسم العميل أو رقم الهاتف..." emptyText="لا يوجد عميل مطابق" />
+    {disabledCustomer && <p className="text-xs text-amber-700 mt-2">لا يمكن تغيير العميل بعد تسجيل عربون.</p>}
+    {form.customerId ? <div className="mt-3 grid gap-2 rounded-xl bg-emerald-50 px-4 py-3 sm:grid-cols-2"><div><p className="text-[11px] font-bold text-emerald-700">اسم العميل</p><p className="mt-1 font-black text-slate-800">{form.customerName}</p></div><div><p className="text-[11px] font-bold text-emerald-700">رقم الهاتف</p><p className="mt-1 font-mono font-bold text-slate-800" dir="ltr">{form.customerPhone || "—"}</p></div></div> : <div className="mt-3 grid gap-3 sm:grid-cols-2"><div><label className="form-label">اسم العميل *</label><input disabled={disabledCustomer} className="form-input disabled:bg-slate-100" placeholder="عميل غير مسجل" value={form.customerName} onChange={(event) => setForm({ ...form, customerName: event.target.value })} /></div><div><label className="form-label">رقم الهاتف</label><input disabled={disabledCustomer} className="form-input disabled:bg-slate-100" placeholder="01xxxxxxxxx" value={form.customerPhone} onChange={(event) => setForm({ ...form, customerPhone: event.target.value })} /></div></div>}
+  </section>;
 }
 
 function DateNotesEditor({ form, setForm }: { form: FormState; setForm: (form: FormState) => void }) {
-  return <div className="grid grid-cols-2 gap-3"><div><label className="form-label">تاريخ التسليم المتوقع</label><input className="form-input" type="date" value={form.expectedDate} onChange={(event) => setForm({ ...form, expectedDate: event.target.value })} /></div><div><label className="form-label">ملاحظات</label><input className="form-input" value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} /></div></div>;
+  return <div className="rounded-2xl border border-slate-200 bg-white p-4"><p className="mb-3 font-black text-slate-800">التسليم والملاحظات</p><div className="grid gap-3 sm:grid-cols-2"><div><label className="form-label">تاريخ التسليم المتوقع</label><input className="form-input" type="date" value={form.expectedDate} onChange={(event) => setForm({ ...form, expectedDate: event.target.value })} /></div><div className="sm:col-span-2"><label className="form-label">ملاحظات أمر البيع</label><textarea className="form-input min-h-20" value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} placeholder="أي ملاحظات تخص التجهيز أو التسليم..." /></div></div></div>;
 }
 
-function OrderFormShell({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
-  return <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"><div className="bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto"><div className="sticky top-0 bg-white border-b border-slate-100 px-6 py-4 flex items-center justify-between rounded-t-3xl sm:rounded-t-2xl z-10"><h2 className="font-bold text-slate-800 flex items-center gap-2"><ShoppingCart className="w-5 h-5 text-indigo-600" />{title}</h2><button onClick={onClose} className="p-1.5 hover:bg-slate-100 rounded-lg"><X className="w-4 h-4" /></button></div>{children}</div></div>;
+function OrderFormShell({ title, subtitle, onClose, children }: { title: string; subtitle?: string; onClose: () => void; children: React.ReactNode }) {
+  return <div className="fixed inset-0 z-[120] flex items-end justify-center bg-slate-950/55 p-0 sm:items-center sm:p-4"><div className="flex h-[96vh] w-full max-w-5xl flex-col overflow-hidden rounded-t-3xl bg-white shadow-2xl sm:h-auto sm:max-h-[94vh] sm:rounded-2xl"><div className="flex items-center justify-between gap-4 border-b border-slate-200 bg-white px-4 py-3 lg:px-5"><div><h2 className="flex items-center gap-2 text-lg font-black text-slate-900"><ShoppingCart className="w-5 h-5 text-indigo-600" />{title}</h2>{subtitle && <p className="mt-1 text-xs text-slate-500">{subtitle}</p>}</div><button type="button" onClick={onClose} className="grid h-9 w-9 place-items-center rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200" aria-label="إغلاق"><X className="w-4 h-4" /></button></div>{children}</div></div>;
 }
