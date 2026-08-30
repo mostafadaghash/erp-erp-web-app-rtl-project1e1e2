@@ -14,8 +14,9 @@ test("ORU-02 edit action is limited before invoice linkage", () => {
   assert.match(page, /!order\.linkedInvoiceId/);
 });
 
-test("ORU-03 order edit submits items and trusted server-recalculated fields", () => {
-  assert.match(page, /items: items\.map/);
+test("ORU-03 order edit submits selected linked items and trusted server-recalculated fields", () => {
+  assert.match(page, /items: selectedItems\.map/);
+  assert.match(page, /productId: item\.productId/);
   assert.match(page, /expectedDate: form\.expectedDate/);
   assert.doesNotMatch(page, /updateOrder\([\s\S]{0,500}total,/);
 });
