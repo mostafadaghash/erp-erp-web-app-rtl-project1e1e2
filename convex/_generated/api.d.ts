@@ -12,6 +12,8 @@ import type * as auditLogs from "../auditLogs.js";
 import type * as auth from "../auth.js";
 import type * as branches from "../branches.js";
 import type * as categories from "../categories.js";
+import type * as customerFollowUps from "../customerFollowUps.js";
+import type * as customerFollowUpWorkspace from "../customerFollowUpWorkspace.js";
 import type * as customers from "../customers.js";
 import type * as deliveries from "../deliveries.js";
 import type * as employees from "../employees.js";
@@ -51,6 +53,8 @@ declare const fullApi: ApiFromModules<{
   auth: typeof auth;
   branches: typeof branches;
   categories: typeof categories;
+  customerFollowUps: typeof customerFollowUps;
+  customerFollowUpWorkspace: typeof customerFollowUpWorkspace;
   customers: typeof customers;
   deliveries: typeof deliveries;
   employees: typeof employees;
