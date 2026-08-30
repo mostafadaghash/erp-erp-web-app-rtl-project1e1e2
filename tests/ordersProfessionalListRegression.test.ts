@@ -13,6 +13,7 @@ test("orders list uses one compact toolbar with search, status and period filter
 
 test("orders rows open details and secondary actions live under more menu", () => {
   assert.match(page, /data-testid="order-row"[\s\S]*setDetailsTarget\(order\._id\)/);
+  assert.match(page, /tabIndex=\{0\}/);
   assert.match(page, /data-testid="order-more-actions"/);
   assert.match(page, /data-testid="order-actions-menu"/);
   assert.match(page, /تسجيل دفعة/);
