@@ -596,7 +596,7 @@ export function QuotesPage({ createRequestToken }: { createRequestToken?: number
                 </div>
 
                 <div className="hidden grid-cols-[minmax(220px,1fr)_90px_130px_120px_140px_44px] gap-2 px-1 pb-2 text-[11px] font-black text-slate-500 lg:grid">
-                  <span>الصنف</span><span>الكمية</span><span>سعر الوحدة</span><span>خصم السطر</span><span>إجمالي السطر</span><span />
+                  <span>الصنف</span><span>الكمية</span><span>سعر الوحدة</span><span>الخصم</span><span>الإجمالي</span><span />
                 </div>
 
                 <div className="space-y-2">
@@ -618,11 +618,11 @@ export function QuotesPage({ createRequestToken }: { createRequestToken?: number
                         <input data-testid="quote-line-unit-price" min="0" step="0.01" type="number" className="form-input font-bold" aria-label="سعر الوحدة" value={line.unitPrice} onChange={event => setLines(rows => rows.map((row, itemIndex) => itemIndex === index ? { ...row, unitPrice: event.target.value } : row))} />
                       </div>
                       <div>
-                        <label className="form-label lg:hidden">خصم السطر</label>
-                        <input data-testid="quote-line-discount" min="0" step="0.01" type="number" className="form-input" aria-label="خصم السطر" value={line.discount} onChange={event => setLines(rows => rows.map((row, itemIndex) => itemIndex === index ? { ...row, discount: event.target.value } : row))} />
+                        <label className="form-label lg:hidden">الخصم</label>
+                        <input data-testid="quote-line-discount" min="0" step="0.01" type="number" className="form-input" aria-label="الخصم" value={line.discount} onChange={event => setLines(rows => rows.map((row, itemIndex) => itemIndex === index ? { ...row, discount: event.target.value } : row))} />
                       </div>
                       <div>
-                        <label className="form-label lg:hidden">إجمالي السطر</label>
+                        <label className="form-label lg:hidden">الإجمالي</label>
                         <div className="flex h-10 items-center rounded-lg border border-slate-200 bg-white px-3 text-sm font-black text-slate-800">
                           {formatAppCurrency(calculateLineTotal(line))}
                         </div>
