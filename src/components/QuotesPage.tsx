@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
-import { Eye, FileText, Plus, Printer, Search, Send, X } from "lucide-react";
+import { Eye, FileText, Pencil, Plus, Printer, Search, Send, X } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "../../convex/_generated/api";
 import type { Doc, Id } from "../../convex/_generated/dataModel";
@@ -9,9 +9,11 @@ import { getErrorMessage } from "../lib/errors";
 import { formatAppCurrency, formatAppDate, formatAppNumber } from "../lib/utils";
 
 const today = new Date().toISOString().slice(0, 10);
-type QuoteLine = { productId: string; quantity: number };
+type QuoteLine = { productId: string; quantity: number; unitPrice: string; discount: string };
 type QuoteStatus = Doc<"quotes">["status"];
 type QuoteDateFilter = "today" | "7days" | "month" | "custom" | "all";
+
+const blankQuoteLine = (): QuoteLine => ({ productId: "", quantity: 1, unitPrice: "0", discount: "0" });
 
 const statusLabels: Record<QuoteStatus, string> = {
   draft: "مسودة",
@@ -66,6 +68,12 @@ function statusBadgeClass(status: QuoteStatus) {
   return "badge-info";
 }
 
+function calculateLineTotal(line: QuoteLine) {
+  const unitPrice = Number(line.unitPrice || 0);
+  const discount = Number(line.discount || 0);
+  return Math.max(0, unitPrice * line.quantity - discount);
+}
+
 function printQuote(quote: Doc<"quotes">) {
   const frame = window.open("", "_blank", "width=900,height=700");
   if (!frame) return toast.error("اسمح بفتح نافذة الطباعة");
@@ -87,9 +95,11 @@ export function QuotesPage({ createRequestToken }: { createRequestToken?: number
   const customers = useQuery(api.customers.list, effectiveBranch ? { branchId: effectiveBranch } : "skip") ?? [];
   const products = useQuery(api.products.list, effectiveBranch ? { branchId: effectiveBranch } : {}) ?? [];
   const createQuote = useMutation(api.quotes.create);
+  const updateQuote = useMutation(api.quotes.update);
   const updateStatus = useMutation(api.quotes.updateStatus);
 
   const [open, setOpen] = useState(false);
+  const [editingQuote, setEditingQuote] = useState<Doc<"quotes"> | null>(null);
   const [busy, setBusy] = useState(false);
   const [statusBusyId, setStatusBusyId] = useState<Id<"quotes"> | null>(null);
   const [selectedQuote, setSelectedQuote] = useState<Doc<"quotes"> | null>(null);
@@ -110,23 +120,82 @@ export function QuotesPage({ createRequestToken }: { createRequestToken?: number
   const [discount, setDiscount] = useState("0");
   const [tax, setTax] = useState("0");
   const [notes, setNotes] = useState("");
-  const [lines, setLines] = useState<QuoteLine[]>([{ productId: "", quantity: 1 }]);
+  const [lines, setLines] = useState<QuoteLine[]>([blankQuoteLine()]);
+
+  const resetEditor = () => {
+    setEditingQuote(null);
+    setCustomerId("");
+    setCustomerName("");
+    setCustomerPhone("");
+    setDate(today);
+    setValidUntil("");
+    setDiscount("0");
+    setTax("0");
+    setNotes("");
+    setLines([blankQuoteLine()]);
+  };
+
+  const openCreateEditor = () => {
+    resetEditor();
+    setOpen(true);
+  };
+
+  const openEditEditor = (quote: Doc<"quotes">) => {
+    setEditingQuote(quote);
+    setCustomerId(quote.customerId ? String(quote.customerId) : "");
+    setCustomerName(quote.customerName);
+    setCustomerPhone(quote.customerPhone ?? "");
+    setDate(quote.date);
+    setValidUntil(quote.validUntil ?? "");
+    setDiscount(String(quote.discount));
+    setTax(String(quote.tax));
+    setNotes(quote.notes ?? "");
+    setLines(quote.items.map(item => ({
+      productId: String(item.productId),
+      quantity: item.quantity,
+      unitPrice: String(item.unitPrice),
+      discount: String(item.discount),
+    })));
+    setSelectedQuote(null);
+    setOpen(true);
+  };
+
+  const closeEditor = () => {
+    if (busy) return;
+    setOpen(false);
+    resetEditor();
+  };
 
   useEffect(() => {
     if (me?.branchId) setBranchId(String(me.branchId));
   }, [me?.branchId]);
 
   useEffect(() => {
-    if (createRequestToken && canCreate) setOpen(true);
+    if (!createRequestToken || !canCreate) return;
+    setEditingQuote(null);
+    setCustomerId("");
+    setCustomerName("");
+    setCustomerPhone("");
+    setDate(today);
+    setValidUntil("");
+    setDiscount("0");
+    setTax("0");
+    setNotes("");
+    setLines([blankQuoteLine()]);
+    setOpen(true);
   }, [createRequestToken, canCreate]);
 
   const total = useMemo(
-    () => lines.reduce((sum, line) => {
-      const product = products.find(row => row._id === line.productId);
-      return sum + (product?.sellPrice ?? 0) * line.quantity;
-    }, 0) - Number(discount || 0) + Number(tax || 0),
-    [lines, products, discount, tax],
+    () => lines.reduce((sum, line) => sum + calculateLineTotal(line), 0) - Number(discount || 0) + Number(tax || 0),
+    [lines, discount, tax],
   );
+
+  const editorHasInvalidLine = lines.some(line => {
+    if (!line.productId) return false;
+    const unitPrice = Number(line.unitPrice || 0);
+    const lineDiscount = Number(line.discount || 0);
+    return !Number.isInteger(line.quantity) || line.quantity <= 0 || unitPrice < 0 || lineDiscount < 0 || lineDiscount > unitPrice * line.quantity;
+  });
 
   const customRangeInvalid = dateFilter === "custom" && Boolean(customFrom && customTo && customFrom > customTo);
   const normalizedSearch = search.trim().toLowerCase();
@@ -141,36 +210,45 @@ export function QuotesPage({ createRequestToken }: { createRequestToken?: number
     if (!effectiveBranch) return toast.error("اختر الفرع");
     const selected = lines.filter(line => line.productId);
     if (!selected.length) return toast.error("أضف صنفًا واحدًا على الأقل");
+    if (editorHasInvalidLine) return toast.error("راجع الكمية والسعر والخصم لكل صنف");
     setBusy(true);
     try {
-      await createQuote({
+      const items = selected.map(line => ({
+        productId: line.productId as Id<"products">,
+        quantity: line.quantity,
+        unitPrice: Number(line.unitPrice || 0),
+        discount: Number(line.discount || 0),
+      }));
+      const commonPayload = {
         customerId: customerId ? customerId as Id<"customers"> : undefined,
         customerName: customerName || undefined,
         customerPhone: customerPhone || undefined,
-        items: selected.map(line => {
-          const product = products.find(row => row._id === line.productId)!;
-          return { productId: product._id, quantity: line.quantity, unitPrice: product.sellPrice, discount: 0 };
-        }),
+        items,
         discount: Number(discount || 0),
         tax: Number(tax || 0),
         date,
         validUntil: validUntil || undefined,
         notes: notes || undefined,
-        branchId: effectiveBranch,
-        creationRequestId: crypto.randomUUID(),
-      });
-      toast.success("تم إنشاء عرض السعر");
+      };
+
+      if (editingQuote) {
+        const result = await updateQuote({ quoteId: editingQuote._id, ...commonPayload });
+        toast.success(result.status === "draft" && editingQuote.status === "sent"
+          ? "تم تعديل عرض السعر وإعادته إلى مسودة لإعادة إرساله"
+          : "تم تعديل عرض السعر");
+      } else {
+        await createQuote({
+          ...commonPayload,
+          branchId: effectiveBranch,
+          creationRequestId: crypto.randomUUID(),
+        });
+        toast.success("تم إنشاء عرض السعر");
+      }
+
       setOpen(false);
-      setLines([{ productId: "", quantity: 1 }]);
-      setCustomerId("");
-      setCustomerName("");
-      setCustomerPhone("");
-      setDiscount("0");
-      setTax("0");
-      setValidUntil("");
-      setNotes("");
+      resetEditor();
     } catch (error) {
-      toast.error(getErrorMessage(error, "تعذر إنشاء عرض السعر"));
+      toast.error(getErrorMessage(error, editingQuote ? "تعذر تعديل عرض السعر" : "تعذر إنشاء عرض السعر"));
     } finally {
       setBusy(false);
     }
@@ -190,6 +268,16 @@ export function QuotesPage({ createRequestToken }: { createRequestToken?: number
     }
   };
 
+  const updateLineProduct = (index: number, productId: string) => {
+    const product = products.find(row => row._id === productId);
+    setLines(rows => rows.map((row, itemIndex) => itemIndex === index ? {
+      ...row,
+      productId,
+      unitPrice: product ? String(product.sellPrice) : "0",
+      discount: "0",
+    } : row));
+  };
+
   return (
     <div className="erp-page space-y-3" data-testid="quotes-page">
       <section className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm sm:flex-row sm:items-center sm:justify-between">
@@ -200,7 +288,7 @@ export function QuotesPage({ createRequestToken }: { createRequestToken?: number
           </p>
         </div>
         {canCreate && (
-          <button type="button" data-testid="quote-new" className="btn-primary shrink-0" onClick={() => setOpen(true)}>
+          <button type="button" data-testid="quote-new" className="btn-primary shrink-0" onClick={openCreateEditor}>
             <Plus className="h-4 w-4" />
             عرض سعر جديد
           </button>
@@ -266,25 +354,11 @@ export function QuotesPage({ createRequestToken }: { createRequestToken?: number
           <div className="flex w-full flex-wrap items-center gap-2 lg:w-auto lg:flex-nowrap">
             <label className="flex items-center gap-2 whitespace-nowrap text-xs font-bold text-slate-500">
               من
-              <input
-                data-testid="quote-date-from"
-                className="form-input h-10 w-[150px] py-1.5 text-xs"
-                type="date"
-                value={customFrom}
-                max={customTo || undefined}
-                onChange={event => setCustomFrom(event.target.value)}
-              />
+              <input data-testid="quote-date-from" className="form-input h-10 w-[150px] py-1.5 text-xs" type="date" value={customFrom} max={customTo || undefined} onChange={event => setCustomFrom(event.target.value)} />
             </label>
             <label className="flex items-center gap-2 whitespace-nowrap text-xs font-bold text-slate-500">
               إلى
-              <input
-                data-testid="quote-date-to"
-                className="form-input h-10 w-[150px] py-1.5 text-xs"
-                type="date"
-                value={customTo}
-                min={customFrom || undefined}
-                onChange={event => setCustomTo(event.target.value)}
-              />
+              <input data-testid="quote-date-to" className="form-input h-10 w-[150px] py-1.5 text-xs" type="date" value={customTo} min={customFrom || undefined} onChange={event => setCustomTo(event.target.value)} />
             </label>
           </div>
         )}
@@ -339,13 +413,13 @@ export function QuotesPage({ createRequestToken }: { createRequestToken?: number
                       <button type="button" className="erp-action erp-action-primary" onClick={() => setSelectedQuote(quote)} title="فتح عرض السعر">
                         <Eye className="h-4 w-4" /> فتح
                       </button>
+                      {canEdit && (quote.status === "draft" || quote.status === "sent") && (
+                        <button type="button" data-testid="quote-edit" className="erp-action" onClick={() => openEditEditor(quote)}>
+                          <Pencil className="h-4 w-4" /> تعديل
+                        </button>
+                      )}
                       {canEdit && quote.status === "draft" && (
-                        <button
-                          type="button"
-                          className="erp-action"
-                          disabled={statusBusyId === quote._id}
-                          onClick={() => void changeStatus(quote, "sent")}
-                        >
+                        <button type="button" className="erp-action" disabled={statusBusyId === quote._id} onClick={() => void changeStatus(quote, "sent")}>
                           <Send className="h-4 w-4" /> إرسال
                         </button>
                       )}
@@ -368,7 +442,7 @@ export function QuotesPage({ createRequestToken }: { createRequestToken?: number
                     </p>
                     <p className="mt-1 text-xs">يمكنك تغيير البحث أو الفترة أو الحالة لعرض نتائج أخرى.</p>
                     {canCreate && effectiveBranch && (
-                      <button type="button" className="erp-action mt-3" onClick={() => setOpen(true)}>
+                      <button type="button" className="erp-action mt-3" onClick={openCreateEditor}>
                         <Plus className="h-4 w-4" /> إنشاء أول عرض سعر
                       </button>
                     )}
@@ -390,6 +464,11 @@ export function QuotesPage({ createRequestToken }: { createRequestToken?: number
                 <p className="mt-1 text-xs text-slate-300">{selectedQuote.customerName}</p>
               </div>
               <div className="flex items-center gap-2">
+                {canEdit && (selectedQuote.status === "draft" || selectedQuote.status === "sent") && (
+                  <button type="button" onClick={() => openEditEditor(selectedQuote)} className="rounded-lg border border-white/15 bg-white/10 px-3 py-2 text-xs font-black hover:bg-white/15">
+                    <Pencil className="ml-1 inline h-4 w-4" /> تعديل العرض
+                  </button>
+                )}
                 {canPrint && (
                   <button type="button" onClick={() => printQuote(selectedQuote)} className="rounded-lg border border-white/15 bg-white/10 px-3 py-2 text-xs font-black hover:bg-white/15">
                     <Printer className="ml-1 inline h-4 w-4" /> طباعة
@@ -463,19 +542,25 @@ export function QuotesPage({ createRequestToken }: { createRequestToken?: number
 
       {open && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto bg-slate-950/55 p-3">
-          <form onSubmit={submit} className="my-4 flex max-h-[94vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
+          <form onSubmit={submit} className="my-4 flex max-h-[94vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl" data-testid="quote-editor">
             <header className="flex items-center justify-between border-b border-slate-200 bg-white px-5 py-4">
               <div>
                 <p className="text-xs font-bold text-[var(--erp-accent-strong)]">المبيعات</p>
-                <h2 className="mt-1 text-xl font-black text-slate-900">عرض سعر جديد</h2>
-                <p className="mt-1 text-xs text-slate-500">أدخل العميل والأصناف وحدد مدة صلاحية العرض.</p>
+                <h2 className="mt-1 text-xl font-black text-slate-900">{editingQuote ? `تعديل عرض السعر ${editingQuote.quoteNumber}` : "عرض سعر جديد"}</h2>
+                <p className="mt-1 text-xs text-slate-500">سعر الصنف يُملأ تلقائيًا ويمكن تعديله لهذا العرض فقط دون تغيير سعر كارت الصنف.</p>
               </div>
-              <button type="button" onClick={() => setOpen(false)} className="grid h-9 w-9 place-items-center rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200" aria-label="إغلاق">
+              <button type="button" onClick={closeEditor} className="grid h-9 w-9 place-items-center rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200" aria-label="إغلاق">
                 <X className="h-5 w-5" />
               </button>
             </header>
 
             <div className="overflow-y-auto p-5">
+              {editingQuote?.status === "sent" && (
+                <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-800">
+                  تعديل عرض تم إرساله سيعيد حالته إلى مسودة حتى تتم مراجعته وإرساله للعميل مرة أخرى.
+                </div>
+              )}
+
               <div className="rounded-xl border border-slate-200 p-4">
                 <label className="form-label">العميل</label>
                 <select className="form-input" value={customerId} onChange={event => {
@@ -485,6 +570,9 @@ export function QuotesPage({ createRequestToken }: { createRequestToken?: number
                   if (customer) {
                     setCustomerName(customer.name);
                     setCustomerPhone(customer.phone);
+                  } else if (!id) {
+                    setCustomerName("");
+                    setCustomerPhone("");
                   }
                 }}>
                   <option value="">عميل غير مسجل</option>
@@ -500,18 +588,46 @@ export function QuotesPage({ createRequestToken }: { createRequestToken?: number
 
               <div className="mt-4 rounded-xl border border-slate-200 p-4">
                 <div className="mb-3 flex items-center justify-between gap-3">
-                  <div><p className="font-black text-slate-800">أصناف العرض</p><p className="mt-1 text-xs text-slate-500">أضف الأصناف والكميات المطلوبة.</p></div>
-                  <button type="button" className="erp-action" onClick={() => setLines(rows => [...rows, { productId: "", quantity: 1 }])}><Plus className="h-4 w-4" /> إضافة صنف</button>
+                  <div>
+                    <p className="font-black text-slate-800">أصناف العرض وأسعاره</p>
+                    <p className="mt-1 text-xs text-slate-500">يمكن تغيير سعر الوحدة والخصم لكل صنف داخل عرض السعر فقط.</p>
+                  </div>
+                  <button type="button" className="erp-action" onClick={() => setLines(rows => [...rows, blankQuoteLine()])}><Plus className="h-4 w-4" /> إضافة صنف</button>
                 </div>
+
+                <div className="hidden grid-cols-[minmax(220px,1fr)_90px_130px_120px_140px_44px] gap-2 px-1 pb-2 text-[11px] font-black text-slate-500 lg:grid">
+                  <span>الصنف</span><span>الكمية</span><span>سعر الوحدة</span><span>خصم السطر</span><span>إجمالي السطر</span><span />
+                </div>
+
                 <div className="space-y-2">
                   {lines.map((line, index) => (
-                    <div key={index} className="grid grid-cols-[minmax(0,1fr)_100px_auto] gap-2">
-                      <select required className="form-input" value={line.productId} onChange={event => setLines(rows => rows.map((row, itemIndex) => itemIndex === index ? { ...row, productId: event.target.value } : row))}>
-                        <option value="">اختر الصنف</option>
-                        {products.filter(row => row.isActive).map(row => <option key={row._id} value={row._id}>{row.name} — {formatAppCurrency(row.sellPrice)}</option>)}
-                      </select>
-                      <input min="1" type="number" className="form-input" aria-label="الكمية" value={line.quantity} onChange={event => setLines(rows => rows.map((row, itemIndex) => itemIndex === index ? { ...row, quantity: Number(event.target.value) } : row))} />
-                      <button type="button" className="btn-secondary px-3" onClick={() => setLines(rows => rows.length === 1 ? rows : rows.filter((_, itemIndex) => itemIndex !== index))} aria-label="حذف الصنف"><X className="h-4 w-4" /></button>
+                    <div key={index} className="grid gap-2 rounded-xl bg-slate-50 p-2 sm:grid-cols-2 lg:grid-cols-[minmax(220px,1fr)_90px_130px_120px_140px_44px] lg:items-center">
+                      <div>
+                        <label className="form-label lg:hidden">الصنف</label>
+                        <select required className="form-input" value={line.productId} onChange={event => updateLineProduct(index, event.target.value)}>
+                          <option value="">اختر الصنف</option>
+                          {products.filter(row => row.isActive).map(row => <option key={row._id} value={row._id}>{row.name} — {formatAppCurrency(row.sellPrice)}</option>)}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="form-label lg:hidden">الكمية</label>
+                        <input min="1" step="1" type="number" className="form-input" aria-label="الكمية" value={line.quantity} onChange={event => setLines(rows => rows.map((row, itemIndex) => itemIndex === index ? { ...row, quantity: Number(event.target.value) } : row))} />
+                      </div>
+                      <div>
+                        <label className="form-label lg:hidden">سعر الوحدة</label>
+                        <input data-testid="quote-line-unit-price" min="0" step="0.01" type="number" className="form-input font-bold" aria-label="سعر الوحدة" value={line.unitPrice} onChange={event => setLines(rows => rows.map((row, itemIndex) => itemIndex === index ? { ...row, unitPrice: event.target.value } : row))} />
+                      </div>
+                      <div>
+                        <label className="form-label lg:hidden">خصم السطر</label>
+                        <input data-testid="quote-line-discount" min="0" step="0.01" type="number" className="form-input" aria-label="خصم السطر" value={line.discount} onChange={event => setLines(rows => rows.map((row, itemIndex) => itemIndex === index ? { ...row, discount: event.target.value } : row))} />
+                      </div>
+                      <div>
+                        <label className="form-label lg:hidden">إجمالي السطر</label>
+                        <div className="flex h-10 items-center rounded-lg border border-slate-200 bg-white px-3 text-sm font-black text-slate-800">
+                          {formatAppCurrency(calculateLineTotal(line))}
+                        </div>
+                      </div>
+                      <button type="button" className="btn-secondary h-10 px-3" onClick={() => setLines(rows => rows.length === 1 ? rows : rows.filter((_, itemIndex) => itemIndex !== index))} aria-label="حذف الصنف"><X className="h-4 w-4" /></button>
                     </div>
                   ))}
                 </div>
@@ -524,15 +640,21 @@ export function QuotesPage({ createRequestToken }: { createRequestToken?: number
                 <div><label className="form-label">الضريبة</label><input type="number" min="0" step="0.01" className="form-input" value={tax} onChange={event => setTax(event.target.value)} /></div>
               </div>
 
-              <div className="mt-4 grid gap-4 lg:grid-cols-[1fr_280px]">
+              <div className="mt-4 grid gap-4 lg:grid-cols-[1fr_300px]">
                 <div><label className="form-label">ملاحظات العرض</label><textarea className="form-input min-h-24" placeholder="شروط الدفع أو أي ملاحظات للعميل..." value={notes} onChange={event => setNotes(event.target.value)} /></div>
-                <div className="rounded-xl bg-slate-50 p-4"><p className="text-xs font-bold text-slate-500">إجمالي عرض السعر</p><p className="mt-2 text-2xl font-black text-[var(--erp-accent-strong)]">{formatAppCurrency(Math.max(0, total))}</p><p className="mt-2 text-xs text-slate-500">يشمل الخصم والضريبة المحددين أعلاه.</p></div>
+                <div className="rounded-xl bg-slate-50 p-4">
+                  <p className="text-xs font-bold text-slate-500">إجمالي عرض السعر</p>
+                  <p className="mt-2 text-2xl font-black text-[var(--erp-accent-strong)]">{formatAppCurrency(Math.max(0, total))}</p>
+                  <p className="mt-2 text-xs text-slate-500">محسوب من الأسعار المعدلة داخل العرض والخصومات والضريبة.</p>
+                </div>
               </div>
             </div>
 
             <footer className="flex items-center justify-end gap-2 border-t border-slate-200 bg-slate-50 px-5 py-3">
-              <button type="button" className="btn-secondary" disabled={busy} onClick={() => setOpen(false)}>إلغاء</button>
-              <button disabled={busy || total < 0} className="btn-primary">{busy ? "جارٍ الحفظ…" : "حفظ عرض السعر"}</button>
+              <button type="button" className="btn-secondary" disabled={busy} onClick={closeEditor}>إلغاء</button>
+              <button data-testid="quote-editor-submit" disabled={busy || total < 0 || editorHasInvalidLine} className="btn-primary">
+                {busy ? "جارٍ الحفظ…" : editingQuote ? "حفظ التعديلات" : "حفظ عرض السعر"}
+              </button>
             </footer>
           </form>
         </div>
