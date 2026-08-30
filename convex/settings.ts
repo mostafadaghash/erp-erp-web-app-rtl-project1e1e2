@@ -2,6 +2,7 @@ import { mutation, query } from "./_generated/server";
 import type { QueryCtx } from "./_generated/server";
 import { ConvexError, v } from "convex/values";
 import { requireAdmin, logAction } from "./lib/auth";
+import { normalizePostDeliveryFollowUpDays } from "../shared/postDeliveryFollowUpRules.ts";
 
 const DEFAULT_STORE_NAME = "DAGHASH ERP";
 const DEFAULT_TAGLINE = "إدارة أعمالك بوضوح";
@@ -111,11 +112,23 @@ export const upsert = mutation({
     currency: v.string(),
     taxRate: v.number(),
     whatsappNumber: v.optional(v.string()),
+    postDeliveryFollowUpDays: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const user = await requireAdmin(ctx);
     if (!Number.isFinite(args.taxRate) || args.taxRate < 0 || args.taxRate > 100) {
       throw new ConvexError("نسبة الضريبة يجب أن تكون بين 0 و100");
+    }
+
+    let postDeliveryFollowUpDays: number;
+    try {
+      postDeliveryFollowUpDays = normalizePostDeliveryFollowUpDays(
+        args.postDeliveryFollowUpDays,
+      );
+    } catch (error) {
+      throw new ConvexError(
+        error instanceof Error ? error.message : "مدة متابعة ما بعد البيع غير صالحة",
+      );
     }
 
     const normalizedArgs = {
@@ -134,6 +147,7 @@ export const upsert = mutation({
       currency: "EGP",
       taxRate: Math.round(args.taxRate * 100) / 100,
       whatsappNumber: normalizeOptional(args.whatsappNumber, 30),
+      postDeliveryFollowUpDays,
     };
 
     const existing = await ctx.db.query("settings").first();
@@ -159,6 +173,7 @@ export const upsert = mutation({
             secondaryColor: existing.secondaryColor,
             currency: existing.currency,
             taxRate: existing.taxRate,
+            postDeliveryFollowUpDays: existing.postDeliveryFollowUpDays,
           }
         : undefined,
       after: normalizedArgs,
