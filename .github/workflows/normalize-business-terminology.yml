@@ -1,0 +1,39 @@
+name: Normalize Business Terminology
+
+on:
+  push:
+    branches:
+      - agent/sales-returns-table-redesign
+    paths:
+      - scripts/normalize-business-terminology.mjs
+      - .github/workflows/normalize-business-terminology.yml
+
+permissions:
+  contents: write
+
+jobs:
+  normalize:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v4
+        with:
+          ref: agent/sales-returns-table-redesign
+          fetch-depth: 0
+
+      - name: Normalize terminology
+        run: node scripts/normalize-business-terminology.mjs --fix
+
+      - name: Commit normalized wording
+        shell: bash
+        run: |
+          if git diff --quiet; then
+            echo "No terminology changes needed."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src convex shared tests
+          git commit -m "توحيد مسميات الإلغاء في النظام"
+          git push origin HEAD:agent/sales-returns-table-redesign

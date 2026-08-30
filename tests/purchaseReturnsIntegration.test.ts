@@ -1351,7 +1351,7 @@ test("PRT-39 Print DTO والصلاحية واسم المستخدم", async () =
   );
 });
 
-test("PRT-40 عكس خفض الدين", async () => {
+test("PRT-40 إلغاء خفض الدين", async () => {
   const e = await fixture();
   const before = await rows(e);
   const id = await e.client.mutation(
@@ -1385,7 +1385,7 @@ test("PRT-40 عكس خفض الدين", async () => {
   );
 });
 
-test("PRT-41 عكس الرد النقدي", async () => {
+test("PRT-41 إلغاء الرد النقدي", async () => {
   const e = await fixture({ payable: 100, paid: 100, supplierFreight: 0 });
   const refundAccountId = await account(e);
   const id = await e.client.mutation(
@@ -1414,7 +1414,7 @@ test("PRT-41 عكس الرد النقدي", async () => {
   );
 });
 
-test("PRT-42 عكس مختلط", async () => {
+test("PRT-42 إلغاء مختلط", async () => {
   const e = await fixture({
     items: [{ quantity: 1, lineTotal: 70, stock: 5, inventoryValue: 70 }],
     payable: 100,
@@ -1450,7 +1450,7 @@ test("PRT-42 عكس مختلط", async () => {
   assert.equal(state.transactions.length, 2);
 });
 
-test("PRT-43 Retry العكس", async () => {
+test("PRT-43 Retry الإلغاء", async () => {
   const e = await fixture();
   const id = await e.client.mutation(
     api.purchaseReturns.create,
@@ -1469,7 +1469,7 @@ test("PRT-43 Retry العكس", async () => {
   assert.deepEqual(await rows(e), once);
 });
 
-test("PRT-44 رفض عكس مختلف", async () => {
+test("PRT-44 رفض إلغاء مختلف", async () => {
   const e = await fixture();
   const id = await e.client.mutation(
     api.purchaseReturns.create,
@@ -1564,7 +1564,7 @@ test("PRT-46 استعادة جميع الأرصدة التشغيلية", async (
   assert.equal(after.returns[0].status, "reversed");
 });
 
-test("PRT-47 توافق عكس دفعة المورد", async () => {
+test("PRT-47 توافق إلغاء دفعة المورد", async () => {
   const e = await fixture({
     payable: 100,
     paid: 0,
@@ -1592,22 +1592,22 @@ test("PRT-47 توافق عكس دفعة المورد", async () => {
     e.client.mutation(api.supplierPayments.reverse, {
       paymentId,
       date: "2026-02-03",
-      reason: "عكس الدفعة",
+      reason: "إلغاء الدفعة",
       requestId: "prt-47-payment-reverse",
     }),
-    /لا يمكن عكس دفعة المورد قبل عكس إشعار خصم الشراء/,
+    /لا يمكن إلغاء دفعة المورد قبل إلغاء إشعار خصم الشراء/,
   );
   assert.deepEqual(await rows(e), inconsistent);
   await e.client.mutation(api.purchaseReturns.reverse, {
     purchaseReturnId: returnId,
     date: "2026-02-03",
-    reason: "عكس الإشعار أولاً",
+    reason: "إلغاء الإشعار أولاً",
     requestId: "prt-47-return-reverse",
   });
   await e.client.mutation(api.supplierPayments.reverse, {
     paymentId,
     date: "2026-02-03",
-    reason: "عكس الدفعة",
+    reason: "إلغاء الدفعة",
     requestId: "prt-47-payment-reverse",
   });
   const final = await rows(e);

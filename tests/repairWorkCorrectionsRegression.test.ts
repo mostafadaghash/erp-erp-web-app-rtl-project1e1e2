@@ -35,7 +35,7 @@ test("REPAIR-WORK-03 correction requires a documented reason and preserves colle
 });
 
 test("REPAIR-WORK-04 correction reverses old inventory and posts actual used parts", () => {
-  assert.match(backend, /عكس قطع الصيانة قبل تصحيح/);
+  assert.match(backend, /إلغاء قطع الصيانة قبل تصحيح/);
   assert.match(backend, /quantityDelta: part\.quantity/);
   assert.match(backend, /valueDelta: exactValue/);
   assert.match(backend, /type: INVENTORY_MOVEMENT_TYPES\.repairPartReversal/);

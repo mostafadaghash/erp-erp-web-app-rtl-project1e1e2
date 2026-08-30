@@ -51,7 +51,7 @@ const ACTION_CONFIG: Record<
   confirm_opening: { label: "اعتماد افتتاح", color: "bg-emerald-100 text-emerald-700", icon: Plus },
   activate_financial_posting: { label: "تفعيل الربط", color: "bg-emerald-100 text-emerald-700", icon: Plus },
   reverse: {
-    label: "عكس",
+    label: "إلغاء",
     color: "bg-orange-100 text-orange-700",
     icon: Trash2,
   },
@@ -63,7 +63,7 @@ const ACTION_CONFIG: Record<
   update_details: { label: "تعديل تفاصيل", color: "bg-blue-100 text-blue-700", icon: Edit2 },
   rotate_tracking_token: { label: "تجديد التتبع", color: "bg-amber-100 text-amber-700", icon: Edit2 },
   receive: { label: "استلام", color: "bg-emerald-100 text-emerald-700", icon: Plus },
-  void: { label: "إبطال", color: "bg-red-100 text-red-700", icon: Trash2 },
+  void: { label: "إلغاء", color: "bg-red-100 text-red-700", icon: Trash2 },
 };
 
 const MODULE_LABELS: Record<string, string> = {
@@ -122,7 +122,7 @@ const FIELD_LABELS: Record<string, string> = {
   allocationsCount: "عدد التوزيعات",
   accountName: "الحساب المالي",
   supplierName: "المورد",
-  reversalReason: "سبب العكس",
+  reversalReason: "سبب الإلغاء",
   cancellationReason: "سبب الإلغاء",
   customerName: "العميل",
   total: "الإجمالي",
@@ -166,7 +166,7 @@ const FIELD_LABELS: Record<string, string> = {
   totalLandedCost: "إجمالي التكلفة الواصلة",
   supplierFreightAmount: "شحن المورد",
   hasSupplierLedgerEntry: "تم إنشاء حركة مورد",
-  voidReason: "سبب الإبطال",
+  voidReason: "سبب الإلغاء",
 };
 
 type SnapshotRow = { field: string; value: string };
@@ -185,7 +185,7 @@ const DOCUMENT_TYPE_LABELS: Record<string, string> = {
   supplier: "مورد",
   supplier_ledger_entry: "حركة دفتر مورد",
   supplier_payment: "سند دفع مورد",
-  supplier_payment_reversal: "عكس سند دفع مورد",
+  supplier_payment_reversal: "إلغاء سند دفع مورد",
   purchase_receipt: "مستند شراء",
   purchase_return: "مرتجع شراء",
   supplier_refund: "استرداد مورد",
@@ -223,7 +223,7 @@ function DocumentLinks({
       : null,
     financialTransactionId ? { label: "الحركة المالية", type: "financial_transaction", id: financialTransactionId, number: null } : null,
     journalEntryId ? { label: "القيد المحاسبي", type: "journal_entry", id: journalEntryId, number: null } : null,
-    reversalOfId ? { label: "عكس لـ", type: null, id: reversalOfId, number: null } : null,
+    reversalOfId ? { label: "إلغاء للمستند", type: null, id: reversalOfId, number: null } : null,
   ].filter(Boolean) as Array<{ label: string; type: string | null; id: string | null; number: string | null }>;
   if (rows.length === 0) return null;
   return (

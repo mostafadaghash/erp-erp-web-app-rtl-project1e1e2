@@ -189,7 +189,7 @@ export async function reverseRepairRevenueJournal(
       accountId: line.accountId,
       debit: line.credit,
       credit: line.debit,
-      description: `عكس ${line.description ?? input.repairNumber}`,
+      description: `إلغاء ${line.description ?? input.repairNumber}`,
     })),
     requestId: input.requestId,
     sourceType: "operational_reversal",

@@ -177,7 +177,7 @@ export const updateItems = mutation({
         quantityDelta: item.quantity,
         unitCost: item.unitCost,
         type: INVENTORY_MOVEMENT_TYPES.saleReversal,
-        reason: `عكس مخزون تعديل الفاتورة ${invoice.invoiceNumber}: ${reason}`,
+        reason: `إلغاء مخزون تعديل الفاتورة ${invoice.invoiceNumber}: ${reason}`,
         referenceId: String(invoice._id),
         referenceType: "invoice",
       });

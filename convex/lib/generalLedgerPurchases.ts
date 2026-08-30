@@ -259,7 +259,7 @@ export async function reversePurchaseReturnJournal(
   if (!input.originalEntryId) {
     if (input.hasAccountingImpact) {
       throw new ConvexError(
-        "لا يمكن عكس مرتجع غير مرتبط بقيده التشغيلي الأصلي",
+        "لا يمكن إلغاء مرتجع غير مرتبط بقيده التشغيلي الأصلي",
       );
     }
     return null;
@@ -284,7 +284,7 @@ export async function reversePurchaseReturnJournal(
       accountId: item.accountId,
       debit: item.credit,
       credit: item.debit,
-      description: `عكس: ${item.description ?? input.referenceNumber}`,
+      description: `إلغاء: ${item.description ?? input.referenceNumber}`,
     })),
     requestId: input.requestId,
     sourceType: "operational_reversal",

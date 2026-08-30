@@ -54,7 +54,7 @@ const ledgerTypeLabels: Record<string, string> = {
   supplier_payment: "دفعة مورد",
   supplier_refund: "رد من المورد",
   adjustment: "تسوية",
-  reversal: "عكس",
+  reversal: "إلغاء",
 };
 
 export function SuppliersPage() {
@@ -535,18 +535,18 @@ export function SuppliersPage() {
                   )}
                   {entry.reversalDate && (
                     <p className="mt-1 text-xs text-rose-700">
-                      تاريخ العكس: {entry.reversalDate}
+                      تاريخ الإلغاء: {entry.reversalDate}
                     </p>
                   )}
                   {entry.reversalReason && (
                     <p className="mt-1 text-xs text-rose-700 break-words">
-                      سبب العكس: {entry.reversalReason}
+                      سبب الإلغاء: {entry.reversalReason}
                     </p>
                   )}
                   <p className="mt-1 text-xs text-slate-500">
                     الرصيد: {entry.balanceBefore.toLocaleString("ar-EG")} ←{" "}
                     {entry.balanceAfter.toLocaleString("ar-EG")}
-                    {entry.status === "reversed" ? " · معكوس" : ""}
+                    {entry.status === "reversed" ? " · ملغي" : ""}
                   </p>
                 </article>
               ))}

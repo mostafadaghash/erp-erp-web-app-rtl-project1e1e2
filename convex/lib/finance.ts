@@ -163,13 +163,13 @@ export async function reversePostedFinancialTransaction(ctx: MutationCtx, user: 
   if (!original) throw new ConvexError("المعاملة الأصلية غير موجودة");
   const existing = await findFinancialTransactionByRequest(ctx, "reversal", user.userId, input.requestId);
   if (existing) {
-    if (existing.originalTransactionId !== original._id) throw new ConvexError("معرف طلب العكس مستخدم لعملية أخرى");
+    if (existing.originalTransactionId !== original._id) throw new ConvexError("معرف طلب الإلغاء مستخدم لعملية أخرى");
     return existing._id;
   }
-  if (original.status === "reversed" || original.reversalTransactionId) throw new ConvexError("تم عكس المعاملة سابقاً بطلب مختلف");
+  if (original.status === "reversed" || original.reversalTransactionId) throw new ConvexError("تم إلغاء المعاملة سابقاً بطلب مختلف");
   const movements = await ctx.db.query("financialMovements").withIndex("by_transaction", q => q.eq("transactionId", original._id)).collect();
   const posted = await postFinancialTransaction(ctx, user, { type: "reversal", requestId: input.requestId, date: input.date, amount: original.amount,
-    description: `عكس ${original.transactionNumber}: ${input.reason}`, branchId: original.branchId, originalTransactionId: original._id,
+    description: `إلغاء ${original.transactionNumber}: ${input.reason}`, branchId: original.branchId, originalTransactionId: original._id,
     referenceType: input.referenceType ?? "financial_transaction", referenceId: input.referenceId ?? String(original._id), referenceNumber: input.referenceNumber ?? original.transactionNumber,
     customerId: original.customerId, supplierId: original.supplierId, movements: movements.map(movement => ({ accountId: movement.accountId, signedAmount: -movement.signedAmount })) });
   await ctx.db.patch(original._id, { status: "reversed", reversedAt: Date.now(), reversedBy: user.userId, reversalReason: input.reason, reversalTransactionId: posted.transactionId });

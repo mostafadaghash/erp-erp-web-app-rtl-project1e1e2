@@ -38,7 +38,7 @@ test("CSF-04 supplier ledger exposes invoice and reversal metadata", () => {
   assert.match(suppliersPage, /entry\.reversalDate/);
   assert.match(suppliersPage, /entry\.reversalReason/);
   assert.ok(suppliersPage.includes("فاتورة المورد"));
-  assert.ok(suppliersPage.includes("سبب العكس"));
+  assert.ok(suppliersPage.includes("سبب الإلغاء"));
 });
 
 test("CSF-05 supplier search waits for the supplier list", () => {
