@@ -4,12 +4,17 @@
  */
 import type { QueryCtx, MutationCtx } from "../_generated/server";
 import type { Id } from "../_generated/dataModel";
-import { internal } from "../_generated/api";
+import { makeFunctionReference } from "convex/server";
 import { ConvexError } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { PERMISSIONS, ROLE_PERMISSIONS } from "./permissions.ts";
 import type { Permission } from "./permissions.ts";
 import { isPostDeliveryAuditTrigger } from "../../shared/postDeliveryFollowUpRules.ts";
+
+const postDeliveryFollowUpWorker = makeFunctionReference<
+  "mutation",
+  { auditLogId: Id<"auditLogs"> }
+>("postDeliveryFollowUps:processAuditEvent");
 
 // ──────────────────────────────────────────────
 // Types
@@ -289,11 +294,7 @@ export async function logAction(
       status,
     })
   ) {
-    await ctx.scheduler.runAfter(
-      0,
-      internal.postDeliveryFollowUps.processAuditEvent,
-      { auditLogId },
-    );
+    await ctx.scheduler.runAfter(0, postDeliveryFollowUpWorker, { auditLogId });
   }
 }
 
