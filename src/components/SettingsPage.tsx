@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import {
   Building2,
+  CalendarClock,
   Image,
   MessageCircle,
   Palette,
@@ -68,6 +69,7 @@ const emptyForm = {
   currency: "EGP",
   taxRate: 14,
   whatsappNumber: "",
+  postDeliveryFollowUpDays: 2,
 };
 
 export function SettingsPage() {
@@ -105,6 +107,7 @@ export function SettingsPage() {
       currency: "EGP",
       taxRate: settings.taxRate,
       whatsappNumber: settings.whatsappNumber ?? "",
+      postDeliveryFollowUpDays: settings.postDeliveryFollowUpDays ?? 2,
     });
     if (settings.modules) {
       setModules({
@@ -136,6 +139,7 @@ export function SettingsPage() {
         currency: "EGP",
         taxRate: Number(form.taxRate),
         whatsappNumber: form.whatsappNumber || undefined,
+        postDeliveryFollowUpDays: Number(form.postDeliveryFollowUpDays),
       });
       toast.success("تم حفظ إعدادات النظام والهوية");
     } catch (error) {
@@ -271,6 +275,34 @@ export function SettingsPage() {
           <div className="mb-5 flex items-center gap-2"><MessageCircle className="h-5 w-5 text-emerald-600" /><h2 className="font-black text-slate-800">التواصل وواتساب</h2></div>
           <label className="form-label">رقم واتساب للإشعارات<input className="form-input" dir="ltr" value={form.whatsappNumber} onChange={event => setForm({ ...form, whatsappNumber: event.target.value })} placeholder="201012345678" /><span className="mt-1 block text-xs font-normal text-slate-400">اكتب رمز الدولة بدون + أو 00</span></label>
           {form.whatsappNumber && <a href={`https://wa.me/${normalizeEgyptPhoneForWhatsApp(form.whatsappNumber)}?text=${encodeURIComponent("مرحبًا، هذه رسالة اختبار من نظام الإدارة")}`} target="_blank" rel="noopener noreferrer" className="mt-3 inline-flex items-center gap-2 rounded-xl bg-emerald-500 px-4 py-2 text-sm font-bold text-white transition hover:bg-emerald-600"><MessageCircle className="h-4 w-4" />اختبار واتساب</a>}
+        </section>
+
+        <section className="settings-section" data-testid="post-delivery-follow-up-settings">
+          <div className="mb-5 flex items-center gap-2">
+            <CalendarClock className="h-5 w-5 text-[var(--brand-primary)]" />
+            <div>
+              <h2 className="font-black text-slate-800">متابعة ما بعد البيع</h2>
+              <p className="text-xs text-slate-500">ينشئ النظام متابعة واحدة تلقائيًا بعد تسليم أمر بيع أو صيانة أو شحنة</p>
+            </div>
+          </div>
+          <div className="grid gap-4 md:grid-cols-[minmax(0,260px)_1fr] md:items-end">
+            <label className="form-label">
+              إنشاء المتابعة بعد عدد أيام
+              <input
+                data-testid="post-delivery-follow-up-days"
+                className="form-input"
+                type="number"
+                min="0"
+                max="365"
+                step="1"
+                value={form.postDeliveryFollowUpDays}
+                onChange={event => setForm({ ...form, postDeliveryFollowUpDays: Number(event.target.value) })}
+              />
+            </label>
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+              القيمة الافتراضية <b>2 يوم</b>. اختيار 0 يعني أن المتابعة تظهر في نفس يوم التسليم. إعادة حفظ أو تحديث العملية بعد التسليم لا تنشئ مهمة ثانية لنفس العملية.
+            </div>
+          </div>
         </section>
 
         <button data-testid="settings-save" type="submit" disabled={saving} className="btn-primary flex w-full items-center justify-center gap-2 sm:w-auto"><Save className="h-4 w-4" />{saving ? "جارٍ الحفظ..." : "حفظ إعدادات النظام"}</button>
