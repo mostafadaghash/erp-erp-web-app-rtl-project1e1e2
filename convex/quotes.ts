@@ -99,6 +99,68 @@ export const create = mutation({
   },
 });
 
+export const update = mutation({
+  args: {
+    quoteId: v.id("quotes"),
+    customerId: v.optional(v.id("customers")),
+    customerName: v.optional(v.string()),
+    customerPhone: v.optional(v.string()),
+    items: v.array(itemValidator),
+    discount: v.optional(v.number()),
+    tax: v.optional(v.number()),
+    date: v.string(),
+    validUntil: v.optional(v.string()),
+    notes: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const user = await requirePermission(ctx, "edit_quotes");
+    const quote = await ctx.db.get(args.quoteId);
+    if (!quote) throw new ConvexError("عرض السعر غير موجود");
+    assertBranchAccess(user, quote);
+    if (quote.status !== "draft" && quote.status !== "sent") {
+      throw new ConvexError("لا يمكن تعديل عرض السعر بعد إغلاق حالته");
+    }
+    if (!isValidIsoDate(args.date) || (args.validUntil && !isValidIsoDate(args.validUntil))) throw new ConvexError("تاريخ عرض السعر غير صالح");
+    if (args.validUntil && args.validUntil < args.date) throw new ConvexError("تاريخ الصلاحية يسبق تاريخ العرض");
+    if (!args.items.length) throw new ConvexError("أضف صنفًا واحدًا على الأقل");
+
+    const customer = args.customerId ? await requireActiveCustomer(ctx, args.customerId, quote.branchId) : undefined;
+    const customerName = customer?.name ?? args.customerName?.trim();
+    if (!customerName) throw new ConvexError("اسم العميل مطلوب");
+
+    const items = await Promise.all(args.items.map(async item => {
+      const product = await ctx.db.get(item.productId);
+      if (!product || product.isActive === false) throw new ConvexError("أحد أصناف العرض غير موجود أو معطل");
+      if (product.branchId && product.branchId !== quote.branchId) throw new ConvexError("أحد أصناف العرض يتبع فرعًا آخر");
+      if (!Number.isInteger(item.quantity) || item.quantity <= 0) throw new ConvexError("كمية الصنف غير صالحة");
+      const unitPrice = roundMoney(item.unitPrice), discount = roundMoney(item.discount ?? 0);
+      if (unitPrice < 0 || discount < 0 || discount > unitPrice * item.quantity) throw new ConvexError("سعر أو خصم الصنف غير صالح");
+      return { productId: product._id, productName: product.name, quantity: item.quantity, unitPrice, discount, total: roundMoney(unitPrice * item.quantity - discount) };
+    }));
+    const subtotal = roundMoney(items.reduce((sum, item) => sum + item.total, 0));
+    const discount = roundMoney(args.discount ?? 0), tax = roundMoney(args.tax ?? 0);
+    if (discount < 0 || discount > subtotal || tax < 0) throw new ConvexError("الخصم أو الضريبة غير صالحين");
+
+    const nextStatus = quote.status === "sent" ? "draft" : quote.status;
+    await ctx.db.patch(quote._id, {
+      customerId: customer?._id,
+      customerName,
+      customerPhone: customer?.phone ?? (args.customerPhone?.trim() || undefined),
+      items,
+      subtotal,
+      discount,
+      tax,
+      total: roundMoney(subtotal - discount + tax),
+      validUntil: args.validUntil,
+      notes: args.notes?.trim() || undefined,
+      date: args.date,
+      status: nextStatus,
+      updatedAt: Date.now(),
+    });
+    return { status: nextStatus };
+  },
+});
+
 export const updateStatus = mutation({
   args: { quoteId: v.id("quotes"), status: quoteStatus },
   handler: async (ctx, args) => {
