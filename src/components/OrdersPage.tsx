@@ -8,6 +8,7 @@ import type { Doc, Id } from "../../convex/_generated/dataModel";
 import {
   ShoppingCart, Plus, X, Search, Clock, CheckCircle, Package, Truck, XCircle,
   CreditCard, Trash2, MessageCircle, Printer, Pencil, Eye, FileText, Link2,
+  MoreHorizontal,
 } from "lucide-react";
 import { PrintModal } from "./PrintTemplate";
 import { buildEgyptWhatsAppUrl } from "../lib/utils";
@@ -32,6 +33,7 @@ function getWhatsAppMessage(status: string, orderNumber: string, customerName: s
 }
 
 type OrderStatus = "pending" | "confirmed" | "ready" | "delivered" | "cancelled";
+type OrderPeriod = "all" | "today" | "week" | "month" | "custom";
 type OrderItem = { productId?: string; productName: string; quantity: number; unitPrice: number; notes?: string };
 
 const statusConfig: Record<OrderStatus, { label: string; badge: string; icon: React.ElementType }> = {
@@ -44,15 +46,23 @@ const statusConfig: Record<OrderStatus, { label: string; badge: string; icon: Re
 
 const statusFlow: OrderStatus[] = ["pending", "confirmed", "ready", "delivered"];
 const orderFilters: Array<{ v: OrderStatus | "all"; l: string }> = [
-  { v: "all", l: "الكل" },
-  { v: "pending", l: "انتظار" },
+  { v: "all", l: "كل الحالات" },
+  { v: "pending", l: "قيد الانتظار" },
   { v: "confirmed", l: "مؤكد" },
   { v: "ready", l: "جاهز" },
-  { v: "delivered", l: "مُسلَّم" },
+  { v: "delivered", l: "تم التسليم" },
   { v: "cancelled", l: "ملغي" },
+];
+const periodFilters: Array<{ v: OrderPeriod; l: string }> = [
+  { v: "all", l: "كل الفترات" },
+  { v: "today", l: "اليوم" },
+  { v: "week", l: "آخر 7 أيام" },
+  { v: "month", l: "هذا الشهر" },
+  { v: "custom", l: "فترة مخصصة" },
 ];
 const emptyItem = (): OrderItem => ({ productId: "", productName: "", quantity: 1, unitPrice: 0 });
 const money = (value: number) => `${value.toLocaleString("ar-EG")} ج.م`;
+const dateKey = (value: Date) => `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, "0")}-${String(value.getDate()).padStart(2, "0")}`;
 
 export function OrdersPage({ createRequestToken }: { createRequestToken?: number }) {
   const canCreate = usePermission("create_orders");
@@ -63,7 +73,11 @@ export function OrdersPage({ createRequestToken }: { createRequestToken?: number
   const canPrint = usePermission("print_orders");
 
   const [filterStatus, setFilterStatus] = useState<OrderStatus | "all">("all");
+  const [filterPeriod, setFilterPeriod] = useState<OrderPeriod>("all");
+  const [customFrom, setCustomFrom] = useState("");
+  const [customTo, setCustomTo] = useState("");
   const [search, setSearch] = useState("");
+  const [openActionsId, setOpenActionsId] = useState<Id<"orders"> | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [editTarget, setEditTarget] = useState<Doc<"orders"> | null>(null);
   const [detailsTarget, setDetailsTarget] = useState<Id<"orders"> | null>(null);
@@ -89,6 +103,13 @@ export function OrdersPage({ createRequestToken }: { createRequestToken?: number
     if (createRequestToken && canCreate) setShowForm(true);
   }, [createRequestToken, canCreate]);
 
+  useEffect(() => {
+    if (!openActionsId) return;
+    const close = () => setOpenActionsId(null);
+    document.addEventListener("click", close);
+    return () => document.removeEventListener("click", close);
+  }, [openActionsId]);
+
   const { results: orders, status: paginationStatus, loadMore } = usePaginatedQuery(
     api.orderPagination.list,
     filterStatus === "all" ? {} : { status: filterStatus },
@@ -107,11 +128,25 @@ export function OrdersPage({ createRequestToken }: { createRequestToken?: number
   const storeName = settings?.storeName ?? "المتجر";
   const isLoadingOrders = paginationStatus === "LoadingFirstPage";
   const needle = search.trim().toLocaleLowerCase("ar-EG");
+  const today = new Date();
+  const todayKey = dateKey(today);
+  const weekStart = new Date(today); weekStart.setDate(today.getDate() - 6);
+  const weekStartKey = dateKey(weekStart);
+  const monthStartKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-01`;
   const filtered = orders.filter((order) => {
-    if (!needle) return true;
-    return order.customerName.toLocaleLowerCase("ar-EG").includes(needle)
+    const matchesSearch = !needle
+      || order.customerName.toLocaleLowerCase("ar-EG").includes(needle)
       || order.orderNumber.toLocaleLowerCase("ar-EG").includes(needle)
       || (order.customerPhone ?? "").includes(needle);
+    if (!matchesSearch) return false;
+    if (filterPeriod === "all") return true;
+    const orderDate = dateKey(new Date(order._creationTime));
+    if (filterPeriod === "today") return orderDate === todayKey;
+    if (filterPeriod === "week") return orderDate >= weekStartKey && orderDate <= todayKey;
+    if (filterPeriod === "month") return orderDate >= monthStartKey && orderDate <= todayKey;
+    if (customFrom && orderDate < customFrom) return false;
+    if (customTo && orderDate > customTo) return false;
+    return true;
   });
 
   const handleStatusChange = async (id: Id<"orders">, status: OrderStatus) => {
@@ -200,38 +235,45 @@ export function OrdersPage({ createRequestToken }: { createRequestToken?: number
   };
 
   return (
-    <div className="p-4 lg:p-6 space-y-6" data-testid="orders-page">
-      <div className="flex items-center justify-between gap-4 flex-wrap">
-        <div>
-          <h1 className="text-2xl font-black text-slate-800 flex items-center gap-2"><ShoppingCart className="w-6 h-6 text-indigo-600" />أوامر البيع</h1>
-          <p className="text-slate-500 text-sm mt-0.5">دورة أمر البيع من الإنشاء حتى الفاتورة والشحن والتسليم</p>
+    <div className="space-y-3 p-3 lg:p-4" data-testid="orders-page">
+      <div className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2"><ShoppingCart className="h-5 w-5 text-indigo-600" /><h1 className="text-xl font-black text-slate-900">أوامر البيع</h1></div>
+          <p className="mt-0.5 text-xs text-slate-500">إدارة أوامر البيع ومتابعة التجهيز والتحصيل والتسليم من شاشة واحدة</p>
         </div>
-        {canCreate && <button data-testid="order-create-open" onClick={() => setShowForm(true)} className="btn-primary flex items-center gap-2"><Plus className="w-4 h-4" />أمر بيع جديد</button>}
+        {canCreate && <button data-testid="order-create-open" onClick={() => setShowForm(true)} className="btn-primary flex shrink-0 items-center gap-2"><Plus className="w-4 h-4" />أمر بيع جديد</button>}
       </div>
 
-      {stats && !stats.isReady && <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">إحصائيات أوامر البيع قيد التهيئة أو إعادة البناء. قائمة أوامر البيع تعمل بصورة طبيعية، لكن بطاقات الملخص لن تُعتمد حتى اكتمال التهيئة.</div>}
+      {stats && !stats.isReady && <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-xs text-amber-800">إحصائيات أوامر البيع قيد التهيئة. قائمة الأوامر تعمل بصورة طبيعية.</div>}
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 gap-2 lg:grid-cols-4" data-testid="orders-compact-stats">
         {[
-          { label: "قيد الانتظار", value: stats?.pending ?? 0, color: "text-amber-600", bg: "bg-amber-50", icon: Clock },
-          { label: "مؤكدة", value: stats?.confirmed ?? 0, color: "text-blue-600", bg: "bg-blue-50", icon: CheckCircle },
-          { label: "جاهزة", value: stats?.ready ?? 0, color: "text-purple-600", bg: "bg-purple-50", icon: Package },
-          { label: "مُسلَّمة", value: stats?.delivered ?? 0, color: "text-emerald-600", bg: "bg-emerald-50", icon: Truck },
+          { label: "قيد الانتظار", value: stats?.pending ?? 0, color: "text-amber-700", bg: "bg-amber-50", icon: Clock },
+          { label: "مؤكدة", value: stats?.confirmed ?? 0, color: "text-blue-700", bg: "bg-blue-50", icon: CheckCircle },
+          { label: "جاهزة", value: stats?.ready ?? 0, color: "text-purple-700", bg: "bg-purple-50", icon: Package },
+          { label: "تم التسليم", value: stats?.delivered ?? 0, color: "text-emerald-700", bg: "bg-emerald-50", icon: Truck },
         ].map((item) => {
           const Icon = item.icon;
-          return <div key={item.label} className="stat-card flex items-center gap-4"><div className={`w-12 h-12 ${item.bg} rounded-xl flex items-center justify-center flex-shrink-0`}><Icon className={`w-5 h-5 ${item.color}`} /></div><div><p className="text-2xl font-black text-slate-800">{item.value}</p><p className="text-xs text-slate-500">{item.label}</p></div></div>;
+          return <div key={item.label} className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2.5"><div className={`grid h-9 w-9 place-items-center rounded-lg ${item.bg}`}><Icon className={`h-4 w-4 ${item.color}`} /></div><div><p className="text-lg font-black leading-none text-slate-900">{item.value}</p><p className="mt-1 text-[11px] text-slate-500">{item.label}</p></div></div>;
         })}
       </div>
 
-      <div className="flex gap-3 flex-wrap">
-        <div className="relative flex-1 min-w-48"><Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" /><input data-testid="order-search" className="form-input pr-9" placeholder="بحث بالاسم أو رقم أمر البيع أو الهاتف..." value={search} onChange={(event) => setSearch(event.target.value)} /></div>
-        <div className="flex gap-2 flex-wrap">
-          {orderFilters.map((filter) => <button key={filter.v} onClick={() => setFilterStatus(filter.v)} className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${filterStatus === filter.v ? "bg-indigo-600 text-white shadow-sm" : "bg-white text-slate-600 border border-slate-200 hover:border-indigo-300"}`}>{filter.l}</button>)}
+      <div className="rounded-2xl border border-slate-200 bg-white p-2 shadow-sm" data-testid="orders-toolbar">
+        <div className="flex flex-col gap-2 lg:flex-row lg:items-center">
+          <div className="relative min-w-0 flex-1"><Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><input data-testid="order-search" className="form-input pr-9" placeholder="ابحث باسم العميل أو رقم أمر البيع أو الهاتف..." value={search} onChange={(event) => setSearch(event.target.value)} /></div>
+          <select data-testid="order-status-filter" className="form-input lg:w-44" value={filterStatus} onChange={(event) => setFilterStatus(event.target.value as OrderStatus | "all")}>
+            {orderFilters.map((filter) => <option key={filter.v} value={filter.v}>{filter.l}</option>)}
+          </select>
+          <select data-testid="order-period-filter" className="form-input lg:w-40" value={filterPeriod} onChange={(event) => setFilterPeriod(event.target.value as OrderPeriod)}>
+            {periodFilters.map((filter) => <option key={filter.v} value={filter.v}>{filter.l}</option>)}
+          </select>
+          <div className="flex h-10 items-center justify-center rounded-lg bg-slate-100 px-3 text-xs font-bold text-slate-600 lg:min-w-28">{filtered.length.toLocaleString("ar-EG")} نتيجة</div>
         </div>
+        {filterPeriod === "custom" && <div className="mt-2 grid gap-2 border-t border-slate-100 pt-2 sm:grid-cols-2 lg:mr-auto lg:w-[420px]" data-testid="order-custom-period"><input aria-label="من تاريخ" className="form-input" type="date" value={customFrom} onChange={(event) => setCustomFrom(event.target.value)} /><input aria-label="إلى تاريخ" className="form-input" type="date" value={customTo} onChange={(event) => setCustomTo(event.target.value)} /></div>}
       </div>
 
-      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-        {isLoadingOrders ? <div className="text-center py-16 text-slate-400">جارٍ تحميل أوامر البيع...</div> : filtered.length === 0 ? <div className="text-center py-16"><div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-4"><ShoppingCart className="w-7 h-7 text-slate-400" /></div><p className="text-slate-500 font-medium">{needle ? "لا توجد نتائج ضمن أوامر البيع المحمّلة" : "لا توجد أوامر بيع"}</p></div> : <div className="overflow-x-auto"><table className="data-table"><thead><tr><th>رقم أمر البيع</th><th>العميل</th><th>الأصناف</th><th>الإجمالي</th><th>المدفوع</th><th>المتبقي</th><th>الحالة</th><th>المتوقع</th><th>إجراءات</th></tr></thead><tbody>{filtered.map((order) => {
+      <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+        {isLoadingOrders ? <div className="py-12 text-center text-sm text-slate-400">جارٍ تحميل أوامر البيع...</div> : filtered.length === 0 ? <div className="py-12 text-center"><div className="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-xl bg-slate-100"><ShoppingCart className="h-5 w-5 text-slate-400" /></div><p className="text-sm font-medium text-slate-500">{needle || filterPeriod !== "all" ? "لا توجد أوامر مطابقة للفلاتر الحالية" : "لا توجد أوامر بيع"}</p></div> : <div className="overflow-x-auto"><table className="data-table min-w-[1050px]"><thead><tr><th>رقم أمر البيع</th><th>العميل</th><th>الأصناف</th><th>الإجمالي</th><th>التحصيل</th><th>الحالة</th><th>المتوقع</th><th className="w-48">الإجراء</th></tr></thead><tbody>{filtered.map((order) => {
           const cfg = statusConfig[order.status as OrderStatus] ?? statusConfig.pending;
           const Icon = cfg.icon;
           const currentIdx = statusFlow.indexOf(order.status as OrderStatus);
@@ -242,29 +284,34 @@ export function OrdersPage({ createRequestToken }: { createRequestToken?: number
           const waLink = order.customerPhone ? buildWhatsAppLink(order.customerPhone, getWhatsAppMessage(order.status, order.orderNumber, order.customerName, storeName, order.remaining)) : null;
           const canModifyBody = canEdit && ["pending", "confirmed"].includes(order.status) && !order.linkedInvoiceId;
           const financialEditable = !order.linkedInvoiceId && !["cancelled", "delivered"].includes(order.status);
-          return <tr key={order._id} data-testid="order-row" data-order-number={order.orderNumber} data-customer-name={order.customerName} data-status={order.status}>
-            <td><span className="font-mono font-bold text-indigo-600 text-xs">{order.orderNumber}</span>{order.linkedInvoiceId && <span className="mr-2 inline-flex items-center gap-1 text-[11px] text-violet-600"><Link2 className="w-3 h-3" />فاتورة</span>}</td>
-            <td><p className="font-medium text-slate-800">{order.customerName}</p>{order.customerPhone && <p className="text-xs text-slate-400">{order.customerPhone}</p>}</td>
-            <td><p className="text-slate-700">{order.items.length} صنف</p><p className="text-xs text-slate-400 truncate max-w-32">{order.items.map((item) => item.productName).join("، ")}</p></td>
-            <td className="font-bold text-slate-800">{money(order.total)}</td>
-            <td className="text-emerald-600 font-medium">{money(order.deposit)}</td>
-            <td><span className={`font-bold ${order.remaining > 0 ? "text-amber-600" : "text-emerald-600"}`}>{money(order.remaining)}</span></td>
-            <td><span className={cfg.badge}><Icon className="w-3 h-3 ml-1" />{cfg.label}</span></td>
-            <td className="text-slate-500 text-xs">{order.expectedDate ?? "—"}</td>
-            <td><div className="flex items-center gap-1.5">
-              <button onClick={() => setDetailsTarget(order._id)} className="p-1.5 bg-slate-50 text-slate-500 rounded-lg hover:bg-indigo-50 hover:text-indigo-600" title="التفاصيل والـTimeline"><Eye className="w-3.5 h-3.5" /></button>
-              {canModifyBody && <button onClick={() => setEditTarget(order)} className="p-1.5 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100" title="تعديل أمر البيع"><Pencil className="w-3.5 h-3.5" /></button>}
-              {canEdit && nextStatus && order.status !== "cancelled" && <button data-testid="order-status-next" data-next-status={nextStatus} disabled={statusBusyId === order._id} onClick={() => handleStatusChange(order._id, nextStatus)} className="px-2.5 py-1.5 bg-indigo-50 text-indigo-600 rounded-lg text-xs font-medium hover:bg-indigo-100 disabled:opacity-50 whitespace-nowrap">{statusConfig[nextStatus].label}</button>}
-              {canEdit && order.status === "ready" && order.linkedInvoiceId && <span className="text-[11px] text-violet-600 px-2 py-1 bg-violet-50 rounded-lg">التسليم من عملية الشحن</span>}
-              {canCollect && financialEditable && order.remaining > 0 && <button onClick={() => { setShowPayment(order._id); setPaymentAmount(""); setPaymentAccountId(""); setPaymentNotes(""); setPaymentRequestId(crypto.randomUUID()); }} className="p-1.5 bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-100" title="تسجيل دفعة"><CreditCard className="w-3.5 h-3.5" /></button>}
-              {canRefund && financialEditable && order.deposit > 0 && <button onClick={() => openRefund(order)} className="p-1.5 bg-amber-50 text-amber-700 rounded-lg" title="استرداد عربون"><CreditCard className="w-3.5 h-3.5" /></button>}
-              {showWA && waLink && <a href={waLink} target="_blank" rel="noopener noreferrer" className="p-1.5 bg-green-50 text-green-600 rounded-lg hover:bg-green-100" title={`إرسال إشعار واتساب — ${cfg.label}`}><MessageCircle className="w-3.5 h-3.5" /></a>}
-              {canPrint && <button onClick={() => setPrintOrder(order)} className="p-1.5 bg-slate-50 text-slate-400 rounded-lg hover:bg-indigo-50 hover:text-indigo-600" title="طباعة"><Printer className="w-3.5 h-3.5" /></button>}
-              {canDelete && !["cancelled", "delivered"].includes(order.status) && <button onClick={() => openCancel(order)} className="p-1.5 bg-red-50 text-red-500 rounded-lg hover:bg-red-100" title="إلغاء أمر البيع"><Trash2 className="w-3.5 h-3.5" /></button>}
-            </div></td>
+          const hasSecondaryActions = canModifyBody || (canCollect && financialEditable && order.remaining > 0) || (canRefund && financialEditable && order.deposit > 0) || Boolean(showWA && waLink) || canPrint || (canDelete && !["cancelled", "delivered"].includes(order.status));
+          return <tr key={order._id} data-testid="order-row" data-order-number={order.orderNumber} data-customer-name={order.customerName} data-status={order.status} role="button" tabIndex={0} className="cursor-pointer transition hover:bg-indigo-50/40 focus:bg-indigo-50/50 focus:outline-none" onClick={() => setDetailsTarget(order._id)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setDetailsTarget(order._id); } }}>
+            <td><span className="font-mono text-xs font-black text-indigo-700">{order.orderNumber}</span>{order.linkedInvoiceId && <span className="mr-2 inline-flex items-center gap-1 text-[10px] text-violet-600"><Link2 className="h-3 w-3" />فاتورة</span>}</td>
+            <td><p className="font-bold text-slate-800">{order.customerName}</p>{order.customerPhone && <p className="mt-0.5 text-xs text-slate-400" dir="ltr">{order.customerPhone}</p>}</td>
+            <td><p className="text-sm text-slate-700">{order.items.length} صنف</p><p className="max-w-40 truncate text-[11px] text-slate-400">{order.items.map((item) => item.productName).join("، ")}</p></td>
+            <td className="font-black text-slate-800">{money(order.total)}</td>
+            <td><p className="text-xs text-emerald-700">مدفوع {money(order.deposit)}</p><p className={`mt-1 text-xs font-black ${order.remaining > 0 ? "text-amber-700" : "text-emerald-700"}`}>متبقي {money(order.remaining)}</p></td>
+            <td><span className={cfg.badge}><Icon className="ml-1 h-3 w-3" />{cfg.label}</span>{order.status === "ready" && order.linkedInvoiceId && <p className="mt-1 text-[10px] text-violet-600">التسليم من الشحن</p>}</td>
+            <td className="text-xs text-slate-500">{order.expectedDate ?? "—"}</td>
+            <td onClick={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>
+              <div className="flex items-center gap-1.5">
+                {canEdit && nextStatus && order.status !== "cancelled" && <button data-testid="order-status-next" data-next-status={nextStatus} disabled={statusBusyId === order._id} onClick={() => handleStatusChange(order._id, nextStatus)} className="min-w-20 rounded-lg bg-indigo-600 px-2.5 py-1.5 text-xs font-bold text-white hover:bg-indigo-700 disabled:opacity-50">{statusConfig[nextStatus].label}</button>}
+                {hasSecondaryActions && openActionsId !== order._id && <button data-testid="order-actions-menu" type="button" onClick={(event) => { event.stopPropagation(); setOpenActionsId(order._id); }} className="grid h-8 w-9 place-items-center rounded-lg border border-slate-200 bg-white text-slate-500 hover:bg-slate-50" title="مزيد من الإجراءات"><MoreHorizontal className="h-4 w-4" /></button>}
+                {openActionsId === order._id && <div data-testid="order-actions-expanded" className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white p-1 shadow-sm">
+                  <button type="button" onClick={() => { setDetailsTarget(order._id); setOpenActionsId(null); }} className="grid h-7 w-7 place-items-center rounded-md text-slate-500 hover:bg-slate-100" title="التفاصيل"><Eye className="h-3.5 w-3.5" /></button>
+                  {canModifyBody && <button type="button" onClick={() => { setEditTarget(order); setOpenActionsId(null); }} className="grid h-7 w-7 place-items-center rounded-md text-blue-600 hover:bg-blue-50" title="تعديل"><Pencil className="h-3.5 w-3.5" /></button>}
+                  {canCollect && financialEditable && order.remaining > 0 && <button type="button" onClick={() => { setShowPayment(order._id); setPaymentAmount(""); setPaymentAccountId(""); setPaymentNotes(""); setPaymentRequestId(crypto.randomUUID()); setOpenActionsId(null); }} className="grid h-7 w-7 place-items-center rounded-md text-emerald-700 hover:bg-emerald-50" title="تسجيل دفعة"><CreditCard className="h-3.5 w-3.5" /></button>}
+                  {canRefund && financialEditable && order.deposit > 0 && <button type="button" onClick={() => { openRefund(order); setOpenActionsId(null); }} className="grid h-7 w-7 place-items-center rounded-md text-amber-700 hover:bg-amber-50" title="استرداد عربون"><CreditCard className="h-3.5 w-3.5" /></button>}
+                  {showWA && waLink && <a href={waLink} target="_blank" rel="noopener noreferrer" onClick={() => setOpenActionsId(null)} className="grid h-7 w-7 place-items-center rounded-md text-green-600 hover:bg-green-50" title={`إرسال إشعار واتساب — ${cfg.label}`}><MessageCircle className="h-3.5 w-3.5" /></a>}
+                  {canPrint && <button type="button" onClick={() => { setPrintOrder(order); setOpenActionsId(null); }} className="grid h-7 w-7 place-items-center rounded-md text-slate-600 hover:bg-slate-100" title="طباعة"><Printer className="h-3.5 w-3.5" /></button>}
+                  {canDelete && !["cancelled", "delivered"].includes(order.status) && <button type="button" onClick={() => { openCancel(order); setOpenActionsId(null); }} className="grid h-7 w-7 place-items-center rounded-md text-red-600 hover:bg-red-50" title="إلغاء أمر البيع"><Trash2 className="h-3.5 w-3.5" /></button>}
+                  <button type="button" onClick={() => setOpenActionsId(null)} className="grid h-7 w-7 place-items-center rounded-md text-slate-400 hover:bg-slate-100" title="إغلاق"><X className="h-3.5 w-3.5" /></button>
+                </div>}
+              </div>
+            </td>
           </tr>;
         })}</tbody></table></div>}
-        {!isLoadingOrders && orders.length > 0 && <div className="border-t border-slate-100 px-4 py-3 flex items-center justify-between gap-3 flex-wrap"><p className="text-xs text-slate-500">تم تحميل {orders.length.toLocaleString("ar-EG")} أمر بيع{needle && paginationStatus !== "Exhausted" ? " — البحث الحالي داخل النتائج المحمّلة فقط" : ""}</p><div className="flex items-center gap-2">{paginationStatus === "CanLoadMore" && <button type="button" className="btn-secondary" onClick={() => loadMore(25)}>تحميل المزيد</button>}{paginationStatus === "LoadingMore" && <span className="text-sm text-slate-400">جارٍ تحميل المزيد...</span>}{paginationStatus === "Exhausted" && <span className="text-xs text-slate-400">تم تحميل كل النتائج</span>}</div></div>}
+        {!isLoadingOrders && orders.length > 0 && <div className="flex items-center justify-between gap-3 border-t border-slate-100 px-3 py-2"><p className="text-[11px] text-slate-500">تم تحميل {orders.length.toLocaleString("ar-EG")} أمر بيع{(needle || filterPeriod !== "all") && paginationStatus !== "Exhausted" ? " — الفلاتر الحالية داخل النتائج المحمّلة" : ""}</p><div className="flex items-center gap-2">{paginationStatus === "CanLoadMore" && <button type="button" className="erp-action" onClick={() => loadMore(25)}>تحميل المزيد</button>}{paginationStatus === "LoadingMore" && <span className="text-xs text-slate-400">جارٍ التحميل...</span>}{paginationStatus === "Exhausted" && <span className="text-[11px] text-slate-400">كل النتائج محملة</span>}</div></div>}
       </div>
 
       {showPayment && <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"><div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6"><div className="flex items-center justify-between mb-5"><h2 className="font-bold text-slate-800 flex items-center gap-2"><CreditCard className="w-5 h-5 text-emerald-600" />تسجيل دفعة</h2><button disabled={busy} onClick={() => setShowPayment(null)} className="p-1.5 hover:bg-slate-100 rounded-lg"><X className="w-4 h-4" /></button></div><div className="space-y-4"><div><label className="form-label">المبلغ المدفوع (ج.م)</label><input className="form-input text-center text-xl font-bold" type="number" min="0.01" step="0.01" value={paymentAmount} onChange={(event) => setPaymentAmount(event.target.value)} autoFocus /></div><select className="form-input" value={paymentAccountId} onChange={(event) => setPaymentAccountId(event.target.value)}><option value="">اختر حساب التحصيل</option>{collectionAccounts.map((account) => <option key={account._id} value={account._id}>{account.name}</option>)}</select><input className="form-input" type="date" value={paymentDate} onChange={(event) => setPaymentDate(event.target.value)} /><textarea className="form-input" placeholder="ملاحظات" value={paymentNotes} onChange={(event) => setPaymentNotes(event.target.value)} /><div className="flex gap-3"><button disabled={busy} onClick={() => setShowPayment(null)} className="btn-secondary flex-1">إلغاء</button><button disabled={busy} onClick={() => handlePayment(showPayment)} className="btn-success flex-1">{busy ? "جارٍ التسجيل..." : "تسجيل"}</button></div></div></div></div>}
