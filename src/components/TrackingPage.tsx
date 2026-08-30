@@ -1,435 +1,265 @@
-import { useState, useEffect } from "react";
-import { useQuery } from "convex/react";
+import { useMemo, useState } from "react";
+import { useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import {
-  Search, Wrench, CheckCircle, AlertCircle,
-  Package, MessageCircle, ArrowRight
+  AlertCircle,
+  Ban,
+  Check,
+  CheckCircle2,
+  Circle,
+  Clock3,
+  PackageCheck,
+  RefreshCw,
+  ShieldCheck,
 } from "lucide-react";
-import { normalizeEgyptPhoneForWhatsApp } from "../lib/utils";
+import { isValidCustomerTrackingToken } from "../../shared/customerTrackingPortalRules";
 
-const statusSteps = [
-  { key: "received",    label: "تم الاستلام",     icon: Package,      desc: "تم استلام جهازك وتسجيله في النظام" },
-  { key: "in_progress", label: "قيد الإصلاح",     icon: Wrench,       desc: "فريقنا التقني يعمل على إصلاح جهازك الآن" },
-  { key: "ready",       label: "جاهز للاستلام",   icon: CheckCircle,  desc: "تم إصلاح جهازك وهو جاهز للاستلام" },
-  { key: "delivered",   label: "تم التسليم",       icon: CheckCircle,  desc: "تم تسليم الجهاز بنجاح" },
-];
-
-const statusOrder: Record<string, number> = {
-  received: 0,
-  in_progress: 1,
-  ready: 2,
-  delivered: 3,
-  cancelled: -1,
+type PortalStep = {
+  key: string;
+  label: string;
+  state: "completed" | "current" | "upcoming" | "stopped";
 };
 
+type VerifiedTracking = {
+  sourceNumber: string;
+  sourceType: "order" | "repair" | "delivery";
+  sourceTypeLabel: string;
+  status: string;
+  currentStatus: string;
+  lastUpdatedAt: number;
+  steps: PortalStep[];
+};
+
+function readTrackingToken(): string {
+  const hash = window.location.hash;
+  const match = hash.match(/^#track=([a-f0-9]{64})$/i);
+  return match?.[1]?.toLowerCase() ?? "";
+}
+
+function formatPortalDate(timestamp: number): string {
+  if (!Number.isFinite(timestamp)) return "—";
+  return new Intl.DateTimeFormat("ar-EG-u-nu-latn", {
+    dateStyle: "medium",
+    timeStyle: "short",
+    timeZone: "Africa/Cairo",
+  }).format(new Date(timestamp));
+}
+
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) {
+    const match = error.message.match(/Uncaught ConvexError:\s*(.*?)(?:\n|$)/);
+    if (match?.[1]) return match[1].trim();
+    return error.message.replace(/^Error:\s*/, "").trim();
+  }
+  return "تعذر التحقق من بيانات المتابعة";
+}
+
+function StepIcon({ state }: { state: PortalStep["state"] }) {
+  if (state === "completed") return <Check className="h-4 w-4" />;
+  if (state === "current") return <Clock3 className="h-4 w-4" />;
+  if (state === "stopped") return <Ban className="h-4 w-4" />;
+  return <Circle className="h-3.5 w-3.5" />;
+}
+
 export function TrackingPage() {
-  const [token, setToken] = useState("");
-  const [searchToken, setSearchToken] = useState("");
-  const settings = useQuery(api.settings.getPublic);
+  const token = useMemo(readTrackingToken, []);
+  const verify = useMutation(api.customerTrackingPortal.verify);
+  const [phoneLast4, setPhoneLast4] = useState("");
+  const [result, setResult] = useState<VerifiedTracking | null>(null);
+  const [error, setError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
-  // Read token from URL hash
-  useEffect(() => {
-    const readHash = () => {
-      const hash = window.location.hash;
-      const match = hash.match(/#track=([A-Z0-9]+)/i);
-      if (match) {
-        const t = match[1].toUpperCase();
-        setSearchToken(t);
-        setToken(t);
-      }
-    };
-    readHash();
-    window.addEventListener("hashchange", readHash);
-    return () => window.removeEventListener("hashchange", readHash);
-  }, []);
+  const validToken = isValidCustomerTrackingToken(token);
 
-  const repair = useQuery(
-    api.repairs.getByTracking,
-    searchToken ? { token: searchToken } : "skip"
-  );
-
-  const storeName = settings?.storeName ?? "DAGHASH ERP";
-  const whatsapp = settings?.whatsappNumber
-    ? normalizeEgyptPhoneForWhatsApp(settings.whatsappNumber)
-    : undefined;
-  const primary = settings?.primaryColor ?? "#6366f1";
-  const secondary = settings?.secondaryColor ?? "#8b5cf6";
-  const gradBg = `linear-gradient(135deg, ${primary}, ${secondary})`;
-
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!token.trim()) return;
-    const upper = token.trim().toUpperCase();
-    setSearchToken(upper);
-    window.location.hash = "#track=" + upper;
+  const submitVerification = async (event?: React.FormEvent) => {
+    event?.preventDefault();
+    if (!validToken || submitting) return;
+    setError("");
+    setSubmitting(true);
+    try {
+      const verified = await verify({ token, phoneLast4 });
+      setResult(verified as VerifiedTracking);
+    } catch (verificationError) {
+      setResult(null);
+      setError(getErrorMessage(verificationError));
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  const currentStep = repair ? (statusOrder[repair.status] ?? 0) : -1;
-  const isCancelled = repair?.status === "cancelled";
-  const isReady = repair?.status === "ready";
-
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
-      {/* Decorative blobs */}
-      <div
-        className="fixed top-0 right-0 w-96 h-96 rounded-full blur-3xl opacity-20 pointer-events-none"
-        style={{ background: primary }}
-      />
-      <div
-        className="fixed bottom-0 left-0 w-80 h-80 rounded-full blur-3xl opacity-15 pointer-events-none"
-        style={{ background: secondary }}
-      />
-
-      {/* Header */}
-      <header className="relative z-10 border-b border-white/10 bg-white/5 backdrop-blur-sm">
-        <div className="max-w-2xl mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div
-              className="w-9 h-9 rounded-xl flex items-center justify-center shadow-lg flex-shrink-0"
-              style={{ background: gradBg }}
-            >
-              <Wrench className="w-4 h-4 text-white" />
-            </div>
-            <div>
-              <p className="text-white font-bold text-sm leading-tight">{storeName}</p>
-              <p className="text-slate-400 text-xs">متابعة طلب الصيانة</p>
-            </div>
+    <div dir="rtl" className="min-h-screen bg-slate-950 text-slate-100">
+      <div className="pointer-events-none fixed inset-x-0 top-0 h-80 bg-gradient-to-b from-indigo-500/10 to-transparent" />
+      <main className="relative mx-auto flex min-h-screen w-full max-w-3xl flex-col px-4 py-8 sm:px-6 sm:py-12">
+        <header className="mb-8 flex items-center gap-3">
+          <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-indigo-400/20 bg-indigo-500/15">
+            <ShieldCheck className="h-5 w-5 text-indigo-300" />
           </div>
-          {whatsapp && (
-            <a
-              href={"https://wa.me/" + whatsapp}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-2 px-3 py-1.5 bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 rounded-xl text-xs font-medium hover:bg-emerald-500/30 transition-colors"
-            >
-              <MessageCircle className="w-3.5 h-3.5" />
-              تواصل معنا
-            </a>
-          )}
-        </div>
-      </header>
-
-      <main className="relative z-10 max-w-2xl mx-auto px-4 py-10">
-        {/* Hero */}
-        <div className="text-center mb-10 animate-fade-in-up">
-          <div
-            className="inline-flex items-center justify-center w-16 h-16 rounded-2xl mb-4 shadow-2xl"
-            style={{ background: gradBg }}
-          >
-            <Search className="w-7 h-7 text-white" />
+          <div>
+            <p className="text-base font-extrabold text-white">بوابة متابعة العميل</p>
+            <p className="text-xs text-slate-400">عرض آمن ومختصر لحالة العملية</p>
           </div>
-          <h1 className="text-3xl font-black text-white mb-2">تتبع طلب الصيانة</h1>
-          <p className="text-slate-400 text-sm">أدخل رمز التتبع الخاص بك لمعرفة حالة جهازك</p>
-        </div>
+        </header>
 
-        {/* Search Form */}
-        <form onSubmit={handleSearch} className="mb-8 animate-fade-in-up">
-          <div className="flex gap-3">
-            <input
-              className="flex-1 px-5 py-4 bg-white/10 border border-white/20 rounded-2xl text-white placeholder-slate-500 focus:outline-none focus:border-white/40 focus:ring-2 focus:ring-white/10 transition-all text-center font-mono text-lg tracking-widest uppercase"
-              placeholder="أدخل رمز التتبع"
-              value={token}
-              onChange={e => setToken(e.target.value.toUpperCase())}
-              maxLength={64}
-              autoComplete="off"
-              spellCheck={false}
-              dir="ltr"
-            />
-            <button
-              type="submit"
-              className="px-6 py-4 rounded-2xl text-white font-bold transition-all active:scale-95 shadow-lg flex items-center gap-2 flex-shrink-0"
-              style={{ background: gradBg }}
-            >
-              <Search className="w-5 h-5" />
-              <span className="hidden sm:inline">بحث</span>
-            </button>
-          </div>
-        </form>
-
-        {/* Loading */}
-        {searchToken && repair === undefined && (
-          <div className="text-center py-16 animate-fade-in-up">
-            <div
-              className="w-10 h-10 border-2 border-t-transparent rounded-full animate-spin mx-auto mb-3"
-              style={{ borderColor: primary, borderTopColor: "transparent" }}
-            />
-            <p className="text-slate-400 text-sm">جاري البحث...</p>
-          </div>
-        )}
-
-        {/* Not Found */}
-        {searchToken && repair === null && (
-          <div className="bg-white/5 border border-white/10 rounded-3xl p-8 text-center animate-fade-in-up">
-            <div className="w-16 h-16 bg-red-500/20 rounded-2xl flex items-center justify-center mx-auto mb-4">
-              <AlertCircle className="w-8 h-8 text-red-400" />
-            </div>
-            <h2 className="text-white font-bold text-lg mb-2">لم يتم العثور على الطلب</h2>
-            <p className="text-slate-400 text-sm mb-6">
-              الرمز{" "}
-              <span className="font-mono text-white font-bold bg-white/10 px-2 py-0.5 rounded-lg">
-                {searchToken}
-              </span>{" "}
-              غير موجود في النظام.
-              <br />تأكد من الرمز وحاول مجدداً.
+        {!validToken ? (
+          <section className="rounded-3xl border border-rose-400/20 bg-rose-500/10 p-6 text-center sm:p-10">
+            <AlertCircle className="mx-auto mb-4 h-10 w-10 text-rose-300" />
+            <h1 className="mb-2 text-xl font-black text-white">رابط المتابعة غير صالح</h1>
+            <p className="text-sm leading-7 text-slate-300">
+              استخدم رابط المتابعة الذي تم إرساله لك من المنشأة. لا يمكن البحث عن العمليات من هذه الصفحة.
             </p>
-            {whatsapp && (
-              <a
-                href={"https://wa.me/" + whatsapp + "?text=" + encodeURIComponent("مرحباً، أريد الاستفسار عن طلب الصيانة")}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 px-5 py-2.5 bg-emerald-500 text-white rounded-xl font-medium hover:bg-emerald-600 transition-colors text-sm"
-              >
-                <MessageCircle className="w-4 h-4" />
-                تواصل مع المنشأة
-              </a>
-            )}
-          </div>
-        )}
-
-        {/* Repair Found */}
-        {repair && (
-          <div className="space-y-5 animate-fade-in-up">
-
-            {/* Main Card */}
-            <div className="bg-white/8 backdrop-blur-sm border border-white/15 rounded-3xl overflow-hidden">
-
-              {/* Card Header */}
-              <div
-                className="px-6 py-5"
-                style={{ background: `linear-gradient(135deg, ${primary}30, ${secondary}20)` }}
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="text-slate-400 text-xs mb-1">رقم الطلب</p>
-                    <p className="font-mono font-black text-white text-xl tracking-wider">{repair.repairNumber}</p>
-                    <p className="text-slate-400 text-xs mt-1">{repair.customerName}</p>
-                  </div>
-                  <div className="flex-shrink-0">
-                    {isCancelled ? (
-                      <span className="px-3 py-1.5 rounded-full text-xs font-bold bg-red-500/20 text-red-300 border border-red-500/30">
-                        ملغي
-                      </span>
-                    ) : (
-                      <span
-                        className="px-3 py-1.5 rounded-full text-xs font-bold text-white"
-                        style={{ background: gradBg }}
-                      >
-                        {statusSteps[currentStep]?.label ?? "مستلم"}
-                      </span>
-                    )}
-                  </div>
-                </div>
+          </section>
+        ) : !result ? (
+          <section className="rounded-3xl border border-white/10 bg-white/[0.055] p-5 shadow-2xl shadow-black/20 sm:p-8">
+            <div className="mb-6 text-center">
+              <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-500/15 ring-1 ring-emerald-400/20">
+                <PackageCheck className="h-7 w-7 text-emerald-300" />
               </div>
-
-              {/* Device Info */}
-              <div className="px-6 py-5 border-b border-white/10">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-slate-500 text-xs mb-1">الجهاز</p>
-                    <p className="text-white font-bold">{repair.deviceBrand} {repair.deviceModel}</p>
-                    <p className="text-slate-400 text-xs mt-0.5">{repair.deviceType}</p>
-                  </div>
-                  <div>
-                    <p className="text-slate-500 text-xs mb-1">المشكلة</p>
-                    <p className="text-white text-sm font-medium leading-relaxed">{repair.problem}</p>
-                  </div>
-                  {repair.diagnosis && (
-                    <div className="col-span-2 bg-white/5 rounded-xl p-3">
-                      <p className="text-slate-500 text-xs mb-1">التشخيص</p>
-                      <p className="text-slate-300 text-sm">{repair.diagnosis}</p>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Financial Info */}
-              <div className="px-6 py-4 border-b border-white/10">
-                <div className="grid grid-cols-3 gap-4 text-center">
-                  <div>
-                    <p className="text-slate-500 text-xs mb-1">التكلفة الإجمالية</p>
-                    <p className="text-white font-black text-xl">{repair.totalCost.toLocaleString("ar-EG")}</p>
-                    <p className="text-slate-500 text-xs">ج.م</p>
-                  </div>
-                  <div>
-                    <p className="text-slate-500 text-xs mb-1">المدفوع</p>
-                    <p className="text-emerald-400 font-black text-xl">{repair.deposit.toLocaleString("ar-EG")}</p>
-                    <p className="text-slate-500 text-xs">ج.م</p>
-                  </div>
-                  <div>
-                    <p className="text-slate-500 text-xs mb-1">المتبقي</p>
-                    <p className={`font-black text-xl ${repair.remaining > 0 ? "text-amber-400" : "text-emerald-400"}`}>
-                      {repair.remaining.toLocaleString("ar-EG")}
-                    </p>
-                    <p className="text-slate-500 text-xs">ج.م</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Dates & Technician */}
-              <div className="px-6 py-4">
-                <div className="flex items-center justify-between flex-wrap gap-4 text-sm">
-                  <div>
-                    <p className="text-slate-500 text-xs">تاريخ الاستلام</p>
-                    <p className="text-slate-300 font-medium mt-0.5">{repair.receivedDate}</p>
-                  </div>
-                  {repair.expectedDate && (
-                    <div className="text-center">
-                      <p className="text-slate-500 text-xs">التسليم المتوقع</p>
-                      <p className="text-slate-300 font-medium mt-0.5">{repair.expectedDate}</p>
-                    </div>
-                  )}
-                </div>
-              </div>
+              <h1 className="text-2xl font-black text-white">تحقق من رقم الهاتف</h1>
+              <p className="mt-2 text-sm leading-7 text-slate-400">
+                لأمان بيانات العملية، أدخل آخر 4 أرقام من رقم الهاتف المسجل عليها.
+              </p>
             </div>
 
-            {/* Progress Steps */}
-            {!isCancelled && (
-              <div className="bg-white/8 backdrop-blur-sm border border-white/15 rounded-3xl p-6">
-                <h2 className="text-white font-bold mb-6 text-sm flex items-center gap-2">
-                  <div className="w-1 h-4 rounded-full" style={{ background: gradBg }} />
-                  مراحل الصيانة
-                </h2>
-                <div>
-                  {statusSteps.map((step, i) => {
-                    const Icon = step.icon;
-                    const isDone = i <= currentStep;
-                    const isCurrent = i === currentStep;
-                    const isLast = i === statusSteps.length - 1;
+            <form onSubmit={submitVerification} className="mx-auto max-w-sm space-y-4">
+              <div>
+                <label htmlFor="tracking-phone-last4" className="mb-2 block text-sm font-bold text-slate-200">
+                  آخر 4 أرقام من الهاتف
+                </label>
+                <input
+                  id="tracking-phone-last4"
+                  data-testid="tracking-phone-last4"
+                  dir="ltr"
+                  inputMode="numeric"
+                  autoComplete="off"
+                  value={phoneLast4}
+                  onChange={(event) => {
+                    const normalized = event.target.value
+                      .replace(/[٠-٩]/g, (digit) => String("٠١٢٣٤٥٦٧٨٩".indexOf(digit)))
+                      .replace(/\D/g, "")
+                      .slice(0, 4);
+                    setPhoneLast4(normalized);
+                    setError("");
+                  }}
+                  placeholder="0000"
+                  className="w-full rounded-2xl border border-white/15 bg-slate-900/80 px-4 py-4 text-center font-mono text-2xl font-black tracking-[0.35em] text-white outline-none transition focus:border-indigo-400/60 focus:ring-4 focus:ring-indigo-500/10"
+                />
+              </div>
+
+              {error && (
+                <div role="alert" className="flex items-start gap-2 rounded-2xl border border-rose-400/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
+                  <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                  <span>{error}</span>
+                </div>
+              )}
+
+              <button
+                type="submit"
+                data-testid="tracking-verify"
+                disabled={submitting || phoneLast4.length !== 4}
+                className="flex w-full items-center justify-center gap-2 rounded-2xl bg-indigo-600 px-4 py-3.5 text-sm font-extrabold text-white transition hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {submitting ? <RefreshCw className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}
+                {submitting ? "جاري التحقق..." : "عرض حالة العملية"}
+              </button>
+            </form>
+
+            <p className="mt-6 text-center text-xs leading-6 text-slate-500">
+              لا يعرض هذا الرابط أي بيانات مالية أو ملاحظات داخلية أو بيانات موظفين.
+            </p>
+          </section>
+        ) : (
+          <div className="space-y-5" data-testid="tracking-public-result">
+            <section className="overflow-hidden rounded-3xl border border-white/10 bg-white/[0.055] shadow-2xl shadow-black/20">
+              <div className="border-b border-white/10 bg-gradient-to-l from-indigo-500/15 to-emerald-500/10 p-5 sm:p-7">
+                <div className="flex flex-wrap items-start justify-between gap-4">
+                  <div>
+                    <p className="text-xs font-bold text-slate-400">رقم العملية</p>
+                    <h1 className="mt-1 font-mono text-2xl font-black tracking-wide text-white">{result.sourceNumber}</h1>
+                  </div>
+                  <span className="rounded-full border border-emerald-400/20 bg-emerald-500/15 px-3 py-1.5 text-xs font-extrabold text-emerald-200">
+                    {result.status}
+                  </span>
+                </div>
+              </div>
+
+              <div className="grid gap-px bg-white/10 sm:grid-cols-2">
+                {[
+                  ["نوع العملية", result.sourceTypeLabel],
+                  ["الحالة", result.status],
+                  ["آخر تحديث", formatPortalDate(result.lastUpdatedAt)],
+                  ["الحالة الحالية", result.currentStatus],
+                ].map(([label, value]) => (
+                  <div key={label} className="bg-slate-950/75 p-5">
+                    <p className="text-xs font-bold text-slate-500">{label}</p>
+                    <p className="mt-1.5 text-sm font-extrabold text-slate-100">{value}</p>
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            {result.steps.length > 0 && (
+              <section className="rounded-3xl border border-white/10 bg-white/[0.055] p-5 sm:p-7">
+                <div className="mb-6 flex items-center justify-between gap-3">
+                  <div>
+                    <h2 className="font-black text-white">خطوات التنفيذ / التوصيل</h2>
+                    <p className="mt-1 text-xs text-slate-500">يتم تحديث الخطوات حسب حالة العملية المسجلة</p>
+                  </div>
+                  <CheckCircle2 className="h-5 w-5 text-indigo-300" />
+                </div>
+
+                <div className="space-y-1">
+                  {result.steps.map((step, index) => {
+                    const active = step.state === "current";
+                    const done = step.state === "completed";
+                    const stopped = step.state === "stopped";
                     return (
-                      <div key={step.key} className="flex gap-4">
-                        {/* Icon + connector line */}
-                        <div className="flex flex-col items-center flex-shrink-0">
+                      <div key={step.key} className="flex gap-3">
+                        <div className="flex flex-col items-center">
                           <div
-                            className="w-10 h-10 rounded-full flex items-center justify-center transition-all duration-500"
-                            style={isDone
-                              ? { background: gradBg, boxShadow: isCurrent ? `0 0 0 4px ${primary}30` : "none" }
-                              : { background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.15)" }
-                            }
+                            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full border ${
+                              done
+                                ? "border-emerald-400/30 bg-emerald-500/20 text-emerald-200"
+                                : active
+                                  ? "border-indigo-400/40 bg-indigo-500/25 text-indigo-100 ring-4 ring-indigo-500/10"
+                                  : stopped
+                                    ? "border-rose-400/30 bg-rose-500/20 text-rose-200"
+                                    : "border-white/10 bg-white/5 text-slate-600"
+                            }`}
                           >
-                            <Icon className={`w-4 h-4 ${isDone ? "text-white" : "text-slate-600"}`} />
+                            <StepIcon state={step.state} />
                           </div>
-                          {!isLast && (
-                            <div
-                              className="w-0.5 flex-1 my-1.5 rounded-full transition-all duration-500"
-                              style={{
-                                minHeight: "28px",
-                                background: i < currentStep ? primary : "rgba(255,255,255,0.08)"
-                              }}
-                            />
+                          {index < result.steps.length - 1 && (
+                            <div className={`my-1 h-6 w-px ${done ? "bg-emerald-400/35" : "bg-white/10"}`} />
                           )}
                         </div>
-
-                        {/* Text */}
-                        <div className={`flex-1 ${isLast ? "pb-0" : "pb-6"}`}>
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <p className={`font-bold text-sm ${isDone ? "text-white" : "text-slate-500"}`}>
-                              {step.label}
-                            </p>
-                            {isCurrent && (
-                              <span
-                                className="text-xs px-2 py-0.5 rounded-full font-medium"
-                                style={{ background: primary + "25", color: primary }}
-                              >
-                                الحالة الحالية
-                              </span>
-                            )}
-                          </div>
-                          <p className={`text-xs mt-0.5 leading-relaxed ${isDone ? "text-slate-400" : "text-slate-600"}`}>
-                            {step.desc}
+                        <div className="pt-2">
+                          <p className={`text-sm font-bold ${active || done ? "text-slate-100" : stopped ? "text-rose-200" : "text-slate-500"}`}>
+                            {step.label}
                           </p>
                         </div>
                       </div>
                     );
                   })}
                 </div>
-              </div>
+              </section>
             )}
 
-            {/* Cancelled */}
-            {isCancelled && (
-              <div className="bg-red-500/10 border border-red-500/20 rounded-3xl p-6 text-center">
-                <AlertCircle className="w-10 h-10 text-red-400 mx-auto mb-3" />
-                <p className="text-red-300 font-bold mb-1">تم إلغاء الطلب</p>
-                <p className="text-slate-400 text-sm">للاستفسار يرجى التواصل مع المنشأة مباشرة</p>
-              </div>
-            )}
-
-            {/* Ready Banner */}
-            {isReady && (
-              <div
-                className="rounded-3xl p-6 text-center"
-                style={{
-                  background: `linear-gradient(135deg, ${primary}20, ${secondary}15)`,
-                  border: `1px solid ${primary}35`
-                }}
-              >
-                <div
-                  className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-3"
-                  style={{ background: gradBg }}
-                >
-                  <CheckCircle className="w-7 h-7 text-white" />
-                </div>
-                <p className="text-white font-black text-xl mb-1">جهازك جاهز للاستلام!</p>
-                <p className="text-slate-400 text-sm mb-5">
-                  يمكنك زيارة المنشأة لاستلام جهازك
-                  {repair.remaining > 0 && (
-                    <span className="text-amber-400 font-bold">
-                      {" "}والمبلغ المتبقي {repair.remaining.toLocaleString("ar-EG")} ج.م
-                    </span>
-                  )}
-                </p>
-                {whatsapp && (
-                  <a
-                    href={"https://wa.me/" + whatsapp + "?text=" + encodeURIComponent("مرحباً، جهازي جاهز للاستلام - رقم الطلب: " + repair.repairNumber)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 px-6 py-3 bg-emerald-500 text-white rounded-xl font-bold hover:bg-emerald-600 transition-colors shadow-lg shadow-emerald-500/20"
-                  >
-                    <MessageCircle className="w-4 h-4" />
-                    تأكيد موعد الاستلام
-                  </a>
-                )}
-              </div>
-            )}
-
-            {/* WhatsApp Contact */}
-            {whatsapp && !isReady && !isCancelled && (
-              <div className="bg-white/5 border border-white/10 rounded-2xl p-4 flex items-center justify-between gap-4">
-                <div>
-                  <p className="text-white text-sm font-medium">هل لديك استفسار؟</p>
-                  <p className="text-slate-400 text-xs mt-0.5">تواصل معنا مباشرة عبر واتساب</p>
-                </div>
-                <a
-                  href={"https://wa.me/" + whatsapp + "?text=" + encodeURIComponent("مرحباً، أريد الاستفسار عن طلب الصيانة رقم: " + repair.repairNumber)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-2 px-4 py-2.5 bg-emerald-500 text-white rounded-xl text-sm font-bold hover:bg-emerald-600 transition-colors flex-shrink-0 shadow-lg shadow-emerald-500/20"
-                >
-                  <MessageCircle className="w-4 h-4" />
-                  واتساب
-                </a>
-              </div>
-            )}
-
-            {/* Search Again */}
             <button
-              onClick={() => {
-                setToken("");
-                setSearchToken("");
-                window.location.hash = "#track";
-              }}
-              className="w-full flex items-center justify-center gap-2 py-3 text-slate-500 hover:text-slate-300 transition-colors text-sm"
+              type="button"
+              onClick={() => void submitVerification()}
+              disabled={submitting}
+              className="mx-auto flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-xs font-bold text-slate-300 transition hover:bg-white/10 disabled:opacity-50"
             >
-              <ArrowRight className="w-4 h-4" />
-              البحث عن طلب آخر
+              <RefreshCw className={`h-3.5 w-3.5 ${submitting ? "animate-spin" : ""}`} />
+              تحديث الحالة
             </button>
           </div>
         )}
 
-        {/* Footer */}
-        <div className="text-center mt-12 pt-6 border-t border-white/10">
-          <p className="text-slate-600 text-xs">{storeName} • نظام إدارة الأعمال</p>
-        </div>
+        <footer className="mt-auto pt-10 text-center text-[11px] leading-6 text-slate-600">
+          الرابط مخصص لمتابعة حالة العملية فقط ولا يمنح صلاحية الدخول إلى النظام.
+        </footer>
       </main>
     </div>
   );
