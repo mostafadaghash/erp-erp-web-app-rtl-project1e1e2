@@ -64,7 +64,7 @@ function buildLinearSteps(
 
 const ORDER_STEPS = [
   { key: "pending", label: "تم استلام الطلب" },
-  { key: "processing", label: "جاري التجهيز" },
+  { key: "confirmed", label: "جاري التجهيز" },
   { key: "ready", label: "تم التجهيز" },
   { key: "shipped", label: "تم التسليم لشركة الشحن" },
   { key: "delivered", label: "تم تسليم الأوردر" },
@@ -72,7 +72,8 @@ const ORDER_STEPS = [
 
 const REPAIR_STEPS = [
   { key: "received", label: "تم استلام الجهاز" },
-  { key: "under_inspection", label: "الفحص" },
+  { key: "under_inspection", label: "جاري الفحص" },
+  { key: "awaiting_approval", label: "في انتظار الموافقة" },
   { key: "in_progress", label: "جاري الصيانة" },
   { key: "ready", label: "تم الإصلاح" },
   { key: "delivered", label: "تم التسليم" },
@@ -90,7 +91,7 @@ export function publicOrderStatus(rawStatus: string, deliveryStatus?: string): s
   if (rawStatus === "delivered" || deliveryStatus === "delivered") return "تم تسليم الأوردر";
   if (deliveryStatus === "shipped") return "تم التسليم لشركة الشحن";
   if (rawStatus === "ready") return "تم التجهيز";
-  if (rawStatus === "processing") return "جاري التجهيز";
+  if (rawStatus === "confirmed" || rawStatus === "processing") return "جاري التجهيز";
   return "قيد الإنتظار";
 }
 
@@ -129,7 +130,7 @@ export function buildPublicTrackingSteps(
       rawStatus === "delivered" || deliveryStatus === "delivered" ? "delivered" :
       deliveryStatus === "shipped" ? "shipped" :
       rawStatus === "ready" ? "ready" :
-      rawStatus === "processing" ? "processing" : "pending";
+      rawStatus === "confirmed" || rawStatus === "processing" ? "confirmed" : "pending";
     return buildLinearSteps(ORDER_STEPS, ORDER_STEPS.findIndex((step) => step.key === effective));
   }
 
@@ -137,8 +138,7 @@ export function buildPublicTrackingSteps(
     if (rawStatus === "cancelled") {
       return [{ key: "stopped", label: "تم إيقاف العملية", state: "stopped" }];
     }
-    const effective = rawStatus === "awaiting_approval" ? "under_inspection" : rawStatus;
-    const index = REPAIR_STEPS.findIndex((step) => step.key === effective);
+    const index = REPAIR_STEPS.findIndex((step) => step.key === rawStatus);
     return buildLinearSteps(REPAIR_STEPS, Math.max(0, index));
   }
 
