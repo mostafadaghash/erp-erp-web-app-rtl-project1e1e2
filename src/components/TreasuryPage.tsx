@@ -234,7 +234,7 @@ export function TreasuryPage() {
       {dialog && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4 backdrop-blur-sm">
           <div className="w-[min(96vw,560px)] space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl">
-            <div className="flex items-start justify-between border-b border-slate-100 pb-4"><div><h2 className="text-xl font-black">{dialog === "opening" ? "تسجيل الرصيد الافتتاحي" : dialog === "transfer" ? "تحويل بين الحسابات" : dialog === "settlement" ? "تسوية حساب وسيط" : dialog === "initialize" ? "اعتماد التشغيل المالي" : "إلغاء حركة مالية"}</h2>{dialog === "reverse" && <p className="mt-1 text-sm text-slate-500">سيتم إنشاء حركة عكسية موثقة بدل حذف الحركة الأصلية.</p>}</div><button className="rounded-xl p-2 hover:bg-slate-100" onClick={() => setDialog(null)} aria-label="إغلاق"><X className="h-5 w-5" /></button></div>
+            <div className="flex items-start justify-between border-b border-slate-100 pb-4"><div><h2 className="text-xl font-black">{dialog === "opening" ? "تسجيل الرصيد الافتتاحي" : dialog === "transfer" ? "تحويل بين الحسابات" : dialog === "settlement" ? "تسوية حساب وسيط" : dialog === "initialize" ? "اعتماد التشغيل المالي" : "إلغاء حركة مالية"}</h2>{dialog === "reverse" && <p className="mt-1 text-sm text-slate-500">سيتم إلغاء أثر الحركة مع الاحتفاظ بالحركة الأصلية في السجل.</p>}</div><button className="rounded-xl p-2 hover:bg-slate-100" onClick={() => setDialog(null)} aria-label="إغلاق"><X className="h-5 w-5" /></button></div>
 
             {dialog === "initialize" && <div data-testid="finance-confirmation-dialog" className="space-y-3"><p className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm leading-7 text-amber-900">هذا الاعتماد نهائي. بعد تفعيل التشغيل المالي لن تتمكن من تعديل تاريخ بدء التسجيل أو الأرصدة الافتتاحية من شاشة الإعداد.</p><div className="rounded-xl bg-slate-50 p-3 text-sm text-slate-700"><span className="text-slate-500">تاريخ بدء التسجيل المالي:</span> <strong>{cutoverDate}</strong></div></div>}
             {dialog === "opening" && <div><label className="form-label">الرصيد الافتتاحي</label><input className="form-input" type="number" min="0" step="0.01" value={openingAmount} onChange={event => setOpeningAmount(event.target.value)} /></div>}
@@ -260,7 +260,7 @@ export function TreasuryPage() {
               }
               if (dialog === "reverse" && reverseTransactionId) {
                 if (!reverseReason.trim()) return toast.error("اكتب سبب إلغاء الحركة");
-                void run(() => reverseTransaction({ transactionId: reverseTransactionId, reason: reverseReason.trim(), date: today, requestId: crypto.randomUUID() }), "تم إلغاء الحركة وتسجيل الحركة العكسية");
+                void run(() => reverseTransaction({ transactionId: reverseTransactionId, reason: reverseReason.trim(), date: today, requestId: crypto.randomUUID() }), "تم إلغاء الحركة بنجاح");
               }
             }}>{busy ? "جارٍ الحفظ…" : dialog === "initialize" ? "اعتماد نهائي" : "حفظ"}</button></div>
           </div>

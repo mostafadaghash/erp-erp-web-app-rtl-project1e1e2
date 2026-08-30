@@ -72,11 +72,11 @@ export function ExpensesPage({ createRequestToken }: { createRequestToken?: numb
     setIsVoiding(true);
     try {
       await voidExpense({ id: voidTarget._id, reason: voidReason.trim(), date: new Date().toISOString().slice(0, 10), requestId: crypto.randomUUID() });
-      toast.success("تم إبطال المصروف بنجاح");
+      toast.success("تم إلغاء المصروف بنجاح");
       setVoidTarget(null);
       setVoidReason("");
     } catch (error) {
-      toast.error(getErrorMessage(error, "تعذر إبطال المصروف"));
+      toast.error(getErrorMessage(error, "تعذر إلغاء المصروف"));
     } finally {
       setIsVoiding(false);
     }
@@ -177,8 +177,8 @@ export function ExpensesPage({ createRequestToken }: { createRequestToken?: numb
                   </td>
                   <td className="text-slate-500 text-xs">{e.notes ?? "-"}</td>
                   <td>
-                    {e.status === "voided" ? <span className="badge badge-danger">مبطل</span> : (
-                      <div className="flex items-center gap-2"><span className="badge badge-success">نشط</span>{canVoid && <button data-testid="expense-void-open" className="rounded-lg bg-red-50 px-2 py-1 text-xs font-bold text-red-700" onClick={() => { setVoidTarget(e); setVoidReason(""); }}>إبطال المصروف</button>}</div>
+                    {e.status === "voided" ? <span className="badge badge-danger">ملغي</span> : (
+                      <div className="flex items-center gap-2"><span className="badge badge-success">نشط</span>{canVoid && <button data-testid="expense-void-open" className="rounded-lg bg-red-50 px-2 py-1 text-xs font-bold text-red-700" onClick={() => { setVoidTarget(e); setVoidReason(""); }}>إلغاء المصروف</button>}</div>
                     )}
                   </td>
                 </tr>
@@ -197,7 +197,7 @@ export function ExpensesPage({ createRequestToken }: { createRequestToken?: numb
       </div>
 
       {voidTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" dir="rtl"><div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl"><h2 className="text-lg font-black">إبطال المصروف</h2><p className="my-3 rounded-lg bg-amber-50 p-3 text-sm text-amber-800">سيظل السجل محفوظًا تاريخيًا، لكنه لن يدخل ضمن إجماليات المصروفات.</p><form data-testid="expense-void-form" onSubmit={handleVoid} className="space-y-4"><div><label className="form-label">سبب الإبطال *</label><textarea data-testid="expense-void-reason" className="form-input" required rows={3} value={voidReason} onChange={e => setVoidReason(e.target.value)} /></div><div className="flex gap-3"><button data-testid="expense-void-submit" className="btn-primary flex-1" disabled={isVoiding || !voidReason.trim()}>{isVoiding ? "جارٍ الإبطال..." : "تأكيد الإبطال"}</button><button type="button" className="btn-secondary" disabled={isVoiding} onClick={() => setVoidTarget(null)}>تراجع</button></div></form></div></div>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" dir="rtl"><div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl"><h2 className="text-lg font-black">إلغاء المصروف</h2><p className="my-3 rounded-lg bg-amber-50 p-3 text-sm text-amber-800">سيظل السجل محفوظًا تاريخيًا، لكنه لن يدخل ضمن إجماليات المصروفات.</p><form data-testid="expense-void-form" onSubmit={handleVoid} className="space-y-4"><div><label className="form-label">سبب الإلغاء *</label><textarea data-testid="expense-void-reason" className="form-input" required rows={3} value={voidReason} onChange={e => setVoidReason(e.target.value)} /></div><div className="flex gap-3"><button data-testid="expense-void-submit" className="btn-primary flex-1" disabled={isVoiding || !voidReason.trim()}>{isVoiding ? "جارٍ الإلغاء..." : "تأكيد الإلغاء"}</button><button type="button" className="btn-secondary" disabled={isVoiding} onClick={() => setVoidTarget(null)}>تراجع</button></div></form></div></div>
       )}
 
       {/* Add Expense Modal */}

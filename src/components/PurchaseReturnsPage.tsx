@@ -171,7 +171,7 @@ export function PurchaseReturnsPage() {
         reason: reversalReason.trim(),
         requestId: reversalRequestId.current,
       });
-      toast.success("تم عكس المرتجع");
+      toast.success("تم إلغاء المرتجع");
       setReverseRow(null);
       reversalRequestId.current = newRequestId();
     } catch (caught) {
@@ -200,14 +200,14 @@ export function PurchaseReturnsPage() {
       `<tr><td>${esc(item.productName)}</td><td>${item.quantityReturned}</td><td>${item.historicalUnitCost.toFixed(2)}</td><td>${item.goodsCreditAmount.toFixed(2)}</td></tr>`,
     ).join("");
     const reversed = printDto.status === "reversed"
-      ? `<p><b>العكس:</b> ${esc(printDto.reversalDate)} — ${esc(printDto.reversalReason)}</p>`
+      ? `<p><b>سبب الإلغاء:</b> ${esc(printDto.reversalDate)} — ${esc(printDto.reversalReason)}</p>`
       : "";
     const popup = window.open("", "_blank");
     if (!popup) {
       toast.error("تعذر فتح نافذة الطباعة");
       return;
     }
-    popup.document.body.innerHTML = `<!doctype html><html dir="rtl" lang="ar"><head><title>${esc(printDto.returnNumber)}</title><style>body{font-family:Tahoma;padding:32px}h1{text-align:center}table{width:100%;border-collapse:collapse}td,th{border:1px solid;padding:8px}.sign{display:flex;justify-content:space-between;margin-top:70px}</style></head><body><h1>إشعار خصم مورد</h1><p>رقم PRN: ${esc(printDto.returnNumber)} | إشعار المورد: ${esc(printDto.externalCreditNoteNumber)}</p><p>المورد: ${esc(printDto.supplierName)} | الفرع: ${esc(printDto.branchName)} | التاريخ: ${esc(printDto.date)} | الحالة: ${printDto.status === "posted" ? "مرحل" : "معكوس"}</p><p>مستند الشراء: ${esc(printDto.receiptNumber)} | فاتورة المورد: ${esc(printDto.externalInvoiceNumber)}</p><table><thead><tr><th>البند</th><th>الكمية</th><th>التكلفة</th><th>الخصم</th></tr></thead><tbody>${items}</tbody></table><p>خصم الشحن: ${printDto.freightCredit.toFixed(2)} | إجمالي الخصم: ${printDto.totalCredit.toFixed(2)} | خفض المديونية: ${printDto.debtReduction.toFixed(2)} | الرد النقدي: ${printDto.cashRefund.toFixed(2)}</p><p>حساب الرد: ${esc(printDto.refundAccountName)}</p>${reversed}<div class="sign"><span>المُعد: ${esc(printDto.createdBy)}</span><span>المراجع: ............</span><span>المستلم: ............</span></div></body></html>`;
+    popup.document.body.innerHTML = `<!doctype html><html dir="rtl" lang="ar"><head><title>${esc(printDto.returnNumber)}</title><style>body{font-family:Tahoma;padding:32px}h1{text-align:center}table{width:100%;border-collapse:collapse}td,th{border:1px solid;padding:8px}.sign{display:flex;justify-content:space-between;margin-top:70px}</style></head><body><h1>إشعار خصم مورد</h1><p>رقم PRN: ${esc(printDto.returnNumber)} | إشعار المورد: ${esc(printDto.externalCreditNoteNumber)}</p><p>المورد: ${esc(printDto.supplierName)} | الفرع: ${esc(printDto.branchName)} | التاريخ: ${esc(printDto.date)} | الحالة: ${printDto.status === "posted" ? "مرحل" : "ملغي"}</p><p>مستند الشراء: ${esc(printDto.receiptNumber)} | فاتورة المورد: ${esc(printDto.externalInvoiceNumber)}</p><table><thead><tr><th>البند</th><th>الكمية</th><th>التكلفة</th><th>الخصم</th></tr></thead><tbody>${items}</tbody></table><p>خصم الشحن: ${printDto.freightCredit.toFixed(2)} | إجمالي الخصم: ${printDto.totalCredit.toFixed(2)} | خفض المديونية: ${printDto.debtReduction.toFixed(2)} | الرد النقدي: ${printDto.cashRefund.toFixed(2)}</p><p>حساب الرد: ${esc(printDto.refundAccountName)}</p>${reversed}<div class="sign"><span>المُعد: ${esc(printDto.createdBy)}</span><span>المراجع: ............</span><span>المستلم: ............</span></div></body></html>`;
     popup.document.close();
     popup.print();
     setPrintId(null);
@@ -268,12 +268,12 @@ export function PurchaseReturnsPage() {
       )}
 
       <section className="erp-section">
-        <div className="erp-section-header"><h2 className="erp-section-title">سجل مرتجعات المشتريات</h2><span className="text-xs text-slate-500">يمكن طباعة المستند أو تصحيحه أو عكسه حسب الصلاحيات.</span></div>
+        <div className="erp-section-header"><h2 className="erp-section-title">سجل مرتجعات المشتريات</h2><span className="text-xs text-slate-500">يمكن طباعة المستند أو تصحيحه أو إلغاؤه حسب الصلاحيات.</span></div>
         <div className="overflow-x-auto">
           <table className="data-table">
             <thead><tr><th>رقم الإشعار</th><th>المورد</th><th>الفرع</th><th>التاريخ</th><th>الإجمالي</th><th>الحالة</th><th>الإجراءات</th></tr></thead>
             <tbody>
-              {returns.results.map((row) => <tr key={row._id}><td className="font-mono font-black text-blue-700">{row.returnNumber}</td><td>{row.supplierName}</td><td>{branches.find((branch) => branch._id === row.branchId)?.name ?? "الفرع الحالي"}</td><td>{row.date}</td><td className="font-black">{money(row.totalCredit)}</td><td><span className={`badge ${row.status === "posted" ? "badge-success" : "badge-danger"}`}>{row.status === "posted" ? "مرحل" : "معكوس"}</span></td><td><div className="flex gap-1">{canPrint && <button className="erp-action" onClick={() => handlePrint(row._id)}><Printer className="h-4 w-4" />طباعة</button>}{canCreate && row.status === "posted" && <button data-testid="purchase-return-edit-open" className="erp-action erp-action-primary" onClick={() => setEditRow(row)}><Pencil className="h-4 w-4" />تعديل</button>}{row.status === "posted" && canReverse && canReverseFinance && <button className="erp-action erp-action-danger" disabled={busy} onClick={() => openReverse(row)}><RotateCcw className="h-4 w-4" />عكس</button>}</div></td></tr>)}
+              {returns.results.map((row) => <tr key={row._id}><td className="font-mono font-black text-blue-700">{row.returnNumber}</td><td>{row.supplierName}</td><td>{branches.find((branch) => branch._id === row.branchId)?.name ?? "الفرع الحالي"}</td><td>{row.date}</td><td className="font-black">{money(row.totalCredit)}</td><td><span className={`badge ${row.status === "posted" ? "badge-success" : "badge-danger"}`}>{row.status === "posted" ? "مرحل" : "ملغي"}</span></td><td><div className="flex gap-1">{canPrint && <button className="erp-action" onClick={() => handlePrint(row._id)}><Printer className="h-4 w-4" />طباعة</button>}{canCreate && row.status === "posted" && <button data-testid="purchase-return-edit-open" className="erp-action erp-action-primary" onClick={() => setEditRow(row)}><Pencil className="h-4 w-4" />تعديل</button>}{row.status === "posted" && canReverse && canReverseFinance && <button className="erp-action erp-action-danger" disabled={busy} onClick={() => openReverse(row)}><RotateCcw className="h-4 w-4" />إلغاء</button>}</div></td></tr>)}
               {returns.results.length === 0 && <tr><td colSpan={7} className="py-10 text-center text-slate-500">لا توجد مرتجعات مشتريات في الفرع المحدد.</td></tr>}
             </tbody>
           </table>
@@ -292,10 +292,10 @@ export function PurchaseReturnsPage() {
       {reverseRow && (
         <div className="fixed inset-0 z-50 grid place-items-center bg-black/50 p-4">
           <div className="w-full max-w-lg space-y-4 bg-white p-5 shadow-2xl" role="dialog" aria-modal="true">
-            <div className="border-b border-slate-300 pb-3"><h2 className="text-lg font-black text-slate-900">عكس إشعار الخصم {reverseRow.returnNumber}</h2><p className="mt-1 text-sm text-slate-600">سيعيد العكس المخزون والخزينة ورصيد المورد ومستند الشراء.</p></div>
-            <label><span className="form-label">سبب العكس *</span><input className="form-input" placeholder="اكتب سبب العكس الإلزامي" value={reversalReason} onChange={(event) => setReversalReason(event.target.value)} /></label>
-            <label><span className="form-label">تاريخ العكس</span><input className="form-input" type="date" value={reversalDate} onChange={(event) => setReversalDate(event.target.value)} /></label>
-            <div className="flex justify-end gap-2 border-t border-slate-300 pt-3"><button className="btn-secondary" disabled={busy} onClick={() => setReverseRow(null)}>إلغاء</button><button className="btn-danger" disabled={busy || !reversalReason.trim()} onClick={() => void submitReverse()}>{busy ? "جاري العكس..." : "تأكيد العكس"}</button></div>
+            <div className="border-b border-slate-300 pb-3"><h2 className="text-lg font-black text-slate-900">إلغاء إشعار الخصم {reverseRow.returnNumber}</h2><p className="mt-1 text-sm text-slate-600">سيتم إلغاء أثر المرتجع على المخزون والخزينة ورصيد المورد ومستند الشراء مع الاحتفاظ بالسجل.</p></div>
+            <label><span className="form-label">سبب الإلغاء *</span><input className="form-input" placeholder="اكتب سبب الإلغاء الإلزامي" value={reversalReason} onChange={(event) => setReversalReason(event.target.value)} /></label>
+            <label><span className="form-label">تاريخ الإلغاء</span><input className="form-input" type="date" value={reversalDate} onChange={(event) => setReversalDate(event.target.value)} /></label>
+            <div className="flex justify-end gap-2 border-t border-slate-300 pt-3"><button className="btn-secondary" disabled={busy} onClick={() => setReverseRow(null)}>إلغاء</button><button className="btn-danger" disabled={busy || !reversalReason.trim()} onClick={() => void submitReverse()}>{busy ? "جاري الإلغاء..." : "تأكيد الإلغاء"}</button></div>
           </div>
         </div>
       )}

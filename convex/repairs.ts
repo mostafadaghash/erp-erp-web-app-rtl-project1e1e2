@@ -878,7 +878,7 @@ async function transitionRepair(
           part.inventoryValueRemoved / part.quantity,
         valueDelta: part.inventoryValueRemoved,
         type: INVENTORY_MOVEMENT_TYPES.repairPartReversal,
-        reason: `عكس قطع غيار الصيانة ${repair.repairNumber}`,
+        reason: `إلغاء قطع غيار الصيانة ${repair.repairNumber}`,
         referenceId: String(repair._id),
         referenceType: "repair_cancellation",
       });

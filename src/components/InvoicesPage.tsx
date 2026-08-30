@@ -534,7 +534,7 @@ export function InvoicesPage({ onNavigate, view = "sales", creditOnly = false }:
               <p><strong>العميل:</strong> {cancelTarget.customerName}</p>
               <p><strong>الإجمالي:</strong> {formatCurrency(cancelTarget.total)}</p>
             </div>
-            <p className="mb-3 rounded-lg bg-red-50 p-3 text-sm font-bold text-red-700">سيتم عكس المخزون ورصيد العميل. أكد الإلغاء بكتابة السبب.</p>
+            <p className="mb-3 rounded-lg bg-red-50 p-3 text-sm font-bold text-red-700">سيتم إلغاء المخزون ورصيد العميل. أكد الإلغاء بكتابة السبب.</p>
             <form onSubmit={handleCancel} className="space-y-4">
               <div><label className="form-label">سبب الإلغاء *</label><textarea className="form-input" required value={cancelReason} onChange={e => setCancelReason(e.target.value)} rows={3} /></div>
               <div className="flex gap-3"><button className="btn-primary flex-1" disabled={isCancelling || !cancelReason.trim()}>{isCancelling ? "جارٍ الإلغاء..." : "تأكيد إلغاء الفاتورة"}</button><button type="button" className="btn-secondary" disabled={isCancelling} onClick={() => setCancelTarget(null)}>تراجع</button></div>

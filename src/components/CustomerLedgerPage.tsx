@@ -471,7 +471,7 @@ function CustomerStatement({
           الأرصدة النهائية: مديونية {statement.balances.receivable} · مقدم {statement.balances.advance} · مشتريات {statement.balances.totalPurchases}
         </p>
         <p>
-          إجماليات الحركة: مدين {statement.totals.receivableDebit} · دائن {statement.totals.receivableCredit} · مقدم داخل {statement.totals.advanceIn} · مقدم خارج {statement.totals.advanceOut} · مشتريات {statement.totals.purchasesIn} · عكس مشتريات {statement.totals.purchasesOut}
+          إجماليات الحركة: مدين {statement.totals.receivableDebit} · دائن {statement.totals.receivableCredit} · مقدم داخل {statement.totals.advanceIn} · مقدم خارج {statement.totals.advanceOut} · مشتريات {statement.totals.purchasesIn} · إلغاء مشتريات {statement.totals.purchasesOut}
         </p>
       </section>
       <footer className="grid grid-cols-3 gap-8 mt-16 text-center">

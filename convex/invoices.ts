@@ -343,7 +343,7 @@ export const update = mutation({
     });
 
     for (const [productId, quantity] of oldQuantities) {
-      await changeProductStock(ctx, user, { productId: productId as Id<"products">, quantityDelta: quantity, unitCost: inv.items.find(item => String(item.productId) === productId)?.unitCost ?? (() => { throw new ConvexError("الفاتورة القديمة بلا تكلفة تاريخية ولا يمكن عكسها آلياً"); })(), type: INVENTORY_MOVEMENT_TYPES.saleReversal, reason: `عكس مخزون تعديل الفاتورة ${inv.invoiceNumber}`, referenceId: String(id), referenceType: "invoice" });
+      await changeProductStock(ctx, user, { productId: productId as Id<"products">, quantityDelta: quantity, unitCost: inv.items.find(item => String(item.productId) === productId)?.unitCost ?? (() => { throw new ConvexError("الفاتورة القديمة بلا تكلفة تاريخية ولا يمكن إلغاؤها آلياً"); })(), type: INVENTORY_MOVEMENT_TYPES.saleReversal, reason: `إلغاء مخزون تعديل الفاتورة ${inv.invoiceNumber}`, referenceId: String(id), referenceType: "invoice" });
     }
     for (const [productId, quantity] of prepared.requested) {
       await changeProductStock(ctx, user, { productId: productId as Id<"products">, quantityDelta: -quantity, unitCost: prepared.productDocs.get(productId).costPrice, type: INVENTORY_MOVEMENT_TYPES.sale, reason: `بيع بعد تعديل الفاتورة ${inv.invoiceNumber}`, referenceId: String(id), referenceType: "invoice" });
@@ -440,7 +440,7 @@ export const cancel = mutation({
       const product = await ctx.db.get(productId as Id<"products">);
       if (!product) throw new ConvexError("تعذر استعادة مخزون منتج محذوف من الفاتورة");
       assertBranchAccess(user, product);
-      await changeProductStock(ctx, user, { productId: product._id, quantityDelta: quantity, unitCost: inv.items.find(item => String(item.productId) === productId)?.unitCost ?? (() => { throw new ConvexError("الفاتورة القديمة بلا تكلفة تاريخية ولا يمكن عكسها آلياً"); })(), type: INVENTORY_MOVEMENT_TYPES.saleReversal, reason: `عكس مخزون إلغاء الفاتورة ${inv.invoiceNumber}`, referenceId: String(args.id), referenceType: "invoice" });
+      await changeProductStock(ctx, user, { productId: product._id, quantityDelta: quantity, unitCost: inv.items.find(item => String(item.productId) === productId)?.unitCost ?? (() => { throw new ConvexError("الفاتورة القديمة بلا تكلفة تاريخية ولا يمكن إلغاؤها آلياً"); })(), type: INVENTORY_MOVEMENT_TYPES.saleReversal, reason: `إلغاء مخزون إلغاء الفاتورة ${inv.invoiceNumber}`, referenceId: String(args.id), referenceType: "invoice" });
     }
     if (inv.customerId) {
       await postCustomerLedgerEntry(ctx, user, { type: "invoice_cancel", requestId: args.requestId, customerId: inv.customerId, branchId: inv.branchId!, date: args.date, receivableDelta: -inv.remaining, advanceDelta: 0, purchasesDelta: -(inv.netTotal ?? inv.total), description: `إلغاء الفاتورة ${inv.invoiceNumber}`, referenceType: "invoice", referenceId: String(inv._id), referenceNumber: inv.invoiceNumber });

@@ -73,18 +73,18 @@ const transactionLabels: Record<string, string> = {
   invoice_payment: "تحصيل فاتورة",
   invoice_refund: "استرداد فاتورة",
   sales_return: "مرتجع مبيعات",
-  sales_return_reversal: "عكس مرتجع مبيعات",
+  sales_return_reversal: "إلغاء مرتجع مبيعات",
   order_deposit: "عربون طلب",
   order_deposit_application: "تسوية عربون",
   delivery_cod_collection: "تحصيل شحن",
-  delivery_cod_reversal: "عكس تحصيل شحن",
+  delivery_cod_reversal: "إلغاء تحصيل شحن",
   order_refund: "استرداد طلب",
   repair_charge: "تكلفة صيانة",
   repair_adjustment: "تعديل صيانة",
   repair_cancel: "إلغاء صيانة",
   repair_payment: "تحصيل صيانة",
   repair_refund: "استرداد صيانة",
-  reversal: "قيد عكسي",
+  reversal: "قيد إلغاء",
 };
 
 const invoiceStatusLabels: Record<string, string> = {

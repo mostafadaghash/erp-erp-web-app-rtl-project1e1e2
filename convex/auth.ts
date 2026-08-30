@@ -206,7 +206,7 @@ export const signOut = action({
         dedupeKey: authEventKey("logout", subject),
         userId: subject.split("|")[0],
         userName: identity.name ?? "مستخدم مصادق",
-        details: "تسجيل خروج موثق من الخادم قبل إبطال الجلسة دون تسجيل Tokens",
+        details: "تسجيل خروج موثق من الخادم قبل إلغاء الجلسة دون تسجيل Tokens",
       });
     }
     return await ctx.runAction(

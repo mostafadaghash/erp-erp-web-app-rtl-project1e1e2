@@ -165,9 +165,9 @@ const accountClassLabel: Record<ChartAccount["accountClass"], string> = {
 const sourceLabel: Record<EntrySummary["sourceType"], string> = {
   opening: "افتتاحي",
   manual: "يدوي",
-  reversal: "عكس",
+  reversal: "إلغاء",
   financial: "تشغيلي مالي",
-  financial_reversal: "عكس تشغيلي مالي",
+  financial_reversal: "إلغاء حركة مالية",
 };
 
 function lineNumbers(lines: LineDraft[]) {
@@ -637,7 +637,7 @@ export function GeneralLedgerPage() {
           )
           .join(
             "",
-          )}</tbody><tfoot><tr><th colspan="3">الإجمالي</th><th>${money(dto.totalDebit)}</th><th>${money(dto.totalCredit)}</th></tr></tfoot></table>${dto.reversalReason ? `<p>سبب العكس: ${escapeHtml(dto.reversalReason)} — ${escapeHtml(dto.reversalDate)}</p>` : ""}`,
+          )}</tbody><tfoot><tr><th colspan="3">الإجمالي</th><th>${money(dto.totalDebit)}</th><th>${money(dto.totalCredit)}</th></tr></tfoot></table>${dto.reversalReason ? `<p>سبب الإلغاء: ${escapeHtml(dto.reversalReason)} — ${escapeHtml(dto.reversalDate)}</p>` : ""}`,
       );
     } catch (error) {
       toast.error(getErrorMessage(error, "تعذرت طباعة القيد"));
@@ -925,7 +925,7 @@ export function GeneralLedgerPage() {
                 <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">
                   كل حركة مالية جديدة من تاريخ{" "}
                   <strong>{status.financialPostingCutoverDate}</strong> تُنشئ
-                  قيدًا مزدوجًا داخل Mutation نفسها. عكس الحركة المالية يعكس
+                  قيدًا مزدوجًا داخل Mutation نفسها. إلغاء الحركة المالية يعكس
                   القيد المرتبط بها.
                 </div>
               ) : canInitialize ? (
@@ -1120,7 +1120,7 @@ export function GeneralLedgerPage() {
         <section className="card p-5">
           <h2 className="font-bold">قيد يومية يدوي متعدد السطور</h2>
           <p className="mb-4 text-sm text-slate-500">
-            لا يمكن تعديل القيد المرحّل؛ التصحيح يتم بقيد عكس موثق.
+            لا يمكن تعديل القيد المرحّل؛ التصحيح يتم بإلغاء القيد مع تسجيل العملية في السجل.
           </p>
           <div className="mb-4 grid gap-3 md:grid-cols-2">
             <input
@@ -1239,7 +1239,7 @@ export function GeneralLedgerPage() {
                       <td>{entry.date}</td>
                       <td>{entry.memo}</td>
                       <td>{sourceLabel[entry.sourceType]}</td>
-                      <td>{entry.status === "posted" ? "مرحّل" : "معكوس"}</td>
+                      <td>{entry.status === "posted" ? "مرحّل" : "ملغي"}</td>
                       <td>{money(entry.totalDebit)}</td>
                       <td className="flex flex-wrap gap-2">
                         <button
@@ -1273,7 +1273,7 @@ export function GeneralLedgerPage() {
                                 setModal("reverse");
                               }}
                             >
-                              عكس
+                              إلغاء
                             </button>
                           )}
                       </td>
@@ -1719,7 +1719,7 @@ export function GeneralLedgerPage() {
       )}
 
       {modal === "reverse" && selectedEntryId && (
-        <ModalShell title="عكس قيد يومية" close={() => !busy && setModal(null)}>
+        <ModalShell title="إلغاء قيد يومية" close={() => !busy && setModal(null)}>
           <div className="space-y-3">
             <input
               className="form-input"
@@ -1733,7 +1733,7 @@ export function GeneralLedgerPage() {
             <textarea
               className="form-input"
               value={reversalReason}
-              placeholder="سبب العكس الإلزامي"
+              placeholder="سبب الإلغاء الإلزامي"
               onChange={(event) => {
                 setReversalReason(event.target.value);
                 reversalRequestId.current = newRequestId();
@@ -1754,13 +1754,13 @@ export function GeneralLedgerPage() {
                       reason: reversalReason.trim(),
                       requestId: reversalRequestId.current,
                     }),
-                  "تم عكس القيد",
+                  "تم إلغاء القيد",
                   reversalRequestId,
                   () => setModal(null),
                 )
               }
             >
-              ترحيل قيد العكس
+              تأكيد الإلغاء
             </button>
           </div>
         </ModalShell>

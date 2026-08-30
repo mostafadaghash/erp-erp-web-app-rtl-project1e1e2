@@ -744,7 +744,7 @@ test("PIB-23 debt-only reversal restores inventory AP supplier and original jour
   await e.t.mutation(api.purchaseReturns.reverse, {
     purchaseReturnId: returnId,
     date: "2026-01-12",
-    reason: "عكس اختبار",
+    reason: "إلغاء اختبار",
     requestId: "reverse-request",
   });
   const row = await e.raw.run((ctx) => ctx.db.get(returnId));
@@ -773,7 +773,7 @@ test("PIB-24 cash-only reversal reverses both financial and operational journals
   await e.t.mutation(api.purchaseReturns.reverse, {
     purchaseReturnId: returnId,
     date: "2026-01-12",
-    reason: "عكس نقدي",
+    reason: "إلغاء نقدي",
     requestId: "reverse-cash",
   });
   const row = await e.raw.run((ctx) => ctx.db.get(returnId));
@@ -792,7 +792,7 @@ test("PIB-25 reversal retry is idempotent and a conflicting request leaves state
   const args = {
     purchaseReturnId: returnId,
     date: "2026-01-12",
-    reason: "عكس ثابت",
+    reason: "إلغاء ثابت",
     requestId: "reverse-fixed",
   };
   const first = await e.t.mutation(api.purchaseReturns.reverse, args);
@@ -820,7 +820,7 @@ test("PIB-26 closed reversal period rolls back stock finance supplier and journa
     e.t.mutation(api.purchaseReturns.reverse, {
       purchaseReturnId: returnId,
       date: "2026-01-12",
-      reason: "عكس مغلق",
+      reason: "إلغاء مغلق",
       requestId: "reverse-closed",
     }),
     /الفترة المالية غير مفتوحة/,

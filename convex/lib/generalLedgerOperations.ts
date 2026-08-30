@@ -244,7 +244,7 @@ async function financialLines(
       await add("shipping_fees", fee, 0, "رسوم التسوية");
       break;
     case "reversal":
-      throw new ConvexError("يجب اشتقاق قيد العكس من المعاملة الأصلية");
+      throw new ConvexError("يجب اشتقاق قيد الإلغاء من المعاملة الأصلية");
   }
   return lines;
 }
@@ -401,7 +401,7 @@ export async function postFinancialTransactionJournal(
 
   if (transaction.type === "reversal") {
     if (!transaction.originalTransactionId)
-      throw new ConvexError("معاملة العكس غير مرتبطة بأصل");
+      throw new ConvexError("معاملة الإلغاء غير مرتبطة بأصل");
     const original = await ctx.db.get(transaction.originalTransactionId);
     if (!original) throw new ConvexError("المعاملة الأصلية للعكس غير موجودة");
     const originalMovements = await ctx.db
@@ -427,7 +427,7 @@ export async function postFinancialTransactionJournal(
         ...line,
         debit: line.credit,
         credit: line.debit,
-        description: `عكس: ${line.description ?? original.transactionNumber}`,
+        description: `إلغاء: ${line.description ?? original.transactionNumber}`,
       })),
       requestId: `financial:${transaction._id}`,
       sourceType: "financial_reversal",

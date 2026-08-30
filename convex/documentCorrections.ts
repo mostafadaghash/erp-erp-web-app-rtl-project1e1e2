@@ -61,7 +61,7 @@ export const editPurchaseOrder = mutation({
     assertBranchAccess(user, shipment);
     if (shipment.status === "cancelled") throw new ConvexError("لا يمكن تعديل عملية شراء ملغاة");
     if (shipment.status === "arrived" || shipment.purchaseReceiptId) {
-      throw new ConvexError("تم استلام هذه المشتريات وترحيلها للمخزون؛ استخدم مرتجع شراء أو عكس المستند بدلاً من تغيير التاريخ المالي مباشرة");
+      throw new ConvexError("تم استلام هذه المشتريات وترحيلها للمخزون؛ استخدم مرتجع شراء أو إلغاء المستند بدلاً من تغيير التاريخ المالي مباشرة");
     }
     if (shipment.status !== "ordered" && shipment.status !== "in_transit") {
       throw new ConvexError("حالة مستند المشتريات لا تسمح بالتعديل");
@@ -168,7 +168,7 @@ export const editSalesReturn = mutation({
     const note = await ctx.db.get(args.salesReturnId);
     if (!note) throw new ConvexError("مرتجع المبيعات غير موجود");
     assertBranchAccess(user, note);
-    if (note.status !== "posted") throw new ConvexError("لا يمكن تعديل إشعار دائن معكوس");
+    if (note.status !== "posted") throw new ConvexError("لا يمكن تعديل إشعار دائن ملغي");
     if (note.cashRefund > 0 || note.financialTransactionId) {
       throw new ConvexError("هذا المرتجع مرتبط برد نقدي؛ اعكس الإشعار ثم أنشئ المرتجع الصحيح حتى تظل حركة الخزينة قابلة للمراجعة");
     }
@@ -248,7 +248,7 @@ export const editSalesReturn = mutation({
         quantityDelta: -item.quantityReturned,
         unitCost: item.historicalUnitCost,
         type: INVENTORY_MOVEMENT_TYPES.sale,
-        reason: `عكس أثر مرتجع قبل تصحيح ${note.creditNoteNumber}`,
+        reason: `إلغاء أثر مرتجع قبل تصحيح ${note.creditNoteNumber}`,
         referenceId: String(note._id),
         referenceType: "sales_return_correction",
       });
@@ -352,7 +352,7 @@ export const editPurchaseReturn = mutation({
     const row = await ctx.db.get(args.purchaseReturnId);
     if (!row) throw new ConvexError("مرتجع المشتريات غير موجود");
     assertBranchAccess(user, row);
-    if (row.status !== "posted") throw new ConvexError("لا يمكن تعديل مرتجع مشتريات معكوس");
+    if (row.status !== "posted") throw new ConvexError("لا يمكن تعديل مرتجع مشتريات ملغي");
     if (row.cashRefund > 0 || row.financialTransactionId) {
       throw new ConvexError("هذا المرتجع مرتبط برد نقدي من المورد؛ اعكس المرتجع ثم أنشئ المستند الصحيح للحفاظ على أثر الخزينة");
     }
@@ -385,7 +385,7 @@ export const editPurchaseReturn = mutation({
         unitCost: item.inventoryValueRemoved / item.quantityReturned,
         valueDelta: item.inventoryValueRemoved,
         type: INVENTORY_MOVEMENT_TYPES.purchaseReturn,
-        reason: `عكس أثر مرتجع قبل تصحيح ${row.returnNumber}`,
+        reason: `إلغاء أثر مرتجع قبل تصحيح ${row.returnNumber}`,
         referenceId: String(row._id),
         referenceType: "purchase_return_correction",
       });
@@ -506,7 +506,7 @@ export const editPurchaseReturn = mutation({
         referenceType: "purchase_return",
         referenceId: String(row._id),
         referenceNumber: row.returnNumber,
-        description: `عكس حركة المورد القديمة قبل تصحيح ${row.returnNumber}`,
+        description: `إلغاء حركة المورد القديمة قبل تصحيح ${row.returnNumber}`,
         originalEntryId: row.supplierLedgerEntryId,
         reversalReason: reason,
         reversalDate: args.date,
@@ -539,7 +539,7 @@ export const editPurchaseReturn = mutation({
         reason,
         hasAccountingImpact: row.totalCredit !== 0 || row.inventoryValueRemoved !== 0,
       });
-      if (!reversal) throw new ConvexError("تعذر عكس قيد مرتجع الشراء القديم؛ لا يمكن حفظ تصحيح غير متوازن");
+      if (!reversal) throw new ConvexError("تعذر إلغاء قيد مرتجع الشراء القديم؛ لا يمكن حفظ تصحيح غير متوازن");
       reversalJournalId = reversal._id;
     }
     const newJournal = await postPurchaseReturnJournal(ctx, user, {

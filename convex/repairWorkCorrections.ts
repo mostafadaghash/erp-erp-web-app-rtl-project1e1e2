@@ -207,7 +207,7 @@ export const updateWork = mutation({
         unitCost: historicalUnitCost,
         valueDelta: exactValue,
         type: INVENTORY_MOVEMENT_TYPES.repairPartReversal,
-        reason: `عكس قطع الصيانة قبل تصحيح ${repair.repairNumber}`,
+        reason: `إلغاء قطع الصيانة قبل تصحيح ${repair.repairNumber}`,
         referenceId: String(repair._id),
         referenceType: "repair_work_correction",
       });

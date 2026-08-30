@@ -320,7 +320,7 @@ export function ShipmentsPage({ createRequestToken }: { createRequestToken?: num
                 <>
                   {purchaseDocument?.receipt && (
                     <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-                      هذا المستند تم استلامه وترحيله للمخزون ومديونية المورد. تصحيح الكميات أو القيم يتم عبر مرتجع مشتريات أو عكس موثق، وليس بتغيير الفاتورة التاريخية مباشرة.
+                      هذا المستند تم استلامه وترحيله للمخزون ومديونية المورد. تصحيح الكميات أو القيم يتم عبر مرتجع مشتريات أو إلغاء موثق، وليس بتغيير الفاتورة التاريخية مباشرة.
                     </div>
                   )}
                   <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">

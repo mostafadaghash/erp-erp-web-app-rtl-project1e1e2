@@ -164,12 +164,12 @@ export function SalesReturnsPanel() {
         date: reverseDate,
         requestId: reversalRequestId.current,
       });
-      toast.success("تم عكس الإشعار الدائن");
+      toast.success("تم إلغاء الإشعار الدائن");
       setReverseId(null);
       setSelectedNote(null);
       reversalRequestId.current = crypto.randomUUID();
     } catch (error) {
-      toast.error(getErrorMessage(error, "تعذر عكس الإشعار"));
+      toast.error(getErrorMessage(error, "تعذر إلغاء الإشعار"));
     } finally {
       setBusy(false);
     }
@@ -237,7 +237,7 @@ export function SalesReturnsPanel() {
         >
           <option value="">كل الحالات</option>
           <option value="posted">مكتمل</option>
-          <option value="reversed">معكوس</option>
+          <option value="reversed">ملغي</option>
         </select>
 
         {dateFilter === "custom" && (
@@ -319,7 +319,7 @@ export function SalesReturnsPanel() {
                   <td className="font-bold text-emerald-700">{formatCurrency(note.cashRefund)}</td>
                   <td>
                     <span className={`badge ${note.status === "reversed" ? "badge-danger" : "badge-success"}`}>
-                      {note.status === "reversed" ? "معكوس" : "مكتمل"}
+                      {note.status === "reversed" ? "ملغي" : "مكتمل"}
                     </span>
                   </td>
                   <td>
@@ -345,7 +345,7 @@ export function SalesReturnsPanel() {
                       )}
                       {canCreate && canReverse && note.status === "posted" && (
                         <button type="button" onClick={() => beginReverse(note)} className="rounded-lg bg-red-50 px-2 py-1.5 text-xs font-bold text-red-700 hover:bg-red-100">
-                          عكس
+                          إلغاء
                         </button>
                       )}
                     </div>
@@ -429,7 +429,7 @@ export function SalesReturnsPanel() {
                 <div className="rounded-xl bg-slate-50 p-3"><p className="text-xs text-slate-500">العميل</p><p className="mt-1 font-black text-slate-800">{selectedNote.customerName}</p></div>
                 <div className="rounded-xl bg-slate-50 p-3"><p className="text-xs text-slate-500">تاريخ المرتجع</p><p className="mt-1 font-black text-slate-800">{selectedNote.date}</p></div>
                 <div className="rounded-xl bg-indigo-50 p-3"><p className="text-xs text-indigo-700">إجمالي المرتجع</p><p className="mt-1 text-lg font-black text-indigo-800">{formatCurrency(selectedNote.totalCredit)}</p></div>
-                <div className={`rounded-xl p-3 ${selectedNote.status === "reversed" ? "bg-red-50" : "bg-emerald-50"}`}><p className={`text-xs ${selectedNote.status === "reversed" ? "text-red-700" : "text-emerald-700"}`}>الحالة</p><p className={`mt-1 text-lg font-black ${selectedNote.status === "reversed" ? "text-red-800" : "text-emerald-800"}`}>{selectedNote.status === "reversed" ? "معكوس" : "مكتمل"}</p></div>
+                <div className={`rounded-xl p-3 ${selectedNote.status === "reversed" ? "bg-red-50" : "bg-emerald-50"}`}><p className={`text-xs ${selectedNote.status === "reversed" ? "text-red-700" : "text-emerald-700"}`}>الحالة</p><p className={`mt-1 text-lg font-black ${selectedNote.status === "reversed" ? "text-red-800" : "text-emerald-800"}`}>{selectedNote.status === "reversed" ? "ملغي" : "مكتمل"}</p></div>
               </div>
 
               <div className="overflow-x-auto rounded-xl border border-slate-200">
@@ -454,7 +454,7 @@ export function SalesReturnsPanel() {
                   <h4 className="font-black text-slate-800">سبب المرتجع والملاحظات</h4>
                   <p className="mt-2 text-sm leading-7 text-slate-600">{selectedNote.reason}</p>
                   {selectedNote.status === "reversed" && selectedNote.reversalReason && (
-                    <div className="mt-4 rounded-lg bg-red-50 p-3 text-sm text-red-700"><strong>سبب العكس:</strong> {selectedNote.reversalReason}</div>
+                    <div className="mt-4 rounded-lg bg-red-50 p-3 text-sm text-red-700"><strong>سبب الإلغاء:</strong> {selectedNote.reversalReason}</div>
                   )}
                 </div>
                 <dl className="space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm">
@@ -466,7 +466,7 @@ export function SalesReturnsPanel() {
               </div>
 
               {canCreate && canReverse && selectedNote.status === "posted" && (
-                <div className="mt-4 flex justify-end"><button type="button" onClick={() => beginReverse(selectedNote)} className="rounded-lg bg-red-50 px-4 py-2 text-sm font-bold text-red-700 hover:bg-red-100">عكس المرتجع</button></div>
+                <div className="mt-4 flex justify-end"><button type="button" onClick={() => beginReverse(selectedNote)} className="rounded-lg bg-red-50 px-4 py-2 text-sm font-bold text-red-700 hover:bg-red-100">إلغاء المرتجع</button></div>
               )}
             </div>
           </div>
@@ -518,11 +518,11 @@ export function SalesReturnsPanel() {
       {reverseId && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <form onSubmit={submitReverse} className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
-            <h3 className="text-lg font-black">عكس مرتجع البيع</h3>
-            <p className="my-3 rounded bg-red-50 p-3 text-sm text-red-700">سيتم عكس المخزون والفاتورة والعميل والحساب المالي.</p>
-            <textarea required className="form-input" placeholder="سبب العكس" value={reverseReason} onChange={(event) => setReverseReason(event.target.value)} />
+            <h3 className="text-lg font-black">إلغاء مرتجع البيع</h3>
+            <p className="my-3 rounded bg-red-50 p-3 text-sm text-red-700">سيتم إلغاء أثر المرتجع على المخزون والفاتورة والعميل والحساب المالي مع الاحتفاظ بالسجل.</p>
+            <textarea required className="form-input" placeholder="سبب الإلغاء" value={reverseReason} onChange={(event) => setReverseReason(event.target.value)} />
             <input required type="date" className="form-input mt-3" value={reverseDate} onChange={(event) => setReverseDate(event.target.value)} />
-            <div className="mt-4 flex gap-2"><button disabled={busy || !reverseReason.trim()} className="btn-primary flex-1">{busy ? "جارٍ العكس..." : "تأكيد العكس"}</button><button type="button" disabled={busy} className="btn-secondary" onClick={() => setReverseId(null)}>إلغاء</button></div>
+            <div className="mt-4 flex gap-2"><button disabled={busy || !reverseReason.trim()} className="btn-primary flex-1">{busy ? "جارٍ الإلغاء..." : "تأكيد الإلغاء"}</button><button type="button" disabled={busy} className="btn-secondary" onClick={() => setReverseId(null)}>إلغاء</button></div>
           </form>
         </div>
       )}
@@ -541,7 +541,7 @@ export function SalesReturnsPanel() {
       {printId && printable && (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-white p-5 sm:p-8">
           <div className="mx-auto max-w-2xl rounded-xl border border-slate-200 p-6 sm:p-8">
-            <h1 className="text-center text-2xl font-black">إشعار دائن {printable.status === "reversed" && <span className="text-red-700">— معكوس</span>}</h1>
+            <h1 className="text-center text-2xl font-black">إشعار دائن {printable.status === "reversed" && <span className="text-red-700">— ملغي</span>}</h1>
             <div className="mt-6 grid gap-3 text-sm sm:grid-cols-2"><p><strong>رقم المرتجع:</strong> {printable.creditNoteNumber}</p><p><strong>الفاتورة:</strong> {printable.invoiceNumber}</p><p><strong>العميل:</strong> {printable.customerName}</p><p><strong>التاريخ:</strong> {printable.date}</p></div>
             <div className="mt-5 overflow-x-auto"><table className="data-table min-w-[520px]"><thead><tr><th>الصنف</th><th>الكمية</th><th>قيمة الائتمان</th></tr></thead><tbody>{printable.items.map((item) => <tr key={String(item.productId)}><td>{item.productName}</td><td>{formatAmount(item.quantityReturned)}</td><td>{formatCurrency(item.creditAmount)}</td></tr>)}</tbody></table></div>
             <p className="mt-5 text-lg font-black">الإجمالي: {formatCurrency(printable.totalCredit)}</p>

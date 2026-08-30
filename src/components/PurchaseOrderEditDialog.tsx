@@ -116,7 +116,7 @@ export function PurchaseOrderEditDialog({
 
         <div className="overflow-y-auto p-5">
           <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-            يمكن تعديل الكمية وتكلفة الشراء قبل الاستلام والترحيل. بعد الاستلام لا يسمح بتغيير التاريخ المالي مباشرة؛ استخدم مرتجع المشتريات أو العكس.
+            يمكن تعديل الكمية وتكلفة الشراء قبل الاستلام والترحيل. بعد الاستلام لا يسمح بتغيير التاريخ المالي مباشرة؛ استخدم مرتجع المشتريات أو الإلغاء.
           </div>
           {blocked && <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">هذا المستند تم ترحيله أو إلغاؤه ولا يقبل التعديل المباشر.</div>}
 

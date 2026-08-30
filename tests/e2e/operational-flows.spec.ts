@@ -88,7 +88,7 @@ test.describe("critical operational flow readiness", () => {
       if (!value) await selectFirstRealOption(branch);
     }
 
-    for (const label of ["COD لدى شركات الشحن", "COD تمت تسويته", "COD معكوس", "رسوم شركات الشحن"]) {
+    for (const label of ["COD لدى شركات الشحن", "COD تمت تسويته", "COD ملغي", "رسوم شركات الشحن"]) {
       await expect(page.getByText(label, { exact: true })).toBeVisible();
     }
 

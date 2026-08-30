@@ -206,7 +206,7 @@ test("GLUI-27 reverses a posted non-reversal journal through a modal", () => {
 });
 
 test("GLUI-28 requires reversal date reason and stable idempotency", () => {
-  assert.match(ui, /سبب العكس الإلزامي/);
+  assert.match(ui, /سبب الإلغاء الإلزامي/);
   assert.match(ui, /!reversalReason\.trim\(\)/);
   assert.match(ui, /requestId: reversalRequestId\.current/);
 });
@@ -341,5 +341,5 @@ test("FGBUI-05 UI distinguishes financial bridge from full operational posting",
 
 test("FGBUI-06 financial journal sources have explicit Arabic labels", () => {
   assert.match(ui, /financial: "تشغيلي مالي"/);
-  assert.match(ui, /financial_reversal: "عكس تشغيلي مالي"/);
+  assert.match(ui, /financial_reversal: "إلغاء حركة مالية"/);
 });
