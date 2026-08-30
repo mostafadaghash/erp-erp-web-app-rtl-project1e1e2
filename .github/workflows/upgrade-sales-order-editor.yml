@@ -5,7 +5,7 @@ on:
     branches:
       - agent/professional-sales-order-editor
     paths:
-      - scripts/upgrade-sales-order-editor.mjs
+      - scripts/upgrade_sales_order_editor.py
       - .github/workflows/upgrade-sales-order-editor.yml
 
 permissions:
@@ -21,7 +21,7 @@ jobs:
           ref: agent/professional-sales-order-editor
           fetch-depth: 0
       - name: Apply upgrade
-        run: node scripts/upgrade-sales-order-editor.mjs
+        run: python3 scripts/upgrade_sales_order_editor.py
       - name: Commit upgrade
         shell: bash
         run: |
