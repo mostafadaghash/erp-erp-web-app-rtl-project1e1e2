@@ -8,6 +8,8 @@ import { ConvexError } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { PERMISSIONS, ROLE_PERMISSIONS } from "./permissions.ts";
 import type { Permission } from "./permissions.ts";
+import { isPostDeliveryAuditTrigger } from "../../shared/postDeliveryFollowUpRules.ts";
+import { createPostDeliveryFollowUpFromAudit } from "./postDeliveryFollowUpAutomation.ts";
 
 // ──────────────────────────────────────────────
 // Types
@@ -253,7 +255,7 @@ export async function logAction(
   const beforeSnapshot = createAuditSnapshot(params.before);
   const afterSnapshot = createAuditSnapshot(params.after);
   const hasBranchOverride = Object.prototype.hasOwnProperty.call(params, "branchId");
-  await ctx.db.insert("auditLogs", {
+  const auditLogId = await ctx.db.insert("auditLogs", {
     userId: user.userId,
     userName: user.name,
     branchId: hasBranchOverride ? params.branchId ?? undefined : user.branchId,
@@ -277,6 +279,37 @@ export async function logAction(
     reversalOfId: safeAuditLink(params.reversalOfId),
     timestamp: Date.now(),
   });
+
+  const rawStatus = params.after?.status;
+  const status = typeof rawStatus === "string" ? rawStatus : undefined;
+  if (
+    isPostDeliveryAuditTrigger({
+      module: params.module,
+      action: params.action,
+      status,
+    })
+  ) {
+    try {
+      await createPostDeliveryFollowUpFromAudit(ctx, auditLogId);
+    } catch (error) {
+      await ctx.db.insert("auditLogs", {
+        userId: "system:post_delivery_follow_up",
+        userName: "النظام",
+        branchId: hasBranchOverride ? params.branchId ?? undefined : user.branchId,
+        action: "automation_error",
+        module: "customer_follow_ups",
+        recordId: params.recordId ? String(params.recordId).slice(0, 200) : undefined,
+        recordLabel: params.recordLabel?.trim().slice(0, 200),
+        details: error instanceof Error
+          ? `تعذر إنشاء متابعة ما بعد البيع: ${error.message}`.slice(0, 1000)
+          : "تعذر إنشاء متابعة ما بعد البيع",
+        sourceType: safeAuditLink(params.sourceType),
+        sourceId: safeAuditLink(params.sourceId),
+        sourceNumber: safeAuditLink(params.sourceNumber),
+        timestamp: Date.now(),
+      });
+    }
+  }
 }
 
 // ──────────────────────────────────────────────

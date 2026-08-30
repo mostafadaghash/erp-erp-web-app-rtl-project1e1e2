@@ -25,6 +25,7 @@ import type * as leads from "../leads.js";
 import type * as lib_auth from "../lib/auth.js";
 import type * as lib_permissions from "../lib/permissions.js";
 import type * as orders from "../orders.js";
+import type * as postDeliveryFollowUps from "../postDeliveryFollowUps.js";
 import type * as products from "../products.js";
 import type * as purchaseReturns from "../purchaseReturns.js";
 import type * as repairs from "../repairs.js";
@@ -67,6 +68,7 @@ declare const fullApi: ApiFromModules<{
   "lib/auth": typeof lib_auth;
   "lib/permissions": typeof lib_permissions;
   orders: typeof orders;
+  postDeliveryFollowUps: typeof postDeliveryFollowUps;
   products: typeof products;
   purchaseReturns: typeof purchaseReturns;
   repairs: typeof repairs;

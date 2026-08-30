@@ -88,6 +88,7 @@ const applicationTables = {
     currency: v.string(),
     taxRate: v.number(),
     whatsappNumber: v.optional(v.string()),
+    postDeliveryFollowUpDays: v.optional(v.number()),
     modules: v.optional(v.object({
       invoices:   v.optional(v.boolean()),
       orders:     v.optional(v.boolean()),
