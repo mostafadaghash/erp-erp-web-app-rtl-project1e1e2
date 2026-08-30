@@ -4,21 +4,22 @@ import { readFileSync } from "node:fs";
 
 const read = (path: string) => readFileSync(path, "utf8");
 
-test("audited delivery events schedule the post-delivery worker without generated API runtime imports", () => {
+test("audited delivery events invoke the atomic post-delivery automation without scheduler or generated API runtime imports", () => {
   const auth = read("convex/lib/auth.ts");
   assert.match(auth, /isPostDeliveryAuditTrigger/);
-  assert.match(auth, /makeFunctionReference/);
-  assert.match(auth, /postDeliveryFollowUps:processAuditEvent/);
-  assert.match(auth, /ctx\.scheduler\.runAfter/);
+  assert.match(auth, /createPostDeliveryFollowUpFromAudit/);
+  assert.match(auth, /await createPostDeliveryFollowUpFromAudit\(ctx, auditLogId\)/);
+  assert.doesNotMatch(auth, /ctx\.scheduler\.runAfter/);
   assert.doesNotMatch(auth, /from "\.\.\/_generated\/api"/);
 });
 
-test("automatic follow-up uses a stable creation key and customer-service assignee preference", () => {
-  const worker = read("convex/postDeliveryFollowUps.ts");
-  assert.match(worker, /buildPostDeliveryFollowUpCreationKey/);
-  assert.match(worker, /withIndex\("by_creation_key"/);
-  assert.match(worker, /profile\.role === "customer_service"/);
-  assert.match(worker, /POST_DELIVERY_FOLLOW_UP_TYPE/);
+test("atomic automatic follow-up uses a stable creation key and customer-service assignee preference", () => {
+  const automation = read("convex/lib/postDeliveryFollowUpAutomation.ts");
+  assert.match(automation, /buildPostDeliveryFollowUpCreationKey/);
+  assert.match(automation, /withIndex\("by_creation_key"/);
+  assert.match(automation, /profile\.role === "customer_service"/);
+  assert.match(automation, /POST_DELIVERY_FOLLOW_UP_TYPE/);
+  assert.match(automation, /ctx\.db\.insert\("customerFollowUps"/);
 });
 
 test("settings persist and expose a configurable post-delivery delay to admins", () => {
