@@ -4,11 +4,13 @@ import { readFileSync } from "node:fs";
 
 const read = (path: string) => readFileSync(path, "utf8");
 
-test("audited delivery events schedule the post-delivery worker", () => {
+test("audited delivery events schedule the post-delivery worker without generated API runtime imports", () => {
   const auth = read("convex/lib/auth.ts");
   assert.match(auth, /isPostDeliveryAuditTrigger/);
-  assert.match(auth, /internal\.postDeliveryFollowUps\.processAuditEvent/);
+  assert.match(auth, /makeFunctionReference/);
+  assert.match(auth, /postDeliveryFollowUps:processAuditEvent/);
   assert.match(auth, /ctx\.scheduler\.runAfter/);
+  assert.doesNotMatch(auth, /from "\.\.\/_generated\/api"/);
 });
 
 test("automatic follow-up uses a stable creation key and customer-service assignee preference", () => {
