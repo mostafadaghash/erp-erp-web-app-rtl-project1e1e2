@@ -322,7 +322,7 @@ export function NewPurchaseInvoicePage({ onNavigate }: NewPurchaseInvoicePagePro
                   <th>اسم الصنف</th>
                   <th className="w-40">الكمية</th>
                   <th className="w-44">تكلفة الوحدة</th>
-                  <th className="w-44">إجمالي السطر</th>
+                  <th className="w-44">الإجمالي</th>
                   <th className="w-16" aria-label="حذف" />
                 </tr>
               </thead>
