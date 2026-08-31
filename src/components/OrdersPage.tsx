@@ -280,7 +280,7 @@ export function OrdersPage({ createRequestToken }: { createRequestToken?: number
           const hasPhone = Boolean(order.customerPhone);
           const showWA = hasPhone && ["confirmed", "preparing", "ready", "delivered_to_customer", "handed_to_shipping", "received", "cancelled"].includes(currentStatus);
           const waLink = order.customerPhone ? buildWhatsAppLink(order.customerPhone, getWhatsAppMessage(order.status, order.orderNumber, order.customerName, storeName, order.remaining)) : null;
-          const canModifyBody = canEdit && ["pending", "confirmed", "preparing"].includes(currentStatus) && !order.linkedInvoiceId;
+          const canModifyBody = canEdit && ["pending", "confirmed"].includes(currentStatus) && !order.linkedInvoiceId;
           const financialEditable = !order.linkedInvoiceId && !["cancelled", "delivered_to_customer", "received"].includes(currentStatus);
           const canCancelThis = canDelete && !["cancelled", "delivered_to_customer", "received", "handed_to_shipping"].includes(currentStatus);
           const hasSecondaryActions = (canCollect && financialEditable && order.remaining > 0) || (canRefund && financialEditable && order.deposit > 0) || Boolean(showWA && waLink) || canPrint || canCancelThis;

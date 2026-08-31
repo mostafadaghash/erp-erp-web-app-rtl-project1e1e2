@@ -12,7 +12,7 @@ import { postCustomerLedgerEntry } from "./lib/customerLedger.ts";
 import { assertOrderNotLockedByDelivery } from "./lib/deliveryLocks.ts";
 import { applyOrderStatsChange, getOrderStatsRebuildState, readOrderStats, rebuildOrderStatsBatch } from "./lib/orderStats.ts";
 
-const editableStatuses = new Set(["pending", "confirmed", "preparing"]);
+const editableStatuses = new Set(["pending", "confirmed"]);
 const terminalOrderStatuses = new Set(["delivered_to_customer", "received", "cancelled"]);
 
 async function normalizeOrderItems(ctx: MutationCtx, branchId: Id<"branches"> | undefined, items: Array<{ productId?: Id<"products">; productName: string; quantity: number; unitPrice: number; notes?: string }>) {

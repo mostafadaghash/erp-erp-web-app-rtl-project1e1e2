@@ -10,7 +10,7 @@ test("ORU-01 edit form is wired to orders.update", () => {
 });
 
 test("ORU-02 edit action is limited before invoice linkage", () => {
-  assert.match(page, /\["pending", "confirmed"\]\.includes\(order\.status\)/);
+  assert.match(page, /\["pending", "confirmed"\]\.includes\(currentStatus\)/);
   assert.match(page, /!order\.linkedInvoiceId/);
 });
 
@@ -30,7 +30,7 @@ test("ORU-04 cancellation uses a dedicated modal, never prompt or confirm", () =
 
 test("ORU-05 cancellation action is permission-aligned to delete_orders", () => {
   assert.match(page, /usePermission\("delete_orders"\)/);
-  assert.match(page, /\{canDelete && !\["cancelled", "delivered"\]\.includes\(order\.status\)/);
+  assert.match(page, /const canCancelThis = canDelete && !\["cancelled", "delivered_to_customer", "received", "handed_to_shipping"\]\.includes\(currentStatus\)/);
 });
 
 test("ORU-06 cancellation modal explains deposit and invoice blockers", () => {
@@ -41,8 +41,8 @@ test("ORU-06 cancellation modal explains deposit and invoice blockers", () => {
 });
 
 test("ORU-07 linked delivery orders do not offer direct delivered transition", () => {
-  assert.match(page, /candidate === "delivered" && order\.linkedInvoiceId \? null : candidate/);
-  assert.match(page, /التسليم من عملية الشحن/);
+  assert.match(page, /candidate === "delivered_to_customer" && order\.linkedInvoiceId \? null : candidate/);
+  assert.match(page, /الحالة التالية من مسار الشحن/);
 });
 
 test("ORU-08 details modal uses the server-owned order details read model", () => {

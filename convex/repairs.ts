@@ -840,16 +840,16 @@ async function transitionRepair(
     throw new ConvexError("يجب تعيين فني قبل بدء الإصلاح");
   }
   if (args.status === "ready" && !nextDiagnosis) {
-    throw new ConvexError("التشخيص مطلوب قبل اعتماد حالة تم الإصلاح");
+    throw new ConvexError("التشخيص مطلوب قبل اعتماد الصيانة جاهزة");
   }
   if (args.status === "cancelled" && !reason) {
-    throw new ConvexError("سبب رفض العميل مطلوب");
+    throw new ConvexError("سبب الإلغاء مطلوب");
   }
   if (args.status === "rejected_by_shipping" && !reason) {
     throw new ConvexError("سبب رفض شركة الشحن مطلوب");
   }
   if (args.status === "cancelled" && repair.deposit > 0) {
-    throw new ConvexError("يجب استرداد عربون الصيانة بالكامل قبل تسجيل رفض العميل");
+    throw new ConvexError("يجب استرداد عربون الصيانة بالكامل قبل الإلغاء");
   }
   if (args.status === "delivered" && repair.remaining > 0) {
     throw new ConvexError("لا يمكن تسليم صيانة عليها مبلغ متبقٍ");

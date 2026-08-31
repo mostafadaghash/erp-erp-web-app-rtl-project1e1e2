@@ -63,7 +63,7 @@ const repairFilterOptions: Array<{ value: RepairFilter; label: string }> = [
   { value: "rejected_by_shipping", label: "مرفوض من شركة الشحن" },
 ];
 
-function matchesRepairFilter(status: string, filter: RepairFilter) {
+function matchesRepairFilter(status: RepairStatus, filter: RepairFilter) {
   if (!filter) return true;
   if (filter === "repairing") return status === "under_inspection" || status === "in_progress";
   return status === filter;
@@ -262,15 +262,15 @@ export function RepairsPage({ createRequestToken }: { createRequestToken?: numbe
   const transitionValidationReason = (() => {
     if (!transitionTarget || !transitionNext) return null;
     if (!isIsoDate(transitionForm.date)) return "اختر تاريخ عملية صالحًا";
-    if (transitionNext === "in_progress" && !transitionTarget.technicianName) return "عيّن فنيًا قبل بدء الصيانة";
-    if (transitionNext === "ready" && !transitionForm.diagnosis.trim()) return "أدخل التشخيص النهائي قبل اعتماد «تم الإصلاح»";
+    if (transitionNext === "in_progress" && !transitionTarget.technicianName) return "عيّن فنيًا قبل بدء الإصلاح";
+    if (transitionNext === "ready" && !transitionForm.diagnosis.trim()) return "أدخل التشخيص النهائي قبل اعتماد الجاهزية";
     if (transitionNext === "cancelled") {
-      if (transitionTarget.deposit > 0) return "استرد العربون بالكامل قبل تسجيل رفض العميل";
-      if (!transitionForm.reason.trim()) return "أدخل سبب رفض العميل";
+      if (transitionTarget.deposit > 0) return "استرد العربون بالكامل قبل إلغاء الصيانة";
+      if (!transitionForm.reason.trim()) return "أدخل سبب الإلغاء";
     }
     if (transitionNext === "rejected_by_shipping" && !transitionForm.reason.trim()) return "أدخل سبب رفض شركة الشحن";
     if (transitionNext === "delivered") {
-      if (transitionTarget.remaining > 0) return "حصّل المبلغ المتبقي قبل تسليم الجهاز للعميل";
+      if (transitionTarget.remaining > 0) return "حصّل المبلغ المتبقي قبل تسليم الجهاز";
       const warrantyDays = Number(transitionForm.warrantyDays || 0);
       if (!Number.isInteger(warrantyDays) || warrantyDays < 0 || warrantyDays > 365) return "مدة الضمان يجب أن تكون عدد أيام صحيحًا من صفر إلى 365";
     }
@@ -690,7 +690,7 @@ export function RepairsPage({ createRequestToken }: { createRequestToken?: numbe
                     <td className="px-2 py-2" onClick={(event) => event.stopPropagation()}>
                       <div className="flex items-center justify-center gap-1.5">
                         <button className="rounded-lg border border-slate-200 p-2 text-slate-600 hover:bg-slate-100" title="فتح" onClick={() => setDetailTarget(r)}><Eye className="h-4 w-4" /></button>
-                        {canEdit && !["delivered", "cancelled", "rejected_by_shipping"].includes(r.status) && (
+                        {canEdit && !["delivered", "cancelled"].includes(r.status) && (
                           <button data-testid="repair-work-edit-open" className="rounded-lg border border-emerald-200 bg-emerald-50 p-2 text-emerald-700 hover:bg-emerald-100" title="تعديل العمل والقطع" onClick={() => setWorkTarget(r)}><Pencil className="h-4 w-4" /></button>
                         )}
                         {canCollect && r.remaining > 0 && r.status !== "delivered" && r.status !== "cancelled" && (
