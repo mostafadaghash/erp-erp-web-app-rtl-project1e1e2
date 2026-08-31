@@ -180,7 +180,7 @@ const NAV_GROUPS: NavGroup[] = [
   },
   {
     key: "administration",
-    label: "الإدارة والإعدادات",
+    label: "الإعدادات",
     icon: Settings,
     items: [
       { id: "branches", label: "الفروع", icon: Building2, moduleKey: "branches", permission: "view_branches" },
