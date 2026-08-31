@@ -64,11 +64,12 @@ test("CSU-07 customer card exposes direct ledger navigation with both IDs", () =
   assert.match(customers, /حساب العميل/);
 });
 
-test("CSU-08 application shell carries the selected customer into ledger page", () => {
-  assert.match(app, /customerLedgerTarget/);
+test("CSU-08 application shell carries the selected customer into a deterministic ledger workspace tab", () => {
   assert.match(app, /<CustomersPage onOpenLedger=\{openCustomerLedger\}/);
-  assert.match(app, /initialCustomerId=\{customerLedgerTarget\?\.customerId\}/);
-  assert.match(app, /initialBranchId=\{customerLedgerTarget\?\.branchId\}/);
+  assert.match(app, /entityIdentity\("customer-ledger", String\(customerId\), String\(branchId\)\)/);
+  assert.match(app, /payload: \{ customerId: String\(customerId\), branchId: String\(branchId\) \}/);
+  assert.match(app, /initialCustomerId=\{customerId\}/);
+  assert.match(app, /initialBranchId=\{branchId\}/);
 });
 
 test("CSU-09 customer ledger honors an initial branch and customer target", () => {
