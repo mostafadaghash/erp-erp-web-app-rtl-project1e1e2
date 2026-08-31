@@ -9,13 +9,20 @@ export const FOLLOW_UP_WORKSPACE_ROLES = [
 
 export type FollowUpWorkspaceRole = (typeof FOLLOW_UP_WORKSPACE_ROLES)[number];
 
-export const ACTIVE_ORDER_STATUSES = ["pending", "confirmed", "ready"] as const;
+export const ACTIVE_ORDER_STATUSES = [
+  "pending",
+  "confirmed",
+  "preparing",
+  "ready",
+  "handed_to_shipping",
+] as const;
 export const ACTIVE_REPAIR_STATUSES = [
   "received",
   "under_inspection",
   "awaiting_approval",
   "in_progress",
   "ready",
+  "rejected_by_shipping",
 ] as const;
 export const ACTIVE_DELIVERY_STATUSES = ["pending", "shipped"] as const;
 
