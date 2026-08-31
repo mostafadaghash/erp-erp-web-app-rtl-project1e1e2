@@ -45,6 +45,12 @@ import { VouchersPage } from "./VouchersPage";
 import type { ReportKind } from "./ReportsPage";
 import { WorkspaceTabs } from "../workspace/WorkspaceTabs";
 import {
+  WorkspaceRecordPage,
+  workspaceRecordIdentity,
+  type WorkspaceRecordTarget,
+  type WorkspaceRecordType,
+} from "../workspace/WorkspaceRecordPage";
+import {
   activateOrAppend,
   closeTabsByIds,
   createWorkspaceTabId,
@@ -65,7 +71,7 @@ export type Page =
   | "deliveries" | "shipments" | "branches" | "employees" | "crm"
   | "reports" | "settings" | "audit-logs" | "accounts-home" | "treasury"
   | "supplier-payments" | "purchase-returns" | "customer-ledger"
-  | "general-ledger" | "data-export" | "vouchers" | "payment-schedules";
+  | "general-ledger" | "data-export" | "vouchers" | "payment-schedules" | "workspace-record";
 
 const FOLLOW_UP_ROLE_FALLBACK = new Set(["admin", "manager", "sales", "customer_service", "technician", "shipping"]);
 const PAGES_WITHOUT_GLOBAL_SEARCH = new Set<Page>(["branches", "employees", "settings"]);
@@ -106,6 +112,22 @@ const PAGE_PERMISSIONS: Partial<Record<Page, Permission>> = {
   "data-export": "export_data",
   vouchers: "view_finance",
   "payment-schedules": "view_finance",
+};
+
+const RECORD_PERMISSIONS: Record<WorkspaceRecordType, Permission> = {
+  product: "view_products",
+  customer: "view_customers",
+  supplier: "view_suppliers",
+  invoice: "view_invoices",
+  order: "view_orders",
+};
+
+const RECORD_MODULE_PAGES: Record<WorkspaceRecordType, Page> = {
+  product: "products",
+  customer: "customers",
+  supplier: "suppliers",
+  invoice: "invoices",
+  order: "orders",
 };
 
 const PAGE_MODULES: Partial<Record<Page, string>> = {
@@ -161,6 +183,7 @@ const PAGE_META: Record<Page, { group: string; title: string }> = {
   "data-export": { group: "الإدارة", title: "تصدير البيانات" },
   vouchers: { group: "الحسابات", title: "سندات القبض والصرف" },
   "payment-schedules": { group: "الحسابات", title: "الشيكات والأقساط" },
+  "workspace-record": { group: "مساحة العمل", title: "سجل" },
 };
 
 const REPORT_TITLES: Record<ReportKind, string> = {
@@ -208,6 +231,22 @@ const CREATE_ACTIONS: Array<{ id: string; page: CreateTarget; label: string; per
 interface WorkspaceState {
   tabs: WorkspaceTab<Page>[];
   activeId: string;
+}
+
+function readWorkspaceRecordTarget(value: unknown): WorkspaceRecordTarget | null {
+  if (!value || typeof value !== "object") return null;
+  const candidate = value as Partial<WorkspaceRecordTarget>;
+  if (!["product", "customer", "supplier", "invoice", "order"].includes(candidate.type ?? "")) return null;
+  if (typeof candidate.title !== "string" || typeof candidate.group !== "string") return null;
+  if (candidate.id !== undefined && typeof candidate.id !== "string") return null;
+  if (candidate.lookup !== undefined) {
+    if (!candidate.lookup || typeof candidate.lookup !== "object") return null;
+    if (!["sku", "phone", "invoiceNumber"].includes(candidate.lookup.kind)) return null;
+    if (typeof candidate.lookup.value !== "string") return null;
+    if (candidate.lookup.branchId !== undefined && typeof candidate.lookup.branchId !== "string") return null;
+  }
+  if (!candidate.id && !candidate.lookup) return null;
+  return candidate as WorkspaceRecordTarget;
 }
 
 function makeInitialDashboard(): WorkspaceTab<Page> {
@@ -293,6 +332,9 @@ export function ERPApp() {
     return isModuleEnabled(page) && (hasPermission || hasFollowUpFallback);
   };
 
+  const canAccessWorkspaceRecord = (target: WorkspaceRecordTarget) =>
+    can(RECORD_PERMISSIONS[target.type]) && isModuleEnabled(RECORD_MODULE_PAGES[target.type]);
+
   const canSelectWorkingBranch =
     settings !== undefined &&
     me?.role === "admin" &&
@@ -321,7 +363,12 @@ export function ERPApp() {
       if (!restored || restored.tabs.length === 0) return;
       const now = Date.now();
       const tabs = restored.tabs
-        .filter((tab) => tab.page in PAGE_META && canAccessPage(tab.page))
+        .filter((tab) => {
+          if (!(tab.page in PAGE_META) || !canAccessPage(tab.page)) return false;
+          if (tab.page !== "workspace-record") return true;
+          const target = readWorkspaceRecordTarget(tab.payload?.recordTarget);
+          return Boolean(target && canAccessWorkspaceRecord(target));
+        })
         .map((tab, index): WorkspaceTab<Page> => ({
           ...tab,
           id: createWorkspaceTabId("restored"),
@@ -366,6 +413,7 @@ export function ERPApp() {
     kind = "singleton",
     identityKey,
     title,
+    group,
     entityId,
     payload,
     restoreSafe,
@@ -374,6 +422,7 @@ export function ERPApp() {
     kind?: WorkspaceTabKind;
     identityKey?: string;
     title?: string;
+    group?: string;
     entityId?: string;
     payload?: Record<string, unknown>;
     restoreSafe?: boolean;
@@ -390,7 +439,7 @@ export function ERPApp() {
         id: createWorkspaceTabId(page),
         page,
         title: resolvedTitle,
-        group: meta.group,
+        group: group ?? meta.group,
         identityKey: resolvedIdentity,
         kind: resolvedKind,
         dirty: false,
@@ -405,6 +454,21 @@ export function ERPApp() {
     });
     setQuickMenuOpen(false);
     setSidebarOpen(false);
+  };
+
+  const openWorkspaceRecord = (target: WorkspaceRecordTarget) => {
+    if (!canAccessWorkspaceRecord(target)) return;
+    const recordKey = workspaceRecordIdentity(target);
+    openWorkspaceTab({
+      page: "workspace-record",
+      kind: "entity",
+      identityKey: entityIdentity("workspace-record", recordKey),
+      title: target.title,
+      group: target.group,
+      entityId: target.id ?? recordKey,
+      payload: { recordTarget: target },
+      restoreSafe: true,
+    });
   };
 
   const navigate = (page: Page) => {
@@ -507,6 +571,88 @@ export function ERPApp() {
     performClose(existingIds);
   };
 
+  const handleWorkspaceRecordClick = (event: React.MouseEvent<HTMLElement>) => {
+    const target = event.target instanceof Element ? event.target : null;
+    if (!target) return;
+
+    const invoiceRow = target.closest<HTMLElement>('tr[data-testid="invoice-row"]');
+    if (invoiceRow) {
+      const interactive = target.closest("button, a, input, select, textarea");
+      const explicitOpen = target.closest('[data-testid="invoice-open"], [data-testid="invoice-open-number"]');
+      if (interactive && !explicitOpen) return;
+      const invoiceNumber = invoiceRow.dataset.invoiceNumber;
+      if (!invoiceNumber) return;
+      event.preventDefault();
+      event.stopPropagation();
+      openWorkspaceRecord({
+        type: "invoice",
+        title: `فاتورة ${invoiceNumber}`,
+        group: "المبيعات",
+        lookup: { kind: "invoiceNumber", value: invoiceNumber },
+      });
+      return;
+    }
+
+    const customerRow = target.closest<HTMLElement>('tr[data-testid="customer-card"]');
+    if (customerRow) {
+      const interactive = target.closest<HTMLElement>("button, a, input, select, textarea");
+      if (interactive && interactive.textContent?.trim() !== "بطاقة") return;
+      const customerName = customerRow.dataset.customerName?.trim();
+      const phone = customerRow.querySelector("td:nth-child(2)")?.textContent?.trim();
+      if (!customerName || !phone) return;
+      event.preventDefault();
+      event.stopPropagation();
+      openWorkspaceRecord({
+        type: "customer",
+        title: `العميل: ${customerName}`,
+        group: "العملاء",
+        lookup: { kind: "phone", value: phone },
+      });
+      return;
+    }
+
+    const productRow = target.closest<HTMLElement>('tr[data-testid="product-row"]');
+    if (productRow) {
+      if (target.closest("button, a, input, select, textarea")) return;
+      const productName = productRow.dataset.productName?.trim();
+      const sku = productRow.dataset.productSku?.trim();
+      if (!productName || !sku) return;
+      event.preventDefault();
+      event.stopPropagation();
+      openWorkspaceRecord({
+        type: "product",
+        title: productName,
+        group: "المخزون",
+        lookup: {
+          kind: "sku",
+          value: sku,
+          branchId: productRow.dataset.productBranchId || undefined,
+        },
+      });
+    }
+  };
+
+  const handleWorkspaceRecordKeyDown = (event: React.KeyboardEvent<HTMLElement>) => {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    if (!(event.target instanceof HTMLElement)) return;
+    const row = event.target.closest<HTMLElement>('tr[data-testid="invoice-row"], tr[data-testid="customer-card"]');
+    if (!row || event.target !== row) return;
+    const invoiceNumber = row.dataset.invoiceNumber;
+    if (invoiceNumber) {
+      event.preventDefault();
+      event.stopPropagation();
+      openWorkspaceRecord({ type: "invoice", title: `فاتورة ${invoiceNumber}`, group: "المبيعات", lookup: { kind: "invoiceNumber", value: invoiceNumber } });
+      return;
+    }
+    const customerName = row.dataset.customerName?.trim();
+    const phone = row.querySelector("td:nth-child(2)")?.textContent?.trim();
+    if (customerName && phone) {
+      event.preventDefault();
+      event.stopPropagation();
+      openWorkspaceRecord({ type: "customer", title: `العميل: ${customerName}`, group: "العملاء", lookup: { kind: "phone", value: phone } });
+    }
+  };
+
   if (me === undefined) {
     return (
       <div className="flex h-screen items-center justify-center bg-slate-50" dir="rtl">
@@ -535,12 +681,17 @@ export function ERPApp() {
   };
 
   const renderTab = (tab: WorkspaceTab<Page>) => {
-    const tabAuthorized = canAccessPage(tab.page);
+    const recordTarget = tab.page === "workspace-record" ? readWorkspaceRecordTarget(tab.payload?.recordTarget) : null;
+    const tabAuthorized = canAccessPage(tab.page) && (tab.page !== "workspace-record" || Boolean(recordTarget && canAccessWorkspaceRecord(recordTarget)));
     const createToken = typeof tab.payload?.createRequestToken === "number" ? tab.payload.createRequestToken : undefined;
     const reportTarget = (tab.payload?.reportTarget as ReportKind | undefined) ?? "sales";
     const voucherKind = tab.payload?.voucherKind === "disbursement" ? "disbursement" : "receipt";
     const customerId = typeof tab.payload?.customerId === "string" ? tab.payload.customerId as Id<"customers"> : undefined;
     const branchId = typeof tab.payload?.branchId === "string" ? tab.payload.branchId as Id<"branches"> : undefined;
+    const navigateFromNewTab = (page: Page) => {
+      markTabDirty(tab.id, false);
+      navigate(page);
+    };
 
     return (
       <section
@@ -576,8 +727,8 @@ export function ERPApp() {
         {tabAuthorized && tab.page === "invoices" && <InvoicesPage onNavigate={navigate} view="sales" />}
         {tabAuthorized && tab.page === "sales-returns" && <InvoicesPage onNavigate={navigate} view="returns" />}
         {tabAuthorized && tab.page === "credit-invoices" && <InvoicesPage onNavigate={navigate} view="sales" creditOnly />}
-        {tabAuthorized && tab.page === "new-invoice" && <NewInvoicePage onNavigate={navigate} />}
-        {tabAuthorized && tab.page === "new-purchase-invoice" && <NewPurchaseInvoicePage onNavigate={navigate} />}
+        {tabAuthorized && tab.page === "new-invoice" && <NewInvoicePage onNavigate={navigateFromNewTab} />}
+        {tabAuthorized && tab.page === "new-purchase-invoice" && <NewPurchaseInvoicePage onNavigate={navigateFromNewTab} />}
         {tabAuthorized && tab.page === "quotes" && <QuotesPage createRequestToken={createToken} />}
         {tabAuthorized && tab.page === "repairs" && <RepairsPage createRequestToken={createToken} />}
         {tabAuthorized && tab.page === "expenses" && <ExpensesPage createRequestToken={createToken} />}
@@ -601,6 +752,9 @@ export function ERPApp() {
         {tabAuthorized && tab.page === "data-export" && <DataExportPage permissions={permissions} />}
         {tabAuthorized && tab.page === "vouchers" && <VouchersPage initialKind={voucherKind} createRequestToken={createToken} />}
         {tabAuthorized && tab.page === "payment-schedules" && <PaymentSchedulesPage createRequestToken={createToken} />}
+        {tabAuthorized && tab.page === "workspace-record" && recordTarget && (
+          <WorkspaceRecordPage target={recordTarget} onOpenRecord={openWorkspaceRecord} />
+        )}
       </section>
     );
   };
@@ -648,7 +802,7 @@ export function ERPApp() {
               </div>
             </div>
 
-            {!PAGES_WITHOUT_GLOBAL_SEARCH.has(currentPage) && <GlobalSearch onNavigate={navigate} />}
+            {!PAGES_WITHOUT_GLOBAL_SEARCH.has(currentPage) && <GlobalSearch onNavigate={navigate} onOpenRecord={openWorkspaceRecord} />}
             <div className="mr-auto flex items-center gap-2.5">
               {canSelectWorkingBranch && (
                 <select
@@ -714,7 +868,11 @@ export function ERPApp() {
             onRequestClose={requestClose}
           />
 
-          <main className="erp-workspace-main min-h-0 flex-1 overflow-y-auto">
+          <main
+            className="erp-workspace-main min-h-0 flex-1 overflow-y-auto"
+            onClickCapture={handleWorkspaceRecordClick}
+            onKeyDownCapture={handleWorkspaceRecordKeyDown}
+          >
             {workspace.tabs.map(renderTab)}
           </main>
         </div>
