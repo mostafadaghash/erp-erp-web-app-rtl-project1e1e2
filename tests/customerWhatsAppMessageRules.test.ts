@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   CUSTOMER_WHATSAPP_MESSAGE_STATUS_LABELS,
+  CUSTOMER_WHATSAPP_MESSAGE_TYPE_LABELS,
   buildCustomerWhatsAppMessageBody,
   buildCustomerWhatsAppMessageKey,
   canStartCustomerWhatsAppAttempt,
@@ -57,7 +58,8 @@ test("duplicate protection blocks unresolved or completed sends but permits fail
   assert.equal(canStartCustomerWhatsAppAttempt("succeeded"), false);
 });
 
-test("prepared templates contain customer and operation reference without financial data", () => {
+test("prepared templates use unified shipping terminology without financial data", () => {
+  assert.equal(CUSTOMER_WHATSAPP_MESSAGE_TYPE_LABELS.shipped, "تم التسليم لشركة الشحن");
   const message = buildCustomerWhatsAppMessageBody({
     customerName: "أحمد",
     operationType: "delivery",
@@ -66,7 +68,7 @@ test("prepared templates contain customer and operation reference without financ
   });
   assert.match(message, /أحمد/);
   assert.match(message, /DEL-2026-001/);
-  assert.match(message, /تم شحن/);
+  assert.match(message, /شركة الشحن/);
   assert.doesNotMatch(message, /تكلفة|ربح|متبقي|مدفوع/);
 });
 
