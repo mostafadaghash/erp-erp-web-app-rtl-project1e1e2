@@ -16,6 +16,7 @@ import type * as customerFollowUpOutcomes from "../customerFollowUpOutcomes.js";
 import type * as customerFollowUps from "../customerFollowUps.js";
 import type * as customerFollowUpWorkspace from "../customerFollowUpWorkspace.js";
 import type * as customerTrackingPortal from "../customerTrackingPortal.js";
+import type * as customerWhatsAppMessages from "../customerWhatsAppMessages.js";
 import type * as customers from "../customers.js";
 import type * as deliveries from "../deliveries.js";
 import type * as employees from "../employees.js";
@@ -60,6 +61,7 @@ declare const fullApi: ApiFromModules<{
   customerFollowUps: typeof customerFollowUps;
   customerFollowUpWorkspace: typeof customerFollowUpWorkspace;
   customerTrackingPortal: typeof customerTrackingPortal;
+  customerWhatsAppMessages: typeof customerWhatsAppMessages;
   customers: typeof customers;
   deliveries: typeof deliveries;
   employees: typeof employees;
