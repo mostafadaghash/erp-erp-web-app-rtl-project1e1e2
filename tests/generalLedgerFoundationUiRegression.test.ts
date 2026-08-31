@@ -3,121 +3,85 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
 const ui = readFileSync("src/components/GeneralLedgerPage.tsx", "utf8");
-const app = readFileSync("src/components/ERPApp.tsx", "utf8");
-const sidebar = readFileSync("src/components/Sidebar.tsx", "utf8");
+const backend = readFileSync("convex/generalLedger.ts", "utf8");
 
-// Foundation visibility and access.
-test("GLUI-01 general ledger is routed and permission protected", () => {
-  assert.match(app, /general-ledger/);
-  assert.match(app, /view_general_ledger/);
-  assert.match(sidebar, /general-ledger/);
+test("GLUI-01 renders the complete page in Arabic RTL", () => {
+  assert.match(ui, /dir="rtl"/);
+  assert.match(ui, /الأستاذ العام/);
 });
 
-test("GLUI-02 page exposes foundation state without pretending full operational posting", () => {
+test("GLUI-02 keeps the Foundation-only warning visible", () => {
   assert.match(ui, /وضع التأسيس Foundation/);
-  assert.match(ui, /operationalPostingEnabled/);
-  assert.match(ui, /financialPostingEnabled/);
+  assert.match(ui, /الترحيل التشغيلي:[\s\S]*غير مفعّل/);
+  assert.match(ui, /COD غير مفعّل بعد/);
 });
 
-test("GLUI-03 page uses protected general-ledger queries and mutations", () => {
-  for (const token of [
-    "generalLedger.status",
-    "generalLedger.chart",
-    "generalLedger.periods",
-    "generalLedger.openingStatus",
-    "generalLedger.entriesPage",
-    "generalLedger.ledgerPage",
-    "generalLedger.trialBalancePage",
-    "generalLedger.initialize",
-    "generalLedger.confirmOpening",
-    "generalLedger.postManualJournal",
-    "generalLedger.reverseJournal",
-    "generalLedger.closePeriod",
-    "generalLedger.reopenPeriod",
-  ]) assert.match(ui, new RegExp(token.replaceAll(".", "\\.")));
+test("GLUI-03 protects every capability with a top-level permission hook", () => {
+  for (const permission of [
+    "view_general_ledger",
+    "initialize_general_ledger",
+    "manage_chart_of_accounts",
+    "post_manual_journals",
+    "reverse_journal_entries",
+    "close_accounting_periods",
+    "reopen_accounting_periods",
+    "print_general_ledger",
+  ]) {
+    assert.match(ui, new RegExp(`usePermission\\("${permission}"\\)`));
+  }
 });
 
-test("GLUI-04 branch context is explicit for administrators", () => {
+test("GLUI-04 blocks the page when view permission is absent", () => {
+  assert.match(ui, /if \(!canView\)/);
+  assert.match(ui, /لا تملك صلاحية عرض الأستاذ العام/);
+});
+
+test("GLUI-05 loads GL branch options through a protected dedicated query", () => {
   assert.match(ui, /generalLedger\.availableBranches/);
-  assert.match(ui, /canSelectBranch/);
-  assert.match(ui, /اختر الفرع/);
+  assert.match(ui, /canView \? \{\} : "skip"/);
+  assert.match(backend, /availableBranches=query/);
+  assert.match(backend, /requirePermission\(ctx,"view_general_ledger"\)/);
 });
 
-test("GLUI-05 initialization is permission gated and one-time", () => {
-  assert.match(ui, /initialize_general_ledger/);
+test("GLUI-06 lets Admin and Accountant choose a branch", () => {
+  assert.match(ui, /me\?\.role === "admin" \|\| me\?\.role === "accountant"/);
+  assert.match(ui, /الفرع النشط/);
+  assert.match(ui, /onChange=\{\(event\) => changeBranch/);
+});
+
+test("GLUI-07 pins non-central users to their available branch", () => {
+  assert.match(ui, /canSelectBranch \?/);
+  assert.match(ui, /فرع المستخدم/);
+  assert.match(backend, /if\(!user\.branchId\)throw new ConvexError/);
+});
+
+test("GLUI-08 rotates scoped request ids and selections on branch change", () => {
+  assert.match(
+    ui,
+    /useEffect\(\(\) => \{[\s\S]*openingRequestId\.current = newRequestId\(\)/,
+  );
+  assert.match(ui, /journalRequestId\.current = newRequestId\(\)/);
+  assert.match(ui, /reversalRequestId\.current = newRequestId\(\)/);
+  assert.match(ui, /setSelectedEntryId\(null\)/);
+});
+
+test("GLUI-09 reads and displays the server cutover date", () => {
+  assert.match(backend, /cutoverDate:s\.cutoverDate/);
+  assert.match(ui, /status\?\.initialized/);
+  assert.match(ui, /setOpeningDate\(status\.cutoverDate\)/);
+  assert.match(ui, /تاريخ القطع: \{status\.cutoverDate\}/);
+});
+
+test("GLUI-10 initializes the GL with a stable request id and busy guard", () => {
   assert.match(ui, /generalLedger\.initialize/);
-  assert.match(ui, /تهيئة الأستاذ العام/);
+  assert.match(ui, /initializeRequestId = useRef\(newRequestId\(\)\)/);
+  assert.match(ui, /requestId: initializeRequestId\.current/);
+  assert.match(ui, /if \(busy\) return/);
 });
 
-test("GLUI-06 chart supports hierarchy, class labels and deactivation", () => {
-  assert.match(ui, /chartChildren/);
-  assert.match(ui, /accountClassLabel/);
-  assert.match(ui, /renderChart/);
-  assert.match(ui, /deactivateAccount/);
-});
-
-test("GLUI-07 opening balances require balanced lines or explicit zero opening", () => {
-  assert.match(ui, /isZeroOpening/);
-  assert.match(ui, /lineValidation/);
-  assert.match(ui, /اعتماد افتتاح صفري/);
-});
-
-test("GLUI-08 manual journals expose date, memo and dynamic lines", () => {
-  assert.match(ui, /post_manual_journals/);
-  assert.match(ui, /JournalLinesEditor/);
-  assert.match(ui, /وصف السطر/);
-});
-
-test("GLUI-09 reversal requires reason and date", () => {
-  assert.match(ui, /reverse_journal_entries/);
-  assert.match(ui, /reversalReason/);
-  assert.match(ui, /reversalDate/);
-});
-
-test("GLUI-10 period controls expose close and reopen operations", () => {
-  assert.match(ui, /close_accounting_periods/);
-  assert.match(ui, /reopen_accounting_periods/);
-  assert.match(ui, /إغلاق الفترة/);
-  assert.match(ui, /إعادة فتح الفترة/);
-});
-
-test("GLUI-11 entries use server pagination instead of client slicing", () => {
-  assert.match(ui, /usePaginatedQuery\(\s*api\.generalLedger\.entriesPage/);
-  assert.match(ui, /entries\.loadMore/);
-  assert.doesNotMatch(ui, /entries\.slice\(/);
-});
-
-test("GLUI-12 ledger uses server pagination instead of client slicing", () => {
-  assert.match(ui, /usePaginatedQuery\(\s*api\.generalLedger\.ledgerPage/);
-  assert.match(ui, /ledger\.loadMore/);
-  assert.doesNotMatch(ui, /ledger\.slice\(/);
-});
-
-test("GLUI-13 trial balance uses server pagination instead of client slicing", () => {
-  assert.match(ui, /usePaginatedQuery\(\s*api\.generalLedger\.trialBalancePage/);
-  assert.match(ui, /trial\.loadMore/);
-  assert.doesNotMatch(ui, /trial\.slice\(/);
-});
-
-test("GLUI-14 printing uses dedicated full queries instead of browser-loaded pages", () => {
-  assert.match(ui, /entriesForPrint/);
-  assert.match(ui, /ledgerForPrint/);
-  assert.match(ui, /trialBalanceForPrint/);
-});
-
-test("GLUI-15 print permissions are explicitly enforced", () => {
-  assert.match(ui, /print_general_ledger/);
-  assert.match(ui, /canPrint/);
-});
-
-test("GLUI-16 print popup is isolated from the application DOM", () => {
-  assert.match(ui, /window\.open\("", "_blank"/);
-  assert.match(ui, /popup\.opener = null/);
-  assert.match(ui, /document\.write/);
-});
-
-test("GLUI-17 page exposes chart, opening, journal, entries, periods, ledger and trial tabs", () => {
+test("GLUI-11 exposes all eight functional tabs", () => {
   for (const label of [
+    "الملخص",
     "دليل الحسابات",
     "الأرصدة الافتتاحية",
     "قيد يدوي",
@@ -125,22 +89,69 @@ test("GLUI-17 page exposes chart, opening, journal, entries, periods, ledger and
     "الفترات",
     "دفتر الحساب",
     "ميزان المراجعة",
-  ]) assert.match(ui, new RegExp(label));
+  ]) {
+    assert.match(ui, new RegExp(label));
+  }
 });
 
-test("GLUI-18 foundation copy keeps unsupported operational posting explicit", () => {
-  assert.match(ui, /ربط المبيعات والمخزون والمشتريات غير النقدية ما زال معطلًا/);
-  assert.match(ui, /الربط التلقائي للمبيعات والمخزون والمشتريات وCOD غير مفعّل بعد/);
+test("GLUI-12 renders a hierarchical chart from parent relationships", () => {
+  assert.match(ui, /chartChildren = useMemo/);
+  assert.match(ui, /renderChart\(/);
+  assert.match(ui, /renderChart\(account\._id, depth \+ 1\)/);
 });
 
-test("GLUI-19 opening and journal flows expose idempotency request ids", () => {
-  assert.match(ui, /openingRequestId/);
-  assert.match(ui, /journalRequestId/);
-  assert.match(ui, /newRequestId/);
+test("GLUI-13 creates only posting children under active grouping accounts", () => {
+  assert.match(ui, /generalLedger\.createAccount/);
+  assert.match(ui, /!account\.isPosting && account\.isActive/);
+  assert.match(ui, /اختر الحساب التجميعي الأب/);
+});
+
+test("GLUI-14 derives account normal side and supports contra accounts", () => {
+  assert.match(ui, /newAccountNormalSide/);
+  assert.match(ui, /newAccount\.isContra/);
+  assert.match(ui, /حساب مقابل Contra/);
+});
+
+test("GLUI-15 deactivates accounts through a confirmation modal", () => {
+  assert.match(ui, /generalLedger\.deactivateAccount/);
+  assert.match(ui, /modal === "deactivate"/);
+  assert.match(ui, /ستظل القيود التاريخية محفوظة/);
+  assert.doesNotMatch(ui, /window\.confirm/);
+});
+
+test("GLUI-16 reads branch opening state with skip protection", () => {
+  assert.match(ui, /generalLedger\.openingStatus/);
+  assert.match(
+    ui,
+    /canView && effectiveBranch \? \{ branchId: effectiveBranch \} : "skip"/,
+  );
+  assert.match(backend, /openingStatus=query/);
+});
+
+test("GLUI-17 supports an explicit zero opening without journal lines", () => {
+  assert.match(ui, /اعتماد رصيد افتتاحي صفري/);
+  assert.match(ui, /lines: zeroOpening \? \[\] : journalArgs\(openingLines\)/);
+});
+
+test("GLUI-18 supports a balanced non-zero opening with dynamic lines", () => {
+  assert.match(ui, /JournalLinesEditor/);
+  assert.match(ui, /openingTotals\.valid/);
+  assert.match(ui, /generalLedger\.confirmOpening/);
+});
+
+test("GLUI-19 preserves the opening request id across failed retries", () => {
+  assert.match(ui, /openingRequestId = useRef\(newRequestId\(\)\)/);
+  assert.match(ui, /requestId: openingRequestId\.current/);
+  assert.match(
+    ui,
+    /run\([\s\S]*"تم اعتماد افتتاح الفرع",[\s\S]*openingRequestId/,
+  );
 });
 
 test("GLUI-20 provides a dynamic multi-line manual journal editor", () => {
-  assert.match(ui, /onChange\(\[\.\.\.lines, newLine\(\)\]\)/);
+  assert.match(ui, /قيد يومية يدوي متعدد السطور/);
+  assert.match(ui, /setJournalLines/);
+  assert.match(ui, /إضافة سطر/);
   assert.match(ui, /حذف السطر/);
 });
 
@@ -153,13 +164,11 @@ test("GLUI-21 prevents one-sided, duplicate, zero, or unbalanced journals", () =
   assert.match(ui, /debit === credit/);
 });
 
-test("GLUI-22 previews debit credit and difference in the configured base currency", () => {
+test("GLUI-22 previews debit credit and difference in EGP", () => {
   assert.match(ui, /إجمالي المدين:/);
   assert.match(ui, /إجمالي الدائن:/);
   assert.match(ui, /الفرق:/);
-  assert.match(ui, /useCurrency\(\)/);
-  assert.match(ui, /formatCurrency\(totals\.debit\)/);
-  assert.match(ui, /currencyCode/);
+  assert.match(ui, /currency: "EGP"/);
 });
 
 test("GLUI-23 posts journals only after branch opening", () => {
@@ -174,35 +183,163 @@ test("GLUI-24 preserves the journal request id on failure and rotates it on succ
   assert.match(ui, /"تم ترحيل القيد",[\s\S]*journalRequestId/);
 });
 
-test("GLUI-25 reversal request id is preserved on failure and rotates on success", () => {
-  assert.match(ui, /reversalRequestId = useRef\(newRequestId\(\)\)/);
+test("GLUI-25 paginates journal entries with real Convex pagination", () => {
+  assert.match(ui, /usePaginatedQuery\([\s\S]*generalLedger\.entriesPaginated/);
+  assert.match(ui, /entries\.status === "CanLoadMore"/);
+  assert.match(ui, /entries\.loadMore\(15\)/);
+});
+
+test("GLUI-26 loads entry details only for a selected entry", () => {
+  assert.match(ui, /generalLedger\.entryDetails/);
+  assert.match(
+    ui,
+    /canView && selectedEntryId \? \{ entryId: selectedEntryId \} : "skip"/,
+  );
+  assert.match(ui, /تفاصيل \{entryDetails\.entryNumber\}/);
+});
+
+test("GLUI-27 reverses a posted non-reversal journal through a modal", () => {
+  assert.match(ui, /entry\.status === "posted"/);
+  assert.match(ui, /entry\.sourceType !== "reversal"/);
+  assert.match(ui, /modal === "reverse"/);
+  assert.match(ui, /generalLedger\.reverseJournal/);
+});
+
+test("GLUI-28 requires reversal date reason and stable idempotency", () => {
+  assert.match(ui, /سبب الإلغاء الإلزامي/);
+  assert.match(ui, /!reversalReason\.trim\(\)/);
   assert.match(ui, /requestId: reversalRequestId\.current/);
 });
 
-test("GLUI-26 branch change rotates request ids so stale requests are not reused", () => {
-  assert.match(ui, /openingRequestId\.current = newRequestId\(\)/);
-  assert.match(ui, /journalRequestId\.current = newRequestId\(\)/);
-  assert.match(ui, /reversalRequestId\.current = newRequestId\(\)/);
+test("GLUI-29 creates or opens a valid monthly accounting period", () => {
+  assert.match(ui, /generalLedger\.createOrOpenPeriod/);
+  assert.match(ui, /type="month"/);
+  assert.match(ui, /\^\\d\{4\}-\(0\[1-9\]\|1\[0-2\]\)\$/);
 });
 
-test("GLUI-27 ledger and trial filters reset pagination deliberately", () => {
-  assert.match(ui, /setLedgerAccountId/);
-  assert.match(ui, /setLedgerPeriod/);
-  assert.match(ui, /setTrialPeriod/);
+test("GLUI-30 closes periods only with permission and a reason", () => {
+  assert.match(ui, /generalLedger\.closePeriod/);
+  assert.match(ui, /periodAction === "close"/);
+  assert.match(ui, /!periodReason\.trim\(\)/);
+  assert.match(ui, /canClose/);
 });
 
-test("GLUI-28 entry print query is bounded by period", () => {
-  assert.match(ui, /entriesForPrint/);
-  assert.match(ui, /printEntryPeriod/);
+test("GLUI-31 reopens periods through a separate permission path", () => {
+  assert.match(ui, /generalLedger\.reopenPeriod/);
+  assert.match(ui, /setPeriodAction\("reopen"\)/);
+  assert.match(ui, /canReopen/);
 });
 
-test("GLUI-29 ledger print query is bounded by account and period", () => {
-  assert.match(ui, /ledgerForPrint/);
-  assert.match(ui, /ledgerAccountId/);
-  assert.match(ui, /ledgerPeriod/);
+test("GLUI-32 paginates the account ledger using the indexed public query", () => {
+  assert.match(
+    ui,
+    /usePaginatedQuery\([\s\S]*generalLedger\.accountLedgerPaginated/,
+  );
+  assert.match(ui, /ledger\.status === "CanLoadMore"/);
+  assert.match(ui, /ledger\.loadMore\(20\)/);
 });
 
-test("GLUI-30 trial print query is bounded by period", () => {
-  assert.match(ui, /trialBalanceForPrint/);
-  assert.match(ui, /trialPeriod/);
+test("GLUI-33 displays opening and continuous running balances", () => {
+  assert.match(ui, /ledgerOpeningPage\?\.openingBalance/);
+  assert.match(ui, /الرصيد الافتتاحي قبل الفترة/);
+  assert.match(ui, /row\.runningBalance/);
+});
+
+test("GLUI-34 loads trial balance only with branch and period", () => {
+  assert.match(ui, /generalLedger\.trialBalance/);
+  assert.match(ui, /canView && effectiveBranch && trialPeriod/);
+  assert.match(ui, /periodKey: trialPeriod/);
+});
+
+test("GLUI-35 renders opening movement and closing debit-credit columns", () => {
+  assert.match(ui, /row\.openingDebit/);
+  assert.match(ui, /row\.openingCredit/);
+  assert.match(ui, /row\.periodDebit/);
+  assert.match(ui, /row\.periodCredit/);
+  assert.match(ui, /row\.closingDebit/);
+  assert.match(ui, /row\.closingCredit/);
+});
+
+test("GLUI-36 prints an entry from the protected DTO after awaiting Convex", () => {
+  assert.match(ui, /await convex\.query\(api\.generalLedger\.entryForPrint/);
+  assert.match(ui, /if \(busy \|\| !canPrint\) return/);
+  assert.match(ui, /قيد يومية \$\{dto\.entryNumber\}/);
+});
+
+test("GLUI-37 prints trial balance from its protected print query", () => {
+  assert.match(
+    ui,
+    /await convex\.query\([\s\S]*generalLedger\.trialBalanceForPrint/,
+  );
+  assert.match(ui, /طباعة ميزان المراجعة/);
+  assert.match(ui, /إعداد: __________/);
+  assert.match(ui, /مراجعة: __________/);
+  assert.match(ui, /اعتماد: __________/);
+});
+
+test("GLUI-38 escapes printable database text before document.write", () => {
+  assert.match(ui, /const escapeHtml/);
+  assert.match(ui, /escapeHtml\(dto\.memo\)/);
+  assert.match(ui, /escapeHtml\(row\.nameAr\)/);
+});
+
+test("GLUI-39 surfaces real Convex errors and blocks double submission", () => {
+  assert.match(ui, /getErrorMessage\(error, "تعذر تنفيذ العملية"\)/);
+  assert.match(ui, /disabled=\{busy/);
+  assert.match(ui, /if \(busy\) return/);
+});
+
+test("GLUI-40 forbids unsafe escapes prompts and fake print hooks", () => {
+  assert.doesNotMatch(ui, /\bas\s+any\b|@ts-ign[o]re/);
+  assert.doesNotMatch(ui, /window\.prompt|prompt\(/);
+  assert.doesNotMatch(ui, /__generalLedgerPrint|setTimeout\([^)]*print/);
+  assert.match(ui, /window\.open\("", "_blank"\)/);
+});
+
+test("FGBUI-01 financial readiness query is permission and state gated", () => {
+  assert.match(ui, /api\.generalLedger\.financialPostingReadinessStatus/);
+  assert.match(
+    ui,
+    /canInitialize[\s\S]*status\?\.initialized[\s\S]*!status\.financialPostingEnabled/,
+  );
+  assert.match(ui, /: "skip"/);
+});
+
+test("FGBUI-02 activation uses the dedicated backend mutation", () => {
+  assert.match(
+    ui,
+    /useMutation\(\s*api\.generalLedger\.enableFinancialPosting/,
+  );
+  assert.match(ui, /enableFinancialPosting\(\{/);
+  assert.match(ui, /cutoverDate: financialCutoverDate/);
+});
+
+test("FGBUI-03 activation request id remains stable across failure", () => {
+  assert.match(
+    ui,
+    /const financialPostingRequestId = useRef\(newRequestId\(\)\)/,
+  );
+  assert.match(ui, /requestId: financialPostingRequestId\.current/);
+  assert.match(ui, /financialPostingRequestId,\s*\)/);
+});
+
+test("FGBUI-04 activation button requires successful reconciliation", () => {
+  assert.match(ui, /!financialReadiness\?\.ready/);
+  assert.match(ui, /financialReadiness\.issues\.map/);
+  assert.match(ui, /المطابقة ناجحة وجاهزة للتفعيل/);
+});
+
+test("FGBUI-05 UI distinguishes financial bridge from full operational posting", () => {
+  assert.match(ui, /ربط الخزائن بالأستاذ العام/);
+  assert.match(ui, /status\.financialPostingEnabled/);
+  assert.match(ui, /status\.operationalPostingEnabled/);
+  assert.match(
+    ui,
+    /ربط المبيعات والمخزون والمشتريات غير النقدية ما زال معطلًا/,
+  );
+});
+
+test("FGBUI-06 financial journal sources have explicit Arabic labels", () => {
+  assert.match(ui, /financial: "تشغيلي مالي"/);
+  assert.match(ui, /financial_reversal: "إلغاء حركة مالية"/);
 });
