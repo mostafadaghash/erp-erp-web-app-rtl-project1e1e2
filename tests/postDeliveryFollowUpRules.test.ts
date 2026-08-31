@@ -30,12 +30,16 @@ test("post-delivery delay rejects invalid configuration", () => {
   assert.throws(() => addDaysToIsoDate("2026-02-30", 2), /تاريخ التسليم غير صالح/);
 });
 
-test("only real delivery transitions trigger automatic follow-up", () => {
+test("only real terminal delivery transitions trigger automatic follow-up", () => {
+  assert.equal(isPostDeliveryAuditTrigger({ module: "orders", action: "update_status", status: "delivered_to_customer" }), true);
+  assert.equal(isPostDeliveryAuditTrigger({ module: "orders", action: "update_status", status: "received" }), true);
   assert.equal(isPostDeliveryAuditTrigger({ module: "orders", action: "update_status", status: "delivered" }), true);
   assert.equal(isPostDeliveryAuditTrigger({ module: "repairs", action: "update_status", status: "delivered" }), true);
   assert.equal(isPostDeliveryAuditTrigger({ module: "deliveries", action: "confirm", status: "delivered" }), true);
   assert.equal(isPostDeliveryAuditTrigger({ module: "deliveries", action: "update_status", status: "delivered" }), false);
+  assert.equal(isPostDeliveryAuditTrigger({ module: "orders", action: "update_status", status: "handed_to_shipping" }), false);
   assert.equal(isPostDeliveryAuditTrigger({ module: "orders", action: "update_status", status: "ready" }), false);
+  assert.equal(isPostDeliveryAuditTrigger({ module: "repairs", action: "update_status", status: "rejected_by_shipping" }), false);
   assert.equal(isPostDeliveryAuditTrigger({ module: "customer_follow_ups", action: "create", status: "follow_up_later" }), false);
 });
 
