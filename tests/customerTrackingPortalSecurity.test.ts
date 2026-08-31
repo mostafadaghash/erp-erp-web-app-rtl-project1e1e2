@@ -78,10 +78,12 @@ test("legacy repair tracking can no longer act as an unauthenticated public endp
   const auth = read("convex/lib/auth.ts");
   const legacy = repairs.match(/export const getByTracking = query\(\{[\s\S]*?\n\}\);\n\nexport const create/);
   assert.ok(legacy, "legacy endpoint guard must remain detectable");
+  assert.match(legacy[0], /requirePermission\(ctx, "view_repairs"\)/);
   assert.match(legacy[0], /requireModuleEnabled\(ctx, "repairs"\)/);
+
   const moduleGuard = auth.match(/export async function requireModuleEnabled\([\s\S]*?\n\}\n\nexport async function requireModulePermission/);
   assert.ok(moduleGuard, "module guard must remain detectable");
-  assert.match(moduleGuard[0], /await requireAuth\(ctx\)/);
+  assert.doesNotMatch(moduleGuard[0], /requireAuth\(ctx\)/);
 });
 
 test("tracking tokens are isolated in a dedicated indexed table and not written to audit details", () => {
