@@ -17,6 +17,7 @@ const emptyResult = {
   nonEmptyTables: [],
   nonZeroFinancialAccounts: 0,
   nonZeroGeneralLedgerOpenings: 0,
+  customerWhatsAppMessageEvents: 0,
 };
 
 test("Fresh Start table contract covers every application schema table", async () => {
@@ -62,9 +63,24 @@ test("customer tracking links are rejected as business history during Fresh Star
   );
 });
 
+test("WhatsApp message events are rejected even though setup audit logs are otherwise allowed", () => {
+  const initialized = {
+    ...emptyResult,
+    phase: "initialized",
+    nonEmptyTables: [...INITIALIZED_SETUP_TABLES],
+    customerWhatsAppMessageEvents: 1,
+  };
+  assert.throws(
+    () => validateLiveAudit({ phase: "initialized", result: initialized }),
+    /customer-whatsapp-message-events:1/,
+  );
+});
+
 test("inline audit is read-only and bounded for table-presence checks", () => {
   const query = buildInlineAuditQuery("blank");
   assert.match(query, /\.take\(1\)/);
+  assert.match(query, /customer_whatsapp_messages/);
+  assert.match(query, /\.withIndex\('by_module'/);
   assert.match(query, /JSON\.stringify/);
   assert.doesNotMatch(query, /ctx\.db\.(insert|patch|replace|delete)/);
 });
@@ -86,6 +102,7 @@ test("Fresh Start evidence is release-bound and records mandatory zero-data chec
   assert.equal(evidence.status, "PASS");
   assert.equal(evidence.checks.demoSeedUnavailable, true);
   assert.equal(evidence.checks.noBusinessRecords, true);
+  assert.equal(evidence.checks.noWhatsAppMessageHistory, true);
 });
 
 test("Fresh Start CLI bypasses the Windows npx.cmd spawn failure", async () => {
