@@ -30,6 +30,7 @@ interface I18nContextValue {
   direction: Direction;
   locale: string;
   setLanguage: (language: Language) => void;
+  hydrateLanguage: (language: Language) => void;
   t: (key: TranslationKey, params?: TranslateParams) => string;
   formatNumber: (value: number, options?: Intl.NumberFormatOptions) => string;
   formatDate: (value: Date | number | string, options?: Intl.DateTimeFormatOptions) => string;
@@ -47,6 +48,14 @@ function readStoredLanguage(): Language {
   }
 }
 
+function persistLocalLanguage(nextLanguage: Language): void {
+  try {
+    window.localStorage.setItem(LANGUAGE_STORAGE_KEY, nextLanguage);
+  } catch {
+    // Language selection remains valid for the current session when storage is unavailable.
+  }
+}
+
 function interpolate(value: string, params?: TranslateParams): string {
   if (!params) return value;
   return value.replace(/\{([\w.-]+)\}/g, (match, key: string) =>
@@ -57,13 +66,17 @@ function interpolate(value: string, params?: TranslateParams): string {
 export function I18nProvider({ children }: { children: ReactNode }) {
   const [language, setLanguageState] = useState<Language>(readStoredLanguage);
 
+  const hydrateLanguage = useCallback((nextLanguage: Language) => {
+    setLanguageState((current) => current === nextLanguage ? current : nextLanguage);
+    persistLocalLanguage(nextLanguage);
+  }, []);
+
   const setLanguage = useCallback((nextLanguage: Language) => {
     setLanguageState(nextLanguage);
-    try {
-      window.localStorage.setItem(LANGUAGE_STORAGE_KEY, nextLanguage);
-    } catch {
-      // The language still changes for the current session if storage is unavailable.
-    }
+    persistLocalLanguage(nextLanguage);
+    window.dispatchEvent(new CustomEvent("erp-language-selected", {
+      detail: { language: nextLanguage },
+    }));
   }, []);
 
   useEffect(() => {
@@ -90,6 +103,7 @@ export function I18nProvider({ children }: { children: ReactNode }) {
     direction,
     locale,
     setLanguage,
+    hydrateLanguage,
     t: (key, params) => interpolate(translateKey(language, key), params),
     formatNumber: (number, options) => new Intl.NumberFormat(locale, {
       numberingSystem: "latn",
@@ -99,7 +113,7 @@ export function I18nProvider({ children }: { children: ReactNode }) {
       const date = input instanceof Date ? input : new Date(input);
       return new Intl.DateTimeFormat(locale, options).format(date);
     },
-  }), [direction, language, locale, setLanguage]);
+  }), [direction, hydrateLanguage, language, locale, setLanguage]);
 
   return (
     <I18nContext.Provider value={value}>
