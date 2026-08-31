@@ -50,6 +50,18 @@ test("initialized audit permits setup only and rejects business history", () => 
   );
 });
 
+test("customer tracking links are rejected as business history during Fresh Start", () => {
+  const initialized = {
+    ...emptyResult,
+    phase: "initialized",
+    nonEmptyTables: [...INITIALIZED_SETUP_TABLES, "customerTrackingLinks"],
+  };
+  assert.throws(
+    () => validateLiveAudit({ phase: "initialized", result: initialized }),
+    /non-empty:customerTrackingLinks/,
+  );
+});
+
 test("inline audit is read-only and bounded for table-presence checks", () => {
   const query = buildInlineAuditQuery("blank");
   assert.match(query, /\.take\(1\)/);

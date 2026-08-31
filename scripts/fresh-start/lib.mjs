@@ -54,6 +54,7 @@ export const APPLICATION_TABLES = Object.freeze([
   "codSettlements",
   "codSettlementItems",
   "deliveryConfirmations",
+  "customerTrackingLinks",
   "customerFollowUps",
   "auditLogs",
 ]);

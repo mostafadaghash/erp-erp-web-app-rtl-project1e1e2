@@ -639,6 +639,24 @@ const applicationTables = {
     .index("by_source", ["sourceType", "sourceId"])
     .index("by_creation_key", ["creationKey"]),
 
+  // روابط بوابة متابعة العميل — لا تحتوي على أي بيانات مالية أو ملاحظات داخلية
+  customerTrackingLinks: defineTable({
+    branchId: v.id("branches"),
+    sourceType: v.union(v.literal("order"), v.literal("repair"), v.literal("delivery")),
+    sourceId: v.string(),
+    sourceNumber: v.string(),
+    token: v.string(),
+    failedAttempts: v.number(),
+    lockedUntil: v.optional(v.number()),
+    lastVerifiedAt: v.optional(v.number()),
+    createdBy: v.string(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_token", ["token"])
+    .index("by_source", ["sourceType", "sourceId"])
+    .index("by_branch", ["branchId"]),
+
   // سجل المراجعة
   auditLogs: defineTable({
     userId: v.optional(v.string()),
@@ -670,7 +688,8 @@ const applicationTables = {
     .index("by_branch", ["branchId"])
     .index("by_branch_module_action", ["branchId", "module", "action"])
     .index("by_user_module_action", ["userId", "module", "action"])
-    .index("by_module_action", ["module", "action"]),
+    .index("by_module_action", ["module", "action"])
+    .index("by_record", ["module", "recordId"]),
 };
 
 export default defineSchema({
