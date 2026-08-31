@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { messages, type TranslationKey } from "../src/i18n/catalog.ts";
 
 const read = (path: string) => readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
 const sidebar = read("src/components/Sidebar.tsx");
@@ -22,31 +23,37 @@ const repairs = read("src/components/RepairsPage.tsx");
 const purchaseReturns = read("src/components/PurchaseReturnsPage.tsx");
 const reports = read("src/components/ReportsPage.tsx");
 
-test("professional ERP navigation uses conventional Arabic information architecture", () => {
-  for (const label of [
-    "لوحة التحكم",
-    "المبيعات",
-    "فواتير المبيعات",
-    "مرتجعات المبيعات",
-    "عروض الأسعار",
-    "طلبات البيع",
-    "العملاء",
-    "المشتريات",
-    "فواتير المشتريات",
-    "مرتجعات المشتريات",
-    "إدارة المخزون",
-    "الشحن",
-    "طلبات الشحن والتسويات",
-    "أوامر الصيانة",
-    "الحسابات",
-    "الخزائن والحسابات",
-    "سندات القبض والصرف",
-    "حسابات العملاء",
-    "حسابات الموردين",
-    "الشيكات والأقساط",
-    "المستخدمون والصلاحيات",
-    "سجل العمليات",
-  ]) assert.match(sidebar, new RegExp(label));
+test("professional ERP navigation keeps the approved information architecture in both languages", () => {
+  const expected: Array<[TranslationKey, string, string]> = [
+    ["nav.dashboard", "لوحة التحكم", "Dashboard"],
+    ["nav.sales", "المبيعات", "Sales"],
+    ["nav.salesInvoices", "فواتير المبيعات", "Sales Invoices"],
+    ["nav.salesReturns", "مرتجعات المبيعات", "Sales Returns"],
+    ["nav.quotes", "عروض الأسعار", "Quotations"],
+    ["nav.salesOrders", "طلبات البيع", "Sales Orders"],
+    ["nav.customers", "العملاء", "Customers"],
+    ["nav.purchases", "المشتريات", "Purchases"],
+    ["nav.purchaseInvoices", "فواتير المشتريات", "Purchase Invoices"],
+    ["nav.purchaseReturns", "مرتجعات المشتريات", "Purchase Returns"],
+    ["nav.inventoryManagement", "إدارة المخزون", "Inventory Management"],
+    ["nav.shipping", "الشحن", "Shipping"],
+    ["nav.shippingSettlements", "طلبات الشحن والتسويات", "Shipping & Settlements"],
+    ["nav.repairOrders", "أوامر الصيانة", "Repair Orders"],
+    ["nav.accounts", "الحسابات", "Accounts"],
+    ["nav.treasury", "الخزائن والحسابات", "Treasury & Accounts"],
+    ["nav.vouchers", "سندات القبض والصرف", "Receipt & Disbursement Vouchers"],
+    ["nav.customerAccounts", "حسابات العملاء", "Customer Accounts"],
+    ["nav.supplierAccounts", "حسابات الموردين", "Supplier Accounts"],
+    ["nav.paymentSchedules", "الشيكات والأقساط", "Checks & Installments"],
+    ["nav.usersPermissions", "المستخدمون والصلاحيات", "Users & Permissions"],
+    ["nav.auditLog", "سجل العمليات", "Audit Log"],
+  ];
+
+  for (const [key, arabic, english] of expected) {
+    assert.match(sidebar, new RegExp(`labelKey:\\s*"${key.replace(".", "\\.")}"`));
+    assert.equal(messages.ar[key], arabic);
+    assert.equal(messages.en[key], english);
+  }
 
   for (const legacy of [
     "المبيعات والفواتير",
