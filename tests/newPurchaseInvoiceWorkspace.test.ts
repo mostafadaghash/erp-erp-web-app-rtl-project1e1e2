@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { messages } from "../src/i18n/catalog.ts";
 
 const read = (path: string) => readFileSync(new URL(path, import.meta.url), "utf8");
 const app = read("../src/components/ERPApp.tsx");
@@ -9,7 +10,9 @@ const page = read("../src/components/NewPurchaseInvoicePage.tsx");
 const css = read("../src/new-purchase-invoice-pos.css");
 
 test("purchase navigation exposes a dedicated new invoice page", () => {
-  assert.match(sidebar, /id: "new-purchase-invoice", label: "فاتورة مشتريات جديدة"/);
+  assert.match(sidebar, /id: "new-purchase-invoice", labelKey: "nav\.newPurchaseInvoice"/);
+  assert.equal(messages.ar["nav.newPurchaseInvoice"], "فاتورة مشتريات جديدة");
+  assert.equal(messages.en["nav.newPurchaseInvoice"], "New Purchase Invoice");
   assert.match(app, /"new-purchase-invoice": "create_shipments"/);
   assert.match(app, /"new-purchase-invoice": \{ group: "المشتريات", title: "فاتورة مشتريات جديدة" \}/);
   assert.match(app, /page: "new-purchase-invoice", label: "فاتورة شراء"/);
