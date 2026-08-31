@@ -8,6 +8,8 @@ export const DEFAULT_BRAND = {
   secondaryColor: "#12263a",
 } as const;
 
+export const DEFAULT_FAVICON_PATH = "/favicon.svg";
+
 export interface BrandingSettings {
   storeName?: string;
   shortName?: string;
@@ -40,6 +42,17 @@ export function getBrand(settings?: BrandingSettings | null) {
   };
 }
 
+function resolveFaviconLink() {
+  let favicon = document.querySelector<HTMLLinkElement>('link[rel~="icon"][data-brand-favicon], link[rel~="icon"]');
+  if (!favicon) {
+    favicon = document.createElement("link");
+    favicon.rel = "icon";
+    document.head.appendChild(favicon);
+  }
+  favicon.dataset.brandFavicon = "true";
+  return favicon;
+}
+
 export function useBrandingTheme(settings?: BrandingSettings | null) {
   const brand = getBrand(settings);
 
@@ -49,17 +62,18 @@ export function useBrandingTheme(settings?: BrandingSettings | null) {
     root.style.setProperty("--brand-secondary", brand.secondaryColor);
     document.title = `${brand.storeName} | ${brand.tagline}`;
 
-    let favicon = document.querySelector<HTMLLinkElement>('link[rel="icon"]');
+    const themeColor = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
+    themeColor?.setAttribute("content", brand.secondaryColor);
+
+    const favicon = resolveFaviconLink();
     if (brand.faviconUrl) {
-      if (!favicon) {
-        favicon = document.createElement("link");
-        favicon.rel = "icon";
-        favicon.dataset.dynamicBrandFavicon = "true";
-        document.head.appendChild(favicon);
-      }
       favicon.href = brand.faviconUrl;
-    } else if (favicon?.dataset.dynamicBrandFavicon === "true") {
-      favicon.remove();
+      favicon.removeAttribute("type");
+      favicon.removeAttribute("sizes");
+    } else {
+      favicon.href = DEFAULT_FAVICON_PATH;
+      favicon.type = "image/svg+xml";
+      favicon.setAttribute("sizes", "any");
     }
   }, [
     brand.faviconUrl,
