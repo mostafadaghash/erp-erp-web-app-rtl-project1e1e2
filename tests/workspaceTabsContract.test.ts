@@ -19,6 +19,8 @@ import { workspaceMessage } from "../src/i18n/workspaceMessages.ts";
 const erpSource = readFileSync("src/components/ERPApp.tsx", "utf8");
 const tabsSource = readFileSync("src/workspace/WorkspaceTabs.tsx", "utf8");
 const modelSource = readFileSync("src/workspace/workspaceModel.ts", "utf8");
+const recordSource = readFileSync("src/workspace/WorkspaceRecordPage.tsx", "utf8");
+const globalSearchSource = readFileSync("src/components/GlobalSearch.tsx", "utf8");
 
 type Page = "dashboard" | "invoices" | "new-invoice" | "customer-ledger" | "reports";
 
@@ -132,4 +134,44 @@ test("WS-10 workspace controls are bilingual", () => {
   assert.equal(workspaceMessage("ar", "openPages"), "الصفحات المفتوحة");
   assert.equal(workspaceMessage("en", "openPages"), "Open Pages");
   assert.equal(workspaceMessage("en", "closeWithoutSaving"), "Close Without Saving");
+});
+
+test("WS-11 entity records use stable identities and preserve only safe target descriptors", () => {
+  assert.match(erpSource, /workspaceRecordIdentity\(target\)/);
+  assert.match(erpSource, /entityIdentity\("workspace-record", recordKey\)/);
+  assert.match(erpSource, /payload: \{ recordTarget: target \}/);
+  assert.match(erpSource, /RECORD_PERMISSIONS/);
+  assert.match(erpSource, /canAccessWorkspaceRecord\(target\)/);
+  assert.doesNotMatch(erpSource, /payload: \{ record:|payload: \{ customer:|payload: \{ invoice:/);
+});
+
+test("WS-12 global search opens exact customer supplier and product entity tabs", () => {
+  assert.match(globalSearchSource, /onOpenRecord\?: \(target: WorkspaceRecordTarget\) => void/);
+  assert.match(globalSearchSource, /type: "product", id: String\(row\._id\)/);
+  assert.match(globalSearchSource, /type: "customer", id: String\(row\._id\)/);
+  assert.match(globalSearchSource, /type: "supplier", id: String\(row\._id\)/);
+  assert.match(globalSearchSource, /if \(onOpenRecord\) onOpenRecord\(result\.target\)/);
+});
+
+test("WS-13 workspace record relationships open related entities without replacing the source tab", () => {
+  assert.match(recordSource, /onOpenRecord\(\{ type: "customer", id: String\(invoice\.customerId\)/);
+  assert.match(recordSource, /onOpenRecord\(\{ type: "product", id: String\(item\.productId\)/);
+  assert.match(recordSource, /onOpenRecord\(\{ type: "invoice", id: String\(invoice\._id\)/);
+  assert.match(recordSource, /onOpenRecord\(\{ type: "order", id: String\(order\._id\)/);
+  assert.match(recordSource, /onOpenRecord\(\{ type: "supplier", id: String\(product\.supplierId\)/);
+});
+
+test("WS-14 list row navigation promotes invoices customers and products into entity tabs", () => {
+  assert.match(erpSource, /tr\[data-testid="invoice-row"\]/);
+  assert.match(erpSource, /tr\[data-testid="customer-card"\]/);
+  assert.match(erpSource, /tr\[data-testid="product-row"\]/);
+  assert.match(erpSource, /openWorkspaceRecord\(\{[\s\S]{0,120}type: "invoice"/);
+  assert.match(erpSource, /openWorkspaceRecord\(\{[\s\S]{0,120}type: "customer"/);
+  assert.match(erpSource, /openWorkspaceRecord\(\{[\s\S]{0,120}type: "product"/);
+});
+
+test("WS-15 close-left and close-right follow the visual direction in RTL", () => {
+  assert.match(tabsSource, /document\.documentElement\.dir === "rtl"/);
+  assert.match(tabsSource, /mode === "right"\) targets = rtl \? tabs\.slice\(0, index\) : tabs\.slice\(index \+ 1\)/);
+  assert.match(tabsSource, /mode === "left"\) targets = rtl \? tabs\.slice\(index \+ 1\) : tabs\.slice\(0, index\)/);
 });
