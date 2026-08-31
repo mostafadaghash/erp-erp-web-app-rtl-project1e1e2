@@ -3,7 +3,8 @@ import { useQuery, useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { toast } from "sonner";
 import { Id } from "../../convex/_generated/dataModel";
-import { PERMISSIONS, ROLE_PERMISSIONS } from "../../convex/lib/permissions";
+import { ROLE_PERMISSIONS } from "../../convex/lib/permissions";
+import { ALL_PERMISSION_OPTIONS, PERMISSION_GROUP_ORDER } from "../lib/permissionCatalog";
 import {
   Users, Plus, X, Phone, Building2, Mail, Link, Copy,
   Shield, Pencil, Trash2, CheckCircle, XCircle,
@@ -20,54 +21,6 @@ const ROLES = [
   { value: "shipping",         label: "مستخدم شحن",       color: "bg-orange-100 text-orange-700" },
   { value: "viewer",           label: "مشاهد فقط",      color: "bg-slate-100 text-slate-600" },
 ];
-
-const PERMISSION_LABELS_SOURCE = [
-  { key: "view_products",   label: "عرض المنتجات",           group: "عرض" },
-  { key: "view_customers",  label: "عرض العملاء",            group: "عرض" },
-  { key: "view_orders",     label: "عرض أوامر البيع",          group: "عرض" },
-  { key: "view_invoices",   label: "عرض الفواتير",           group: "عرض" },
-  { key: "view_repairs",    label: "عرض الصيانة",            group: "عرض" },
-  { key: "view_shipments",  label: "عرض عمليات الشراء",            group: "عرض" },
-  { key: "view_reports",    label: "عرض التقارير",           group: "عرض" },
-  { key: "view_prices",     label: "عرض الأسعار",            group: "عرض" },
-  { key: "view_profits",    label: "عرض الأرباح",            group: "عرض" },
-  { key: "create_orders",   label: "إنشاء أوامر بيع",          group: "إضافة" },
-  { key: "create_invoices", label: "إنشاء فواتير",           group: "إضافة" },
-  { key: "create_repairs",  label: "إنشاء أوامر صيانة",      group: "إضافة" },
-  { key: "create_customers",label: "إضافة عملاء",            group: "إضافة" },
-  { key: "create_expenses", label: "إضافة مصروفات",          group: "إضافة" },
-  { key: "create_shipments",label: "إنشاء عمليات شراء",            group: "إضافة" },
-  { key: "edit_orders",     label: "تعديل أوامر البيع",        group: "تعديل" },
-  { key: "edit_repairs",    label: "تعديل الصيانة",          group: "تعديل" },
-  { key: "edit_customers",  label: "تعديل العملاء",          group: "تعديل" },
-  { key: "edit_expenses",   label: "تعديل المصروفات",        group: "تعديل" },
-  { key: "edit_shipments",  label: "تعديل عمليات الشراء",          group: "تعديل" },
-  { key: "export_data",     label: "تصدير البيانات",         group: "أخرى" },
-  { key: "print_invoices",  label: "طباعة الفواتير",         group: "أخرى" },
-  { key: "print_repairs",   label: "طباعة الصيانة",          group: "أخرى" },
-  { key: "print_shipping",  label: "طباعة الشحن",            group: "أخرى" },
-  { key: "manage_users",    label: "إدارة المستخدمين",       group: "أخرى" },
-  { key: "manage_settings", label: "إدارة الإعدادات",        group: "أخرى" },
-  { key: "manage_branches", label: "إدارة الفروع",           group: "أخرى" },
-];
-
-const permissionGroup = (permission: string) => {
-  if (permission.startsWith("view_")) return "عرض";
-  if (permission.startsWith("create_")) return "إضافة";
-  if (permission.startsWith("edit_")) return "تعديل";
-  if (permission.startsWith("delete_")) return "حذف";
-  if (permission.startsWith("manage_")) return "إدارة";
-  return "أخرى";
-};
-
-const ALL_PERMISSIONS = PERMISSIONS.map((key) => {
-  const existing = PERMISSION_LABELS_SOURCE.find((permission) => permission.key === key);
-  return {
-    key,
-    label: existing?.label ?? key,
-    group: permissionGroup(key),
-  };
-});
 
 const ROLE_DEFAULT_PERMISSIONS: Record<string, string[]> = {
   ...ROLE_PERMISSIONS,
@@ -227,12 +180,10 @@ export function EmployeesPage() {
     }
   };
 
-  // Group permissions by group
-  const permGroups = ALL_PERMISSIONS.reduce((acc, p) => {
-    if (!acc[p.group]) acc[p.group] = [];
-    acc[p.group].push(p);
-    return acc;
-  }, {} as Record<string, typeof ALL_PERMISSIONS>);
+  const permGroups = PERMISSION_GROUP_ORDER.map((group) => ({
+    group,
+    permissions: ALL_PERMISSION_OPTIONS.filter((permission) => permission.group === group),
+  }));
 
   return (
     <div className="p-4 lg:p-6 space-y-6">
@@ -528,10 +479,10 @@ export function EmployeesPage() {
 
                 {showPermissions && (
                   <div className="p-4 space-y-4">
-                    <div className="flex gap-2 mb-3">
+                    <div className="flex gap-2 mb-3 flex-wrap">
                       <button
                         type="button"
-                        onClick={() => setForm({ ...form, permissions: ALL_PERMISSIONS.map(p => p.key) })}
+                        onClick={() => setForm({ ...form, permissions: ALL_PERMISSION_OPTIONS.map(p => p.key) })}
                         className="text-xs px-3 py-1.5 bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-100 font-medium"
                       >
                         تحديد الكل
@@ -551,12 +502,12 @@ export function EmployeesPage() {
                         إعادة للافتراضي
                       </button>
                     </div>
-                    {Object.entries(permGroups).map(([group, perms]) => (
-                      <div key={group}>
-                        <p className="text-xs font-bold text-slate-500 uppercase mb-2">{group}</p>
-                        <div className="grid grid-cols-2 gap-2">
-                          {perms.map(p => (
-                            <label key={p.key} className="flex items-center gap-2 cursor-pointer group">
+                    {permGroups.map(({ group, permissions }) => (
+                      <section key={group} className="rounded-xl border border-slate-100 bg-slate-50/60 p-3">
+                        <p className="mb-2 text-sm font-bold text-slate-700">{group}</p>
+                        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                          {permissions.map(p => (
+                            <label key={p.key} className="flex items-center gap-2 cursor-pointer group rounded-lg bg-white px-2.5 py-2 border border-slate-100 hover:border-indigo-200 transition-colors">
                               <input
                                 type="checkbox"
                                 checked={form.permissions.includes(p.key)}
@@ -567,7 +518,7 @@ export function EmployeesPage() {
                             </label>
                           ))}
                         </div>
-                      </div>
+                      </section>
                     ))}
                   </div>
                 )}
