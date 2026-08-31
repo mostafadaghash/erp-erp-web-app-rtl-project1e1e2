@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { MoreHorizontal, PanelsTopLeft, Search, X } from "lucide-react";
 import type { WorkspaceTab } from "./workspaceModel";
+import "./workspace.css";
 
 export interface WorkspaceLabels {
   openPages: string;
