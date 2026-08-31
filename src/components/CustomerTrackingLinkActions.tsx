@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { useMutation } from "convex/react";
-import { Copy, Link2, MessageCircle } from "lucide-react";
+import { Copy, Link2, MessageCircle, X } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import { buildEgyptWhatsAppUrl } from "../lib/utils";
+import { CustomerWhatsAppCenter } from "./CustomerWhatsAppCenter";
 
 function generateSecureTrackingToken(): string {
   const bytes = new Uint8Array(32);
@@ -31,6 +32,7 @@ export function CustomerTrackingLinkActions({
 }) {
   const ensureLink = useMutation(api.customerTrackingPortal.ensureLink);
   const [busyAction, setBusyAction] = useState<"copy" | "whatsapp" | null>(null);
+  const [whatsAppCenterOpen, setWhatsAppCenterOpen] = useState(false);
   const eligible = sourceType === "order" || sourceType === "repair" || sourceType === "delivery";
 
   const resolveUrl = async () => {
@@ -100,6 +102,45 @@ export function CustomerTrackingLinkActions({
         <MessageCircle className="h-4 w-4" />
         إرسال رابط المتابعة عبر واتساب
       </button>
+      <button
+        type="button"
+        data-testid="open-customer-whatsapp-center"
+        onClick={() => setWhatsAppCenterOpen(true)}
+        className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-3 py-2 text-xs font-black text-white transition hover:bg-emerald-700"
+        title="فتح الرسائل التشغيلية وسجل الإرسال داخل بطاقة العميل"
+      >
+        <MessageCircle className="h-4 w-4" />
+        مركز واتساب
+      </button>
+
+      {whatsAppCenterOpen && (
+        <div
+          className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/45 p-3 backdrop-blur-sm sm:p-5"
+          onMouseDown={(event) => {
+            if (event.currentTarget === event.target) setWhatsAppCenterOpen(false);
+          }}
+        >
+          <div className="max-h-[92vh] w-full max-w-5xl overflow-y-auto rounded-2xl bg-slate-50 shadow-2xl" dir="rtl">
+            <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-200 bg-white/95 px-4 py-3 backdrop-blur">
+              <div>
+                <p className="font-black text-slate-900">مركز واتساب — {customerName}</p>
+                <p className="mt-0.5 text-[11px] text-slate-500">جزء من بطاقة العميل، وليس صفحة مستقلة.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setWhatsAppCenterOpen(false)}
+                className="grid h-9 w-9 place-items-center rounded-xl border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                aria-label="إغلاق مركز واتساب"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="p-3 sm:p-4">
+              <CustomerWhatsAppCenter followUpId={followUpId} />
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
