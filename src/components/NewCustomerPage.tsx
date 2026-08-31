@@ -31,7 +31,13 @@ const EMPTY_FORM: ContactFormValues = {
   notes: "",
 };
 
-export function NewCustomerPage({ onClose }: { onClose: () => void }) {
+export function NewCustomerPage({
+  onClose,
+  onSaved,
+}: {
+  onClose: (reason: "saved" | "cancel") => void;
+  onSaved?: () => void;
+}) {
   const canViewBranches = usePermission("view_branches");
   const canCreateCategories = usePermission("edit_customers");
   const me = useQuery(api.employees.me);
@@ -93,9 +99,10 @@ export function NewCustomerPage({ onClose }: { onClose: () => void }) {
         setForm(EMPTY_FORM);
         setCategoryId("");
         setAttempted(false);
+        onSaved?.();
         return;
       }
-      onClose();
+      onClose("saved");
     } catch (error) {
       toast.error(getErrorMessage(error, "تعذر إضافة العميل"));
     } finally {
@@ -137,7 +144,7 @@ export function NewCustomerPage({ onClose }: { onClose: () => void }) {
             سجّل بيانات العميل الأساسية مرة واحدة لتظهر في الفواتير والحسابات والصيانة والشحن.
           </p>
         </div>
-        <button type="button" className="btn-secondary flex items-center gap-2" onClick={onClose} disabled={saving}>
+        <button type="button" className="btn-secondary flex items-center gap-2" onClick={() => onClose("cancel")} disabled={saving}>
           <ArrowRight className="h-4 w-4" />
           قائمة العملاء
         </button>
@@ -347,7 +354,7 @@ export function NewCustomerPage({ onClose }: { onClose: () => void }) {
         </section>
 
         <div className="sticky bottom-3 z-10 flex flex-col-reverse gap-2 rounded-2xl border border-slate-200 bg-white/95 p-3 shadow-lg backdrop-blur sm:flex-row sm:items-center sm:justify-between">
-          <button type="button" className="btn-secondary" onClick={onClose} disabled={saving}>
+          <button type="button" className="btn-secondary" onClick={() => onClose("cancel")} disabled={saving}>
             إلغاء والعودة للقائمة
           </button>
           <div className="flex flex-col gap-2 sm:flex-row">
