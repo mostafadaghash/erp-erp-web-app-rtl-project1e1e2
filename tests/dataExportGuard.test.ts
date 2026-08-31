@@ -67,6 +67,7 @@ test("EXP-11 export remains permission-gated but is kept out of the simplified m
   assert.doesNotMatch(sidebar, /id: "data-export"/);
   assert.match(sidebar, /aria-current=\{isActive \? "page" : undefined\}/);
   assert.match(app, /"data-export": "export_data"/);
-  assert.match(app, /currentPage === "data-export"/);
+  assert.match(app, /tab\.page === "data-export" && <DataExportPage permissions=\{permissions\}/);
+  assert.match(app, /canAccessPage\(tab\.page\)/);
   assert.match(page, /<h1[\s\S]{0,180}تصدير البيانات/);
 });

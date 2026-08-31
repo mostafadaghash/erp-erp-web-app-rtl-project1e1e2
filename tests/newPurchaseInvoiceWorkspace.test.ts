@@ -9,14 +9,16 @@ const sidebar = read("../src/components/Sidebar.tsx");
 const page = read("../src/components/NewPurchaseInvoicePage.tsx");
 const css = read("../src/new-purchase-invoice-pos.css");
 
-test("purchase navigation exposes a dedicated new invoice page", () => {
+test("purchase navigation exposes a dedicated multi-instance new invoice workspace page", () => {
   assert.match(sidebar, /id: "new-purchase-invoice", labelKey: "nav\.newPurchaseInvoice"/);
   assert.equal(messages.ar["nav.newPurchaseInvoice"], "فاتورة مشتريات جديدة");
   assert.equal(messages.en["nav.newPurchaseInvoice"], "New Purchase Invoice");
   assert.match(app, /"new-purchase-invoice": "create_shipments"/);
   assert.match(app, /"new-purchase-invoice": \{ group: "المشتريات", title: "فاتورة مشتريات جديدة" \}/);
   assert.match(app, /page: "new-purchase-invoice", label: "فاتورة شراء"/);
-  assert.match(app, /currentPage === "new-purchase-invoice"[\s\S]{0,120}<NewPurchaseInvoicePage onNavigate=\{navigate\}/);
+  assert.match(app, /MULTI_INSTANCE_PAGES = new Set<Page>\(\["new-invoice", "new-purchase-invoice", "new-customer"\]\)/);
+  assert.match(app, /const navigateFromNewTab = \(page: Page\) => \{[\s\S]{0,120}markTabDirty\(tab\.id, false\);[\s\S]{0,80}navigate\(page\);/);
+  assert.match(app, /tab\.page === "new-purchase-invoice" && <NewPurchaseInvoicePage onNavigate=\{navigateFromNewTab\}/);
 });
 
 test("new purchase invoice uses the existing protected purchase creation contract", () => {

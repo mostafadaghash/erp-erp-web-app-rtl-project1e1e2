@@ -1,12 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
-import { Bell, ChevronDown, Menu, Plus, ShieldX, Wifi, WifiOff } from "lucide-react";
+import { AlertTriangle, Bell, ChevronDown, Menu, Plus, ShieldX, Wifi, WifiOff } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import type { Permission } from "../../convex/lib/permissions";
 import { PermissionProvider } from "../lib/access";
 import { getBrand } from "../lib/branding";
+import { useI18n } from "../i18n/I18nProvider";
+import { workspaceMessage } from "../i18n/workspaceMessages";
 import { AccountsHubPage } from "./AccountsHubPage";
 import { AuditLogsPage } from "./AuditLogsPage";
 import { BranchesPage } from "./BranchesPage";
@@ -41,6 +43,27 @@ import { PaymentSchedulesPage } from "./PaymentSchedulesPage";
 import { QuotesPage } from "./QuotesPage";
 import { VouchersPage } from "./VouchersPage";
 import type { ReportKind } from "./ReportsPage";
+import { WorkspaceTabs } from "../workspace/WorkspaceTabs";
+import {
+  WorkspaceRecordPage,
+  workspaceRecordIdentity,
+  type WorkspaceRecordTarget,
+  type WorkspaceRecordType,
+} from "../workspace/WorkspaceRecordPage";
+import {
+  activateOrAppend,
+  closeTabsByIds,
+  createWorkspaceTabId,
+  entityIdentity,
+  nextNumberedTitle,
+  parsePersistedWorkspace,
+  reportIdentity,
+  serializableWorkspace,
+  singletonIdentity,
+  uniqueIdentity,
+  type WorkspaceTab,
+  type WorkspaceTabKind,
+} from "../workspace/workspaceModel";
 
 export type Page =
   | "dashboard" | "products" | "inventory" | "customers" | "new-customer" | "follow-ups" | "invoices" | "sales-returns" | "quotes" | "credit-invoices"
@@ -48,10 +71,13 @@ export type Page =
   | "deliveries" | "shipments" | "branches" | "employees" | "crm"
   | "reports" | "settings" | "audit-logs" | "accounts-home" | "treasury"
   | "supplier-payments" | "purchase-returns" | "customer-ledger"
-  | "general-ledger" | "data-export" | "vouchers" | "payment-schedules";
+  | "general-ledger" | "data-export" | "vouchers" | "payment-schedules" | "workspace-record";
 
 const FOLLOW_UP_ROLE_FALLBACK = new Set(["admin", "manager", "sales", "customer_service", "technician", "shipping"]);
 const PAGES_WITHOUT_GLOBAL_SEARCH = new Set<Page>(["branches", "employees", "settings"]);
+const MULTI_INSTANCE_PAGES = new Set<Page>(["new-invoice", "new-purchase-invoice", "new-customer"]);
+const WORKSPACE_STORAGE_PREFIX = "business-tech-erp.workspace.v1";
+const LEGACY_PAGE_SESSION_KEY = "business-tech-erp.current-page";
 
 const PAGE_PERMISSIONS: Partial<Record<Page, Permission>> = {
   products: "view_products",
@@ -86,6 +112,22 @@ const PAGE_PERMISSIONS: Partial<Record<Page, Permission>> = {
   "data-export": "export_data",
   vouchers: "view_finance",
   "payment-schedules": "view_finance",
+};
+
+const RECORD_PERMISSIONS: Record<WorkspaceRecordType, Permission> = {
+  product: "view_products",
+  customer: "view_customers",
+  supplier: "view_suppliers",
+  invoice: "view_invoices",
+  order: "view_orders",
+};
+
+const RECORD_MODULE_PAGES: Record<WorkspaceRecordType, Page> = {
+  product: "products",
+  customer: "customers",
+  supplier: "suppliers",
+  invoice: "invoices",
+  order: "orders",
 };
 
 const PAGE_MODULES: Partial<Record<Page, string>> = {
@@ -141,6 +183,18 @@ const PAGE_META: Record<Page, { group: string; title: string }> = {
   "data-export": { group: "الإدارة", title: "تصدير البيانات" },
   vouchers: { group: "الحسابات", title: "سندات القبض والصرف" },
   "payment-schedules": { group: "الحسابات", title: "الشيكات والأقساط" },
+  "workspace-record": { group: "مساحة العمل", title: "سجل" },
+};
+
+const REPORT_TITLES: Record<ReportKind, string> = {
+  overview: "نظرة عامة",
+  sales: "تقرير المبيعات",
+  purchases: "تقرير المشتريات",
+  profit: "الأرباح والخسائر",
+  treasury: "تقرير الخزينة",
+  inventory: "تقرير المخزون",
+  customers: "تقرير العملاء",
+  suppliers: "تقرير الموردين",
 };
 
 type CreateTarget =
@@ -174,19 +228,67 @@ const CREATE_ACTIONS: Array<{ id: string; page: CreateTarget; label: string; per
   { id: "stock-transfer", page: "inventory", label: "تحويل مخزني", permission: "edit_products" },
 ];
 
+interface WorkspaceState {
+  tabs: WorkspaceTab<Page>[];
+  activeId: string;
+}
+
+function readWorkspaceRecordTarget(value: unknown): WorkspaceRecordTarget | null {
+  if (!value || typeof value !== "object") return null;
+  const candidate = value as Partial<WorkspaceRecordTarget>;
+  if (!["product", "customer", "supplier", "invoice", "order"].includes(candidate.type ?? "")) return null;
+  if (typeof candidate.title !== "string" || typeof candidate.group !== "string") return null;
+  if (candidate.id !== undefined && typeof candidate.id !== "string") return null;
+  if (candidate.lookup !== undefined) {
+    if (!candidate.lookup || typeof candidate.lookup !== "object") return null;
+    if (!["sku", "phone", "invoiceNumber"].includes(candidate.lookup.kind)) return null;
+    if (typeof candidate.lookup.value !== "string") return null;
+    if (candidate.lookup.branchId !== undefined && typeof candidate.lookup.branchId !== "string") return null;
+  }
+  if (!candidate.id && !candidate.lookup) return null;
+  return candidate as WorkspaceRecordTarget;
+}
+
+function makeInitialDashboard(): WorkspaceTab<Page> {
+  const now = Date.now();
+  return {
+    id: createWorkspaceTabId("dashboard"),
+    page: "dashboard",
+    title: PAGE_META.dashboard.title,
+    group: PAGE_META.dashboard.group,
+    identityKey: singletonIdentity("dashboard"),
+    kind: "singleton",
+    dirty: false,
+    restoreSafe: true,
+    createdAt: now,
+    lastActiveAt: now,
+  };
+}
+
 export function ERPApp() {
-  const [currentPage, setCurrentPage] = useState<Page>("dashboard");
+  const initialDashboardRef = useRef<WorkspaceTab<Page> | null>(null);
+  if (!initialDashboardRef.current) initialDashboardRef.current = makeInitialDashboard();
+  const [workspace, setWorkspace] = useState<WorkspaceState>(() => ({
+    tabs: [initialDashboardRef.current!],
+    activeId: initialDashboardRef.current!.id,
+  }));
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [quickMenuOpen, setQuickMenuOpen] = useState(false);
   const [isOnline, setIsOnline] = useState(() => navigator.onLine);
-  const [reportTarget, setReportTarget] = useState<ReportKind>("sales");
-  const [voucherKind, setVoucherKind] = useState<"receipt" | "disbursement">("receipt");
+  const [pendingCloseIds, setPendingCloseIds] = useState<string[] | null>(null);
   const quickMenuRef = useRef<HTMLDivElement>(null);
-  const [createRequest, setCreateRequest] = useState<{ page: Page; token: number } | null>(null);
-  const [customerLedgerTarget, setCustomerLedgerTarget] = useState<{
-    customerId: Id<"customers">;
-    branchId: Id<"branches">;
-  } | null>(null);
+  const workspaceRestoredRef = useRef(false);
+  const legacyStorageClearedRef = useRef(false);
+  const { language } = useI18n();
+
+  if (!legacyStorageClearedRef.current) {
+    legacyStorageClearedRef.current = true;
+    try {
+      window.sessionStorage.removeItem(LEGACY_PAGE_SESSION_KEY);
+    } catch {
+      // The workspace does not depend on browser storage being available.
+    }
+  }
 
   const settings = useQuery(api.settings.getPublic);
   const me = useQuery(api.employees.me);
@@ -196,15 +298,21 @@ export function ERPApp() {
   const modules = (settings?.modules ?? {}) as Record<string, boolean | undefined>;
   const lowStock = useQuery(api.products.list, permissions.includes("view_products") ? { lowStock: true } : "skip") ?? [];
 
-  useEffect(() => { const online = () => setIsOnline(true); const offline = () => setIsOnline(false); window.addEventListener("online", online); window.addEventListener("offline", offline); return () => { window.removeEventListener("online", online); window.removeEventListener("offline", offline); }; }, []);
+  useEffect(() => {
+    const online = () => setIsOnline(true);
+    const offline = () => setIsOnline(false);
+    window.addEventListener("online", online);
+    window.addEventListener("offline", offline);
+    return () => {
+      window.removeEventListener("online", online);
+      window.removeEventListener("offline", offline);
+    };
+  }, []);
 
   useEffect(() => {
     if (!quickMenuOpen) return;
     const closeOnOutsidePress = (event: PointerEvent) => {
-      if (
-        event.target instanceof Node &&
-        !quickMenuRef.current?.contains(event.target)
-      ) {
+      if (event.target instanceof Node && !quickMenuRef.current?.contains(event.target)) {
         setQuickMenuOpen(false);
       }
     };
@@ -223,6 +331,9 @@ export function ERPApp() {
     const hasFollowUpFallback = page === "follow-ups" && Boolean(me && FOLLOW_UP_ROLE_FALLBACK.has(me.role));
     return isModuleEnabled(page) && (hasPermission || hasFollowUpFallback);
   };
+
+  const canAccessWorkspaceRecord = (target: WorkspaceRecordTarget) =>
+    can(RECORD_PERMISSIONS[target.type]) && isModuleEnabled(RECORD_MODULE_PAGES[target.type]);
 
   const canSelectWorkingBranch =
     settings !== undefined &&
@@ -243,36 +354,303 @@ export function ERPApp() {
     }
   };
 
-  const navigate = (page: Page) => {
+  useEffect(() => {
+    if (!me || workspaceRestoredRef.current) return;
+    workspaceRestoredRef.current = true;
+    const storageKey = `${WORKSPACE_STORAGE_PREFIX}:${String(me._id)}`;
+    try {
+      const restored = parsePersistedWorkspace<Page>(window.localStorage.getItem(storageKey));
+      if (!restored || restored.tabs.length === 0) return;
+      const now = Date.now();
+      const tabs = restored.tabs
+        .filter((tab) => {
+          if (!(tab.page in PAGE_META) || !canAccessPage(tab.page)) return false;
+          if (tab.page !== "workspace-record") return true;
+          const target = readWorkspaceRecordTarget(tab.payload?.recordTarget);
+          return Boolean(target && canAccessWorkspaceRecord(target));
+        })
+        .map((tab, index): WorkspaceTab<Page> => ({
+          ...tab,
+          id: createWorkspaceTabId("restored"),
+          dirty: false,
+          restoreSafe: true,
+          createdAt: now + index,
+          lastActiveAt: now + index,
+        }));
+      if (tabs.length === 0) return;
+      const active = tabs.find((tab) => tab.identityKey === restored.activeIdentityKey) ?? tabs[0];
+      setWorkspace({ tabs, activeId: active.id });
+    } catch {
+      // Ignore invalid or unavailable local storage and keep the default dashboard.
+    }
+  }, [me]);
+
+  useEffect(() => {
+    if (!me || !workspaceRestoredRef.current) return;
+    const storageKey = `${WORKSPACE_STORAGE_PREFIX}:${String(me._id)}`;
+    try {
+      window.localStorage.setItem(
+        storageKey,
+        JSON.stringify(serializableWorkspace(workspace.tabs, workspace.activeId)),
+      );
+    } catch {
+      // Workspace persistence is best-effort only.
+    }
+  }, [me, workspace]);
+
+  useEffect(() => {
+    if (!workspace.tabs.some((tab) => tab.dirty)) return;
+    const protectRefresh = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", protectRefresh);
+    return () => window.removeEventListener("beforeunload", protectRefresh);
+  }, [workspace.tabs]);
+
+  const openWorkspaceTab = ({
+    page,
+    kind = "singleton",
+    identityKey,
+    title,
+    group,
+    entityId,
+    payload,
+    restoreSafe,
+  }: {
+    page: Page;
+    kind?: WorkspaceTabKind;
+    identityKey?: string;
+    title?: string;
+    group?: string;
+    entityId?: string;
+    payload?: Record<string, unknown>;
+    restoreSafe?: boolean;
+  }) => {
     if (!canAccessPage(page)) return;
-    setCurrentPage(page);
+    setWorkspace((current) => {
+      const meta = PAGE_META[page];
+      const resolvedKind = kind;
+      const baseTitle = title ?? meta.title;
+      const resolvedTitle = resolvedKind === "new" ? nextNumberedTitle(current.tabs, baseTitle) : baseTitle;
+      const resolvedIdentity = identityKey ?? (resolvedKind === "new" ? uniqueIdentity(page) : singletonIdentity(page));
+      const now = Date.now();
+      const incoming: WorkspaceTab<Page> = {
+        id: createWorkspaceTabId(page),
+        page,
+        title: resolvedTitle,
+        group: group ?? meta.group,
+        identityKey: resolvedIdentity,
+        kind: resolvedKind,
+        dirty: false,
+        restoreSafe: restoreSafe ?? resolvedKind !== "new",
+        createdAt: now,
+        lastActiveAt: now,
+        entityId,
+        payload,
+      };
+      const result = activateOrAppend(current.tabs, incoming);
+      return { tabs: result.tabs, activeId: result.activeId };
+    });
     setQuickMenuOpen(false);
     setSidebarOpen(false);
   };
 
-  const requestCreate = (page: CreateTarget, nextVoucherKind?: "receipt" | "disbursement") => {
+  const openWorkspaceRecord = (target: WorkspaceRecordTarget) => {
+    if (!canAccessWorkspaceRecord(target)) return;
+    const recordKey = workspaceRecordIdentity(target);
+    openWorkspaceTab({
+      page: "workspace-record",
+      kind: "entity",
+      identityKey: entityIdentity("workspace-record", recordKey),
+      title: target.title,
+      group: target.group,
+      entityId: target.id ?? recordKey,
+      payload: { recordTarget: target },
+      restoreSafe: true,
+    });
+  };
+
+  const navigate = (page: Page) => {
+    if (MULTI_INSTANCE_PAGES.has(page)) {
+      openWorkspaceTab({ page, kind: "new", restoreSafe: false });
+      return;
+    }
+    openWorkspaceTab({ page, kind: "singleton" });
+  };
+
+  const requestCreate = (
+    page: CreateTarget,
+    nextVoucherKind?: "receipt" | "disbursement",
+    title?: string,
+  ) => {
     if (page === "customers") {
-      if (!canAccessPage("new-customer")) return;
-      return navigate("new-customer");
+      openWorkspaceTab({ page: "new-customer", kind: "new", title, restoreSafe: false });
+      return;
     }
     if (!canAccessPage(page)) return;
-    if (page === "new-invoice" || page === "new-purchase-invoice") return navigate(page);
-    if (nextVoucherKind) setVoucherKind(nextVoucherKind);
-    setCurrentPage(page);
-    setCreateRequest({ page, token: Date.now() });
-    setQuickMenuOpen(false);
-    setSidebarOpen(false);
+    openWorkspaceTab({
+      page,
+      kind: "new",
+      title,
+      restoreSafe: false,
+      payload: {
+        createRequestToken: Date.now(),
+        ...(nextVoucherKind ? { voucherKind: nextVoucherKind } : {}),
+      },
+    });
   };
 
-  const openReport = (report: ReportKind) => { setReportTarget(report); navigate("reports"); };
+  const openReport = (report: ReportKind) => {
+    openWorkspaceTab({
+      page: "reports",
+      kind: "report",
+      identityKey: reportIdentity("reports", report),
+      title: REPORT_TITLES[report],
+      payload: { reportTarget: report },
+      restoreSafe: true,
+    });
+  };
 
   const openCustomerLedger = (
     customerId: Id<"customers">,
     branchId: Id<"branches">,
   ) => {
     if (!canAccessPage("customer-ledger")) return;
-    setCustomerLedgerTarget({ customerId, branchId });
-    navigate("customer-ledger");
+    openWorkspaceTab({
+      page: "customer-ledger",
+      kind: "entity",
+      identityKey: entityIdentity("customer-ledger", String(customerId), String(branchId)),
+      title: PAGE_META["customer-ledger"].title,
+      entityId: String(customerId),
+      payload: { customerId: String(customerId), branchId: String(branchId) },
+      restoreSafe: true,
+    });
+  };
+
+  const activateTab = (tabId: string) => {
+    setWorkspace((current) => {
+      if (!current.tabs.some((tab) => tab.id === tabId)) return current;
+      const now = Date.now();
+      return {
+        tabs: current.tabs.map((tab) => tab.id === tabId ? { ...tab, lastActiveAt: now } : tab),
+        activeId: tabId,
+      };
+    });
+    setSidebarOpen(false);
+    setQuickMenuOpen(false);
+  };
+
+  const markTabDirty = (tabId: string, dirty: boolean) => {
+    setWorkspace((current) => ({
+      ...current,
+      tabs: current.tabs.map((tab) => tab.id === tabId && tab.dirty !== dirty ? { ...tab, dirty } : tab),
+    }));
+  };
+
+  const performClose = (tabIds: string[]) => {
+    const ids = new Set(tabIds);
+    setWorkspace((current) => {
+      const result = closeTabsByIds(current.tabs, current.activeId, ids);
+      if (result.tabs.length > 0 && result.activeId) {
+        return { tabs: result.tabs, activeId: result.activeId };
+      }
+      const dashboard = makeInitialDashboard();
+      return { tabs: [dashboard], activeId: dashboard.id };
+    });
+    setPendingCloseIds(null);
+  };
+
+  const requestClose = (tabIds: string[]) => {
+    const existingIds = [...new Set(tabIds)].filter((id) => workspace.tabs.some((tab) => tab.id === id));
+    if (existingIds.length === 0) return;
+    if (workspace.tabs.some((tab) => existingIds.includes(tab.id) && tab.dirty)) {
+      setPendingCloseIds(existingIds);
+      return;
+    }
+    performClose(existingIds);
+  };
+
+  const handleWorkspaceRecordClick = (event: React.MouseEvent<HTMLElement>) => {
+    const target = event.target instanceof Element ? event.target : null;
+    if (!target) return;
+
+    const invoiceRow = target.closest<HTMLElement>('tr[data-testid="invoice-row"]');
+    if (invoiceRow) {
+      const interactive = target.closest("button, a, input, select, textarea");
+      const explicitOpen = target.closest('[data-testid="invoice-open"], [data-testid="invoice-open-number"]');
+      if (interactive && !explicitOpen) return;
+      const invoiceNumber = invoiceRow.dataset.invoiceNumber;
+      if (!invoiceNumber) return;
+      event.preventDefault();
+      event.stopPropagation();
+      openWorkspaceRecord({
+        type: "invoice",
+        title: `فاتورة ${invoiceNumber}`,
+        group: "المبيعات",
+        lookup: { kind: "invoiceNumber", value: invoiceNumber },
+      });
+      return;
+    }
+
+    const customerRow = target.closest<HTMLElement>('tr[data-testid="customer-card"]');
+    if (customerRow) {
+      const interactive = target.closest<HTMLElement>("button, a, input, select, textarea");
+      if (interactive && interactive.textContent?.trim() !== "بطاقة") return;
+      const customerName = customerRow.dataset.customerName?.trim();
+      const phone = customerRow.querySelector("td:nth-child(2)")?.textContent?.trim();
+      if (!customerName || !phone) return;
+      event.preventDefault();
+      event.stopPropagation();
+      openWorkspaceRecord({
+        type: "customer",
+        title: `العميل: ${customerName}`,
+        group: "العملاء",
+        lookup: { kind: "phone", value: phone },
+      });
+      return;
+    }
+
+    const productRow = target.closest<HTMLElement>('tr[data-testid="product-row"]');
+    if (productRow) {
+      if (target.closest("button, a, input, select, textarea")) return;
+      const productName = productRow.dataset.productName?.trim();
+      const sku = productRow.dataset.productSku?.trim();
+      if (!productName || !sku) return;
+      event.preventDefault();
+      event.stopPropagation();
+      openWorkspaceRecord({
+        type: "product",
+        title: productName,
+        group: "المخزون",
+        lookup: {
+          kind: "sku",
+          value: sku,
+          branchId: productRow.dataset.productBranchId || undefined,
+        },
+      });
+    }
+  };
+
+  const handleWorkspaceRecordKeyDown = (event: React.KeyboardEvent<HTMLElement>) => {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    if (!(event.target instanceof HTMLElement)) return;
+    const row = event.target.closest<HTMLElement>('tr[data-testid="invoice-row"], tr[data-testid="customer-card"]');
+    if (!row || event.target !== row) return;
+    const invoiceNumber = row.dataset.invoiceNumber;
+    if (invoiceNumber) {
+      event.preventDefault();
+      event.stopPropagation();
+      openWorkspaceRecord({ type: "invoice", title: `فاتورة ${invoiceNumber}`, group: "المبيعات", lookup: { kind: "invoiceNumber", value: invoiceNumber } });
+      return;
+    }
+    const customerName = row.dataset.customerName?.trim();
+    const phone = row.querySelector("td:nth-child(2)")?.textContent?.trim();
+    if (customerName && phone) {
+      event.preventDefault();
+      event.stopPropagation();
+      openWorkspaceRecord({ type: "customer", title: `العميل: ${customerName}`, group: "العملاء", lookup: { kind: "phone", value: phone } });
+    }
   };
 
   if (me === undefined) {
@@ -283,13 +661,114 @@ export function ERPApp() {
     );
   }
 
+  const currentTab = workspace.tabs.find((tab) => tab.id === workspace.activeId) ?? workspace.tabs[0];
+  const currentPage = currentTab?.page ?? "dashboard";
   const authorized = canAccessPage(currentPage);
   const pageMeta = PAGE_META[currentPage];
   const createActions = CREATE_ACTIONS.filter(
     (action) => can(action.permission) && isModuleEnabled(action.page),
   );
-  const createToken = (page: Page) =>
-    createRequest?.page === page ? createRequest.token : undefined;
+  const workspaceLabels = {
+    openPages: workspaceMessage(language, "openPages"),
+    searchOpenPages: workspaceMessage(language, "searchOpenPages"),
+    close: workspaceMessage(language, "close"),
+    closeOthers: workspaceMessage(language, "closeOthers"),
+    closeRight: workspaceMessage(language, "closeRight"),
+    closeLeft: workspaceMessage(language, "closeLeft"),
+    closeAll: workspaceMessage(language, "closeAll"),
+    unsaved: workspaceMessage(language, "unsaved"),
+    activePage: workspaceMessage(language, "activePage"),
+  };
+
+  const renderTab = (tab: WorkspaceTab<Page>) => {
+    const recordTarget = tab.page === "workspace-record" ? readWorkspaceRecordTarget(tab.payload?.recordTarget) : null;
+    const tabAuthorized = canAccessPage(tab.page) && (tab.page !== "workspace-record" || Boolean(recordTarget && canAccessWorkspaceRecord(recordTarget)));
+    const createToken = typeof tab.payload?.createRequestToken === "number" ? tab.payload.createRequestToken : undefined;
+    const reportTarget = (tab.payload?.reportTarget as ReportKind | undefined) ?? "sales";
+    const voucherKind = tab.payload?.voucherKind === "disbursement" ? "disbursement" : "receipt";
+    const customerId = typeof tab.payload?.customerId === "string" ? tab.payload.customerId as Id<"customers"> : undefined;
+    const branchId = typeof tab.payload?.branchId === "string" ? tab.payload.branchId as Id<"branches"> : undefined;
+    const navigateFromNewTab = (page: Page) => {
+      markTabDirty(tab.id, false);
+      navigate(page);
+    };
+
+    return (
+      <section
+        key={tab.id}
+        data-workspace-panel={tab.id}
+        data-workspace-page={tab.page}
+        aria-hidden={tab.id !== workspace.activeId}
+        hidden={tab.id !== workspace.activeId}
+        className="min-h-full"
+        onChangeCapture={() => {
+          if (tab.kind === "new" && !tab.dirty) markTabDirty(tab.id, true);
+        }}
+        onInputCapture={() => {
+          if (tab.kind === "new" && !tab.dirty) markTabDirty(tab.id, true);
+        }}
+      >
+        {!tabAuthorized && (
+          <div className="flex min-h-[70vh] items-center justify-center p-6">
+            <div className="text-center">
+              <ShieldX className="mx-auto mb-4 h-14 w-14 text-red-400" />
+              <h2 className="text-xl font-bold text-slate-800">غير مصرح بالوصول</h2>
+              <p className="mt-2 text-sm text-slate-500">لا يملك حسابك الصلاحية المطلوبة لفتح هذه الصفحة.</p>
+            </div>
+          </div>
+        )}
+        {tabAuthorized && tab.page === "dashboard" && <Dashboard onOpenReport={openReport} permissions={permissions} />}
+        {tabAuthorized && tab.page === "accounts-home" && <AccountsHubPage onNavigate={navigate} permissions={permissions} />}
+        {tabAuthorized && tab.page === "products" && <ProductsPage createRequestToken={createToken} />}
+        {tabAuthorized && tab.page === "inventory" && <InventoryWorkspacePage createRequestToken={createToken} />}
+        {tabAuthorized && tab.page === "customers" && <CustomersPage onOpenLedger={openCustomerLedger} onCreateCustomer={() => navigate("new-customer")} createRequestToken={createToken} />}
+        {tabAuthorized && tab.page === "new-customer" && (
+          <NewCustomerPage
+            onClose={(reason) => {
+              if (reason === "saved") {
+                performClose([tab.id]);
+                return;
+              }
+              requestClose([tab.id]);
+            }}
+            onSaved={() => markTabDirty(tab.id, false)}
+          />
+        )}
+        {tabAuthorized && tab.page === "follow-ups" && <CustomerFollowUpsPage />}
+        {tabAuthorized && tab.page === "invoices" && <InvoicesPage onNavigate={navigate} view="sales" />}
+        {tabAuthorized && tab.page === "sales-returns" && <InvoicesPage onNavigate={navigate} view="returns" />}
+        {tabAuthorized && tab.page === "credit-invoices" && <InvoicesPage onNavigate={navigate} view="sales" creditOnly />}
+        {tabAuthorized && tab.page === "new-invoice" && <NewInvoicePage onNavigate={navigateFromNewTab} />}
+        {tabAuthorized && tab.page === "new-purchase-invoice" && <NewPurchaseInvoicePage onNavigate={navigateFromNewTab} />}
+        {tabAuthorized && tab.page === "quotes" && <QuotesPage createRequestToken={createToken} />}
+        {tabAuthorized && tab.page === "repairs" && <RepairsPage createRequestToken={createToken} />}
+        {tabAuthorized && tab.page === "expenses" && <ExpensesPage createRequestToken={createToken} />}
+        {tabAuthorized && tab.page === "suppliers" && <SuppliersPage />}
+        {tabAuthorized && tab.page === "orders" && <OrdersPage createRequestToken={createToken} />}
+        {tabAuthorized && tab.page === "deliveries" && <DeliveriesPage createRequestToken={createToken} />}
+        {tabAuthorized && tab.page === "shipments" && <ShipmentsPage createRequestToken={createToken} />}
+        {tabAuthorized && tab.page === "branches" && <BranchesPage />}
+        {tabAuthorized && tab.page === "employees" && <EmployeesPage />}
+        {tabAuthorized && tab.page === "crm" && <CRMPage />}
+        {tabAuthorized && tab.page === "reports" && <ReportsPage initialReport={reportTarget} />}
+        {tabAuthorized && tab.page === "settings" && <SettingsPage />}
+        {tabAuthorized && tab.page === "audit-logs" && <AuditLogsPage />}
+        {tabAuthorized && tab.page === "treasury" && <TreasuryPage />}
+        {tabAuthorized && tab.page === "supplier-payments" && <SupplierPaymentsPage />}
+        {tabAuthorized && tab.page === "purchase-returns" && <PurchaseReturnsPage />}
+        {tabAuthorized && tab.page === "customer-ledger" && (
+          <CustomerLedgerPage initialCustomerId={customerId} initialBranchId={branchId} />
+        )}
+        {tabAuthorized && tab.page === "general-ledger" && <GeneralLedgerPage />}
+        {tabAuthorized && tab.page === "data-export" && <DataExportPage permissions={permissions} />}
+        {tabAuthorized && tab.page === "vouchers" && <VouchersPage initialKind={voucherKind} createRequestToken={createToken} />}
+        {tabAuthorized && tab.page === "payment-schedules" && <PaymentSchedulesPage createRequestToken={createToken} />}
+        {tabAuthorized && tab.page === "workspace-record" && recordTarget && (
+          <WorkspaceRecordPage target={recordTarget} onOpenRecord={openWorkspaceRecord} />
+        )}
+      </section>
+    );
+  };
 
   return (
     <PermissionProvider permissions={permissions}>
@@ -329,12 +808,12 @@ export function ERPApp() {
                 <Menu className="h-5 w-5" />
               </button>
               <div className="min-w-0">
-                <p className="text-[11px] font-bold text-slate-400">{pageMeta.group}</p>
-                <h1 className="truncate text-base font-black text-slate-900 lg:text-lg">{pageMeta.title}</h1>
+                <p className="text-[11px] font-bold text-slate-400">{currentTab?.group ?? pageMeta.group}</p>
+                <h1 className="truncate text-base font-black text-slate-900 lg:text-lg">{currentTab?.title ?? pageMeta.title}</h1>
               </div>
             </div>
 
-            {!PAGES_WITHOUT_GLOBAL_SEARCH.has(currentPage) && <GlobalSearch onNavigate={navigate} />}
+            {!PAGES_WITHOUT_GLOBAL_SEARCH.has(currentPage) && <GlobalSearch onNavigate={navigate} onOpenRecord={openWorkspaceRecord} />}
             <div className="mr-auto flex items-center gap-2.5">
               {canSelectWorkingBranch && (
                 <select
@@ -378,7 +857,7 @@ export function ERPApp() {
                           key={action.id}
                           type="button"
                           data-testid={`quick-action-${action.page}`}
-                          onClick={() => requestCreate(action.page, action.voucherKind)}
+                          onClick={() => requestCreate(action.page, action.voucherKind, action.label)}
                           className="flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-right text-sm font-bold text-slate-700 transition hover:bg-slate-50 hover:text-[var(--brand-primary)]"
                         >
                           <Plus className="h-3.5 w-3.5" />
@@ -392,57 +871,45 @@ export function ERPApp() {
             </div>
           </header>
 
-          <main className="erp-workspace-main min-h-0 flex-1 overflow-y-auto">
-            {!authorized && (
-              <div className="flex min-h-[70vh] items-center justify-center p-6">
-                <div className="text-center">
-                  <ShieldX className="mx-auto mb-4 h-14 w-14 text-red-400" />
-                  <h2 className="text-xl font-bold text-slate-800">غير مصرح بالوصول</h2>
-                  <p className="mt-2 text-sm text-slate-500">لا يملك حسابك الصلاحية المطلوبة لفتح هذه الصفحة.</p>
-                </div>
-              </div>
-            )}
-            {authorized && currentPage === "dashboard" && <Dashboard onOpenReport={openReport} permissions={permissions} />}
-            {authorized && currentPage === "accounts-home" && <AccountsHubPage onNavigate={navigate} permissions={permissions} />}
-            {authorized && currentPage === "products" && <ProductsPage createRequestToken={createToken("products")} />}
-            {authorized && currentPage === "inventory" && <InventoryWorkspacePage createRequestToken={createToken("inventory")} />}
-            {authorized && currentPage === "customers" && <CustomersPage onOpenLedger={openCustomerLedger} onCreateCustomer={() => navigate("new-customer")} createRequestToken={createToken("customers")} />}
-            {authorized && currentPage === "new-customer" && <NewCustomerPage onClose={() => navigate("customers")} />}
-            {authorized && currentPage === "follow-ups" && <CustomerFollowUpsPage />}
-            {authorized && currentPage === "invoices" && <InvoicesPage onNavigate={navigate} view="sales" />}
-            {authorized && currentPage === "sales-returns" && <InvoicesPage onNavigate={navigate} view="returns" />}
-            {authorized && currentPage === "credit-invoices" && <InvoicesPage onNavigate={navigate} view="sales" creditOnly />}
-            {authorized && currentPage === "new-invoice" && <NewInvoicePage onNavigate={navigate} />}
-            {authorized && currentPage === "new-purchase-invoice" && <NewPurchaseInvoicePage onNavigate={navigate} />}
-            {authorized && currentPage === "quotes" && <QuotesPage createRequestToken={createToken("quotes")} />}
-            {authorized && currentPage === "repairs" && <RepairsPage createRequestToken={createToken("repairs")} />}
-            {authorized && currentPage === "expenses" && <ExpensesPage createRequestToken={createToken("expenses")} />}
-            {authorized && currentPage === "suppliers" && <SuppliersPage />}
-            {authorized && currentPage === "orders" && <OrdersPage createRequestToken={createToken("orders")} />}
-            {authorized && currentPage === "deliveries" && <DeliveriesPage createRequestToken={createToken("deliveries")} />}
-            {authorized && currentPage === "shipments" && <ShipmentsPage createRequestToken={createToken("shipments")} />}
-            {authorized && currentPage === "branches" && <BranchesPage />}
-            {authorized && currentPage === "employees" && <EmployeesPage />}
-            {authorized && currentPage === "crm" && <CRMPage />}
-            {authorized && currentPage === "reports" && <ReportsPage initialReport={reportTarget} />}
-            {authorized && currentPage === "settings" && <SettingsPage />}
-            {authorized && currentPage === "audit-logs" && <AuditLogsPage />}
-            {authorized && currentPage === "treasury" && <TreasuryPage />}
-            {authorized && currentPage === "supplier-payments" && <SupplierPaymentsPage />}
-            {authorized && currentPage === "purchase-returns" && <PurchaseReturnsPage />}
-            {authorized && currentPage === "customer-ledger" && (
-              <CustomerLedgerPage
-                initialCustomerId={customerLedgerTarget?.customerId}
-                initialBranchId={customerLedgerTarget?.branchId}
-              />
-            )}
-            {authorized && currentPage === "general-ledger" && <GeneralLedgerPage />}
-            {authorized && currentPage === "data-export" && <DataExportPage permissions={permissions} />}
-            {authorized && currentPage === "vouchers" && <VouchersPage initialKind={voucherKind} createRequestToken={createToken("vouchers")} />}
-            {authorized && currentPage === "payment-schedules" && <PaymentSchedulesPage createRequestToken={createToken("payment-schedules")} />}
+          <WorkspaceTabs
+            tabs={workspace.tabs}
+            activeId={workspace.activeId}
+            labels={workspaceLabels}
+            onActivate={activateTab}
+            onRequestClose={requestClose}
+          />
+
+          <main
+            className="erp-workspace-main min-h-0 flex-1 overflow-y-auto"
+            onClickCapture={handleWorkspaceRecordClick}
+            onKeyDownCapture={handleWorkspaceRecordKeyDown}
+          >
+            {workspace.tabs.map(renderTab)}
           </main>
         </div>
       </div>
+
+      {pendingCloseIds && (
+        <div className="fixed inset-0 z-[100] grid place-items-center bg-slate-950/45 p-4 backdrop-blur-sm" role="presentation">
+          <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl" role="alertdialog" aria-modal="true" aria-labelledby="workspace-unsaved-title">
+            <div className="flex items-start gap-3">
+              <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-amber-50 text-amber-600">
+                <AlertTriangle className="h-5 w-5" />
+              </div>
+              <div>
+                <h2 id="workspace-unsaved-title" className="text-base font-black text-slate-900">{workspaceMessage(language, "unsavedTitle")}</h2>
+                <p className="mt-1 text-sm leading-6 text-slate-600">
+                  {pendingCloseIds.length === 1 ? workspaceMessage(language, "unsavedSingle") : workspaceMessage(language, "unsavedMultiple")}
+                </p>
+              </div>
+            </div>
+            <div className="mt-5 flex flex-wrap justify-end gap-2">
+              <button type="button" className="btn-secondary" onClick={() => setPendingCloseIds(null)}>{workspaceMessage(language, "stay")}</button>
+              <button type="button" className="rounded-xl bg-rose-600 px-4 py-2 text-sm font-black text-white hover:bg-rose-700" onClick={() => performClose(pendingCloseIds)}>{workspaceMessage(language, "closeWithoutSaving")}</button>
+            </div>
+          </div>
+        </div>
+      )}
     </PermissionProvider>
   );
 }

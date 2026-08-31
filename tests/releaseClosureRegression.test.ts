@@ -25,9 +25,10 @@ test("RELEASE-CLOSURE-02 generic clearing settlement excludes COD clearing accou
   assert.doesNotMatch(definition, /cod_clearing/);
 });
 
-test("RELEASE-CLOSURE-03 creation remains centralized through the shared shell request path", () => {
+test("RELEASE-CLOSURE-03 creation remains centralized through the shared workspace shell request path", () => {
   assert.doesNotMatch(dashboard, /onRequestCreate/);
-  assert.match(shell, /const requestCreate = \(page: CreateTarget, nextVoucherKind\?: "receipt" \| "disbursement"\)/);
+  assert.match(shell, /const requestCreate = \([\s\S]{0,220}page: CreateTarget,[\s\S]{0,120}nextVoucherKind\?: "receipt" \| "disbursement"/);
+  assert.match(shell, /openWorkspaceTab\(/);
   assert.match(shell, /<Dashboard onOpenReport=\{openReport\} permissions=\{permissions\}/);
   for (const page of ["new-invoice", "new-purchase-invoice", "customers", "repairs", "vouchers", "inventory"]) {
     assert.ok(shell.includes(`page: "${page}"`), `missing shared create action for ${page}`);
