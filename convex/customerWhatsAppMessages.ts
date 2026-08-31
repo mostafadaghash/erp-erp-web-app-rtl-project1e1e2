@@ -12,9 +12,17 @@ import {
   buildCustomerWhatsAppMessageKey,
   canStartCustomerWhatsAppAttempt,
   isCustomerWhatsAppMessageApplicable,
+  type CustomerWhatsAppMessageStatus,
   type CustomerWhatsAppMessageType,
   type CustomerWhatsAppOperationType,
 } from "../shared/customerWhatsAppMessageRules.ts";
+
+const MODULE = "customer_whatsapp_messages";
+const ACTION_CREATED = "whatsapp_created";
+const ACTION_ATTEMPT = "whatsapp_attempt";
+const ACTION_SENT = "whatsapp_sent";
+const ACTION_SUCCEEDED = "whatsapp_succeeded";
+const ACTION_FAILED = "whatsapp_failed";
 
 const messageTypeValidator = v.union(
   v.literal("order_confirmation"),
@@ -23,7 +31,6 @@ const messageTypeValidator = v.union(
   v.literal("delivered"),
   v.literal("post_sale_follow_up"),
 );
-
 const manualResultValidator = v.union(v.literal("sent"), v.literal("failed"));
 const providerResultValidator = v.union(v.literal("sent"), v.literal("succeeded"), v.literal("failed"));
 
@@ -60,6 +67,67 @@ type FollowUpContext = {
   operation: OperationSnapshot;
 };
 
+type MessageRecord = {
+  messageKey: string;
+  messageType: CustomerWhatsAppMessageType;
+  status: CustomerWhatsAppMessageStatus;
+  attemptCount: number;
+  createdAt: number;
+  updatedAt: number;
+  lastAttemptAt?: number;
+  sentAt?: number;
+  succeededAt?: number;
+  failedAt?: number;
+  lastError?: string;
+  provider: "manual_whatsapp" | "whatsapp_business_api";
+};
+
+function eventTime(event: Doc<"auditLogs">): number {
+  return event.timestamp ?? event._creationTime;
+}
+
+function snapshotValue(event: Doc<"auditLogs"> | undefined, field: string): string | undefined {
+  return event?.afterSnapshot?.find((row) => row.field === field)?.value;
+}
+
+function isMessageStatus(value: string | undefined): value is CustomerWhatsAppMessageStatus {
+  return value === "prepared" || value === "opened" || value === "sent" || value === "succeeded" || value === "failed";
+}
+
+function deriveMessageRecord(
+  events: Doc<"auditLogs">[],
+  messageKey: string,
+  messageType: CustomerWhatsAppMessageType,
+): MessageRecord | null {
+  if (events.length === 0) return null;
+  const sorted = [...events].sort((a, b) => eventTime(a) - eventTime(b));
+  const created = sorted.find((event) => event.action === ACTION_CREATED) ?? sorted[0];
+  const latestStatusEvent = [...sorted]
+    .reverse()
+    .find((event) => isMessageStatus(snapshotValue(event, "status")));
+  const statusValue = snapshotValue(latestStatusEvent, "status");
+  const status: CustomerWhatsAppMessageStatus = isMessageStatus(statusValue) ? statusValue : "prepared";
+  const attempts = sorted.filter((event) => event.action === ACTION_ATTEMPT);
+  const sentEvents = sorted.filter((event) => event.action === ACTION_SENT);
+  const succeededEvents = sorted.filter((event) => event.action === ACTION_SUCCEEDED);
+  const failedEvents = sorted.filter((event) => event.action === ACTION_FAILED);
+  const providerValue = snapshotValue(latestStatusEvent, "provider") ?? snapshotValue(created, "provider");
+  return {
+    messageKey,
+    messageType,
+    status,
+    attemptCount: attempts.length,
+    createdAt: eventTime(created),
+    updatedAt: eventTime(sorted[sorted.length - 1]),
+    lastAttemptAt: attempts.length ? eventTime(attempts[attempts.length - 1]) : undefined,
+    sentAt: sentEvents.length ? eventTime(sentEvents[sentEvents.length - 1]) : undefined,
+    succeededAt: succeededEvents.length ? eventTime(succeededEvents[succeededEvents.length - 1]) : undefined,
+    failedAt: failedEvents.length ? eventTime(failedEvents[failedEvents.length - 1]) : undefined,
+    lastError: failedEvents.length ? failedEvents[failedEvents.length - 1].details : undefined,
+    provider: providerValue === "whatsapp_business_api" ? "whatsapp_business_api" : "manual_whatsapp",
+  };
+}
+
 function eligibility(
   operation: OperationSnapshot,
   messageType: CustomerWhatsAppMessageType,
@@ -67,7 +135,6 @@ function eligibility(
   if (!isCustomerWhatsAppMessageApplicable(operation.operationType, messageType)) {
     return { eligible: false, reason: "نوع الرسالة لا ينطبق على هذه العملية" };
   }
-
   if (operation.operationType === "order") {
     const delivered = operation.rawStatus === "delivered" || operation.linkedDeliveryStatus === "delivered";
     const shipped = operation.linkedDeliveryStatus === "shipped";
@@ -92,7 +159,6 @@ function eligibility(
         : { eligible: false, reason: "تتاح بعد اكتمال التسليم" };
     }
   }
-
   if (operation.operationType === "repair") {
     if (messageType === "ready_for_pickup") {
       return operation.rawStatus === "ready"
@@ -105,7 +171,6 @@ function eligibility(
         : { eligible: false, reason: "تتاح بعد تسليم جهاز الصيانة" };
     }
   }
-
   if (operation.operationType === "delivery") {
     if (messageType === "shipped") {
       return operation.rawStatus === "shipped"
@@ -118,7 +183,6 @@ function eligibility(
         : { eligible: false, reason: "تتاح بعد تسجيل التسليم" };
     }
   }
-
   return { eligible: false, reason: "الرسالة غير متاحة للحالة الحالية" };
 }
 
@@ -227,77 +291,57 @@ function messageKey(operation: OperationSnapshot, messageType: CustomerWhatsAppM
   });
 }
 
+async function loadMessageEvents(
+  ctx: QueryCtx | MutationCtx,
+  key: string,
+): Promise<Doc<"auditLogs">[]> {
+  return ctx.db
+    .query("auditLogs")
+    .withIndex("by_record", (q) => q.eq("module", MODULE).eq("recordId", key))
+    .collect();
+}
+
 export const getCenter = query({
   args: { followUpId: v.id("customerFollowUps") },
   handler: async (ctx, args) => {
     const user = await requireWhatsAppWorkspaceUser(ctx, "view");
-    let context: FollowUpContext;
-    try {
-      context = await resolveFollowUpContext(ctx, user, args.followUpId);
-    } catch (error) {
-      if (error instanceof ConvexError && String(error.data).includes("متاح للطلبات والصيانة والشحن فقط")) {
-        return { supported: false as const, reason: String(error.data) };
-      }
-      throw error;
+    const followUp = await ctx.db.get(args.followUpId);
+    if (!followUp) return { supported: false as const, reason: "المتابعة غير موجودة" };
+    assertBranchAccess(user, followUp);
+    if (
+      (followUp.sourceType !== "order" && followUp.sourceType !== "repair" && followUp.sourceType !== "delivery") ||
+      !followUp.sourceId
+    ) {
+      return { supported: false as const, reason: "مركز واتساب متاح للطلبات والصيانة والشحن فقط" };
     }
-    const { operation } = context;
-    const records = await ctx.db
-      .query("customerWhatsAppMessages")
-      .withIndex("by_source", (q) =>
-        q.eq("operationType", operation.operationType).eq("operationId", operation.operationId),
-      )
-      .collect();
-    records.sort((a, b) => b.updatedAt - a.updatedAt);
-    const byType = new Map(records.map((record) => [record.messageType, record]));
-
-    return {
-      supported: true as const,
-      customerName: operation.customerName,
-      phone: operation.phone,
-      operationType: operation.operationType,
-      operationNumber: operation.operationNumber,
-      messages: CUSTOMER_WHATSAPP_MESSAGE_TYPES.map((messageType) => {
+    const { operation } = await resolveFollowUpContext(ctx, user, args.followUpId);
+    const messages = await Promise.all(
+      CUSTOMER_WHATSAPP_MESSAGE_TYPES.map(async (messageType) => {
+        const key = messageKey(operation, messageType);
+        const events = await loadMessageEvents(ctx, key);
         const availability = eligibility(operation, messageType);
-        const record = byType.get(messageType);
         return {
           messageType,
           label: CUSTOMER_WHATSAPP_MESSAGE_TYPE_LABELS[messageType],
           applicable: isCustomerWhatsAppMessageApplicable(operation.operationType, messageType),
           eligible: availability.eligible,
           reason: availability.reason,
-          record: record
-            ? {
-                id: record._id,
-                status: record.status,
-                attemptCount: record.attemptCount,
-                createdAt: record.createdAt,
-                updatedAt: record.updatedAt,
-                lastAttemptAt: record.lastAttemptAt,
-                sentAt: record.sentAt,
-                succeededAt: record.succeededAt,
-                failedAt: record.failedAt,
-                lastError: record.lastError,
-                provider: record.provider,
-              }
-            : null,
+          record: deriveMessageRecord(events, key, messageType),
         };
       }),
-      records: records.map((record) => ({
-        id: record._id,
-        createdAt: record.createdAt,
-        customerName: record.customerName,
-        operationType: record.operationType,
-        operationNumber: record.operationNumber,
-        messageType: record.messageType,
-        status: record.status,
-        attemptCount: record.attemptCount,
-        lastAttemptAt: record.lastAttemptAt,
-        sentAt: record.sentAt,
-        succeededAt: record.succeededAt,
-        failedAt: record.failedAt,
-        lastError: record.lastError,
-        provider: record.provider,
-      })),
+    );
+    const records = messages
+      .map((message) => message.record)
+      .filter((record): record is MessageRecord => Boolean(record))
+      .sort((a, b) => b.updatedAt - a.updatedAt);
+    return {
+      supported: true as const,
+      customerName: operation.customerName,
+      phone: operation.phone,
+      operationType: operation.operationType,
+      operationNumber: operation.operationNumber,
+      messages,
+      records,
     };
   },
 });
@@ -312,77 +356,50 @@ export const openManualAttempt = mutation({
     const { operation } = await resolveFollowUpContext(ctx, user, args.followUpId);
     const availability = eligibility(operation, args.messageType);
     if (!availability.eligible) throw new ConvexError(availability.reason ?? "الرسالة غير متاحة للحالة الحالية");
-
-    const idempotencyKey = messageKey(operation, args.messageType);
-    const existing = await ctx.db
-      .query("customerWhatsAppMessages")
-      .withIndex("by_idempotency_key", (q) => q.eq("idempotencyKey", idempotencyKey))
-      .unique();
+    const key = messageKey(operation, args.messageType);
+    const events = await loadMessageEvents(ctx, key);
+    const existing = deriveMessageRecord(events, key, args.messageType);
     if (existing && !canStartCustomerWhatsAppAttempt(existing.status)) {
-      const reason = existing.status === "opened"
-        ? "هناك محاولة مفتوحة بالفعل. سجّل نتيجتها قبل إعادة المحاولة."
-        : "تم إرسال هذه الرسالة من قبل، ولذلك تم منع الإرسال المكرر.";
       return {
         blocked: true as const,
-        reason,
-        messageId: existing._id,
+        reason: existing.status === "opened"
+          ? "هناك محاولة مفتوحة بالفعل. سجّل نتيجتها قبل إعادة المحاولة."
+          : "تم إرسال هذه الرسالة من قبل، ولذلك تم منع الإرسال المكرر.",
+        messageKey: key,
         status: existing.status,
         attemptCount: existing.attemptCount,
       };
     }
 
-    const now = Date.now();
     const messageBody = buildCustomerWhatsAppMessageBody({
       customerName: operation.customerName,
       operationType: operation.operationType,
       operationNumber: operation.operationNumber,
       messageType: args.messageType,
     });
-    const messageId = existing?._id ?? await ctx.db.insert("customerWhatsAppMessages", {
-      branchId: operation.branchId,
-      customerId: operation.customerId,
-      customerName: operation.customerName,
-      phone: operation.phone,
-      operationType: operation.operationType,
-      operationId: operation.operationId,
-      operationNumber: operation.operationNumber,
-      messageType: args.messageType,
-      messageBody,
-      idempotencyKey,
-      provider: "manual_whatsapp",
-      status: "opened",
-      attemptCount: 1,
-      lastAttemptAt: now,
-      lastStatusAt: now,
-      createdBy: user.userId,
-      createdAt: now,
-      updatedBy: user.userId,
-      updatedAt: now,
-    });
-
-    if (existing) {
-      await ctx.db.patch(existing._id, {
-        customerName: operation.customerName,
-        phone: operation.phone,
-        operationNumber: operation.operationNumber,
-        messageBody,
-        provider: "manual_whatsapp",
-        status: "opened",
-        attemptCount: existing.attemptCount + 1,
-        lastAttemptAt: now,
-        lastStatusAt: now,
-        lastError: undefined,
-        failedAt: undefined,
-        updatedBy: user.userId,
-        updatedAt: now,
+    if (!existing) {
+      await logAction(ctx, user, {
+        action: ACTION_CREATED,
+        module: MODULE,
+        recordId: key,
+        recordLabel: `${operation.customerName} - ${CUSTOMER_WHATSAPP_MESSAGE_TYPE_LABELS[args.messageType]}`,
+        details: messageBody,
+        branchId: operation.branchId,
+        sourceType: operation.operationType,
+        sourceId: operation.operationId,
+        sourceNumber: operation.operationNumber,
+        after: {
+          messageType: args.messageType,
+          status: "prepared",
+          provider: "manual_whatsapp",
+        },
       });
     }
-
-    const attemptCount = existing ? existing.attemptCount + 1 : 1;
+    const attemptCount = (existing?.attemptCount ?? 0) + 1;
     await logAction(ctx, user, {
-      action: "whatsapp_attempt",
-      module: "customer_whatsapp_messages",
-      recordId: String(messageId),
+      action: ACTION_ATTEMPT,
+      module: MODULE,
+      recordId: key,
       recordLabel: `${operation.customerName} - ${CUSTOMER_WHATSAPP_MESSAGE_TYPE_LABELS[args.messageType]}`,
       details: `فتح واتساب للمحاولة رقم ${attemptCount}`,
       branchId: operation.branchId,
@@ -392,13 +409,13 @@ export const openManualAttempt = mutation({
       after: {
         messageType: args.messageType,
         status: "opened",
+        provider: "manual_whatsapp",
         attemptCount,
       },
     });
-
     return {
       blocked: false as const,
-      messageId,
+      messageKey: key,
       phone: operation.phone,
       messageBody,
       status: "opened" as const,
@@ -409,73 +426,89 @@ export const openManualAttempt = mutation({
 
 export const markManualResult = mutation({
   args: {
-    messageId: v.id("customerWhatsAppMessages"),
+    followUpId: v.id("customerFollowUps"),
+    messageType: messageTypeValidator,
     result: manualResultValidator,
     failureReason: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const user = await requireWhatsAppWorkspaceUser(ctx, "manage");
-    const record = await ctx.db.get(args.messageId);
+    const { operation } = await resolveFollowUpContext(ctx, user, args.followUpId);
+    const key = messageKey(operation, args.messageType);
+    const events = await loadMessageEvents(ctx, key);
+    const record = deriveMessageRecord(events, key, args.messageType);
     if (!record) throw new ConvexError("سجل الرسالة غير موجود");
-    assertBranchAccess(user, record);
-    if (record.status === args.result) return record._id;
+    if (record.status === args.result) return key;
     if (record.status !== "opened") {
       throw new ConvexError("لا يمكن تغيير نتيجة رسالة ليست في محاولة إرسال مفتوحة");
     }
-    const now = Date.now();
     const failureReason = args.failureReason?.trim().slice(0, 500);
-    await ctx.db.patch(record._id, {
-      status: args.result,
-      sentAt: args.result === "sent" ? now : record.sentAt,
-      failedAt: args.result === "failed" ? now : undefined,
-      lastError: args.result === "failed" ? failureReason || "تعذر الإرسال يدويًا" : undefined,
-      lastStatusAt: now,
-      updatedBy: user.userId,
-      updatedAt: now,
-    });
     await logAction(ctx, user, {
-      action: args.result === "sent" ? "whatsapp_sent" : "whatsapp_failed",
-      module: "customer_whatsapp_messages",
-      recordId: String(record._id),
-      recordLabel: `${record.customerName} - ${CUSTOMER_WHATSAPP_MESSAGE_TYPE_LABELS[record.messageType]}`,
+      action: args.result === "sent" ? ACTION_SENT : ACTION_FAILED,
+      module: MODULE,
+      recordId: key,
+      recordLabel: `${operation.customerName} - ${CUSTOMER_WHATSAPP_MESSAGE_TYPE_LABELS[args.messageType]}`,
       details: args.result === "sent" ? "تم تأكيد إرسال الرسالة يدويًا" : failureReason || "تم تسجيل فشل الإرسال",
-      branchId: record.branchId,
-      sourceType: record.operationType,
-      sourceId: record.operationId,
-      sourceNumber: record.operationNumber,
+      branchId: operation.branchId,
+      sourceType: operation.operationType,
+      sourceId: operation.operationId,
+      sourceNumber: operation.operationNumber,
       before: { status: record.status },
-      after: { status: args.result, attemptCount: record.attemptCount },
+      after: {
+        messageType: args.messageType,
+        status: args.result,
+        provider: "manual_whatsapp",
+        attemptCount: record.attemptCount,
+      },
     });
-    return record._id;
+    return key;
   },
 });
 
-// نقطة الربط المستقبلية مع WhatsApp Business API: مزود الرسائل يستطيع تحديث نفس السجل
-// إلى sent / succeeded / failed دون تغيير الواجهة أو مفتاح منع التكرار.
+// نقطة الربط المستقبلية مع WhatsApp Business API. المزود يضيف حالة إلى نفس الـledger
+// بنفس messageKey، لذلك لا نحتاج لاحقًا إلى تغيير بطاقة العميل أو منطق منع التكرار.
 export const applyProviderResult = internalMutation({
   args: {
-    messageId: v.id("customerWhatsAppMessages"),
+    messageKey: v.string(),
     status: providerResultValidator,
     providerMessageId: v.optional(v.string()),
     providerStatus: v.optional(v.string()),
     error: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const record = await ctx.db.get(args.messageId);
-    if (!record) throw new ConvexError("سجل الرسالة غير موجود");
-    const now = Date.now();
-    await ctx.db.patch(record._id, {
-      provider: "whatsapp_business_api",
-      providerMessageId: args.providerMessageId?.trim().slice(0, 300),
-      providerStatus: args.providerStatus?.trim().slice(0, 120),
-      status: args.status,
-      sentAt: args.status === "sent" ? now : record.sentAt,
-      succeededAt: args.status === "succeeded" ? now : record.succeededAt,
-      failedAt: args.status === "failed" ? now : record.failedAt,
-      lastError: args.status === "failed" ? args.error?.trim().slice(0, 500) || "فشل مزود واتساب" : undefined,
-      lastStatusAt: now,
-      updatedAt: now,
-      updatedBy: "system:whatsapp_business_api",
+    const key = args.messageKey.trim();
+    if (!key) throw new ConvexError("مفتاح الرسالة مطلوب");
+    const events = await loadMessageEvents(ctx, key);
+    if (events.length === 0) throw new ConvexError("سجل الرسالة غير موجود");
+    const sorted = [...events].sort((a, b) => eventTime(a) - eventTime(b));
+    const origin = sorted[0];
+    const messageType = snapshotValue(origin, "messageType") ?? "unknown";
+    const action = args.status === "sent" ? ACTION_SENT : args.status === "succeeded" ? ACTION_SUCCEEDED : ACTION_FAILED;
+    const afterSnapshot = [
+      { field: "messageType", value: messageType },
+      { field: "status", value: args.status },
+      { field: "provider", value: "whatsapp_business_api" },
+      ...(args.providerMessageId ? [{ field: "providerMessageId", value: args.providerMessageId.trim().slice(0, 300) }] : []),
+      ...(args.providerStatus ? [{ field: "providerStatus", value: args.providerStatus.trim().slice(0, 120) }] : []),
+    ];
+    await ctx.db.insert("auditLogs", {
+      userId: "system:whatsapp_business_api",
+      userName: "WhatsApp Business API",
+      action,
+      module: MODULE,
+      recordId: key.slice(0, 200),
+      recordLabel: origin.recordLabel,
+      details: args.status === "failed"
+        ? args.error?.trim().slice(0, 500) || "فشل مزود واتساب"
+        : args.providerStatus?.trim().slice(0, 500) || `WhatsApp Business API: ${args.status}`,
+      afterSnapshot,
+      changedFields: ["status", "provider"],
+      snapshotVersion: 1,
+      sourceType: origin.sourceType,
+      sourceId: origin.sourceId,
+      sourceNumber: origin.sourceNumber,
+      branchId: origin.branchId,
+      timestamp: Date.now(),
     });
   },
 });
