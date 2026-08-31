@@ -12,6 +12,9 @@ import "./new-invoice-pos-final.css";
 import "./invoice-customer-fields-polish.css";
 import "./invoice-list-filter-polish.css";
 import App from "./App";
+import { getDirection } from "./i18n/catalog";
+import { getInitialLanguage } from "./i18n/I18nProvider";
+import { runtimeMessage } from "./i18n/runtimeMessages";
 
 class RuntimeErrorBoundary extends Component<
   { children: ReactNode },
@@ -30,9 +33,13 @@ class RuntimeErrorBoundary extends Component<
   render() {
     if (!this.state.hasError) return this.props.children;
 
+    const language = getInitialLanguage();
+    const direction = getDirection(language);
+
     return (
       <main
-        dir="rtl"
+        dir={direction}
+        lang={language}
         style={{
           minHeight: "100vh",
           display: "grid",
@@ -54,10 +61,10 @@ class RuntimeErrorBoundary extends Component<
           }}
         >
           <h1 style={{ margin: 0, color: "#172033", fontSize: "24px", fontWeight: 900 }}>
-            تعذر عرض النظام
+            {runtimeMessage(language, "runtimeTitle")}
           </h1>
           <p style={{ margin: "12px 0 20px", color: "#697586", lineHeight: 1.9 }}>
-            حدث خطأ أثناء تشغيل الواجهة. أعد المحاولة، وإذا استمر الخطأ فسيتم التعامل معه من سجل التشغيل.
+            {runtimeMessage(language, "runtimeDescription")}
           </p>
           <button
             type="button"
@@ -72,7 +79,7 @@ class RuntimeErrorBoundary extends Component<
               cursor: "pointer",
             }}
           >
-            إعادة المحاولة
+            {runtimeMessage(language, "retry")}
           </button>
         </section>
       </main>
@@ -83,9 +90,13 @@ class RuntimeErrorBoundary extends Component<
 const convexUrl = import.meta.env.VITE_CONVEX_URL;
 
 if (!convexUrl) {
+  const language = getInitialLanguage();
+  const direction = getDirection(language);
+
   createRoot(document.getElementById("root")!).render(
     <main
-      dir="rtl"
+      dir={direction}
+      lang={language}
       style={{
         minHeight: "100vh",
         display: "grid",
@@ -123,10 +134,10 @@ if (!convexUrl) {
           !
         </div>
         <h1 style={{ margin: 0, color: "#172033", fontSize: "24px", fontWeight: 900 }}>
-          الخدمة غير متاحة مؤقتًا
+          {runtimeMessage(language, "unavailableTitle")}
         </h1>
         <p style={{ margin: "12px 0 0", color: "#697586", lineHeight: 1.9 }}>
-          تعذر تشغيل النظام في الوقت الحالي. يرجى المحاولة مرة أخرى بعد قليل أو التواصل مع مسؤول النظام إذا استمرت المشكلة.
+          {runtimeMessage(language, "unavailableDescription")}
         </p>
       </section>
     </main>,

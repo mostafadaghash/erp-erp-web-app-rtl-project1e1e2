@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { messages } from "../src/i18n/catalog.ts";
 
 const read = (path: string) => readFileSync(new URL(path, import.meta.url), "utf8");
 const sidebar = read("../src/components/Sidebar.tsx");
@@ -20,8 +21,10 @@ test("SUX-01 navigation dropdowns close on an outside pointer press", () => {
   assert.match(app, /!quickMenuRef\.current\?\.contains\(event\.target\)/);
 });
 
-test("SUX-02 dashboard is named لوحة التحكم and is a direct navigation item", () => {
-  assert.match(sidebar, /HOME_ITEM: NavItem = \{ id: "dashboard", label: "لوحة التحكم"/);
+test("SUX-02 dashboard is a translated direct navigation item", () => {
+  assert.match(sidebar, /HOME_ITEM: NavItem = \{ id: "dashboard", labelKey: "nav\.dashboard"/);
+  assert.equal(messages.ar["nav.dashboard"], "لوحة التحكم");
+  assert.equal(messages.en["nav.dashboard"], "Dashboard");
   assert.match(sidebar, /data-testid="nav-dashboard"/);
   assert.match(sidebar, /className=\{`erp-nav-home-button/);
   assert.doesNotMatch(sidebar, /key: "home"[\s\S]{0,160}items:/);

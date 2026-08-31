@@ -150,7 +150,7 @@ test("STG-07 target validation refuses production and unsafe origins", () => {
 
 test("STG-08 mobile acceptance uses accessible navigation controls", () => {
   assert.match(erpApp, /aria-label="فتح القائمة الرئيسية"/);
-  assert.match(sidebar, /aria-label="إغلاق القائمة الرئيسية"/);
+  assert.match(sidebar, /aria-label=\{`\$\{t\("common\.close"\)\} \$\{t\("nav\.main"\)\}`\}/);
   assert.match(script, /width: 390, height: 844/);
   assert.match(script, /admin-mobile-navigation\.png/);
 });

@@ -27,6 +27,8 @@ import {
 } from "lucide-react";
 import type { Permission } from "../../convex/lib/permissions";
 import { SignOutButton } from "../SignOutButton";
+import { useI18n } from "../i18n/I18nProvider";
+import type { TranslationKey } from "../i18n/catalog";
 import { BrandMark } from "./BrandMark";
 
 interface SidebarProps {
@@ -49,7 +51,7 @@ interface SidebarProps {
 
 interface NavItem {
   id: Page;
-  label: string;
+  labelKey: TranslationKey;
   icon: React.ElementType;
   moduleKey?: string;
   permission?: Permission;
@@ -58,12 +60,12 @@ interface NavItem {
 
 interface NavGroup {
   key: string;
-  label: string;
+  labelKey: TranslationKey;
   icon: React.ElementType;
   items: NavItem[];
 }
 
-const HOME_ITEM: NavItem = { id: "dashboard", label: "لوحة التحكم", icon: Home };
+const HOME_ITEM: NavItem = { id: "dashboard", labelKey: "nav.dashboard", icon: Home };
 const FOLLOW_UP_ROLES = ["admin", "manager", "sales", "customer_service", "technician", "shipping"];
 const PAGE_SESSION_KEY = "business-tech-erp.current-page";
 const PAGE_IDS = new Set<Page>([
@@ -108,85 +110,85 @@ const isPage = (value: string | null): value is Page =>
 const NAV_GROUPS: NavGroup[] = [
   {
     key: "sales",
-    label: "المبيعات",
+    labelKey: "nav.sales",
     icon: ShoppingBag,
     items: [
-      { id: "new-invoice", label: "فاتورة بيع جديدة", icon: ReceiptText, moduleKey: "invoices", permission: "create_invoices" },
-      { id: "invoices", label: "فواتير المبيعات", icon: ReceiptText, moduleKey: "invoices", permission: "view_invoices" },
-      { id: "sales-returns", label: "مرتجعات المبيعات", icon: RotateCcw, moduleKey: "invoices", permission: "view_sales_returns" },
-      { id: "quotes", label: "عروض الأسعار", icon: FileText, permission: "view_quotes" },
-      { id: "orders", label: "طلبات البيع", icon: ClipboardList, moduleKey: "orders", permission: "view_orders" },
+      { id: "new-invoice", labelKey: "nav.newSalesInvoice", icon: ReceiptText, moduleKey: "invoices", permission: "create_invoices" },
+      { id: "invoices", labelKey: "nav.salesInvoices", icon: ReceiptText, moduleKey: "invoices", permission: "view_invoices" },
+      { id: "sales-returns", labelKey: "nav.salesReturns", icon: RotateCcw, moduleKey: "invoices", permission: "view_sales_returns" },
+      { id: "quotes", labelKey: "nav.quotes", icon: FileText, permission: "view_quotes" },
+      { id: "orders", labelKey: "nav.salesOrders", icon: ClipboardList, moduleKey: "orders", permission: "view_orders" },
     ],
   },
   {
     key: "customers",
-    label: "العملاء",
+    labelKey: "nav.customers",
     icon: Users,
     items: [
-      { id: "new-customer", label: "إضافة عميل", icon: UserPlus, permission: "create_customers" },
-      { id: "customers", label: "قائمة العملاء", icon: Users, permission: "view_customers" },
-      { id: "follow-ups", label: "متابعة العملاء", icon: CalendarClock, permission: "view_follow_ups", roleFallback: FOLLOW_UP_ROLES },
+      { id: "new-customer", labelKey: "nav.addCustomer", icon: UserPlus, permission: "create_customers" },
+      { id: "customers", labelKey: "nav.customerList", icon: Users, permission: "view_customers" },
+      { id: "follow-ups", labelKey: "nav.followUps", icon: CalendarClock, permission: "view_follow_ups", roleFallback: FOLLOW_UP_ROLES },
     ],
   },
   {
     key: "purchases",
-    label: "المشتريات",
+    labelKey: "nav.purchases",
     icon: ShoppingBag,
     items: [
-      { id: "new-purchase-invoice", label: "فاتورة مشتريات جديدة", icon: ReceiptText, moduleKey: "shipments", permission: "create_shipments" },
-      { id: "shipments", label: "فواتير المشتريات", icon: ShoppingBag, moduleKey: "shipments", permission: "view_shipments" },
-      { id: "purchase-returns", label: "مرتجعات المشتريات", icon: RotateCcw, permission: "view_purchase_returns" },
-      { id: "suppliers", label: "الموردون", icon: Truck, moduleKey: "suppliers", permission: "view_suppliers" },
+      { id: "new-purchase-invoice", labelKey: "nav.newPurchaseInvoice", icon: ReceiptText, moduleKey: "shipments", permission: "create_shipments" },
+      { id: "shipments", labelKey: "nav.purchaseInvoices", icon: ShoppingBag, moduleKey: "shipments", permission: "view_shipments" },
+      { id: "purchase-returns", labelKey: "nav.purchaseReturns", icon: RotateCcw, permission: "view_purchase_returns" },
+      { id: "suppliers", labelKey: "nav.suppliers", icon: Truck, moduleKey: "suppliers", permission: "view_suppliers" },
     ],
   },
   {
     key: "inventory",
-    label: "المخزون",
+    labelKey: "nav.inventory",
     icon: Boxes,
-    items: [{ id: "inventory", label: "إدارة المخزون", icon: Package, permission: "view_products" }],
+    items: [{ id: "inventory", labelKey: "nav.inventoryManagement", icon: Package, permission: "view_products" }],
   },
   {
     key: "service",
-    label: "الصيانة",
+    labelKey: "nav.repairs",
     icon: Wrench,
-    items: [{ id: "repairs", label: "أوامر الصيانة", icon: Wrench, moduleKey: "repairs", permission: "view_repairs" }],
+    items: [{ id: "repairs", labelKey: "nav.repairOrders", icon: Wrench, moduleKey: "repairs", permission: "view_repairs" }],
   },
   {
     key: "shipping",
-    label: "الشحن",
+    labelKey: "nav.shipping",
     icon: Truck,
-    items: [{ id: "deliveries", label: "طلبات الشحن والتسويات", icon: Truck, moduleKey: "deliveries", permission: "view_deliveries" }],
+    items: [{ id: "deliveries", labelKey: "nav.shippingSettlements", icon: Truck, moduleKey: "deliveries", permission: "view_deliveries" }],
   },
   {
     key: "accounting",
-    label: "الحسابات",
+    labelKey: "nav.accounts",
     icon: Landmark,
     items: [
-      { id: "accounts-home", label: "نظرة عامة", icon: Landmark, permission: "view_finance" },
-      { id: "treasury", label: "الخزائن والحسابات", icon: Landmark, permission: "view_finance" },
-      { id: "vouchers", label: "سندات القبض والصرف", icon: ReceiptText, permission: "view_finance" },
-      { id: "customer-ledger", label: "حسابات العملاء", icon: BookOpen, permission: "view_customer_ledger" },
-      { id: "supplier-payments", label: "حسابات الموردين", icon: Truck, permission: "view_supplier_ledger" },
-      { id: "credit-invoices", label: "الفواتير الآجلة", icon: ClipboardList, permission: "view_invoices" },
-      { id: "payment-schedules", label: "الشيكات والأقساط", icon: CalendarClock, permission: "view_finance" },
-      { id: "expenses", label: "المصروفات", icon: CircleDollarSign, moduleKey: "expenses", permission: "view_expenses" },
+      { id: "accounts-home", labelKey: "nav.overview", icon: Landmark, permission: "view_finance" },
+      { id: "treasury", labelKey: "nav.treasury", icon: Landmark, permission: "view_finance" },
+      { id: "vouchers", labelKey: "nav.vouchers", icon: ReceiptText, permission: "view_finance" },
+      { id: "customer-ledger", labelKey: "nav.customerAccounts", icon: BookOpen, permission: "view_customer_ledger" },
+      { id: "supplier-payments", labelKey: "nav.supplierAccounts", icon: Truck, permission: "view_supplier_ledger" },
+      { id: "credit-invoices", labelKey: "nav.creditInvoices", icon: ClipboardList, permission: "view_invoices" },
+      { id: "payment-schedules", labelKey: "nav.paymentSchedules", icon: CalendarClock, permission: "view_finance" },
+      { id: "expenses", labelKey: "nav.expenses", icon: CircleDollarSign, moduleKey: "expenses", permission: "view_expenses" },
     ],
   },
   {
     key: "reports",
-    label: "التقارير",
+    labelKey: "nav.reports",
     icon: BarChart3,
-    items: [{ id: "reports", label: "مركز التقارير", icon: BarChart3, moduleKey: "reports", permission: "view_reports" }],
+    items: [{ id: "reports", labelKey: "nav.reportCenter", icon: BarChart3, moduleKey: "reports", permission: "view_reports" }],
   },
   {
     key: "administration",
-    label: "الإعدادات",
+    labelKey: "nav.settings",
     icon: Settings,
     items: [
-      { id: "branches", label: "الفروع", icon: Building2, moduleKey: "branches", permission: "view_branches" },
-      { id: "employees", label: "المستخدمون والصلاحيات", icon: UserCog, moduleKey: "employees", permission: "view_employees" },
-      { id: "audit-logs", label: "سجل العمليات", icon: ShieldCheck, permission: "view_audit_logs" },
-      { id: "settings", label: "إعدادات النظام", icon: Settings, permission: "manage_settings" },
+      { id: "branches", labelKey: "nav.branches", icon: Building2, moduleKey: "branches", permission: "view_branches" },
+      { id: "employees", labelKey: "nav.usersPermissions", icon: UserCog, moduleKey: "employees", permission: "view_employees" },
+      { id: "audit-logs", labelKey: "nav.auditLog", icon: ShieldCheck, permission: "view_audit_logs" },
+      { id: "settings", labelKey: "nav.systemSettings", icon: Settings, permission: "manage_settings" },
     ],
   },
 ];
@@ -214,6 +216,7 @@ export function Sidebar({
 }: SidebarProps) {
   const [openGroup, setOpenGroup] = useState<string | null>(null);
   const restoreAttemptedRef = useRef(false);
+  const { t } = useI18n();
 
   useEffect(() => {
     try {
@@ -268,7 +271,7 @@ export function Sidebar({
   };
 
   return (
-    <aside className="erp-navigation h-full w-full" aria-label="القائمة الرئيسية">
+    <aside className="erp-navigation h-full w-full" aria-label={t("nav.main")}>
       <div className="erp-navigation-inner">
         <div className="erp-nav-brand">
           <BrandMark
@@ -278,20 +281,20 @@ export function Sidebar({
             secondaryColor={brand.secondaryColor}
             size="md"
           />
-          <div className="min-w-0">
+          <div className="min-w-0" data-i18n-skip>
             <p className="max-w-36 truncate text-sm font-black text-slate-900">{brand.shortName}</p>
             <p className="mt-0.5 hidden max-w-40 truncate text-[10px] text-slate-400 xl:block">{brand.tagline}</p>
           </div>
           <button
             onClick={onClose}
             className="mr-auto rounded-lg p-2 text-slate-500 transition hover:bg-slate-100 lg:hidden"
-            aria-label="إغلاق القائمة الرئيسية"
+            aria-label={`${t("common.close")} ${t("nav.main")}`}
           >
             <X className="h-4 w-4" />
           </button>
         </div>
 
-        <nav aria-label="القائمة الرئيسية" className="erp-nav-groups">
+        <nav aria-label={t("nav.main")} className="erp-nav-groups">
           <button
             type="button"
             data-testid="nav-dashboard"
@@ -300,7 +303,7 @@ export function Sidebar({
             className={`erp-nav-home-button ${currentPage === HOME_ITEM.id ? "active" : ""}`}
           >
             <Home className="h-4 w-4" />
-            <span>{HOME_ITEM.label}</span>
+            <span>{t(HOME_ITEM.labelKey)}</span>
           </button>
 
           {groups.map((group) => {
@@ -320,11 +323,11 @@ export function Sidebar({
                   onClick={() => setOpenGroup((value) => (value === group.key ? null : group.key))}
                   className={`erp-nav-group-button ${hasActive ? "active" : ""}`}
                   aria-expanded={isOpen}
-                  aria-label={`قسم ${group.label}`}
+                  aria-label={t(group.labelKey)}
                 >
                   <span className="flex items-center gap-2">
                     <GroupIcon className="h-4 w-4" />
-                    {group.label}
+                    {t(group.labelKey)}
                   </span>
                   <ChevronDown className={`h-3.5 w-3.5 transition-transform ${isOpen ? "rotate-180" : ""}`} />
                 </button>
@@ -344,7 +347,7 @@ export function Sidebar({
                           className={`erp-nav-item ${isActive ? "active" : ""}`}
                         >
                           <Icon className="h-4 w-4 shrink-0" />
-                          <span className="truncate">{item.label}</span>
+                          <span className="truncate">{t(item.labelKey)}</span>
                         </button>
                       );
                     })}
@@ -360,11 +363,12 @@ export function Sidebar({
             <div
               className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-xs font-black text-white"
               style={{ background: `linear-gradient(135deg, ${brand.primaryColor}, ${brand.secondaryColor})` }}
+              data-user-content
             >
               {userName.trim().charAt(0) || "م"}
             </div>
             <div className="min-w-0">
-              <p className="max-w-28 truncate text-xs font-black text-slate-800">{userName}</p>
+              <p className="max-w-28 truncate text-xs font-black text-slate-800" data-user-content>{userName}</p>
               <p
                 data-testid="current-user-role"
                 data-user-role={role}

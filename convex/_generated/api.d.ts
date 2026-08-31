@@ -38,6 +38,7 @@ import type * as seed from "../seed.js";
 import type * as settings from "../settings.js";
 import type * as shipments from "../shipments.js";
 import type * as suppliers from "../suppliers.js";
+import type * as userPreferences from "../userPreferences.js";
 
 import type {
   ApiFromModules,
@@ -84,6 +85,7 @@ declare const fullApi: ApiFromModules<{
   settings: typeof settings;
   shipments: typeof shipments;
   suppliers: typeof suppliers;
+  userPreferences: typeof userPreferences;
 }>;
 declare const fullApiWithMounts: typeof fullApi;
 

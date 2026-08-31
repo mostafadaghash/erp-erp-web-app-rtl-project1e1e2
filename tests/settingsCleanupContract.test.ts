@@ -1,13 +1,16 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
+import { messages } from "../src/i18n/catalog.ts";
 
 const read = (path: string) => readFileSync(path, "utf8");
 
-test("SET-C01 uses the simplified settings navigation label", () => {
+test("SET-C01 uses the simplified translated settings navigation label", () => {
   const sidebar = read("src/components/Sidebar.tsx");
 
-  assert.match(sidebar, /key:\s*"administration"[\s\S]*?label:\s*"الإعدادات"/);
+  assert.match(sidebar, /key:\s*"administration"[\s\S]*?labelKey:\s*"nav\.settings"/);
+  assert.equal(messages.ar["nav.settings"], "الإعدادات");
+  assert.equal(messages.en["nav.settings"], "Settings");
   assert.doesNotMatch(sidebar, /الإدارة والإعدادات/);
 });
 
