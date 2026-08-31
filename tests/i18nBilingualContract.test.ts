@@ -18,6 +18,8 @@ const sidebarSource = readFileSync("src/components/Sidebar.tsx", "utf8");
 const providerSource = readFileSync("src/i18n/I18nProvider.tsx", "utf8");
 const bridgeSource = readFileSync("src/i18n/domBridge.ts", "utf8");
 const directionCss = readFileSync("src/i18n/i18n.css", "utf8");
+const preferencesSource = readFileSync("convex/userPreferences.ts", "utf8");
+const generatedApiSource = readFileSync("convex/_generated/api.d.ts", "utf8");
 
 const MODULE_SAMPLES = [
   ["العملاء", "Customers"],
@@ -111,10 +113,12 @@ test("I18N-07 main navigation consumes translation keys", () => {
   assert.match(sidebarSource, /data-user-content/);
 });
 
-test("I18N-08 language setting is persistent and injected into the existing Settings page", () => {
+test("I18N-08 language setting is persistent locally and injected into the existing Settings page", () => {
   assert.match(providerSource, /LANGUAGE_STORAGE_KEY/);
   assert.match(providerSource, /localStorage\.setItem/);
   assert.match(providerSource, /erp-language-change/);
+  assert.match(providerSource, /erp-language-selected/);
+  assert.match(providerSource, /hydrateLanguage/);
   assert.match(providerSource, /data-testid='settings-page'/);
   assert.match(providerSource, /data-i18n-language-settings-host/);
   assert.match(providerSource, /language-setting-select/);
@@ -135,4 +139,19 @@ test("I18N-10 LTR rules explicitly cover navigation, tables, arrows and print la
   assert.match(directionCss, /erp-nav-dropdown/);
   assert.match(directionCss, /@media print/);
   assert.match(directionCss, /html\[dir="ltr"\] \.print-root/);
+});
+
+test("I18N-11 authenticated language choice is persisted per user through Convex", () => {
+  assert.match(preferencesSource, /requireAuth/);
+  assert.match(preferencesSource, /LANGUAGE_MODULE = "user_preferences"/);
+  assert.match(preferencesSource, /LANGUAGE_ACTION = "set_language"/);
+  assert.match(preferencesSource, /by_user_module_action/);
+  assert.match(preferencesSource, /export const getLanguage = query/);
+  assert.match(preferencesSource, /export const setLanguage = mutation/);
+  assert.match(preferencesSource, /user\.userId/);
+  assert.match(preferencesSource, /details: args\.language/);
+  assert.match(generatedApiSource, /userPreferences: typeof userPreferences/);
+  assert.match(appSource, /AuthenticatedLanguagePreference/);
+  assert.match(appSource, /api\.userPreferences\.getLanguage/);
+  assert.match(appSource, /api\.userPreferences\.setLanguage/);
 });
