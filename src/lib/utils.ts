@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import { useQuery } from "convex/react";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
-import { api } from "../../convex/_generated/api.ts";
+import { api } from "../../convex/_generated/api.js";
 import {
   DEFAULT_CURRENCY_CODE,
   getCurrencyDefinition,
