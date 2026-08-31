@@ -54,66 +54,100 @@ export function customerTrackingCreationKey(
 
 function buildLinearSteps(
   definitions: Array<{ key: string; label: string }>,
-  currentIndex: number,
+  currentKey: string,
 ): CustomerTrackingStep[] {
+  const currentIndex = Math.max(0, definitions.findIndex((step) => step.key === currentKey));
   return definitions.map((step, index) => ({
     ...step,
     state: index < currentIndex ? "completed" : index === currentIndex ? "current" : "upcoming",
   }));
 }
 
-const ORDER_STEPS = [
-  { key: "pending", label: "تم استلام الطلب" },
-  { key: "confirmed", label: "جاري التجهيز" },
+const ORDER_PICKUP_STEPS = [
+  { key: "pending", label: "قيد الإنتظار" },
+  { key: "confirmed", label: "مؤكد" },
+  { key: "preparing", label: "جاري التجهيز" },
   { key: "ready", label: "تم التجهيز" },
-  { key: "shipped", label: "تم التسليم لشركة الشحن" },
-  { key: "delivered", label: "تم تسليم الأوردر" },
+  { key: "delivered_to_customer", label: "تم التسليم للعميل" },
+];
+
+const ORDER_SHIPPING_STEPS = [
+  { key: "pending", label: "قيد الإنتظار" },
+  { key: "confirmed", label: "مؤكد" },
+  { key: "preparing", label: "جاري التجهيز" },
+  { key: "ready", label: "تم التجهيز" },
+  { key: "handed_to_shipping", label: "تم التسليم لشركة الشحن" },
+  { key: "received", label: "تم الإستلام" },
 ];
 
 const REPAIR_STEPS = [
-  { key: "received", label: "تم استلام الجهاز" },
-  { key: "under_inspection", label: "جاري الفحص" },
-  { key: "awaiting_approval", label: "في انتظار الموافقة" },
+  { key: "pending", label: "قيد الإنتظار" },
   { key: "in_progress", label: "جاري الصيانة" },
-  { key: "ready", label: "تم الإصلاح" },
-  { key: "delivered", label: "تم التسليم" },
+  { key: "repaired", label: "تم الإصلاح" },
+  { key: "delivered_to_customer", label: "تم التسليم للعميل" },
 ];
 
 const DELIVERY_STEPS = [
-  { key: "pending", label: "جاري تجهيز الشحنة" },
-  { key: "shipped", label: "تم الشحن" },
-  { key: "delivered", label: "تم التسليم" },
+  { key: "pending", label: "قيد الإنتظار" },
+  { key: "shipped", label: "تم التسليم لشركة الشحن" },
+  { key: "delivered", label: "تم الإستلام" },
 ];
 
+function effectiveOrderStatus(rawStatus: string, deliveryStatus?: string): string {
+  if (rawStatus === "cancelled") return "cancelled";
+  if (deliveryStatus === "returned" || deliveryStatus === "cancelled") return "delivery_failed";
+  if (deliveryStatus === "delivered" || rawStatus === "received" || rawStatus === "delivered") return "received";
+  if (deliveryStatus === "shipped" || rawStatus === "handed_to_shipping") return "handed_to_shipping";
+  if (rawStatus === "delivered_to_customer") return "delivered_to_customer";
+  if (rawStatus === "ready") return "ready";
+  if (rawStatus === "preparing" || rawStatus === "processing") return "preparing";
+  if (rawStatus === "confirmed") return "confirmed";
+  return "pending";
+}
+
+function effectiveRepairStatus(rawStatus: string): string {
+  if (rawStatus === "cancelled") return "rejected_by_customer";
+  if (rawStatus === "rejected_by_shipping") return "rejected_by_shipping";
+  if (rawStatus === "delivered") return "delivered_to_customer";
+  if (rawStatus === "ready") return "repaired";
+  if (rawStatus === "awaiting_approval") return "new_issue";
+  if (rawStatus === "under_inspection" || rawStatus === "in_progress") return "in_progress";
+  return "pending";
+}
+
 export function publicOrderStatus(rawStatus: string, deliveryStatus?: string): string {
-  if (rawStatus === "cancelled") return "ملغي";
-  if (deliveryStatus === "returned" || deliveryStatus === "cancelled") return "تعذر إتمام التوصيل";
-  if (rawStatus === "delivered" || deliveryStatus === "delivered") return "تم تسليم الأوردر";
-  if (deliveryStatus === "shipped") return "تم التسليم لشركة الشحن";
-  if (rawStatus === "ready") return "تم التجهيز";
-  if (rawStatus === "confirmed" || rawStatus === "processing") return "جاري التجهيز";
-  return "قيد الإنتظار";
+  switch (effectiveOrderStatus(rawStatus, deliveryStatus)) {
+    case "cancelled": return "ملغي";
+    case "delivery_failed": return "تعذر إتمام التوصيل";
+    case "received": return "تم الإستلام";
+    case "handed_to_shipping": return "تم التسليم لشركة الشحن";
+    case "delivered_to_customer": return "تم التسليم للعميل";
+    case "ready": return "تم التجهيز";
+    case "preparing": return "جاري التجهيز";
+    case "confirmed": return "مؤكد";
+    default: return "قيد الإنتظار";
+  }
 }
 
 export function publicRepairStatus(rawStatus: string): string {
-  switch (rawStatus) {
-    case "under_inspection": return "جاري الفحص";
-    case "awaiting_approval": return "في انتظار الموافقة";
+  switch (effectiveRepairStatus(rawStatus)) {
     case "in_progress": return "جاري الصيانة";
-    case "ready": return "تم الإصلاح";
-    case "delivered": return "تم التسليم";
-    case "cancelled": return "تم إيقاف العملية";
+    case "new_issue": return "ظهور مشكلة جديدة";
+    case "repaired": return "تم الإصلاح";
+    case "delivered_to_customer": return "تم التسليم للعميل";
+    case "rejected_by_customer": return "مرفوض من العميل";
+    case "rejected_by_shipping": return "مرفوض من شركة الشحن";
     default: return "قيد الإنتظار";
   }
 }
 
 export function publicDeliveryStatus(rawStatus: string): string {
   switch (rawStatus) {
-    case "shipped": return "تم الشحن";
-    case "delivered": return "تم التسليم";
+    case "shipped": return "تم التسليم لشركة الشحن";
+    case "delivered": return "تم الإستلام";
     case "returned": return "تم الإرجاع";
     case "cancelled": return "ملغي";
-    default: return "جاري التجهيز";
+    default: return "قيد الإنتظار";
   }
 }
 
@@ -123,30 +157,37 @@ export function buildPublicTrackingSteps(
   deliveryStatus?: string,
 ): CustomerTrackingStep[] {
   if (sourceType === "order") {
-    if (rawStatus === "cancelled" || deliveryStatus === "returned" || deliveryStatus === "cancelled") {
+    const effective = effectiveOrderStatus(rawStatus, deliveryStatus);
+    if (effective === "cancelled" || effective === "delivery_failed") {
       return [{ key: "stopped", label: publicOrderStatus(rawStatus, deliveryStatus), state: "stopped" }];
     }
-    const effective =
-      rawStatus === "delivered" || deliveryStatus === "delivered" ? "delivered" :
-      deliveryStatus === "shipped" ? "shipped" :
-      rawStatus === "ready" ? "ready" :
-      rawStatus === "confirmed" || rawStatus === "processing" ? "confirmed" : "pending";
-    return buildLinearSteps(ORDER_STEPS, ORDER_STEPS.findIndex((step) => step.key === effective));
+    if (effective === "handed_to_shipping" || effective === "received") {
+      return buildLinearSteps(ORDER_SHIPPING_STEPS, effective);
+    }
+    return buildLinearSteps(ORDER_PICKUP_STEPS, effective);
   }
 
   if (sourceType === "repair") {
-    if (rawStatus === "cancelled") {
-      return [{ key: "stopped", label: "تم إيقاف العملية", state: "stopped" }];
+    const effective = effectiveRepairStatus(rawStatus);
+    if (effective === "rejected_by_customer" || effective === "rejected_by_shipping") {
+      return [{ key: effective, label: publicRepairStatus(rawStatus), state: "stopped" }];
     }
-    const index = REPAIR_STEPS.findIndex((step) => step.key === rawStatus);
-    return buildLinearSteps(REPAIR_STEPS, Math.max(0, index));
+    if (effective === "new_issue") {
+      return [
+        { key: "pending", label: "قيد الإنتظار", state: "completed" },
+        { key: "in_progress", label: "جاري الصيانة", state: "completed" },
+        { key: "new_issue", label: "ظهور مشكلة جديدة", state: "current" },
+        { key: "repaired", label: "تم الإصلاح", state: "upcoming" },
+        { key: "delivered_to_customer", label: "تم التسليم للعميل", state: "upcoming" },
+      ];
+    }
+    return buildLinearSteps(REPAIR_STEPS, effective);
   }
 
   if (rawStatus === "returned" || rawStatus === "cancelled") {
     return [{ key: "stopped", label: publicDeliveryStatus(rawStatus), state: "stopped" }];
   }
-  const index = DELIVERY_STEPS.findIndex((step) => step.key === rawStatus);
-  return buildLinearSteps(DELIVERY_STEPS, Math.max(0, index));
+  return buildLinearSteps(DELIVERY_STEPS, rawStatus === "delivered" ? "delivered" : rawStatus === "shipped" ? "shipped" : "pending");
 }
 
 export function publicTrackingStatus(
