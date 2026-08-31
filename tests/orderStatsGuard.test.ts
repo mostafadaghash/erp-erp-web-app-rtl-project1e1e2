@@ -29,7 +29,7 @@ test("OST-G02 every operational order mutation updates the aggregate", () => {
 
 test("OST-G03 delivery confirmation, reversal and legacy branch assignment stay synchronized", () => {
   assert.match(deliveries, /applyOrderStatsChange\(ctx,order,\{\.\.\.order,status:"received"\}\)/);
-  assert.match(deliveries, /applyOrderStatsChange\(ctx,order,\{\.\.\.order,status:"ready"\}\)/);
+  assert.match(deliveries, /applyOrderStatsChange\(ctx,order,\{\.\.\.order,status:"handed_to_shipping"\}\)/);
   assert.match(branches, /applyOrderStatsChange\(ctx, item, \{ \.\.\.item, branchId: args\.branchId \}\)/);
 });
 
