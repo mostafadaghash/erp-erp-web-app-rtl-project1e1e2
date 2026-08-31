@@ -62,11 +62,6 @@ type OperationSnapshot = {
   phone: string;
 };
 
-type FollowUpContext = {
-  followUp: Doc<"customerFollowUps">;
-  operation: OperationSnapshot;
-};
-
 type MessageRecord = {
   messageKey: string;
   messageType: CustomerWhatsAppMessageType;
@@ -99,18 +94,16 @@ function deriveMessageRecord(
   messageKey: string,
   messageType: CustomerWhatsAppMessageType,
 ): MessageRecord | null {
-  if (events.length === 0) return null;
+  if (!events.length) return null;
   const sorted = [...events].sort((a, b) => eventTime(a) - eventTime(b));
   const created = sorted.find((event) => event.action === ACTION_CREATED) ?? sorted[0];
-  const latestStatusEvent = [...sorted]
-    .reverse()
-    .find((event) => isMessageStatus(snapshotValue(event, "status")));
-  const statusValue = snapshotValue(latestStatusEvent, "status");
-  const status: CustomerWhatsAppMessageStatus = isMessageStatus(statusValue) ? statusValue : "prepared";
+  const latestStatusEvent = [...sorted].reverse().find((event) => isMessageStatus(snapshotValue(event, "status")));
+  const rawStatus = snapshotValue(latestStatusEvent, "status");
+  const status: CustomerWhatsAppMessageStatus = isMessageStatus(rawStatus) ? rawStatus : "prepared";
   const attempts = sorted.filter((event) => event.action === ACTION_ATTEMPT);
-  const sentEvents = sorted.filter((event) => event.action === ACTION_SENT);
-  const succeededEvents = sorted.filter((event) => event.action === ACTION_SUCCEEDED);
-  const failedEvents = sorted.filter((event) => event.action === ACTION_FAILED);
+  const sent = sorted.filter((event) => event.action === ACTION_SENT);
+  const succeeded = sorted.filter((event) => event.action === ACTION_SUCCEEDED);
+  const failed = sorted.filter((event) => event.action === ACTION_FAILED);
   const providerValue = snapshotValue(latestStatusEvent, "provider") ?? snapshotValue(created, "provider");
   return {
     messageKey,
@@ -120,12 +113,23 @@ function deriveMessageRecord(
     createdAt: eventTime(created),
     updatedAt: eventTime(sorted[sorted.length - 1]),
     lastAttemptAt: attempts.length ? eventTime(attempts[attempts.length - 1]) : undefined,
-    sentAt: sentEvents.length ? eventTime(sentEvents[sentEvents.length - 1]) : undefined,
-    succeededAt: succeededEvents.length ? eventTime(succeededEvents[succeededEvents.length - 1]) : undefined,
-    failedAt: failedEvents.length ? eventTime(failedEvents[failedEvents.length - 1]) : undefined,
-    lastError: failedEvents.length ? failedEvents[failedEvents.length - 1].details : undefined,
+    sentAt: sent.length ? eventTime(sent[sent.length - 1]) : undefined,
+    succeededAt: succeeded.length ? eventTime(succeeded[succeeded.length - 1]) : undefined,
+    failedAt: failed.length ? eventTime(failed[failed.length - 1]) : undefined,
+    lastError: failed.length ? failed[failed.length - 1].details : undefined,
     provider: providerValue === "whatsapp_business_api" ? "whatsapp_business_api" : "manual_whatsapp",
   };
+}
+
+function orderIsShipped(operation: OperationSnapshot): boolean {
+  return operation.rawStatus === "handed_to_shipping" || operation.linkedDeliveryStatus === "shipped";
+}
+
+function orderIsDelivered(operation: OperationSnapshot): boolean {
+  return operation.rawStatus === "delivered_to_customer" ||
+    operation.rawStatus === "received" ||
+    operation.rawStatus === "delivered" ||
+    operation.linkedDeliveryStatus === "delivered";
 }
 
 function eligibility(
@@ -135,9 +139,10 @@ function eligibility(
   if (!isCustomerWhatsAppMessageApplicable(operation.operationType, messageType)) {
     return { eligible: false, reason: "نوع الرسالة لا ينطبق على هذه العملية" };
   }
+
   if (operation.operationType === "order") {
-    const delivered = operation.rawStatus === "delivered" || operation.linkedDeliveryStatus === "delivered";
-    const shipped = operation.linkedDeliveryStatus === "shipped";
+    const delivered = orderIsDelivered(operation);
+    const shipped = orderIsShipped(operation);
     if (messageType === "order_confirmation") {
       return operation.rawStatus === "confirmed"
         ? { eligible: true }
@@ -146,43 +151,49 @@ function eligibility(
     if (messageType === "ready_for_pickup") {
       return operation.rawStatus === "ready" && !shipped && !delivered
         ? { eligible: true }
-        : { eligible: false, reason: "تتاح عندما يصبح الطلب جاهزًا للاستلام" };
+        : { eligible: false, reason: "تتاح عندما يصبح الطلب في حالة «تم التجهيز»" };
     }
     if (messageType === "shipped") {
       return shipped
         ? { eligible: true }
-        : { eligible: false, reason: "تتاح بعد تسجيل الشحنة كـ «تم الشحن»" };
+        : { eligible: false, reason: "تتاح بعد «تم التسليم لشركة الشحن»" };
     }
     if (messageType === "delivered" || messageType === "post_sale_follow_up") {
       return delivered
         ? { eligible: true }
-        : { eligible: false, reason: "تتاح بعد اكتمال التسليم" };
+        : { eligible: false, reason: "تتاح بعد «تم التسليم للعميل» أو «تم الإستلام»" };
     }
   }
+
   if (operation.operationType === "repair") {
+    if (operation.rawStatus === "cancelled" || operation.rawStatus === "rejected_by_shipping") {
+      return { eligible: false, reason: "لا تتاح رسائل الإتمام لأمر صيانة مرفوض" };
+    }
     if (messageType === "ready_for_pickup") {
       return operation.rawStatus === "ready"
         ? { eligible: true }
-        : { eligible: false, reason: "تتاح عندما تصبح الصيانة جاهزة للاستلام" };
+        : { eligible: false, reason: "تتاح عندما تصبح الصيانة في حالة «تم الإصلاح»" };
     }
     if (messageType === "delivered" || messageType === "post_sale_follow_up") {
       return operation.rawStatus === "delivered"
         ? { eligible: true }
-        : { eligible: false, reason: "تتاح بعد تسليم جهاز الصيانة" };
+        : { eligible: false, reason: "تتاح بعد «تم التسليم للعميل»" };
     }
   }
+
   if (operation.operationType === "delivery") {
     if (messageType === "shipped") {
       return operation.rawStatus === "shipped"
         ? { eligible: true }
-        : { eligible: false, reason: "تتاح عندما تكون الشحنة في حالة «تم الشحن»" };
+        : { eligible: false, reason: "تتاح عندما تكون الشحنة في حالة «تم التسليم لشركة الشحن»" };
     }
     if (messageType === "delivered" || messageType === "post_sale_follow_up") {
       return operation.rawStatus === "delivered"
         ? { eligible: true }
-        : { eligible: false, reason: "تتاح بعد تسجيل التسليم" };
+        : { eligible: false, reason: "تتاح بعد تسجيل «تم الإستلام»" };
     }
   }
+
   return { eligible: false, reason: "الرسالة غير متاحة للحالة الحالية" };
 }
 
@@ -190,7 +201,7 @@ async function resolveFollowUpContext(
   ctx: QueryCtx | MutationCtx,
   user: AuthUser,
   followUpId: Id<"customerFollowUps">,
-): Promise<FollowUpContext> {
+): Promise<{ followUp: Doc<"customerFollowUps">; operation: OperationSnapshot }> {
   const followUp = await ctx.db.get(followUpId);
   if (!followUp) throw new ConvexError("المتابعة غير موجودة");
   assertBranchAccess(user, followUp);
@@ -388,11 +399,7 @@ export const openManualAttempt = mutation({
         sourceType: operation.operationType,
         sourceId: operation.operationId,
         sourceNumber: operation.operationNumber,
-        after: {
-          messageType: args.messageType,
-          status: "prepared",
-          provider: "manual_whatsapp",
-        },
+        after: { messageType: args.messageType, status: "prepared", provider: "manual_whatsapp" },
       });
     }
     const attemptCount = (existing?.attemptCount ?? 0) + 1;
@@ -406,12 +413,7 @@ export const openManualAttempt = mutation({
       sourceType: operation.operationType,
       sourceId: operation.operationId,
       sourceNumber: operation.operationNumber,
-      after: {
-        messageType: args.messageType,
-        status: "opened",
-        provider: "manual_whatsapp",
-        attemptCount,
-      },
+      after: { messageType: args.messageType, status: "opened", provider: "manual_whatsapp", attemptCount },
     });
     return {
       blocked: false as const,
@@ -439,9 +441,7 @@ export const markManualResult = mutation({
     const record = deriveMessageRecord(events, key, args.messageType);
     if (!record) throw new ConvexError("سجل الرسالة غير موجود");
     if (record.status === args.result) return key;
-    if (record.status !== "opened") {
-      throw new ConvexError("لا يمكن تغيير نتيجة رسالة ليست في محاولة إرسال مفتوحة");
-    }
+    if (record.status !== "opened") throw new ConvexError("لا يمكن تغيير نتيجة رسالة ليست في محاولة إرسال مفتوحة");
     const failureReason = args.failureReason?.trim().slice(0, 500);
     await logAction(ctx, user, {
       action: args.result === "sent" ? ACTION_SENT : ACTION_FAILED,
@@ -465,8 +465,8 @@ export const markManualResult = mutation({
   },
 });
 
-// نقطة الربط المستقبلية مع WhatsApp Business API. المزود يضيف حالة إلى نفس الـledger
-// بنفس messageKey، لذلك لا نحتاج لاحقًا إلى تغيير بطاقة العميل أو منطق منع التكرار.
+// نقطة الربط المستقبلية مع WhatsApp Business API: يكتب المزود إلى نفس السجل
+// ونفس messageKey، لذلك يبقى منع التكرار وبطاقة العميل دون إعادة تصميم.
 export const applyProviderResult = internalMutation({
   args: {
     messageKey: v.string(),
@@ -479,7 +479,7 @@ export const applyProviderResult = internalMutation({
     const key = args.messageKey.trim();
     if (!key) throw new ConvexError("مفتاح الرسالة مطلوب");
     const events = await loadMessageEvents(ctx, key);
-    if (events.length === 0) throw new ConvexError("سجل الرسالة غير موجود");
+    if (!events.length) throw new ConvexError("سجل الرسالة غير موجود");
     const sorted = [...events].sort((a, b) => eventTime(a) - eventTime(b));
     const origin = sorted[0];
     const messageType = snapshotValue(origin, "messageType") ?? "unknown";
