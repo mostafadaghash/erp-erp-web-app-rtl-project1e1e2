@@ -164,11 +164,13 @@ test("GLUI-21 prevents one-sided, duplicate, zero, or unbalanced journals", () =
   assert.match(ui, /debit === credit/);
 });
 
-test("GLUI-22 previews debit credit and difference in EGP", () => {
+test("GLUI-22 previews debit credit and difference in the configured base currency", () => {
   assert.match(ui, /إجمالي المدين:/);
   assert.match(ui, /إجمالي الدائن:/);
   assert.match(ui, /الفرق:/);
-  assert.match(ui, /currency: "EGP"/);
+  assert.match(ui, /useCurrency\(\)/);
+  assert.match(ui, /formatCurrency\(totals\.debit\)/);
+  assert.match(ui, /currencyCode/);
 });
 
 test("GLUI-23 posts journals only after branch opening", () => {

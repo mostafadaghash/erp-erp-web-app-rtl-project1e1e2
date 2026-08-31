@@ -1,3 +1,4 @@
+import { useCurrency } from "../lib/utils";
 import { useEffect, useState } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
@@ -34,6 +35,7 @@ interface ShipItem {
 const emptyItem = (): ShipItem => ({ productName: "", quantity: 1, unitCost: 0, total: 0 });
 
 export function ShipmentsPage({ createRequestToken }: { createRequestToken?: number }) {
+  const { formatCurrency, currencyCode } = useCurrency();
   const canCreate = usePermission("create_shipments");
   const canEdit = usePermission("edit_shipments");
   const canDelete = usePermission("delete_shipments");
@@ -111,7 +113,7 @@ export function ShipmentsPage({ createRequestToken }: { createRequestToken?: num
           { label: "تم الطلب",    value: stats?.ordered ?? 0,    color: "text-blue-600",   bg: "bg-blue-50",   icon: Clock },
           { label: "في الطريق",   value: stats?.inTransit ?? 0,  color: "text-amber-600",  bg: "bg-amber-50",  icon: Plane },
           { label: "وصلت",        value: stats?.arrived ?? 0,    color: "text-emerald-600",bg: "bg-emerald-50",icon: CheckCircle },
-          { label: "إجمالي التكلفة", value: (stats?.totalCost ?? 0).toLocaleString("ar-EG") + " ج.م",
+          { label: "إجمالي التكلفة", value: formatCurrency(stats?.totalCost ?? 0),
             color: "text-indigo-600", bg: "bg-indigo-50", icon: TrendingDown },
         ].map((s) => {
           const Icon = s.icon;
@@ -219,9 +221,9 @@ export function ShipmentsPage({ createRequestToken }: { createRequestToken?: num
                           {shipment.items.map(i => i.productName).join("، ")}
                         </p>
                       </td>
-                      <td className="text-slate-700 font-medium">{shipment.totalCost.toLocaleString("ar-EG")} ج.م</td>
-                      <td className="text-slate-500">{shipment.shippingCost.toLocaleString("ar-EG")} ج.م</td>
-                      <td className="font-bold text-slate-800">{shipment.grandTotal.toLocaleString("ar-EG")} ج.م</td>
+                      <td className="text-slate-700 font-medium">{formatCurrency(shipment.totalCost)}</td>
+                      <td className="text-slate-500">{formatCurrency(shipment.shippingCost)}</td>
+                      <td className="font-bold text-slate-800">{formatCurrency(shipment.grandTotal)}</td>
                       <td>
                         <span className={cfg.badge}>
                           <Icon className="w-3 h-3 ml-1" />
@@ -327,21 +329,21 @@ export function ShipmentsPage({ createRequestToken }: { createRequestToken?: num
                     <div className="rounded-xl bg-slate-50 p-3"><p className="text-xs text-slate-500">المورد</p><p className="mt-1 font-black text-slate-800">{selectedShipment.supplierName}</p></div>
                     <div className="rounded-xl bg-slate-50 p-3"><p className="text-xs text-slate-500">رقم عملية الشراء</p><p className="mt-1 font-mono font-black text-slate-800">{selectedShipment.shipmentNumber}</p></div>
                     <div className="rounded-xl bg-slate-50 p-3"><p className="text-xs text-slate-500">فاتورة المورد</p><p className="mt-1 font-black text-slate-800">{purchaseDocument?.receipt?.externalInvoiceNumber ?? "غير مسجلة"}</p></div>
-                    <div className="rounded-xl bg-emerald-50 p-3"><p className="text-xs text-emerald-700">إجمالي المستند</p><p className="mt-1 text-lg font-black text-emerald-800">{(purchaseDocument?.receipt?.totalLandedCost ?? selectedShipment.grandTotal).toLocaleString("ar-EG")} ج.م</p></div>
+                    <div className="rounded-xl bg-emerald-50 p-3"><p className="text-xs text-emerald-700">إجمالي المستند</p><p className="mt-1 text-lg font-black text-emerald-800">{formatCurrency((purchaseDocument?.receipt?.totalLandedCost ?? selectedShipment.grandTotal))}</p></div>
                   </div>
                   <div className="overflow-x-auto rounded-xl border border-slate-200">
                     <table className="data-table min-w-[720px]">
                       <thead><tr><th>#</th><th>الصنف</th><th>الكمية</th><th>تكلفة الوحدة</th><th>الشحن الموزع</th><th>الإجمالي</th></tr></thead>
                       <tbody>
                         {(purchaseDocument?.receipt?.items ?? selectedShipment.items).map((item, index) => (
-                          <tr key={`${item.productName}-${index}`}><td>{index + 1}</td><td className="font-bold">{item.productName}</td><td>{item.quantity.toLocaleString("ar-EG")}</td><td>{item.unitCost.toLocaleString("ar-EG")} ج.م</td><td>{("allocatedFreight" in item ? item.allocatedFreight : 0).toLocaleString("ar-EG")} ج.م</td><td className="font-black">{("lineTotal" in item ? item.lineTotal : item.total).toLocaleString("ar-EG")} ج.م</td></tr>
+                          <tr key={`${item.productName}-${index}`}><td>{index + 1}</td><td className="font-bold">{item.productName}</td><td>{item.quantity.toLocaleString("ar-EG")}</td><td>{formatCurrency(item.unitCost)}</td><td>{formatCurrency(("allocatedFreight" in item ? item.allocatedFreight : 0))}</td><td className="font-black">{formatCurrency(("lineTotal" in item ? item.lineTotal : item.total))}</td></tr>
                         ))}
                       </tbody>
                     </table>
                   </div>
                   <div className="mt-4 grid gap-4 lg:grid-cols-2">
                     <div className="rounded-xl border border-slate-200 p-4 text-sm"><h3 className="mb-3 font-black text-slate-800">بيانات المستند</h3><div className="space-y-2 text-slate-600"><p>تاريخ الفاتورة: <strong className="text-slate-800">{purchaseDocument?.receipt?.invoiceDate ?? "—"}</strong></p><p>تاريخ الاستلام: <strong className="text-slate-800">{purchaseDocument?.receipt?.receiptDate ?? selectedShipment.arrivedDate ?? "لم تصل بعد"}</strong></p><p>تاريخ الاستحقاق: <strong className="text-slate-800">{purchaseDocument?.receipt?.dueDate ?? "—"}</strong></p><p>الحالة: <strong className="text-slate-800">{statusConfig[selectedShipment.status as ShipmentStatus]?.label ?? selectedShipment.status}</strong></p>{selectedShipment.notes && <p>ملاحظات: <strong className="text-slate-800">{selectedShipment.notes}</strong></p>}</div></div>
-                    <dl className="space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm"><div className="flex justify-between"><dt>البضاعة</dt><dd className="font-bold">{(purchaseDocument?.receipt?.goodsTotal ?? selectedShipment.totalCost).toLocaleString("ar-EG")} ج.م</dd></div><div className="flex justify-between"><dt>الشحن</dt><dd className="font-bold">{(purchaseDocument?.receipt?.totalFreight ?? selectedShipment.shippingCost).toLocaleString("ar-EG")} ج.م</dd></div><div className="flex justify-between border-t border-slate-200 pt-2"><dt className="font-black">إجمالي التكلفة</dt><dd className="font-black text-[var(--erp-accent-strong)]">{(purchaseDocument?.receipt?.totalLandedCost ?? selectedShipment.grandTotal).toLocaleString("ar-EG")} ج.م</dd></div>{purchaseDocument?.receipt && <><div className="flex justify-between"><dt>المدفوع</dt><dd className="font-bold text-emerald-700">{purchaseDocument.receipt.paidAmount.toLocaleString("ar-EG")} ج.م</dd></div><div className="flex justify-between"><dt>المتبقي</dt><dd className="font-bold text-amber-700">{purchaseDocument.receipt.remainingAmount.toLocaleString("ar-EG")} ج.م</dd></div></>}</dl>
+                    <dl className="space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm"><div className="flex justify-between"><dt>البضاعة</dt><dd className="font-bold">{formatCurrency((purchaseDocument?.receipt?.goodsTotal ?? selectedShipment.totalCost))}</dd></div><div className="flex justify-between"><dt>الشحن</dt><dd className="font-bold">{formatCurrency((purchaseDocument?.receipt?.totalFreight ?? selectedShipment.shippingCost))}</dd></div><div className="flex justify-between border-t border-slate-200 pt-2"><dt className="font-black">إجمالي التكلفة</dt><dd className="font-black text-[var(--erp-accent-strong)]">{formatCurrency((purchaseDocument?.receipt?.totalLandedCost ?? selectedShipment.grandTotal))}</dd></div>{purchaseDocument?.receipt && <><div className="flex justify-between"><dt>المدفوع</dt><dd className="font-bold text-emerald-700">{formatCurrency(purchaseDocument.receipt.paidAmount)}</dd></div><div className="flex justify-between"><dt>المتبقي</dt><dd className="font-bold text-amber-700">{formatCurrency(purchaseDocument.receipt.remainingAmount)}</dd></div></>}</dl>
                   </div>
                 </>
               )}
@@ -510,7 +512,7 @@ function NewShipmentForm({ onClose }: { onClose: () => void }) {
                   </div>
                 </div>
                 <div className="text-left text-sm font-bold text-indigo-600">
-                  {(item.quantity * item.unitCost).toLocaleString("ar-EG")} ج.م
+                  {formatCurrency((item.quantity * item.unitCost))}
                 </div>
               </div>
             ))}
@@ -520,16 +522,16 @@ function NewShipmentForm({ onClose }: { onClose: () => void }) {
           <div className="bg-indigo-50 rounded-xl p-4 space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-slate-600 text-sm">تكلفة البضاعة</span>
-              <span className="font-bold text-slate-800">{totalCost.toLocaleString("ar-EG")} ج.م</span>
+              <span className="font-bold text-slate-800">{formatCurrency(totalCost)}</span>
             </div>
             <div>
-              <label className="form-label">تكلفة الشحن (ج.م)</label>
+              <label className="form-label">تكلفة الشحن ({currencyCode})</label>
               <input data-testid="shipment-shipping-cost" className="form-input" type="number" placeholder="0" min="0"
                 value={form.shippingCost} onChange={e => setForm({ ...form, shippingCost: e.target.value })} />
             </div>
             <div className="flex items-center justify-between border-t border-indigo-200 pt-3">
               <span className="font-semibold text-slate-700">الإجمالي الكلي</span>
-              <span className="font-black text-xl text-indigo-700">{grandTotal.toLocaleString("ar-EG")} ج.م</span>
+              <span className="font-black text-xl text-indigo-700">{formatCurrency(grandTotal)}</span>
             </div>
           </div>
 
@@ -585,12 +587,12 @@ function ReceiveShipmentModal({ shipment, onClose }: { shipment: { _id: Id<"ship
     <form data-testid="shipment-receive-form" data-shipment-number={shipment.shipmentNumber} onSubmit={submit} className="w-full max-w-xl space-y-4 rounded-2xl bg-white p-6 shadow-2xl">
       <div className="flex justify-between"><div><h2 className="font-black text-lg">استلام عملية الشراء</h2><p className="font-mono text-indigo-600">{shipment.shipmentNumber}</p><p>{shipment.supplierName}</p></div><button type="button" onClick={onClose}><X /></button></div>
       <div className="grid grid-cols-2 gap-2 rounded-xl bg-slate-50 p-3 text-sm">
-        <span>إجمالي البضاعة</span><b>{shipment.totalCost.toLocaleString("ar-EG")} ج.م</b>
-        <span>إجمالي الشحن</span><b>{shipment.shippingCost.toLocaleString("ar-EG")} ج.م</b>
-        <span>الشحن المحمل على المورد</span><b>{supplierFreight.toLocaleString("ar-EG")} ج.م</b>
-        <span>الشحن الخارجي</span><b>{externalFreight.toLocaleString("ar-EG")} ج.م</b>
-        <span>قيمة المخزون الواصلة</span><b>{shipment.grandTotal.toLocaleString("ar-EG")} ج.م</b>
-        <span>مديونية المورد</span><b>{payable.toLocaleString("ar-EG")} ج.م</b>
+        <span>إجمالي البضاعة</span><b>{formatCurrency(shipment.totalCost)}</b>
+        <span>إجمالي الشحن</span><b>{formatCurrency(shipment.shippingCost)}</b>
+        <span>الشحن المحمل على المورد</span><b>{formatCurrency(supplierFreight)}</b>
+        <span>الشحن الخارجي</span><b>{formatCurrency(externalFreight)}</b>
+        <span>قيمة المخزون الواصلة</span><b>{formatCurrency(shipment.grandTotal)}</b>
+        <span>مديونية المورد</span><b>{formatCurrency(payable)}</b>
       </div>
       <div className="grid grid-cols-2 gap-3">
         <label className="form-label">تاريخ الاستلام *<input data-testid="shipment-receive-date" required type="date" className="form-input" value={receiptDate} onChange={e => setReceiptDate(e.target.value)} /></label>

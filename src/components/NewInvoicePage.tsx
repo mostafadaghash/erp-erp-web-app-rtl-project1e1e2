@@ -44,7 +44,7 @@ export function NewInvoicePage({ onNavigate }: NewInvoicePageProps) {
   const accounts = useQuery(api.finance.collectionAccountPicker, canCollect ? {} : "skip") ?? [];
   const paymentMethods = useQuery(api.paymentMethods.listActive) ?? [];
   const paymentDefaults = useQuery(api.paymentMethods.defaultsForBranch, canCollect ? {} : "skip") ?? [];
-  const { formatAmount } = useCurrency();
+  const { formatAmount, formatCurrency } = useCurrency();
   const requestId = useRef(crypto.randomUUID());
   const productSearchRef = useRef<HTMLInputElement>(null);
   const invoiceDiscountRef = useRef<HTMLInputElement>(null);
@@ -323,7 +323,7 @@ export function NewInvoicePage({ onNavigate }: NewInvoicePageProps) {
                       <p className="truncate text-sm font-black text-slate-800">{p.name}</p>
                       <p className="mt-1 text-xs text-slate-400">{p.sku} · المتاح {formatAmount(p.stock)}</p>
                     </div>
-                    <span className="shrink-0 text-sm font-black text-[var(--erp-accent-strong)]">{formatAmount(p.sellPrice)} ج.م</span>
+                    <span className="shrink-0 text-sm font-black text-[var(--erp-accent-strong)]">{formatCurrency(p.sellPrice)}</span>
                   </button>
                 ))}
                 {filteredProducts.length === 0 && <p className="py-5 text-center text-sm text-slate-400">لا توجد أصناف مطابقة</p>}
@@ -395,7 +395,7 @@ export function NewInvoicePage({ onNavigate }: NewInvoicePageProps) {
                         <button type="button" onClick={() => updateQuantity(item.productId, item.quantity + 1)} aria-label={`زيادة كمية ${item.productName}`}><Plus className="h-3.5 w-3.5" /></button>
                       </div>
                     </td>
-                    <td className="font-bold">{formatAmount(item.unitPrice)} ج.م</td>
+                    <td className="font-bold">{formatCurrency(item.unitPrice)}</td>
                     <td>
                       <input
                         className="pos-line-discount"
@@ -407,7 +407,7 @@ export function NewInvoicePage({ onNavigate }: NewInvoicePageProps) {
                         onChange={e => updateItemDiscount(item.productId, Number(e.target.value))}
                       />
                     </td>
-                    <td className="font-black text-[var(--erp-accent-strong)]">{formatAmount(item.total)} ج.م</td>
+                    <td className="font-black text-[var(--erp-accent-strong)]">{formatCurrency(item.total)}</td>
                     <td>
                       <button type="button" onClick={() => removeFromCart(item.productId)} className="pos-line-delete" aria-label={`حذف ${item.productName}`}><Trash2 className="h-4 w-4" /></button>
                     </td>
@@ -437,13 +437,13 @@ export function NewInvoicePage({ onNavigate }: NewInvoicePageProps) {
               <span>الإجمالي النهائي</span>
               <span>{formatAmount(cart.length)} صنف</span>
             </div>
-            <p data-testid="new-invoice-total" data-value={total} className="erp-pos-total-value">{formatAmount(total)} <span>ج.م</span></p>
+            <p data-testid="new-invoice-total" data-value={total} className="erp-pos-total-value">{formatCurrency(total)}</p>
             <div className="erp-pos-document-meta"><span>رقم الفاتورة: تلقائي</span><span>{invoiceDate}</span></div>
           </div>
 
           <div className="erp-pos-summary-body">
             <div className="pos-invoice-summary-totals">
-              <div className="erp-pos-summary-row"><span>المجموع الفرعي</span><strong>{formatAmount(subtotal)} ج.م</strong></div>
+              <div className="erp-pos-summary-row"><span>المجموع الفرعي</span><strong>{formatCurrency(subtotal)}</strong></div>
               <div className="erp-pos-summary-row">
                 <span>خصم الفاتورة</span>
                 <label className="pos-summary-percent-input">
@@ -451,9 +451,9 @@ export function NewInvoicePage({ onNavigate }: NewInvoicePageProps) {
                   <span>%</span>
                 </label>
               </div>
-              {discountAmount > 0 && <div className="erp-pos-summary-row text-red-500"><span>قيمة الخصم</span><strong>- {formatAmount(discountAmount)} ج.م</strong></div>}
-              <div className="erp-pos-summary-row"><span>الضريبة ({formatAmount(taxRate)}%)</span><strong>{formatAmount(taxAmount)} ج.م</strong></div>
-              <div className="pos-invoice-grand-total-row"><span>الإجمالي الكلي</span><strong>{formatAmount(total)} ج.م</strong></div>
+              {discountAmount > 0 && <div className="erp-pos-summary-row text-red-500"><span>قيمة الخصم</span><strong>- {formatCurrency(discountAmount)}</strong></div>}
+              <div className="erp-pos-summary-row"><span>الضريبة ({formatAmount(taxRate)}%)</span><strong>{formatCurrency(taxAmount)}</strong></div>
+              <div className="pos-invoice-grand-total-row"><span>الإجمالي الكلي</span><strong>{formatCurrency(total)}</strong></div>
             </div>
 
             <div className="pos-invoice-payment-stack">
@@ -465,7 +465,7 @@ export function NewInvoicePage({ onNavigate }: NewInvoicePageProps) {
               </label>
               <div className={`pos-invoice-balance-card ${remaining > 0 ? "is-due" : "is-settled"}`}>
                 <span>{cart.length === 0 ? "المتبقي" : remaining > 0 ? "المتبقي على العميل" : "الفاتورة مسددة"}</span>
-                <strong>{formatAmount(Math.max(0, remaining))} ج.م</strong>
+                <strong>{formatCurrency(Math.max(0, remaining))}</strong>
               </div>
             </div>
 

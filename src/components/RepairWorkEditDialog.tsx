@@ -1,3 +1,4 @@
+import { useCurrency } from "../lib/utils";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { Plus, Trash2, Wrench, X, AlertTriangle } from "lucide-react";
@@ -13,7 +14,6 @@ type WorkPartRow = {
 };
 
 const today = () => new Date().toISOString().slice(0, 10);
-const money = (value: number) => `${value.toLocaleString("ar-EG", { maximumFractionDigits: 2 })} ج.م`;
 
 export function RepairWorkEditDialog({
   repair,
@@ -24,6 +24,8 @@ export function RepairWorkEditDialog({
   onClose: () => void;
   onSaved?: () => void;
 }) {
+  const { formatCurrency } = useCurrency();
+  const money = formatCurrency;
   const partOptions = useQuery(
     api.repairWorkCorrections.partPicker,
     repair.branchId ? { branchId: repair.branchId } : "skip",

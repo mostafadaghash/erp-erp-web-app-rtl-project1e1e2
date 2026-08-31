@@ -1,38 +1,55 @@
+import { useMemo } from "react";
+import { useQuery } from "convex/react";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
+import { api } from "../../convex/_generated/api.js";
+import {
+  DEFAULT_CURRENCY_CODE,
+  getCurrencyDefinition,
+  normalizeCurrencyCode,
+  type CurrencyCode,
+} from "../../shared/currency.ts";
+import {
+  APP_LOCALE,
+  formatCurrencyValue,
+  formatNumberValue,
+} from "./currency.ts";
 
-export const APP_LOCALE = "ar-EG-u-nu-latn";
-export const APP_CURRENCY = "EGP";
+export { APP_LOCALE };
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
 export function formatAppNumber(amount: number): string {
-  return new Intl.NumberFormat(APP_LOCALE).format(amount);
+  return formatNumberValue(amount);
 }
 
-export function formatAppCurrency(amount: number): string {
-  return new Intl.NumberFormat(APP_LOCALE, {
-    style: "currency",
-    currency: APP_CURRENCY,
-    currencyDisplay: "code",
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 2,
-  }).format(amount);
+export function formatAppCurrency(
+  amount: number,
+  currency: CurrencyCode | string | null | undefined = DEFAULT_CURRENCY_CODE,
+): string {
+  return formatCurrencyValue(amount, currency);
 }
 
 export function formatAppDate(value: Date | string | number): string {
   return new Intl.DateTimeFormat(APP_LOCALE).format(new Date(value));
 }
 
-// استخدم هذا الـ hook في الصفحات للحفاظ على نفس تنسيق الأرقام والعملات.
 export function useCurrency() {
-  return {
-    currency: APP_CURRENCY,
-    formatCurrency: formatAppCurrency,
-    formatAmount: formatAppNumber,
-  };
+  const settings = useQuery(api.settings.getPublic);
+  const currency = normalizeCurrencyCode(settings?.currency);
+
+  return useMemo(() => {
+    const definition = getCurrencyDefinition(currency);
+    return {
+      currency,
+      currencyCode: currency,
+      currencyLabel: definition.labelAr,
+      formatCurrency: (amount: number) => formatCurrencyValue(amount, currency),
+      formatAmount: formatNumberValue,
+    };
+  }, [currency]);
 }
 
 export function normalizeEgyptPhoneForWhatsApp(phone: string): string {

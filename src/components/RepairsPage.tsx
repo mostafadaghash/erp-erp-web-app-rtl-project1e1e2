@@ -1,3 +1,4 @@
+import { useCurrency } from "../lib/utils";
 import { FinancialHistory } from "./FinancialHistory";
 import { useEffect, useState } from "react";
 import { usePaginatedQuery, useQuery, useMutation } from "convex/react";
@@ -37,7 +38,6 @@ const isIsoDate = (value: string) => {
 };
 const isMoney = (value: number) =>
   Number.isFinite(value) && value >= 0 && Math.round(value * 100) / 100 === value;
-const money = (value: number) => `${value.toLocaleString("ar-EG", { maximumFractionDigits: 2 })} ج.م`;
 
 const statusConfig: Record<RepairStatus, { label: string; badge: string; icon: LucideIcon }> = {
   received: { label: "قيد الإنتظار", badge: "badge-info", icon: Clock },
@@ -78,6 +78,8 @@ const emptyRepairForm = () => ({
 });
 
 export function RepairsPage({ createRequestToken }: { createRequestToken?: number }) {
+  const { formatCurrency } = useCurrency();
+  const money = formatCurrency;
   const canCreate = usePermission("create_repairs");
   const canEdit = usePermission("edit_repairs");
   const canPrint = usePermission("print_repairs");

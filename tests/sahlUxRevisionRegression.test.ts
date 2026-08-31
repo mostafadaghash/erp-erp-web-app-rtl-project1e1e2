@@ -9,7 +9,7 @@ const home = read("../src/components/Dashboard.tsx");
 const invoices = read("../src/components/InvoicesPage.tsx");
 const newInvoice = read("../src/components/NewInvoicePage.tsx");
 const reports = read("../src/components/ReportsPage.tsx");
-const utils = read("../src/lib/utils.ts");
+const currency = read("../src/lib/currency.ts");
 const css = read("../src/professional-ui.css");
 
 test("SUX-01 navigation dropdowns close on an outside pointer press", () => {
@@ -29,7 +29,7 @@ test("SUX-02 dashboard is named لوحة التحكم and is a direct navigation
 });
 
 test("SUX-03 dashboard is a compact eight-metric workspace", () => {
-  assert.match(utils, /ar-EG-u-nu-latn/);
+  assert.match(currency, /ar-EG-u-nu-latn/);
   assert.match(home, /erp-dashboard-card-grid/);
   assert.match(home, /api\.reporting\.overview/);
   assert.equal((home.match(/key: "/g) ?? []).length, 8);

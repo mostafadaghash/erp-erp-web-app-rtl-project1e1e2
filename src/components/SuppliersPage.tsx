@@ -1,3 +1,4 @@
+import { useCurrency } from "../lib/utils";
 import { useState } from "react";
 import {
   useMutation,
@@ -58,6 +59,7 @@ const ledgerTypeLabels: Record<string, string> = {
 };
 
 export function SuppliersPage() {
+  const { formatCurrency } = useCurrency();
   const canCreate = usePermission("create_suppliers");
   const canEdit = usePermission("edit_suppliers");
   const canSetActive = usePermission("delete_suppliers");
@@ -391,7 +393,7 @@ export function SuppliersPage() {
                     : effectiveBranch && supplierBalances === undefined
                       ? "جارٍ تحميل رصيد الفرع"
                       : hasSupplierBalanceScope
-                        ? `${(balanceFor(supplier._id) ?? 0).toLocaleString("ar-EG")} ج.م`
+                        ? `${formatCurrency((balanceFor(supplier._id) ?? 0))}`
                         : "—"}
                 </p>
               </div>
@@ -488,7 +490,7 @@ export function SuppliersPage() {
                 </h2>
                 <p className="text-sm text-slate-500">
                   الرصيد الحالي:{" "}
-                  {(balanceFor(ledgerTarget._id) ?? 0).toLocaleString("ar-EG")} ج.م
+                  {formatCurrency((balanceFor(ledgerTarget._id) ?? 0))}
                 </p>
               </div>
               <button
@@ -522,7 +524,7 @@ export function SuppliersPage() {
                             : "font-bold text-emerald-700"
                         }
                       >
-                        {entry.amountDelta.toLocaleString("ar-EG")} ج.م
+                        {formatCurrency(entry.amountDelta)}
                       </p>
                       <p className="text-xs text-slate-500">{entry.date}</p>
                     </div>
@@ -574,7 +576,7 @@ export function SuppliersPage() {
           </section>
         </div>
       )}
-      {profileId && <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/50 p-4"><section className="max-h-[88vh] w-full max-w-5xl overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl">{profile === undefined ? <p className="p-10 text-center text-slate-500">جارٍ تحميل بطاقة المورد…</p> : <><header className="flex items-start justify-between border-b pb-4"><div><p className="erp-kicker">بطاقة المورد</p><h2 className="text-2xl font-black">{profile.supplier.name}</h2><p className="mt-1 text-sm text-slate-500">{profile.supplier.phone} {profile.supplier.categoryName ? `— ${profile.supplier.categoryName}` : ""}</p></div><button className="rounded-xl p-2 hover:bg-slate-100" onClick={() => setProfileId(null)}><X className="h-5 w-5" /></button></header><div className="my-5 grid gap-3 sm:grid-cols-3"><div className="rounded-xl bg-amber-50 p-4 text-center"><strong className="block text-xl text-amber-700">{profile.balances.reduce((sum, row) => sum + row.balance, 0).toLocaleString("ar-EG")} ج.م</strong><span className="text-xs text-slate-600">إجمالي المستحق</span></div><div className="rounded-xl bg-blue-50 p-4 text-center"><strong className="block text-xl text-blue-700">{profile.receipts.length}</strong><span className="text-xs text-slate-600">فواتير المشتريات</span></div><div className="rounded-xl bg-emerald-50 p-4 text-center"><strong className="block text-xl text-emerald-700">{profile.payments.length}</strong><span className="text-xs text-slate-600">الدفعات</span></div></div><div className="grid gap-5 lg:grid-cols-2"><div className="rounded-2xl border p-4"><h3 className="mb-3 font-black">البيانات والأسعار السابقة</h3><p className="text-sm leading-7 text-slate-600">{profile.supplier.address || "لا يوجد عنوان"}<br />{profile.supplier.email || "لا يوجد بريد إلكتروني"}<br />{profile.supplier.notes || "لا توجد ملاحظات"}</p><p className="mt-4 text-xs text-slate-500">المرتجعات: {profile.returns.length}</p></div><div className="rounded-2xl border p-4"><h3 className="mb-3 font-black">آخر التعاملات</h3><div className="max-h-64 divide-y overflow-y-auto">{profile.ledger.slice(0, 20).map(entry => <div key={entry._id} className="flex justify-between gap-3 py-2 text-sm"><span>{entry.description}</span><span className="whitespace-nowrap font-bold">{entry.balanceAfter.toLocaleString("ar-EG")} ج.م</span></div>)}{profile.ledger.length === 0 && <p className="text-sm text-slate-400">لا توجد حركات.</p>}</div></div></div></>}</section></div>}
+      {profileId && <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/50 p-4"><section className="max-h-[88vh] w-full max-w-5xl overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl">{profile === undefined ? <p className="p-10 text-center text-slate-500">جارٍ تحميل بطاقة المورد…</p> : <><header className="flex items-start justify-between border-b pb-4"><div><p className="erp-kicker">بطاقة المورد</p><h2 className="text-2xl font-black">{profile.supplier.name}</h2><p className="mt-1 text-sm text-slate-500">{profile.supplier.phone} {profile.supplier.categoryName ? `— ${profile.supplier.categoryName}` : ""}</p></div><button className="rounded-xl p-2 hover:bg-slate-100" onClick={() => setProfileId(null)}><X className="h-5 w-5" /></button></header><div className="my-5 grid gap-3 sm:grid-cols-3"><div className="rounded-xl bg-amber-50 p-4 text-center"><strong className="block text-xl text-amber-700">{formatCurrency(profile.balances.reduce((sum, row) => sum + row.balance, 0))}</strong><span className="text-xs text-slate-600">إجمالي المستحق</span></div><div className="rounded-xl bg-blue-50 p-4 text-center"><strong className="block text-xl text-blue-700">{profile.receipts.length}</strong><span className="text-xs text-slate-600">فواتير المشتريات</span></div><div className="rounded-xl bg-emerald-50 p-4 text-center"><strong className="block text-xl text-emerald-700">{profile.payments.length}</strong><span className="text-xs text-slate-600">الدفعات</span></div></div><div className="grid gap-5 lg:grid-cols-2"><div className="rounded-2xl border p-4"><h3 className="mb-3 font-black">البيانات والأسعار السابقة</h3><p className="text-sm leading-7 text-slate-600">{profile.supplier.address || "لا يوجد عنوان"}<br />{profile.supplier.email || "لا يوجد بريد إلكتروني"}<br />{profile.supplier.notes || "لا توجد ملاحظات"}</p><p className="mt-4 text-xs text-slate-500">المرتجعات: {profile.returns.length}</p></div><div className="rounded-2xl border p-4"><h3 className="mb-3 font-black">آخر التعاملات</h3><div className="max-h-64 divide-y overflow-y-auto">{profile.ledger.slice(0, 20).map(entry => <div key={entry._id} className="flex justify-between gap-3 py-2 text-sm"><span>{entry.description}</span><span className="whitespace-nowrap font-bold">{formatCurrency(entry.balanceAfter)}</span></div>)}{profile.ledger.length === 0 && <p className="text-sm text-slate-400">لا توجد حركات.</p>}</div></div></div></>}</section></div>}
     </div>
   );
 }

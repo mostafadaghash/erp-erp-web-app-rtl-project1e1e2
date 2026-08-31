@@ -1,3 +1,5 @@
+import { currencyValidator } from "./lib/currency.ts";
+import { DEFAULT_CURRENCY_CODE } from "../shared/currency.ts";
 import { mutation, query } from "./_generated/server";
 import type { QueryCtx } from "./_generated/server";
 import { ConvexError, v } from "convex/values";
@@ -109,7 +111,7 @@ export const upsert = mutation({
     invoiceFooter: v.optional(v.string()),
     phone: v.optional(v.string()),
     address: v.optional(v.string()),
-    currency: v.string(),
+    currency: currencyValidator,
     taxRate: v.number(),
     whatsappNumber: v.optional(v.string()),
     postDeliveryFollowUpDays: v.optional(v.number()),
@@ -144,7 +146,7 @@ export const upsert = mutation({
       invoiceFooter: normalizeOptional(args.invoiceFooter, 300),
       phone: normalizeOptional(args.phone, 30),
       address: normalizeOptional(args.address, 250),
-      currency: "EGP",
+      currency: args.currency,
       taxRate: Math.round(args.taxRate * 100) / 100,
       whatsappNumber: normalizeOptional(args.whatsappNumber, 30),
       postDeliveryFollowUpDays,
@@ -154,6 +156,11 @@ export const upsert = mutation({
     const id = existing
       ? (await ctx.db.patch(existing._id, normalizedArgs), existing._id)
       : await ctx.db.insert("settings", normalizedArgs);
+
+    const ledgerSettings = await ctx.db.query("generalLedgerSettings").first();
+    if (ledgerSettings && ledgerSettings.baseCurrency !== normalizedArgs.currency) {
+      await ctx.db.patch(ledgerSettings._id, { baseCurrency: normalizedArgs.currency });
+    }
 
     await logAction(ctx, user, {
       action: "update",
@@ -283,7 +290,7 @@ export const updateModules = mutation({
           storeType: "electronics",
           primaryColor: "#16a66a",
           secondaryColor: "#12263a",
-          currency: "EGP",
+          currency: DEFAULT_CURRENCY_CODE,
           taxRate: 0,
           modules: args.modules,
         });

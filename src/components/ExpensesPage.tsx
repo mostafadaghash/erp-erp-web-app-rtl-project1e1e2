@@ -1,3 +1,4 @@
+import { useCurrency } from "../lib/utils";
 import { FinancialHistory } from "./FinancialHistory";
 import { useEffect, useState } from "react";
 import { useQuery, useMutation } from "convex/react";
@@ -12,6 +13,7 @@ import { getErrorMessage } from "../lib/errors";
 const expenseCategories = ["إيجار", "رواتب", "مرافق", "تسويق", "صيانة", "مشتريات", "نقل", "أخرى"];
 
 export function ExpensesPage({ createRequestToken }: { createRequestToken?: number }) {
+  const { formatCurrency, currencyCode } = useCurrency();
   const canCreate = usePermission("create_expenses");
   const canDisburse = usePermission("record_disbursements");
   const canViewFinance = usePermission("view_finance");
@@ -108,12 +110,12 @@ export function ExpensesPage({ createRequestToken }: { createRequestToken?: numb
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
         <div className="bg-red-50 rounded-xl p-4 text-center">
-          <p className="text-xl font-black text-red-600">{(expenseStats?.total ?? 0).toLocaleString("ar-EG")}</p>
-          <p className="text-xs text-slate-600 mt-0.5">إجمالي المصروفات (ج.م)</p>
+          <p className="text-xl font-black text-red-600">{formatCurrency(expenseStats?.total ?? 0)}</p>
+          <p className="text-xs text-slate-600 mt-0.5">إجمالي المصروفات ({currencyCode})</p>
         </div>
         <div className="bg-amber-50 rounded-xl p-4 text-center">
-          <p className="text-xl font-black text-amber-600">{(expenseStats?.today ?? 0).toLocaleString("ar-EG")}</p>
-          <p className="text-xs text-slate-600 mt-0.5">مصروفات اليوم (ج.م)</p>
+          <p className="text-xl font-black text-amber-600">{formatCurrency(expenseStats?.today ?? 0)}</p>
+          <p className="text-xs text-slate-600 mt-0.5">مصروفات اليوم ({currencyCode})</p>
         </div>
         <div className="bg-slate-50 rounded-xl p-4 text-center">
           <p className="text-xl font-black text-slate-600">{expenseStats?.count ?? 0}</p>
@@ -128,7 +130,7 @@ export function ExpensesPage({ createRequestToken }: { createRequestToken?: numb
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             {byCategory.map(cat => (
               <div key={cat.name} className="bg-slate-50 rounded-xl p-3 text-center">
-                <p className="font-bold text-slate-800">{cat.total.toLocaleString("ar-EG")}</p>
+                <p className="font-bold text-slate-800">{formatCurrency(cat.total)}</p>
                 <p className="text-xs text-slate-500 mt-0.5">{cat.name}</p>
                 <p className="text-xs text-slate-400">{cat.count} عملية</p>
               </div>
@@ -169,7 +171,7 @@ export function ExpensesPage({ createRequestToken }: { createRequestToken?: numb
                 <tr key={e._id} data-testid="expense-row" data-expense-title={e.title} data-status={e.status} className={e.status === "voided" ? "bg-slate-50 opacity-70" : ""}>
                   <td className="font-medium text-slate-800">{e.title}<FinancialHistory referenceType="expense" referenceId={String(e._id)} /></td>
                   <td><span className="badge badge-info">{e.category}</span></td>
-                  <td className="font-bold text-red-600">{e.amount.toLocaleString("ar-EG")} ج.م</td>
+                  <td className="font-bold text-red-600">{formatCurrency(e.amount)}</td>
                   <td className="text-slate-500 text-xs">{e.date}</td>
                   <td className="text-slate-600 text-xs">
                     {e.paymentMethod === "cash" ? "نقدي" :
@@ -225,7 +227,7 @@ export function ExpensesPage({ createRequestToken }: { createRequestToken?: numb
                   </select>
                 </div>
                 <div>
-                  <label className="form-label">المبلغ (ج.م) *</label>
+                  <label className="form-label">المبلغ ({currencyCode}) *</label>
                   <input data-testid="expense-amount" className="form-input" type="number" required value={form.amount} onChange={e => setForm({...form, amount: e.target.value})} placeholder="0" />
                 </div>
                 <div>
