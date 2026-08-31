@@ -381,6 +381,7 @@ export const repairForPrint = query({
 export const getByTracking = query({
   args: { token: v.string() },
   handler: async (ctx, args) => {
+    await requirePermission(ctx, "view_repairs");
     await requireModuleEnabled(ctx, "repairs");
     const token = args.token.trim().toUpperCase();
     if (token.length < 8 || token.length > 64 || !/^[A-Z0-9]+$/.test(token)) {
