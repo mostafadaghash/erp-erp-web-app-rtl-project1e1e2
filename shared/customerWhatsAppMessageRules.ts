@@ -13,8 +13,8 @@ export type CustomerWhatsAppMessageStatus = "prepared" | "opened" | "sent" | "su
 export const CUSTOMER_WHATSAPP_MESSAGE_TYPE_LABELS: Record<CustomerWhatsAppMessageType, string> = {
   order_confirmation: "تأكيد الطلب",
   ready_for_pickup: "جاهز للاستلام",
-  shipped: "تم الشحن",
-  delivered: "تم التسليم",
+  shipped: "تم التسليم لشركة الشحن",
+  delivered: "تم الإستلام / التسليم",
   post_sale_follow_up: "متابعة ما بعد البيع",
 };
 
@@ -80,9 +80,9 @@ export function buildCustomerWhatsAppMessageBody(args: {
     case "ready_for_pickup":
       return `مرحبًا ${name}، ${reference} جاهز الآن للاستلام. يسعدنا استقبال حضرتك.`;
     case "shipped":
-      return `مرحبًا ${name}، تم شحن ${reference} وهو الآن في الطريق إليك. سنوافي حضرتك بأي تحديث جديد.`;
+      return `مرحبًا ${name}، تم تسليم ${reference} لشركة الشحن وهو الآن في طريقه إليك. سنوافي حضرتك بأي تحديث جديد.`;
     case "delivered":
-      return `مرحبًا ${name}، تم تسجيل تسليم ${reference} بنجاح. نتمنى أن تكون تجربتك معنا مرضية.`;
+      return `مرحبًا ${name}، تم تسجيل استلام/تسليم ${reference} بنجاح. نتمنى أن تكون تجربتك معنا مرضية.`;
     case "post_sale_follow_up":
       return `مرحبًا ${name}، نطمئن على حضرتك بعد استلام ${reference}. هل كل شيء يعمل بشكل جيد؟ يسعدنا معرفة رأيك أو مساعدتك في أي ملاحظة.`;
   }
