@@ -722,7 +722,18 @@ export function ERPApp() {
         {tabAuthorized && tab.page === "products" && <ProductsPage createRequestToken={createToken} />}
         {tabAuthorized && tab.page === "inventory" && <InventoryWorkspacePage createRequestToken={createToken} />}
         {tabAuthorized && tab.page === "customers" && <CustomersPage onOpenLedger={openCustomerLedger} onCreateCustomer={() => navigate("new-customer")} createRequestToken={createToken} />}
-        {tabAuthorized && tab.page === "new-customer" && <NewCustomerPage onClose={() => requestClose([tab.id])} />}
+        {tabAuthorized && tab.page === "new-customer" && (
+          <NewCustomerPage
+            onClose={(reason) => {
+              if (reason === "saved") {
+                performClose([tab.id]);
+                return;
+              }
+              requestClose([tab.id]);
+            }}
+            onSaved={() => markTabDirty(tab.id, false)}
+          />
+        )}
         {tabAuthorized && tab.page === "follow-ups" && <CustomerFollowUpsPage />}
         {tabAuthorized && tab.page === "invoices" && <InvoicesPage onNavigate={navigate} view="sales" />}
         {tabAuthorized && tab.page === "sales-returns" && <InvoicesPage onNavigate={navigate} view="returns" />}
