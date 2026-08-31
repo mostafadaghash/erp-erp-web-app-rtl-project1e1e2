@@ -58,7 +58,7 @@ jobs:
 
           replace('tests/deliveryCodIntegration.test.ts', 'assert.equal(after.order?.status,"ready")', 'assert.equal(after.order?.status,"handed_to_shipping")', 1)
           replace('tests/deliveryCodIntegration.test.ts', 'assert.equal(s.order?.status,"delivered")', 'assert.equal(s.order?.status,"received")')
-          replace('tests/deliveryCodIntegration.test.ts', 'assert.equal(s.order?.status,"ready")', 'assert.equal(s.order?.status,"handed_to_shipping")', 1)
+          replace('tests/deliveryCodIntegration.test.ts', 'assert.equal(s.order?.status,"ready")', 'assert.equal(s.order?.status,"handed_to_shipping")', 2)
           replace('tests/deliveryCodIntegration.test.ts', '/تأكيد التسليم من مسار التوصيل/', '/مسار الشحن والتسليم/', 1)
           replace('tests/deliveryCodIntegration.test.ts', '[second,"delivered","delivered",100,0,80]', '[second,"delivered","received",100,0,80]', 1)
 
@@ -70,9 +70,6 @@ jobs:
           replace('tests/ordersOperationalUiRegression.test.ts', '/التسليم من عملية الشحن/', '/الحالة التالية من مسار الشحن/', 1)
 
           replace('tests/professionalErpUiGuard.test.ts', '/التسليم من عملية الشحن/', '/الحالة التالية من مسار الشحن/', 1)
-
-          # Keep repair rejection terminology in the business UI, but preserve the established operational guard semantics.
-          replace('tests/repairWorkCorrectionsRegression.test.ts', '/!\\["delivered", "cancelled"\\]\\.includes\\(r\\.status\\)/', '/!\\["delivered", "cancelled"\\]\\.includes\\(r\\.status\\)/', 1)
 
           # Remove this workflow before the final commit so PR history ends with normal project files only.
           Path('.github/workflows/pr155-fixer.yml').unlink()
