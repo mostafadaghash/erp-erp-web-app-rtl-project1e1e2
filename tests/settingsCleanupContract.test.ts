@@ -31,14 +31,17 @@ test("SET-C03 removes the redundant settings helper copy", () => {
 
 test("SET-C04 hides global search only on requested settings pages", () => {
   const app = read("src/components/ERPApp.tsx");
+  const hiddenPages = app.match(
+    /const PAGES_WITHOUT_GLOBAL_SEARCH = new Set<Page>\(\[([^\]]+)\]\);/,
+  );
 
-  assert.match(
-    app,
-    /const PAGES_WITHOUT_GLOBAL_SEARCH = new Set<Page>\(\["branches", "employees", "settings"\]\);/,
+  assert.ok(hiddenPages, "settings pages without global search must be declared");
+  assert.deepEqual(
+    Array.from(hiddenPages[1].matchAll(/"([^"]+)"/g), match => match[1]),
+    ["branches", "employees", "settings"],
   );
   assert.match(
     app,
-    /!PAGES_WITHOUT_GLOBAL_SEARCH\.has\(currentPage\) && <GlobalSearch onNavigate=\{navigate\} \/>/,
+    /\{!PAGES_WITHOUT_GLOBAL_SEARCH\.has\(currentPage\)\s*&&\s*<GlobalSearch\s+onNavigate=\{navigate\}\s*\/>\}/,
   );
-  assert.doesNotMatch(app, /PAGES_WITHOUT_GLOBAL_SEARCH[^;]*audit-logs/);
 });
