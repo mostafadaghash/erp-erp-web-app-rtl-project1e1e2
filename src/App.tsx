@@ -7,15 +7,25 @@ import { TrackingPage } from "./components/TrackingPage";
 import { SetupWizard, PendingApproval } from "./components/SetupWizard";
 import { BrandMark } from "./components/BrandMark";
 import { getBrand, useBrandingTheme, type BrandingSettings } from "./lib/branding";
+import { I18nProvider, LanguageSelect, useI18n } from "./i18n/I18nProvider";
 
 export default function App() {
+  return (
+    <I18nProvider>
+      <AppContent />
+    </I18nProvider>
+  );
+}
+
+function AppContent() {
   const publicSettings = useQuery(api.settings.getPublic);
+  const { direction } = useI18n();
   useBrandingTheme(publicSettings);
   const isTrackingPage = window.location.hash.startsWith("#track");
 
   if (isTrackingPage) {
     return (
-      <div dir="rtl">
+      <div dir={direction}>
         <TrackingPage />
         <Toaster position="top-center" richColors />
       </div>
@@ -23,7 +33,7 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen" dir="rtl">
+    <div className="min-h-screen" dir={direction}>
       <Authenticated>
         <AuthedRouter />
       </Authenticated>
@@ -39,12 +49,13 @@ export default function App() {
 }
 
 function StartupScreen() {
+  const { direction, t } = useI18n();
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-950 px-6" dir="rtl">
+    <div className="flex min-h-screen items-center justify-center bg-slate-950 px-6" dir={direction}>
       <div className="text-center">
         <div className="brand-spinner mx-auto mb-4" />
-        <p className="text-sm font-bold text-slate-200">جاري تشغيل النظام...</p>
-        <p className="mt-2 text-xs text-slate-500">يتم التحقق من الاتصال والجلسة.</p>
+        <p className="text-sm font-bold text-slate-200">{t("auth.starting")}</p>
+        <p className="mt-2 text-xs text-slate-500">{t("auth.checkingConnection")}</p>
       </div>
     </div>
   );
@@ -52,13 +63,14 @@ function StartupScreen() {
 
 function AuthedRouter() {
   const accessState = useQuery(api.employees.accessState);
+  const { t } = useI18n();
 
   if (accessState === undefined) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-950">
         <div className="text-center">
           <div className="brand-spinner mb-4" />
-          <p className="text-slate-400 text-sm">جاري التحقق من صلاحية الحساب...</p>
+          <p className="text-slate-400 text-sm">{t("auth.checkingAccount")}</p>
         </div>
       </div>
     );
@@ -84,6 +96,7 @@ function LoginPage({
   publicSettings: BrandingSettings | null | undefined;
 }) {
   const setupStatus = useQuery(api.employees.setupStatus);
+  const { direction, t } = useI18n();
   const inviteParams = new URLSearchParams(window.location.search);
   const inviteCode = inviteParams.get("invite")?.trim() || undefined;
   const invitedEmail = inviteParams.get("email")?.trim() || undefined;
@@ -92,8 +105,11 @@ function LoginPage({
   const allowSignUp = needsSetup || Boolean(inviteCode);
 
   return (
-    <div className="auth-shell min-h-screen relative flex items-center justify-center overflow-hidden">
+    <div className="auth-shell min-h-screen relative flex items-center justify-center overflow-hidden" dir={direction}>
       <div className="auth-grid absolute inset-0" />
+      <div className="absolute z-20 top-4" style={{ insetInlineEnd: "1rem" }}>
+        <LanguageSelect compact />
+      </div>
       <div
         className="absolute -top-24 right-[12%] h-96 w-96 rounded-full blur-3xl opacity-20"
         style={{ background: brand.primaryColor }}
@@ -116,13 +132,13 @@ function LoginPage({
             />
           </div>
           <h1 className="mb-1 text-3xl font-black text-white">{brand.storeName}</h1>
-          <p className="text-sm text-slate-300">{brand.tagline}</p>
+          <p className="text-sm text-slate-300" data-i18n-skip>{brand.tagline}</p>
         </div>
 
         {needsSetup && (
           <div className="mb-4 rounded-2xl border border-amber-300/25 bg-amber-300/10 p-4">
             <p className="text-center text-sm text-amber-100">
-              هذا أول استخدام للنظام. أنشئ الحساب الأول ثم أكمل إعداد مدير النظام.
+              {t("auth.firstUse")}
             </p>
           </div>
         )}
@@ -130,7 +146,7 @@ function LoginPage({
         <div className="auth-card rounded-3xl p-7 sm:p-8">
           <div className="mb-6 text-center">
             <h2 className="text-xl font-black text-white">
-              {allowSignUp ? "إنشاء الحساب" : "تسجيل الدخول"}
+              {allowSignUp ? t("auth.createAccount") : t("auth.signIn")}
             </h2>
           </div>
           <CustomSignInForm
@@ -141,7 +157,7 @@ function LoginPage({
         </div>
 
         <p className="mt-6 text-center text-xs text-slate-500">
-          نظام متكامل لإدارة المبيعات والمشتريات والمخزون والحسابات
+          {t("auth.systemSummary")}
         </p>
       </div>
     </div>
