@@ -1,10 +1,11 @@
+import { currencyValidator } from "./lib/currency";
 import { defineSchema, defineTable } from "convex/server";
 import { authTables } from "@convex-dev/auth/server";
 import { v } from "convex/values";
 
 const applicationTables = {
   generalLedgerSettings: defineTable({
-    baseCurrency:v.literal("EGP"),chartVersion:v.string(),status:v.literal("foundation_ready"),operationalPostingEnabled:v.boolean(),
+    baseCurrency:currencyValidator,chartVersion:v.string(),status:v.literal("foundation_ready"),operationalPostingEnabled:v.boolean(),
     financialPostingEnabled:v.optional(v.boolean()),financialPostingCutoverDate:v.optional(v.string()),financialPostingRequestId:v.optional(v.string()),financialPostingFingerprint:v.optional(v.string()),financialPostingActivatedAt:v.optional(v.number()),financialPostingActivatedBy:v.optional(v.string()),
     cutoverDate:v.string(),initializedAt:v.number(),initializedBy:v.string(),initializationRequestId:v.string(),initializationFingerprint:v.string(),
   }).index("by_request",["initializationRequestId"]),
@@ -85,7 +86,7 @@ const applicationTables = {
     invoiceFooter: v.optional(v.string()),
     phone: v.optional(v.string()),
     address: v.optional(v.string()),
-    currency: v.string(),
+    currency: currencyValidator,
     taxRate: v.number(),
     whatsappNumber: v.optional(v.string()),
     postDeliveryFollowUpDays: v.optional(v.number()),

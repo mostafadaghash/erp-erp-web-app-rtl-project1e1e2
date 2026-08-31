@@ -1,3 +1,4 @@
+import { useCurrency } from "../lib/utils";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, usePaginatedQuery, useQuery } from "convex/react";
 import { PackageOpen, Pencil, Printer, RotateCcw, Undo2 } from "lucide-react";
@@ -16,10 +17,10 @@ import { PurchaseReturnEditDialog } from "./PurchaseReturnEditDialog";
 
 const newRequestId = () => crypto.randomUUID();
 const today = () => new Date().toISOString().slice(0, 10);
-const money = (value: number) =>
-  `${value.toLocaleString("ar-EG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ج.م`;
 
 export function PurchaseReturnsPage() {
+  const { formatCurrency } = useCurrency();
+  const money = formatCurrency;
   const canView = usePermission("view_purchase_returns");
   const canCreate = usePermission("create_purchase_returns");
   const canReverse = usePermission("reverse_purchase_returns");

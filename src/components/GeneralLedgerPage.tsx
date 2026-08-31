@@ -1,3 +1,4 @@
+import { useCurrency } from "../lib/utils";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   useConvex,
@@ -23,12 +24,6 @@ import {
 const newRequestId = () => crypto.randomUUID();
 const today = () => new Date().toISOString().slice(0, 10);
 const currentMonth = () => today().slice(0, 7);
-const money = (value: number) =>
-  new Intl.NumberFormat("ar-EG", {
-    style: "currency",
-    currency: "EGP",
-    minimumFractionDigits: 2,
-  }).format(value);
 const roundMoney = (value: number) => Math.round(value * 100) / 100;
 const isCentAmount = (value: number) =>
   Number.isFinite(value) &&
@@ -350,17 +345,17 @@ function JournalLinesEditor({
   );
 }
 
-function Totals({ totals }: { totals: ReturnType<typeof lineValidation> }) {
+function Totals({ totals, formatCurrency }: { totals: ReturnType<typeof lineValidation>; formatCurrency: (value: number) => string }) {
   return (
     <div className="mt-4 grid gap-3 rounded-xl bg-slate-900 p-4 text-sm text-white sm:grid-cols-3">
-      <span>إجمالي المدين: {money(totals.debit)}</span>
-      <span>إجمالي الدائن: {money(totals.credit)}</span>
+      <span>إجمالي المدين: {formatCurrency(totals.debit)}</span>
+      <span>إجمالي الدائن: {formatCurrency(totals.credit)}</span>
       <span
         className={
           totals.difference === 0 ? "text-emerald-300" : "text-red-300"
         }
       >
-        الفرق: {money(totals.difference)}
+        الفرق: {formatCurrency(totals.difference)}
       </span>
       {totals.duplicateAccounts && (
         <span className="text-red-300 sm:col-span-3">
@@ -372,6 +367,8 @@ function Totals({ totals }: { totals: ReturnType<typeof lineValidation> }) {
 }
 
 export function GeneralLedgerPage() {
+  const { formatCurrency, currencyCode } = useCurrency();
+  const money = formatCurrency;
   const convex = useConvex();
   const canView = usePermission("view_general_ledger");
   const canInitialize = usePermission("initialize_general_ledger");
@@ -674,14 +671,14 @@ export function GeneralLedgerPage() {
       );
       openPrintWindow(
         `ميزان المراجعة — ${trialPeriod}`,
-        `<p class="muted">العملة الأساسية: EGP</p><table><thead><tr><th>الكود</th><th>الحساب</th><th>افتتاح مدين</th><th>افتتاح دائن</th><th>حركة مدين</th><th>حركة دائن</th><th>ختام مدين</th><th>ختام دائن</th></tr></thead><tbody>${rows
+        `<p class="muted">العملة الأساسية: ${currencyCode}</p><table><thead><tr><th>الكود</th><th>الحساب</th><th>افتتاح مدين</th><th>افتتاح دائن</th><th>حركة مدين</th><th>حركة دائن</th><th>ختام مدين</th><th>ختام دائن</th></tr></thead><tbody>${rows
           .map(
             (row) =>
               `<tr><td>${escapeHtml(row.code)}</td><td>${escapeHtml(row.nameAr)}</td><td>${money(row.openingDebit)}</td><td>${money(row.openingCredit)}</td><td>${money(row.periodDebit)}</td><td>${money(row.periodCredit)}</td><td>${money(row.closingDebit)}</td><td>${money(row.closingCredit)}</td></tr>`,
           )
           .join(
             "",
-          )}</tbody><tfoot><tr><th colspan="2">الإجمالي</th><th>${money(totals.openingDebit)}</th><th>${money(totals.openingCredit)}</th><th>${money(totals.periodDebit)}</th><th>${money(totals.periodCredit)}</th><th>${money(totals.closingDebit)}</th><th>${money(totals.closingCredit)}</th></tr></tfoot></table>`,
+          )}</tbody><tfoot><tr><th colspan="2">الإجمالي</th><th>${formatCurrency(totals.openingDebit)}</th><th>${formatCurrency(totals.openingCredit)}</th><th>${formatCurrency(totals.periodDebit)}</th><th>${formatCurrency(totals.periodCredit)}</th><th>${formatCurrency(totals.closingDebit)}</th><th>${formatCurrency(totals.closingCredit)}</th></tr></tfoot></table>`,
       );
     } catch (error) {
       toast.error(getErrorMessage(error, "تعذرت طباعة ميزان المراجعة"));
@@ -780,7 +777,7 @@ export function GeneralLedgerPage() {
             <BookOpen className="h-6 w-6" /> الأستاذ العام
           </h1>
           <p className="text-sm text-slate-500">
-            دليل حسابات، قيود مزدوجة، فترات مالية وتقارير مراجعة — EGP.
+            دليل حسابات، قيود مزدوجة، فترات مالية وتقارير مراجعة — {currencyCode}.
           </p>
         </div>
         <div className="min-w-64">
@@ -1080,7 +1077,7 @@ export function GeneralLedgerPage() {
                       openingRequestId.current = newRequestId();
                     }}
                   />
-                  <Totals totals={openingTotals} />
+                  <Totals formatCurrency={formatCurrency} totals={openingTotals} />
                 </>
               )}
               <button
@@ -1153,7 +1150,7 @@ export function GeneralLedgerPage() {
               journalRequestId.current = newRequestId();
             }}
           />
-          <Totals totals={journalTotals} />
+          <Totals formatCurrency={formatCurrency} totals={journalTotals} />
           <button
             type="button"
             className="btn-primary mt-4 disabled:opacity-50"

@@ -1,3 +1,4 @@
+import { formatCurrencyValue } from "../lib/currency";
 import { useRef, useState } from "react";
 import { useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
@@ -126,7 +127,6 @@ const statusLabel: Record<string, string> = {
   returned: "مرتجعة بالكامل",
 };
 
-const money = (value: number) => `${Number(value || 0).toLocaleString("ar-EG", { maximumFractionDigits: 2 })} ج.م`;
 
 function formatDate(ts: number | string) {
   const date = new Date(ts);
@@ -254,6 +254,7 @@ function StoreMark({ settings }: { settings: any }) {
 }
 
 function InvoiceTemplate({ data, settings, layout }: { data: InvoiceData; settings: any; layout: InvoiceLayout }) {
+  const money = (value: number) => formatCurrencyValue(value, settings?.currency);
   const storeName = settings?.storeName ?? "المتجر";
   const legalName = settings?.legalName ?? "";
   const phone = settings?.phone ?? "";
@@ -368,6 +369,7 @@ function DocumentHeader({ title, number, date, dataStatus, settings }: { title: 
 }
 
 function OrderTemplate({ data, settings }: { data: OrderData; settings: any }) {
+  const money = (value: number) => formatCurrencyValue(value, settings?.currency);
   return (
     <article className="erp-print-sheet layout-a4-classic" dir="rtl">
       <DocumentHeader title="أمر بيع" number={data.orderNumber} date={data._creationTime} dataStatus={data.status} settings={settings} />
@@ -390,6 +392,7 @@ function OrderTemplate({ data, settings }: { data: OrderData; settings: any }) {
 }
 
 function RepairTemplate({ data, settings }: { data: RepairData; settings: any }) {
+  const money = (value: number) => formatCurrencyValue(value, settings?.currency);
   return (
     <article className="erp-print-sheet layout-a4-classic" dir="rtl">
       <DocumentHeader title="أمر صيانة" number={data.repairNumber} date={data.receivedDate || data._creationTime} dataStatus={data.status} settings={settings} />

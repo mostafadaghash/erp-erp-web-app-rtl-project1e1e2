@@ -1,3 +1,4 @@
+import { normalizeCurrencyCode } from "../shared/currency.ts";
 import { mutation, query, type QueryCtx } from "./_generated/server";
 import { paginationOptsValidator } from "convex/server";
 import { ConvexError, v } from "convex/values";
@@ -21,7 +22,8 @@ export const initialize=mutation({args:{cutoverDate:v.string(),requestId:v.strin
  const current=await ctx.db.query("generalLedgerSettings").first(); if(current)throw new ConvexError("تمت تهيئة الأستاذ العام بالفعل");
  const ids=new Map<string,Id<"chartOfAccounts">>(); const now=Date.now();
  for(const item of DEFAULT_CHART){const parentId=item.parentCode?ids.get(item.parentCode):undefined;if(item.parentCode&&!parentId)throw new ConvexError("قالب الدليل غير مرتب");const id=await ctx.db.insert("chartOfAccounts",{code:item.code,normalizedCode:item.code,nameAr:item.nameAr,parentId,accountClass:item.accountClass,normalSide:item.normalSide,isContra:item.isContra??false,isPosting:item.isPosting,isSystem:true,systemKey:item.systemKey,isActive:true,createdAt:now,createdBy:user.userId});ids.set(item.code,id);}
- const id=await ctx.db.insert("generalLedgerSettings",{baseCurrency:"EGP",chartVersion:GENERAL_LEDGER_CHART_VERSION,status:"foundation_ready",operationalPostingEnabled:false,financialPostingEnabled:false,cutoverDate,initializedAt:now,initializedBy:user.userId,initializationRequestId:requestId,initializationFingerprint:fp});
+ const businessSettings=await ctx.db.query("settings").first(),baseCurrency=normalizeCurrencyCode(businessSettings?.currency);
+ const id=await ctx.db.insert("generalLedgerSettings",{baseCurrency,chartVersion:GENERAL_LEDGER_CHART_VERSION,status:"foundation_ready",operationalPostingEnabled:false,financialPostingEnabled:false,cutoverDate,initializedAt:now,initializedBy:user.userId,initializationRequestId:requestId,initializationFingerprint:fp});
  await logAction(ctx,user,{action:"initialize",module:"general_ledger",recordId:String(id),details:"Foundation only; operational posting disabled",sourceType:"general_ledger_settings",sourceId:String(id),after:{status:"foundation_ready",cutoverDate,chartVersion:GENERAL_LEDGER_CHART_VERSION}}); return {_id:id,status:"foundation_ready" as const,chartVersion:GENERAL_LEDGER_CHART_VERSION};
 }});
 export const availableBranches=query({args:{},handler:async ctx=>{const user=await requirePermission(ctx,"view_general_ledger");if(user.role==="admin"||user.role==="accountant"){return (await ctx.db.query("branches").collect()).filter(branch=>branch.isActive).map(branch=>({_id:branch._id,name:branch.name}));}if(!user.branchId)throw new ConvexError("المستخدم غير مربوط بفرع");const branch=await ctx.db.get(user.branchId);return branch&&branch.isActive?[{_id:branch._id,name:branch.name}]:[];}});

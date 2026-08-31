@@ -1,3 +1,4 @@
+import { useCurrency } from "../lib/utils";
 import { FinancialHistory } from "./FinancialHistory";
 import { useEffect, useState } from "react";
 import { usePaginatedQuery, useQuery, useMutation } from "convex/react";
@@ -20,7 +21,7 @@ function buildWhatsAppLink(phone: string, message: string) {
   return buildEgyptWhatsAppUrl(phone, message);
 }
 
-function getWhatsAppMessage(status: string, orderNumber: string, customerName: string, storeName: string, remaining: number): string {
+function getWhatsAppMessage(status: string, orderNumber: string, customerName: string, storeName: string, remaining: number, formatCurrency: (value: number) => string): string {
   const normalized = normalizeOrderStatus(status) ?? status;
   const greeting = `السلام عليكم ${customerName} 👋`;
   const store = `*${storeName}*`;
@@ -28,7 +29,7 @@ function getWhatsAppMessage(status: string, orderNumber: string, customerName: s
   switch (normalized) {
     case "confirmed": return `${greeting}\n\nنود إعلامكم بأن طلبكم لدى ${store} قد تم تأكيده ✅\n${ordNum}\n\nسنبدأ التجهيز ونوافيكم بالتحديثات. شكراً لثقتكم 🙏`;
     case "preparing": return `${greeting}\n\nطلبكم لدى ${store} جاري تجهيزه الآن.\n${ordNum}`;
-    case "ready": return `${greeting}\n\nيسعدنا إعلامكم بأن طلبكم لدى ${store} تم تجهيزه 🎉\n${ordNum}\n${remaining > 0 ? `\nالمبلغ المتبقي: *${remaining.toLocaleString("ar-EG")} ج.م*\n` : ""}\nشكراً لكم 😊`;
+    case "ready": return `${greeting}\n\nيسعدنا إعلامكم بأن طلبكم لدى ${store} تم تجهيزه 🎉\n${ordNum}\n${remaining > 0 ? `\nالمبلغ المتبقي: *${formatCurrency(remaining)}*\n` : ""}\nشكراً لكم 😊`;
     case "handed_to_shipping": return `${greeting}\n\nتم تسليم طلبكم لدى ${store} لشركة الشحن 🚚\n${ordNum}`;
     case "delivered_to_customer": return `${greeting}\n\nتم تسليم طلبكم من ${store} بنجاح 🌟\n${ordNum}\n\nشكراً لثقتكم بنا.`;
     case "received": return `${greeting}\n\nتم تأكيد استلام طلبكم من ${store} بنجاح 🌟\n${ordNum}\n\nنتمنى أن تكونوا راضين عن خدمتنا.`;
@@ -64,9 +65,10 @@ const orderFilters: Array<{ v: OrderStatus | "all"; l: string }> = [
   { v: "cancelled", l: "ملغي" },
 ];
 const emptyItem = (): OrderItem => ({ productId: "", productName: "", quantity: 1, unitPrice: 0 });
-const money = (value: number) => `${value.toLocaleString("ar-EG")} ج.م`;
 
 export function OrdersPage({ createRequestToken }: { createRequestToken?: number }) {
+  const { formatCurrency, currencyCode } = useCurrency();
+  const money = formatCurrency;
   const canCreate = usePermission("create_orders");
   const canEdit = usePermission("edit_orders");
   const canDelete = usePermission("delete_orders");
@@ -279,7 +281,7 @@ export function OrdersPage({ createRequestToken }: { createRequestToken?: number
           const nextStatus = candidate === "delivered_to_customer" && order.linkedInvoiceId ? null : candidate;
           const hasPhone = Boolean(order.customerPhone);
           const showWA = hasPhone && ["confirmed", "preparing", "ready", "delivered_to_customer", "handed_to_shipping", "received", "cancelled"].includes(currentStatus);
-          const waLink = order.customerPhone ? buildWhatsAppLink(order.customerPhone, getWhatsAppMessage(order.status, order.orderNumber, order.customerName, storeName, order.remaining)) : null;
+          const waLink = order.customerPhone ? buildWhatsAppLink(order.customerPhone, getWhatsAppMessage(order.status, order.orderNumber, order.customerName, storeName, order.remaining, formatCurrency)) : null;
           const canModifyBody = canEdit && ["pending", "confirmed"].includes(currentStatus) && !order.linkedInvoiceId;
           const financialEditable = !order.linkedInvoiceId && !["cancelled", "delivered_to_customer", "received"].includes(currentStatus);
           const canCancelThis = canDelete && !["cancelled", "delivered_to_customer", "received", "handed_to_shipping"].includes(currentStatus);
@@ -312,7 +314,7 @@ export function OrdersPage({ createRequestToken }: { createRequestToken?: number
         {!isLoadingOrders && orders.length > 0 && <div className="flex items-center justify-between gap-3 border-t border-slate-100 px-3 py-2.5"><p className="text-xs text-slate-500">تم تحميل {orders.length.toLocaleString("ar-EG")} أمر بيع{needle && paginationStatus !== "Exhausted" ? " — البحث داخل النتائج المحمّلة" : ""}</p><div className="flex items-center gap-2">{paginationStatus === "CanLoadMore" && <button type="button" className="erp-action" onClick={() => loadMore(25)}>تحميل المزيد</button>}{paginationStatus === "LoadingMore" && <span className="text-xs text-slate-400">جارٍ التحميل...</span>}{paginationStatus === "Exhausted" && <span className="text-[11px] text-slate-400">كل النتائج محمّلة</span>}</div></div>}
       </div>
 
-      {showPayment && <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"><div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6"><div className="flex items-center justify-between mb-5"><h2 className="font-bold text-slate-800 flex items-center gap-2"><CreditCard className="w-5 h-5 text-emerald-600" />تسجيل دفعة</h2><button disabled={busy} onClick={() => setShowPayment(null)} className="p-1.5 hover:bg-slate-100 rounded-lg"><X className="w-4 h-4" /></button></div><div className="space-y-4"><div><label className="form-label">المبلغ المدفوع (ج.م)</label><input className="form-input text-center text-xl font-bold" type="number" min="0.01" step="0.01" value={paymentAmount} onChange={(event) => setPaymentAmount(event.target.value)} autoFocus /></div><select className="form-input" value={paymentAccountId} onChange={(event) => setPaymentAccountId(event.target.value)}><option value="">اختر حساب التحصيل</option>{collectionAccounts.map((account) => <option key={account._id} value={account._id}>{account.name}</option>)}</select><input className="form-input" type="date" value={paymentDate} onChange={(event) => setPaymentDate(event.target.value)} /><textarea className="form-input" placeholder="ملاحظات" value={paymentNotes} onChange={(event) => setPaymentNotes(event.target.value)} /><div className="flex gap-3"><button disabled={busy} onClick={() => setShowPayment(null)} className="btn-secondary flex-1">إلغاء</button><button disabled={busy} onClick={() => handlePayment(showPayment)} className="btn-success flex-1">{busy ? "جارٍ التسجيل..." : "تسجيل"}</button></div></div></div></div>}
+      {showPayment && <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"><div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6"><div className="flex items-center justify-between mb-5"><h2 className="font-bold text-slate-800 flex items-center gap-2"><CreditCard className="w-5 h-5 text-emerald-600" />تسجيل دفعة</h2><button disabled={busy} onClick={() => setShowPayment(null)} className="p-1.5 hover:bg-slate-100 rounded-lg"><X className="w-4 h-4" /></button></div><div className="space-y-4"><div><label className="form-label">المبلغ المدفوع ({currencyCode})</label><input className="form-input text-center text-xl font-bold" type="number" min="0.01" step="0.01" value={paymentAmount} onChange={(event) => setPaymentAmount(event.target.value)} autoFocus /></div><select className="form-input" value={paymentAccountId} onChange={(event) => setPaymentAccountId(event.target.value)}><option value="">اختر حساب التحصيل</option>{collectionAccounts.map((account) => <option key={account._id} value={account._id}>{account.name}</option>)}</select><input className="form-input" type="date" value={paymentDate} onChange={(event) => setPaymentDate(event.target.value)} /><textarea className="form-input" placeholder="ملاحظات" value={paymentNotes} onChange={(event) => setPaymentNotes(event.target.value)} /><div className="flex gap-3"><button disabled={busy} onClick={() => setShowPayment(null)} className="btn-secondary flex-1">إلغاء</button><button disabled={busy} onClick={() => handlePayment(showPayment)} className="btn-success flex-1">{busy ? "جارٍ التسجيل..." : "تسجيل"}</button></div></div></div></div>}
 
       {refundTarget && <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"><form onSubmit={handleRefund} className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 space-y-4"><h2 className="font-bold text-slate-800">استرداد عربون {refundTarget.orderNumber}</h2><div><label className="form-label">المبلغ *</label><input required min="0.01" max={refundTarget.deposit} step="0.01" type="number" className="form-input" value={refundAmount} onChange={(event) => setRefundAmount(event.target.value)} /></div><div><label className="form-label">حساب الاسترداد *</label><select required className="form-input" value={refundAccountId} onChange={(event) => setRefundAccountId(event.target.value)}><option value="">اختر الحساب</option>{refundAccounts.map((account) => <option key={account._id} value={account._id}>{account.name}</option>)}</select></div><div><label className="form-label">التاريخ *</label><input required type="date" className="form-input" value={refundDate} onChange={(event) => setRefundDate(event.target.value)} /></div><div><label className="form-label">السبب *</label><textarea required className="form-input" value={refundReason} onChange={(event) => setRefundReason(event.target.value)} /></div><div className="flex gap-3"><button type="submit" disabled={busy || !refundReason.trim()} className="btn-primary flex-1">{busy ? "جارٍ الاسترداد..." : "استرداد"}</button><button type="button" disabled={busy} className="btn-secondary" onClick={() => setRefundTarget(null)}>إلغاء</button></div></form></div>}
 

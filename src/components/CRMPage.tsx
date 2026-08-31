@@ -1,3 +1,4 @@
+import { useCurrency } from "../lib/utils";
 import { useState } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
@@ -62,6 +63,7 @@ const emptyLeadForm = (): LeadForm => ({
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export function CRMPage() {
+  const { formatCurrency, currencyCode } = useCurrency();
   const canCreate = usePermission("create_leads");
   const canEdit = usePermission("edit_leads");
   const canDelete = usePermission("delete_leads");
@@ -280,7 +282,7 @@ export function CRMPage() {
                             <Phone className="w-3 h-3" /><span>{lead.phone}</span>
                           </div>
                           {lead.interest && <p className="text-xs text-slate-600 bg-slate-50 rounded-lg px-2 py-1 mb-2 truncate">🛍️ {lead.interest}</p>}
-                          {lead.budget && <p className="text-xs text-emerald-600 font-semibold mb-2">💰 {lead.budget.toLocaleString("ar-EG")} ج.م</p>}
+                          {lead.budget && <p className="text-xs text-emerald-600 font-semibold mb-2">💰 {formatCurrency(lead.budget)}</p>}
                           {lead.nextFollowUpDate && (
                             <div className="flex items-center gap-1 text-xs text-amber-600 mb-2">
                               <Calendar className="w-3 h-3" /><span>متابعة: {lead.nextFollowUpDate}</span>
@@ -351,7 +353,7 @@ export function CRMPage() {
                         </td>
                         <td><span className={`px-2 py-1 rounded-lg text-xs font-medium ${src.color}`}>{src.emoji} {src.label}</span></td>
                         <td><span className="text-sm text-slate-600 truncate max-w-32 block">{lead.interest ?? "—"}</span></td>
-                        <td><span className="text-sm font-semibold text-emerald-600">{lead.budget ? `${lead.budget.toLocaleString("ar-EG")} ج.م` : "—"}</span></td>
+                        <td><span className="text-sm font-semibold text-emerald-600">{lead.budget ? `${formatCurrency(lead.budget)}` : "—"}</span></td>
                         <td><span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${sts.color}`}>{sts.label}</span></td>
                         <td><span className={`text-xs ${lead.nextFollowUpDate ? "text-amber-600 font-medium" : "text-slate-400"}`}>{lead.nextFollowUpDate ?? "—"}</span></td>
                         <td>
@@ -404,7 +406,7 @@ export function CRMPage() {
                   <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${getSource(leadDetail.source).color}`}>{getSource(leadDetail.source).emoji} {getSource(leadDetail.source).label}</span>
                 </div>
                 {leadDetail.interest && <div className="flex items-center gap-2 text-sm"><Star className="w-4 h-4 text-slate-400" /><span className="text-slate-600">{leadDetail.interest}</span></div>}
-                {leadDetail.budget && <div className="flex items-center gap-2 text-sm"><TrendingUp className="w-4 h-4 text-slate-400" /><span className="text-emerald-600 font-semibold">{leadDetail.budget.toLocaleString("ar-EG")} ج.م</span></div>}
+                {leadDetail.budget && <div className="flex items-center gap-2 text-sm"><TrendingUp className="w-4 h-4 text-slate-400" /><span className="text-emerald-600 font-semibold">{formatCurrency(leadDetail.budget)}</span></div>}
                 {leadDetail.assignedTo && <div className="flex items-center gap-2 text-sm"><Users className="w-4 h-4 text-slate-400" /><span className="text-slate-600">مسؤول: {leadDetail.assignedTo}</span></div>}
                 {leadDetail.nextFollowUpDate && <div className="flex items-center gap-2 text-sm"><Calendar className="w-4 h-4 text-amber-500" /><span className="text-amber-600 font-medium">متابعة: {leadDetail.nextFollowUpDate}</span></div>}
                 {leadDetail.notes && <p className="text-xs text-slate-500 bg-white rounded-xl p-3 border border-slate-200">{leadDetail.notes}</p>}
@@ -570,7 +572,7 @@ export function CRMPage() {
                   <input className="form-input" placeholder="مثال: آيفون 15" value={form.interest} onChange={e => setForm({ ...form, interest: e.target.value })} />
                 </div>
                 <div>
-                  <label className="form-label">الميزانية (ج.م)</label>
+                  <label className="form-label">الميزانية ({currencyCode})</label>
                   <input className="form-input" type="number" placeholder="0" value={form.budget} onChange={e => setForm({ ...form, budget: e.target.value })} />
                 </div>
               </div>

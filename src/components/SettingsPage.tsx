@@ -1,3 +1,4 @@
+import { CURRENCY_DEFINITIONS, DEFAULT_CURRENCY_CODE, SUPPORTED_CURRENCY_CODES, normalizeCurrencyCode, type CurrencyCode } from "../../shared/currency";
 import { useEffect, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import {
@@ -66,7 +67,7 @@ const emptyForm = {
   invoiceFooter: "",
   phone: "",
   address: "",
-  currency: "EGP",
+  currency: DEFAULT_CURRENCY_CODE,
   taxRate: 14,
   whatsappNumber: "",
   postDeliveryFollowUpDays: 2,
@@ -104,7 +105,7 @@ export function SettingsPage() {
       invoiceFooter: settings.invoiceFooter ?? "",
       phone: settings.phone ?? "",
       address: settings.address ?? "",
-      currency: "EGP",
+      currency: normalizeCurrencyCode(settings.currency),
       taxRate: settings.taxRate,
       whatsappNumber: settings.whatsappNumber ?? "",
       postDeliveryFollowUpDays: settings.postDeliveryFollowUpDays ?? 2,
@@ -136,7 +137,7 @@ export function SettingsPage() {
         invoiceFooter: form.invoiceFooter || undefined,
         phone: form.phone || undefined,
         address: form.address || undefined,
-        currency: "EGP",
+        currency: form.currency,
         taxRate: Number(form.taxRate),
         whatsappNumber: form.whatsappNumber || undefined,
         postDeliveryFollowUpDays: Number(form.postDeliveryFollowUpDays),
@@ -264,7 +265,7 @@ export function SettingsPage() {
             <label className="form-label">نوع النشاط<select className="form-input" value={form.storeType} onChange={event => setForm({ ...form, storeType: event.target.value })}><option value="retail">تجزئة</option><option value="wholesale">جملة</option><option value="services">خدمات</option><option value="mixed">تجارة وخدمات</option><option value="electronics">إلكترونيات</option></select></label>
             <label className="form-label">رقم الهاتف<input className="form-input" value={form.phone} onChange={event => setForm({ ...form, phone: event.target.value })} placeholder="01xxxxxxxxx" /></label>
             <label className="form-label sm:col-span-2">العنوان<input className="form-input" value={form.address} onChange={event => setForm({ ...form, address: event.target.value })} placeholder="المحافظة، المدينة، العنوان" /></label>
-            <label className="form-label">العملة<select className="form-input" value="EGP" disabled><option value="EGP">جنيه مصري (EGP)</option></select></label>
+            <label className="form-label">العملة الأساسية<select data-testid="settings-currency" className="form-input" value={form.currency} onChange={event => setForm({ ...form, currency: event.target.value as CurrencyCode })}>{SUPPORTED_CURRENCY_CODES.map(code => <option key={code} value={code}>{CURRENCY_DEFINITIONS[code].labelAr} ({code})</option>)}</select><span className="mt-1 block text-xs font-normal text-slate-400">تغيير العملة يغيّر عرض القيم المالية ولا ينفذ تحويل أسعار صرف.</span></label>
             <label className="form-label">ضريبة القيمة المضافة (%)<input className="form-input" type="number" min="0" max="100" step="0.01" value={form.taxRate} onChange={event => setForm({ ...form, taxRate: Number(event.target.value) })} /></label>
             <label className="form-label sm:col-span-2">تذييل الفاتورة<textarea className="form-input min-h-24" maxLength={500} value={form.invoiceFooter} onChange={event => setForm({ ...form, invoiceFooter: event.target.value })} placeholder="شكرًا لتعاملكم معنا" /></label>
           </div>

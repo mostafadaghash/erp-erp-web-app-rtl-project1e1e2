@@ -33,7 +33,7 @@ interface PurchaseItem {
 export function NewPurchaseInvoicePage({ onNavigate }: NewPurchaseInvoicePageProps) {
   const options = useQuery(api.shipments.creationOptions);
   const createShipment = useMutation(api.shipments.create);
-  const { formatAmount } = useCurrency();
+  const { formatAmount, formatCurrency } = useCurrency();
 
   const productSearchRef = useRef<HTMLInputElement>(null);
   const shippingCostRef = useRef<HTMLInputElement>(null);
@@ -341,7 +341,7 @@ export function NewPurchaseInvoicePage({ onNavigate }: NewPurchaseInvoicePagePro
                     <td>
                       <input data-purchase-unit-cost className="purchase-pos-cost-input" type="number" min="0" step="0.01" value={item.unitCost || ""} onChange={(event) => updateUnitCost(item.productId, Number(event.target.value))} placeholder="0.00" aria-label={`تكلفة ${item.productName}`} />
                     </td>
-                    <td className="font-black text-[var(--purchase-accent-dark)]">{formatAmount(item.total)} ج.م</td>
+                    <td className="font-black text-[var(--purchase-accent-dark)]">{formatCurrency(item.total)}</td>
                     <td><button type="button" onClick={() => removeItem(item.productId)} className="purchase-pos-delete" aria-label={`حذف ${item.productName}`}><Trash2 className="h-4 w-4" /></button></td>
                   </tr>
                 )) : (
@@ -366,15 +366,15 @@ export function NewPurchaseInvoicePage({ onNavigate }: NewPurchaseInvoicePagePro
           <div className="purchase-pos-total-card">
             <h2>ملخص فاتورة المشتريات</h2>
             <div className="purchase-pos-total-caption"><span>إجمالي التكلفة</span><span>{formatAmount(items.length)} صنف</span></div>
-            <p data-testid="new-purchase-total" data-value={grandTotal} className="purchase-pos-total-value">{formatAmount(grandTotal)} <span>ج.م</span></p>
+            <p data-testid="new-purchase-total" data-value={grandTotal} className="purchase-pos-total-value">{formatCurrency(grandTotal)}</p>
             <div className="purchase-pos-document-meta"><span>رقم العملية: تلقائي</span><span>{purchaseDate}</span></div>
           </div>
 
           <div className="purchase-pos-summary-body">
             <div className="purchase-pos-summary-totals">
-              <div className="purchase-pos-summary-row"><span>تكلفة البضاعة</span><strong>{formatAmount(goodsTotal)} ج.م</strong></div>
-              <div className="purchase-pos-summary-row"><span>تكلفة الشحن</span><strong>{formatAmount(safeShippingCost)} ج.م</strong></div>
-              <div className="purchase-pos-grand-total-row"><span>الإجمالي الكلي</span><strong>{formatAmount(grandTotal)} ج.م</strong></div>
+              <div className="purchase-pos-summary-row"><span>تكلفة البضاعة</span><strong>{formatCurrency(goodsTotal)}</strong></div>
+              <div className="purchase-pos-summary-row"><span>تكلفة الشحن</span><strong>{formatCurrency(safeShippingCost)}</strong></div>
+              <div className="purchase-pos-grand-total-row"><span>الإجمالي الكلي</span><strong>{formatCurrency(grandTotal)}</strong></div>
             </div>
 
             <div className="purchase-pos-status-card">
