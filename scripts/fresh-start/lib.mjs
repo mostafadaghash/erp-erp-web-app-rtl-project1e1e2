@@ -110,7 +110,8 @@ export function buildInlineAuditQuery(phaseValue) {
     ...APPLICATION_TABLES.map((table) => `if ((await ctx.db.query(${JSON.stringify(table)}).take(1)).length > 0) nonEmptyTables.push(${JSON.stringify(table)});`),
     "const nonZeroFinancialAccounts = (await ctx.db.query('financialAccounts').collect()).filter((row) => row.currentBalance !== 0).length;",
     "const nonZeroGeneralLedgerOpenings = (await ctx.db.query('generalLedgerOpenings').collect()).filter((row) => row.isZeroOpening !== true).length;",
-    `return JSON.stringify({ schemaVersion: ${FRESH_START_SCHEMA_VERSION}, phase: ${JSON.stringify(phase)}, nonEmptyTables, nonZeroFinancialAccounts, nonZeroGeneralLedgerOpenings });`,
+    "const customerWhatsAppMessageEvents = (await ctx.db.query('auditLogs').withIndex('by_module', (q) => q.eq('module', 'customer_whatsapp_messages')).take(1)).length;",
+    `return JSON.stringify({ schemaVersion: ${FRESH_START_SCHEMA_VERSION}, phase: ${JSON.stringify(phase)}, nonEmptyTables, nonZeroFinancialAccounts, nonZeroGeneralLedgerOpenings, customerWhatsAppMessageEvents });`,
   ].join("\n");
 }
 
@@ -148,16 +149,18 @@ export function validateLiveAudit({ phase: phaseValue, result }) {
 
   const nonZeroFinancialAccounts = requireNonNegativeInteger(result.nonZeroFinancialAccounts, "nonZeroFinancialAccounts");
   const nonZeroGeneralLedgerOpenings = requireNonNegativeInteger(result.nonZeroGeneralLedgerOpenings, "nonZeroGeneralLedgerOpenings");
+  const customerWhatsAppMessageEvents = requireNonNegativeInteger(result.customerWhatsAppMessageEvents, "customerWhatsAppMessageEvents");
   const allowed = phase === "blank" ? new Set() : new Set(INITIALIZED_SETUP_TABLES);
   const forbiddenTables = nonEmptyTables.filter((table) => !allowed.has(table));
   const violations = [
     ...forbiddenTables.map((table) => `non-empty:${table}`),
     ...(nonZeroFinancialAccounts ? [`non-zero-financial-accounts:${nonZeroFinancialAccounts}`] : []),
     ...(nonZeroGeneralLedgerOpenings ? [`non-zero-general-ledger-openings:${nonZeroGeneralLedgerOpenings}`] : []),
+    ...(customerWhatsAppMessageEvents ? [`customer-whatsapp-message-events:${customerWhatsAppMessageEvents}`] : []),
   ];
   if (violations.length) throw new Error(`Fresh Start audit failed: ${violations.join(", ")}`);
 
-  return { phase, nonEmptyTables, nonZeroFinancialAccounts, nonZeroGeneralLedgerOpenings };
+  return { phase, nonEmptyTables, nonZeroFinancialAccounts, nonZeroGeneralLedgerOpenings, customerWhatsAppMessageEvents };
 }
 
 export function createFreshStartEvidence({ deployment, environment, releaseCommit, checkedAt, audit }) {
@@ -178,6 +181,7 @@ export function createFreshStartEvidence({ deployment, environment, releaseCommi
       noOutstandingCustomerOrSupplierBalances: true,
       noOutstandingOperationalDocuments: true,
       noOutstandingCod: true,
+      noWhatsAppMessageHistory: audit.customerWhatsAppMessageEvents === 0,
       demoSeedUnavailable: true,
     },
   };
