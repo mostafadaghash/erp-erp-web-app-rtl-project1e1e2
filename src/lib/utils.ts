@@ -2,18 +2,18 @@ import { useMemo } from "react";
 import { useQuery } from "convex/react";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
-import { api } from "../../convex/_generated/api";
+import { api } from "../../convex/_generated/api.ts";
 import {
   DEFAULT_CURRENCY_CODE,
   getCurrencyDefinition,
   normalizeCurrencyCode,
   type CurrencyCode,
-} from "../../shared/currency";
+} from "../../shared/currency.ts";
 import {
   APP_LOCALE,
   formatCurrencyValue,
   formatNumberValue,
-} from "./currency";
+} from "./currency.ts";
 
 export { APP_LOCALE };
 
