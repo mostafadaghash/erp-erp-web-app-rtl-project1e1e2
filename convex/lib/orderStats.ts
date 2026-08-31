@@ -2,7 +2,7 @@ import { ConvexError } from "convex/values";
 import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
 import type { AuthUser } from "./auth.ts";
-import { roundMoney } from "../../shared/businessRules.ts";
+import { normalizeOrderStatus, roundMoney } from "../../shared/businessRules.ts";
 
 export type OrderStatsSnapshot = Pick<Doc<"orders">, "status" | "total" | "remaining" | "branchId">;
 export type OrderStatsValues = {
@@ -29,15 +29,25 @@ const stateKey = "orders" as const;
 const aggregateKey = (generation: number, branchId?: Id<"branches">) =>
   branchId ? `${generation}:branch:${branchId}` : `${generation}:global`;
 
+/**
+ * The materialized aggregate is kept as a coarse compatibility summary.
+ * The Orders page now uses the exact operational status query instead.
+ */
 export function orderStatsContribution(order?: OrderStatsSnapshot | null): OrderStatsValues {
   if (!order) return { ...ZERO };
+  const status = normalizeOrderStatus(order.status);
+  const pending = status === "pending";
+  const confirmed = status === "confirmed" || status === "preparing";
+  const ready = status === "ready" || status === "handed_to_shipping";
+  const delivered = status === "delivered_to_customer" || status === "received";
+  const terminal = delivered || status === "cancelled";
   return {
-    pending: order.status === "pending" ? 1 : 0,
-    confirmed: order.status === "confirmed" ? 1 : 0,
-    ready: order.status === "ready" ? 1 : 0,
-    delivered: order.status === "delivered" ? 1 : 0,
+    pending: pending ? 1 : 0,
+    confirmed: confirmed ? 1 : 0,
+    ready: ready ? 1 : 0,
+    delivered: delivered ? 1 : 0,
     totalValue: roundMoney(order.total),
-    pendingValue: order.status === "delivered" || order.status === "cancelled" ? 0 : roundMoney(order.remaining),
+    pendingValue: terminal ? 0 : roundMoney(order.remaining),
     total: 1,
   };
 }

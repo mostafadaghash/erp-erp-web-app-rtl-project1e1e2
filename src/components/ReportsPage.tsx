@@ -25,6 +25,7 @@ import type {
   ReportingOverview,
   ReportingSalesInvoice,
 } from "../../shared/reportingView";
+import { OperationStatusReportCards } from "./OperationStatusReportCards";
 
 type Period = "today" | "week" | "month" | "year" | "custom";
 export type ReportKind =
@@ -345,7 +346,7 @@ export function ReportsPage({ initialReport }: { initialReport?: ReportKind }) {
   return (
     <div className="space-y-4 p-4 lg:p-6">
       <header className="erp-page-header">
-        <div><span className="erp-kicker">تقارير تفصيلية من المستندات الفعلية</span><h1 className="erp-page-title"><BarChart3 className="h-6 w-6 text-[var(--erp-accent)]" />مركز التقارير</h1><p className="erp-page-subtitle">حدد الفترة والفلاتر، ثم افتح أي فاتورة لمراجعة أصنافها.</p></div>
+        <div><span className="erp-kicker">تقارير تفصيلية من المستندات الفعلية</span><h1 className="erp-page-title"><BarChart3 className="h-6 w-6 text-[var(--erp-accent)]" />مركز التقارير</h1><p className="erp-page-subtitle">حدد الفترة والفرع؛ حالات البيع والصيانة أدناه مرتبطة بنفس دورة التشغيل المستخدمة في المتابعة والشحن.</p></div>
         <button className="erp-action" onClick={() => window.print()}><Printer className="h-4 w-4" />طباعة التقرير</button>
       </header>
 
@@ -370,6 +371,8 @@ export function ReportsPage({ initialReport }: { initialReport?: ReportKind }) {
       </section>
 
       {validationMessage && <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{validationMessage}</div>}
+
+      {!validationMessage && <OperationStatusReportCards from={from} to={to} branchId={canSelectBranch && branchId ? branchId : undefined} />}
 
       {!validationMessage && activeReport === "sales" && <section id="report-output" className="erp-section" data-testid="active-report-sales">
         <div className="erp-section-header"><div><p className="text-xs font-bold text-[var(--erp-accent-strong)]">من {from} إلى {to}</p><h2 className="erp-section-title mt-1">تقرير تحليل المبيعات</h2></div><span className="erp-status">أساس التاريخ: تاريخ العملية</span></div>

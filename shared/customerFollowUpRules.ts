@@ -49,10 +49,12 @@ export function deriveFollowUpCommercialStatus(input: {
 
 export const SALES_ORDER_SOURCE_STATUS_LABELS = [
   "قيد الإنتظار",
-  "جارى التجهيز",
+  "مؤكد",
+  "جاري التجهيز",
   "تم التجهيز",
+  "تم التسليم للعميل",
   "تم التسليم لشركة الشحن",
-  "تم تسليم الأوردر",
+  "تم الإستلام",
   "ملغي",
 ] as const;
 
@@ -61,19 +63,21 @@ export const REPAIR_SOURCE_STATUS_LABELS = [
   "جاري الصيانة",
   "ظهور مشكلة جديدة",
   "تم الإصلاح",
-  "تم التسليم",
+  "تم التسليم للعميل",
   "مرفوض من العميل",
-  "مرفوض من الفني",
+  "مرفوض من شركة الشحن",
 ] as const;
 
-export type RepairRejectionParty = "customer" | "technician";
+export type RepairRejectionParty = "customer" | "shipping";
 
 export function mapOrderSourceStatus(status: string, hasShippedDelivery = false): string | undefined {
   if (status === "cancelled") return "ملغي";
-  if (status === "delivered") return "تم تسليم الأوردر";
-  if (hasShippedDelivery) return "تم التسليم لشركة الشحن";
+  if (status === "received" || status === "delivered") return "تم الإستلام";
+  if (status === "delivered_to_customer") return "تم التسليم للعميل";
+  if (status === "handed_to_shipping" || hasShippedDelivery) return "تم التسليم لشركة الشحن";
   if (status === "ready") return "تم التجهيز";
-  if (status === "confirmed") return "جارى التجهيز";
+  if (status === "preparing") return "جاري التجهيز";
+  if (status === "confirmed") return "مؤكد";
   if (status === "pending") return "قيد الإنتظار";
   return undefined;
 }
@@ -81,7 +85,7 @@ export function mapOrderSourceStatus(status: string, hasShippedDelivery = false)
 export function mapDeliverySourceStatus(status: string): string | undefined {
   if (status === "pending") return "قيد الإنتظار";
   if (status === "shipped") return "تم التسليم لشركة الشحن";
-  if (status === "delivered") return "تم تسليم الأوردر";
+  if (status === "delivered") return "تم الإستلام";
   if (status === "returned") return "مرتجع";
   if (status === "cancelled") return "ملغي";
   return undefined;
@@ -90,7 +94,7 @@ export function mapDeliverySourceStatus(status: string): string | undefined {
 function inferRepairRejectionParty(reason?: string): RepairRejectionParty | undefined {
   const normalized = reason?.trim().toLowerCase();
   if (!normalized) return undefined;
-  if (/(فني|الفني|technician|technical)/i.test(normalized)) return "technician";
+  if (/(شحن|شركة الشحن|shipping|carrier)/i.test(normalized)) return "shipping";
   if (/(عميل|العميل|customer|client)/i.test(normalized)) return "customer";
   return undefined;
 }
@@ -104,12 +108,11 @@ export function mapRepairSourceStatus(
   if (status === "under_inspection" || status === "in_progress") return "جاري الصيانة";
   if (status === "awaiting_approval") return "ظهور مشكلة جديدة";
   if (status === "ready") return "تم الإصلاح";
-  if (status === "delivered") return "تم التسليم";
+  if (status === "delivered") return "تم التسليم للعميل";
+  if (status === "rejected_by_shipping") return "مرفوض من شركة الشحن";
   if (status === "cancelled") {
-    const party = rejectionParty ?? inferRepairRejectionParty(cancellationReason);
-    if (party === "customer") return "مرفوض من العميل";
-    if (party === "technician") return "مرفوض من الفني";
-    return undefined;
+    const party = rejectionParty ?? inferRepairRejectionParty(cancellationReason) ?? "customer";
+    return party === "shipping" ? "مرفوض من شركة الشحن" : "مرفوض من العميل";
   }
   return undefined;
 }

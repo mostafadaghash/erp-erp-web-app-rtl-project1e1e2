@@ -14,42 +14,53 @@ import { PrintModal } from "./PrintTemplate";
 import { buildEgyptWhatsAppUrl } from "../lib/utils";
 import { getErrorMessage } from "../lib/errors";
 import { SearchableCombobox, type SearchableComboboxOption } from "./SearchableCombobox";
+import { normalizeOrderStatus, type CanonicalOrderStatus } from "../../shared/businessRules";
 
 function buildWhatsAppLink(phone: string, message: string) {
   return buildEgyptWhatsAppUrl(phone, message);
 }
 
 function getWhatsAppMessage(status: string, orderNumber: string, customerName: string, storeName: string, remaining: number): string {
+  const normalized = normalizeOrderStatus(status) ?? status;
   const greeting = `السلام عليكم ${customerName} 👋`;
   const store = `*${storeName}*`;
   const ordNum = `رقم أمر البيع: *${orderNumber}*`;
-  switch (status) {
-    case "confirmed": return `${greeting}\n\nنود إعلامكم بأن طلبكم لدى ${store} قد تم تأكيده ✅\n${ordNum}\n\nسنقوم بإشعاركم فور جاهزية الطلب. شكراً لثقتكم 🙏`;
-    case "ready": return `${greeting}\n\nيسعدنا إعلامكم بأن طلبكم لدى ${store} أصبح جاهزاً للاستلام 🎉\n${ordNum}\n${remaining > 0 ? `\nالمبلغ المتبقي: *${remaining.toLocaleString("ar-EG")} ج.م*\n` : ""}\nيمكنكم التفضل باستلامه في أي وقت خلال أوقات الدوام. شكراً لكم 😊`;
-    case "delivered": return `${greeting}\n\nشكراً لزيارتكم ${store} 🌟\n${ordNum}\n\nنتمنى أن تكونوا راضين عن خدمتكم. يسعدنا دائماً خدمتكم 💙`;
-    case "cancelled": return `${greeting}\n\nنأسف لإعلامكم بأنه تم إلغاء طلبكم لدى ${store}\n${ordNum}\n\nللاستفسار أو إعادة الطلب، يرجى التواصل معنا. نعتذر عن أي إزعاج 🙏`;
+  switch (normalized) {
+    case "confirmed": return `${greeting}\n\nنود إعلامكم بأن طلبكم لدى ${store} قد تم تأكيده ✅\n${ordNum}\n\nسنبدأ التجهيز ونوافيكم بالتحديثات. شكراً لثقتكم 🙏`;
+    case "preparing": return `${greeting}\n\nطلبكم لدى ${store} جاري تجهيزه الآن.\n${ordNum}`;
+    case "ready": return `${greeting}\n\nيسعدنا إعلامكم بأن طلبكم لدى ${store} تم تجهيزه 🎉\n${ordNum}\n${remaining > 0 ? `\nالمبلغ المتبقي: *${remaining.toLocaleString("ar-EG")} ج.م*\n` : ""}\nشكراً لكم 😊`;
+    case "handed_to_shipping": return `${greeting}\n\nتم تسليم طلبكم لدى ${store} لشركة الشحن 🚚\n${ordNum}`;
+    case "delivered_to_customer": return `${greeting}\n\nتم تسليم طلبكم من ${store} بنجاح 🌟\n${ordNum}\n\nشكراً لثقتكم بنا.`;
+    case "received": return `${greeting}\n\nتم تأكيد استلام طلبكم من ${store} بنجاح 🌟\n${ordNum}\n\nنتمنى أن تكونوا راضين عن خدمتنا.`;
+    case "cancelled": return `${greeting}\n\nنأسف لإعلامكم بأنه تم إلغاء طلبكم لدى ${store}\n${ordNum}\n\nللاستفسار يرجى التواصل معنا.`;
     default: return `${greeting}\n\nتحديث على طلبكم لدى ${store}\n${ordNum}`;
   }
 }
 
-type OrderStatus = "pending" | "confirmed" | "ready" | "delivered" | "cancelled";
+type OrderStatus = CanonicalOrderStatus;
 type OrderItem = { productId?: string; productName: string; quantity: number; unitPrice: number; notes?: string };
 
 const statusConfig: Record<OrderStatus, { label: string; badge: string; icon: React.ElementType }> = {
-  pending: { label: "قيد الانتظار", badge: "badge badge-warning", icon: Clock },
+  pending: { label: "قيد الإنتظار", badge: "badge badge-warning", icon: Clock },
   confirmed: { label: "مؤكد", badge: "badge badge-info", icon: CheckCircle },
-  ready: { label: "جاهز", badge: "badge badge-purple", icon: Package },
-  delivered: { label: "تم التسليم", badge: "badge badge-success", icon: Truck },
+  preparing: { label: "جاري التجهيز", badge: "badge badge-info", icon: Package },
+  ready: { label: "تم التجهيز", badge: "badge badge-purple", icon: Package },
+  delivered_to_customer: { label: "تم التسليم للعميل", badge: "badge badge-success", icon: CheckCircle },
+  handed_to_shipping: { label: "تم التسليم لشركة الشحن", badge: "badge badge-info", icon: Truck },
+  received: { label: "تم الإستلام", badge: "badge badge-success", icon: Truck },
   cancelled: { label: "ملغي", badge: "badge badge-danger", icon: XCircle },
 };
 
-const statusFlow: OrderStatus[] = ["pending", "confirmed", "ready", "delivered"];
+const statusFlow: OrderStatus[] = ["pending", "confirmed", "preparing", "ready", "delivered_to_customer"];
 const orderFilters: Array<{ v: OrderStatus | "all"; l: string }> = [
   { v: "all", l: "الكل" },
-  { v: "pending", l: "انتظار" },
+  { v: "pending", l: "قيد الإنتظار" },
   { v: "confirmed", l: "مؤكد" },
-  { v: "ready", l: "جاهز" },
-  { v: "delivered", l: "مُسلَّم" },
+  { v: "preparing", l: "جاري التجهيز" },
+  { v: "ready", l: "تم التجهيز" },
+  { v: "delivered_to_customer", l: "تم التسليم للعميل" },
+  { v: "handed_to_shipping", l: "تم التسليم لشركة الشحن" },
+  { v: "received", l: "تم الإستلام" },
   { v: "cancelled", l: "ملغي" },
 ];
 const emptyItem = (): OrderItem => ({ productId: "", productName: "", quantity: 1, unitPrice: 0 });
@@ -104,7 +115,7 @@ export function OrdersPage({ createRequestToken }: { createRequestToken?: number
     filterStatus === "all" ? {} : { status: filterStatus },
     { initialNumItems: 25 },
   );
-  const stats = useQuery(api.orders.stats);
+  const stats = useQuery(api.operationStatusDashboard.orderCounts, {});
   const details = useQuery(api.orders.details, detailsTarget ? { id: detailsTarget } : "skip");
   const settings = useQuery(api.settings.getPublic);
   const updateStatus = useMutation(api.orders.updateStatus);
@@ -140,7 +151,7 @@ export function OrdersPage({ createRequestToken }: { createRequestToken?: number
     setStatusBusyId(id);
     try {
       await updateStatus({ id, status });
-      toast.success("تم تحديث حالة أمر البيع");
+      toast.success(`تم تحديث حالة أمر البيع إلى ${statusConfig[status].label}`);
     } catch (error) {
       toast.error(getErrorMessage(error, "تعذر تحديث حالة أمر البيع"));
     } finally {
@@ -226,19 +237,20 @@ export function OrdersPage({ createRequestToken }: { createRequestToken?: number
         <div className="min-w-0">
           <span className="erp-kicker">المبيعات</span>
           <h1 className="erp-page-title"><ShoppingCart className="h-5 w-5 text-[var(--erp-accent)]" />أوامر البيع</h1>
-          <p className="erp-page-subtitle">متابعة الطلبات من الإنشاء حتى الفاتورة والشحن والتسليم.</p>
+          <p className="erp-page-subtitle">متابعة الطلبات من الإنشاء والتأكيد والتجهيز حتى التسليم أو الاستلام.</p>
         </div>
         {canCreate && <button data-testid="order-create-open" onClick={() => setShowForm(true)} className="btn-primary flex items-center gap-2"><Plus className="w-4 h-4" />أمر بيع جديد</button>}
       </div>
 
-      {stats && !stats.isReady && <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">إحصائيات أوامر البيع قيد التهيئة. القائمة نفسها تعمل بصورة طبيعية حتى اكتمال التهيئة.</div>}
-
-      <div className="grid grid-cols-2 gap-2 xl:grid-cols-4" data-testid="orders-summary-strip">
+      <div className="grid grid-cols-2 gap-2 md:grid-cols-4 xl:grid-cols-7" data-testid="orders-summary-strip">
         {[
-          { label: "قيد الانتظار", value: stats?.pending ?? 0, color: "text-amber-700", bg: "bg-amber-50", border: "border-amber-100", icon: Clock },
-          { label: "مؤكدة", value: stats?.confirmed ?? 0, color: "text-blue-700", bg: "bg-blue-50", border: "border-blue-100", icon: CheckCircle },
-          { label: "جاهزة", value: stats?.ready ?? 0, color: "text-violet-700", bg: "bg-violet-50", border: "border-violet-100", icon: Package },
-          { label: "تم التسليم", value: stats?.delivered ?? 0, color: "text-emerald-700", bg: "bg-emerald-50", border: "border-emerald-100", icon: Truck },
+          { label: "قيد الإنتظار", value: stats?.pending ?? 0, color: "text-amber-700", bg: "bg-amber-50", border: "border-amber-100", icon: Clock },
+          { label: "مؤكد", value: stats?.confirmed ?? 0, color: "text-blue-700", bg: "bg-blue-50", border: "border-blue-100", icon: CheckCircle },
+          { label: "جاري التجهيز", value: stats?.preparing ?? 0, color: "text-sky-700", bg: "bg-sky-50", border: "border-sky-100", icon: Package },
+          { label: "تم التجهيز", value: stats?.ready ?? 0, color: "text-violet-700", bg: "bg-violet-50", border: "border-violet-100", icon: Package },
+          { label: "تم التسليم للعميل", value: stats?.delivered_to_customer ?? 0, color: "text-emerald-700", bg: "bg-emerald-50", border: "border-emerald-100", icon: CheckCircle },
+          { label: "تم التسليم لشركة الشحن", value: stats?.handed_to_shipping ?? 0, color: "text-indigo-700", bg: "bg-indigo-50", border: "border-indigo-100", icon: Truck },
+          { label: "تم الإستلام", value: stats?.received ?? 0, color: "text-emerald-700", bg: "bg-emerald-50", border: "border-emerald-100", icon: Truck },
         ].map((item) => {
           const Icon = item.icon;
           return <div key={item.label} className={`flex min-h-16 items-center justify-between gap-3 rounded-xl border ${item.border} ${item.bg} px-3 py-2.5`}><div><p className={`text-xl font-black leading-none ${item.color}`}>{item.value}</p><p className="mt-1 text-[11px] font-bold text-slate-500">{item.label}</p></div><div className="grid h-9 w-9 place-items-center rounded-lg bg-white/80"><Icon className={`h-4 w-4 ${item.color}`} /></div></div>;
@@ -259,18 +271,20 @@ export function OrdersPage({ createRequestToken }: { createRequestToken?: number
 
       <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         {isLoadingOrders ? <div className="py-14 text-center text-slate-400">جارٍ تحميل أوامر البيع...</div> : filtered.length === 0 ? <div className="py-12 text-center"><div className="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-xl bg-slate-100"><ShoppingCart className="h-5 w-5 text-slate-400" /></div><p className="font-medium text-slate-500">{hasActiveFilters ? "لا توجد أوامر بيع مطابقة للفلاتر" : "لا توجد أوامر بيع"}</p></div> : <div className="overflow-x-auto"><table className="data-table min-w-[1050px]"><thead><tr><th>رقم أمر البيع</th><th>العميل</th><th>الأصناف</th><th>الإجمالي</th><th>المدفوع</th><th>المتبقي</th><th>الحالة</th><th>المتوقع</th><th className="w-44">الإجراء</th></tr></thead><tbody>{filtered.map((order) => {
-          const cfg = statusConfig[order.status as OrderStatus] ?? statusConfig.pending;
+          const currentStatus = normalizeOrderStatus(order.status) ?? "pending";
+          const cfg = statusConfig[currentStatus];
           const Icon = cfg.icon;
-          const currentIdx = statusFlow.indexOf(order.status as OrderStatus);
+          const currentIdx = statusFlow.indexOf(currentStatus);
           const candidate = currentIdx >= 0 && currentIdx < statusFlow.length - 1 ? statusFlow[currentIdx + 1] : null;
-          const nextStatus = candidate === "delivered" && order.linkedInvoiceId ? null : candidate;
+          const nextStatus = candidate === "delivered_to_customer" && order.linkedInvoiceId ? null : candidate;
           const hasPhone = Boolean(order.customerPhone);
-          const showWA = hasPhone && ["confirmed", "ready", "delivered", "cancelled"].includes(order.status);
+          const showWA = hasPhone && ["confirmed", "preparing", "ready", "delivered_to_customer", "handed_to_shipping", "received", "cancelled"].includes(currentStatus);
           const waLink = order.customerPhone ? buildWhatsAppLink(order.customerPhone, getWhatsAppMessage(order.status, order.orderNumber, order.customerName, storeName, order.remaining)) : null;
-          const canModifyBody = canEdit && ["pending", "confirmed"].includes(order.status) && !order.linkedInvoiceId;
-          const financialEditable = !order.linkedInvoiceId && !["cancelled", "delivered"].includes(order.status);
-          const hasSecondaryActions = (canCollect && financialEditable && order.remaining > 0) || (canRefund && financialEditable && order.deposit > 0) || Boolean(showWA && waLink) || canPrint || (canDelete && !["cancelled", "delivered"].includes(order.status));
-          return <tr key={order._id} tabIndex={0} data-testid="order-row" data-order-number={order.orderNumber} data-customer-name={order.customerName} data-status={order.status} onClick={() => { setOpenActionsId(null); setDetailsTarget(order._id); }} onKeyDown={(event) => { if (event.target !== event.currentTarget) return; if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setDetailsTarget(order._id); } }} className="cursor-pointer transition-colors hover:bg-emerald-50/40 focus:bg-emerald-50/40 focus:outline-none">
+          const canModifyBody = canEdit && ["pending", "confirmed"].includes(currentStatus) && !order.linkedInvoiceId;
+          const financialEditable = !order.linkedInvoiceId && !["cancelled", "delivered_to_customer", "received"].includes(currentStatus);
+          const canCancelThis = canDelete && !["cancelled", "delivered_to_customer", "received", "handed_to_shipping"].includes(currentStatus);
+          const hasSecondaryActions = (canCollect && financialEditable && order.remaining > 0) || (canRefund && financialEditable && order.deposit > 0) || Boolean(showWA && waLink) || canPrint || canCancelThis;
+          return <tr key={order._id} tabIndex={0} data-testid="order-row" data-order-number={order.orderNumber} data-customer-name={order.customerName} data-status={currentStatus} onClick={() => { setOpenActionsId(null); setDetailsTarget(order._id); }} onKeyDown={(event) => { if (event.target !== event.currentTarget) return; if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setDetailsTarget(order._id); } }} className="cursor-pointer transition-colors hover:bg-emerald-50/40 focus:bg-emerald-50/40 focus:outline-none">
             <td><span className="font-mono text-xs font-black text-indigo-700">{order.orderNumber}</span>{order.linkedInvoiceId && <span className="mr-2 inline-flex items-center gap-1 text-[10px] font-bold text-violet-600"><Link2 className="h-3 w-3" />فاتورة</span>}</td>
             <td><p className="font-bold text-slate-800">{order.customerName}</p>{order.customerPhone && <p className="mt-0.5 text-xs text-slate-400" dir="ltr">{order.customerPhone}</p>}</td>
             <td><p className="text-sm font-medium text-slate-700">{order.items.length} صنف</p><p className="max-w-40 truncate text-[11px] text-slate-400">{order.items.map((item) => item.productName).join("، ")}</p></td>
@@ -280,16 +294,16 @@ export function OrdersPage({ createRequestToken }: { createRequestToken?: number
             <td><span className={cfg.badge}><Icon className="ml-1 h-3 w-3" />{cfg.label}</span></td>
             <td className="text-xs font-medium text-slate-500">{order.expectedDate ?? "—"}</td>
             <td onClick={(event) => event.stopPropagation()}><div className="flex items-center justify-end gap-1.5">
-              {canEdit && nextStatus && order.status !== "cancelled" && <button data-testid="order-status-next" data-next-status={nextStatus} disabled={statusBusyId === order._id} onClick={() => handleStatusChange(order._id, nextStatus)} className="rounded-lg bg-indigo-50 px-2.5 py-1.5 text-xs font-black text-indigo-700 hover:bg-indigo-100 disabled:opacity-50 whitespace-nowrap">{statusConfig[nextStatus].label}</button>}
-              {canEdit && order.status === "ready" && order.linkedInvoiceId && <span className="rounded-lg bg-violet-50 px-2 py-1 text-[10px] font-bold text-violet-700">التسليم من عملية الشحن</span>}
-              {canModifyBody && <button onClick={() => setEditTarget(order)} className="grid h-8 w-8 place-items-center rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100" title="تعديل أمر البيع"><Pencil className="h-3.5 w-3.5" /></button>}
+              {canEdit && nextStatus && currentStatus !== "cancelled" && <button data-testid="order-status-next" data-next-status={nextStatus} disabled={statusBusyId === order._id} onClick={() => handleStatusChange(order._id, nextStatus)} className="rounded-lg bg-indigo-50 px-2.5 py-1.5 text-xs font-black text-indigo-700 hover:bg-indigo-100 disabled:opacity-50 whitespace-nowrap">{statusConfig[nextStatus].label}</button>}
+              {canEdit && currentStatus === "ready" && order.linkedInvoiceId && <span className="rounded-lg bg-violet-50 px-2 py-1 text-[10px] font-bold text-violet-700">الحالة التالية من مسار الشحن</span>}
+              {canModifyBody && <button onClick={() => setEditTarget(order)} className="grid h-8 w-8 place-items-center rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100" title="تعديل أمر البيع"><Pencil className="h-3.5 w-3" /></button>}
               {hasSecondaryActions && <div className="relative"><button data-testid="order-more-actions" type="button" onClick={(event) => { event.stopPropagation(); setOpenActionsId((current) => current === order._id ? null : order._id); }} className="grid h-8 w-8 place-items-center rounded-lg border border-slate-200 bg-white text-slate-500 hover:border-slate-300 hover:bg-slate-50" title="المزيد من الإجراءات" aria-label="المزيد من الإجراءات"><MoreHorizontal className="h-4 w-4" /></button>
                 {openActionsId === order._id && <div data-testid="order-actions-menu" onClick={(event) => event.stopPropagation()} className="absolute left-0 top-9 z-40 w-52 overflow-hidden rounded-xl border border-slate-200 bg-white p-1.5 text-right shadow-xl">
                   {canCollect && financialEditable && order.remaining > 0 && <button onClick={() => { setOpenActionsId(null); setShowPayment(order._id); setPaymentAmount(""); setPaymentAccountId(""); setPaymentNotes(""); setPaymentRequestId(crypto.randomUUID()); }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs font-bold text-slate-700 hover:bg-emerald-50 hover:text-emerald-700"><CreditCard className="h-4 w-4" />تسجيل دفعة</button>}
                   {canRefund && financialEditable && order.deposit > 0 && <button onClick={() => { setOpenActionsId(null); openRefund(order); }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs font-bold text-slate-700 hover:bg-amber-50 hover:text-amber-700"><CreditCard className="h-4 w-4" />استرداد عربون</button>}
                   {showWA && waLink && <a href={waLink} target="_blank" rel="noopener noreferrer" onClick={() => setOpenActionsId(null)} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs font-bold text-slate-700 hover:bg-green-50 hover:text-green-700"><MessageCircle className="h-4 w-4" />واتساب العميل</a>}
                   {canPrint && <button onClick={() => { setOpenActionsId(null); setPrintOrder(order); }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50"><Printer className="h-4 w-4" />طباعة أمر البيع</button>}
-                  {canDelete && !["cancelled", "delivered"].includes(order.status) && <><div className="my-1 border-t border-slate-100" /><button onClick={() => { setOpenActionsId(null); openCancel(order); }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs font-bold text-red-600 hover:bg-red-50"><Trash2 className="h-4 w-4" />إلغاء أمر البيع</button></>}
+                  {canCancelThis && <><div className="my-1 border-t border-slate-100" /><button onClick={() => { setOpenActionsId(null); openCancel(order); }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs font-bold text-red-600 hover:bg-red-50"><Trash2 className="h-4 w-4" />إلغاء أمر البيع</button></>}
                 </div>}
               </div>}
             </div></td>
@@ -469,7 +483,7 @@ function EditOrderForm({ order, onClose }: { order: Doc<"orders">; onClose: () =
     }
   };
 
-  return <OrderFormShell title={`تعديل ${order.orderNumber}`} subtitle="تعديل العميل والأصناف مسموح قبل تجهيز الطلب وربطه بالفاتورة." onClose={onClose}><form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col"><div className="min-h-0 flex-1 overflow-y-auto p-4 lg:p-5 space-y-4"><CustomerEditor form={form} setForm={setForm} customers={customers ?? []} onSelect={handleCustomerSelect} disabledCustomer={order.deposit > 0} /><OrderItemsEditor items={items} setItems={setItems} products={products} /><div className="grid gap-4 lg:grid-cols-[1fr_320px]"><DateNotesEditor form={form} setForm={setForm} /><div className="rounded-2xl border border-indigo-100 bg-indigo-50 p-4"><div className="flex justify-between"><span className="font-semibold">الإجمالي</span><span className="font-black text-xl text-indigo-700">{money(total)}</span></div><div className="flex justify-between text-sm mt-3"><span>العربون المحفوظ</span><span>{money(order.deposit)}</span></div><div className="flex justify-between text-sm mt-1"><span>المتبقي</span><span className="font-bold text-amber-700">{money(Math.max(0, total - order.deposit))}</span></div></div></div></div><div className="flex items-center justify-end gap-2 border-t border-slate-200 bg-slate-50 px-4 py-3 lg:px-5"><button type="button" disabled={saving} onClick={onClose} className="btn-secondary">إلغاء</button><button type="submit" disabled={saving} className="btn-primary min-w-40 disabled:opacity-50">{saving ? "جارٍ الحفظ..." : "حفظ التعديلات"}</button></div></form></OrderFormShell>;
+  return <OrderFormShell title={`تعديل ${order.orderNumber}`} subtitle="تعديل العميل والأصناف مسموح قبل اكتمال التجهيز وربط الطلب بالفاتورة." onClose={onClose}><form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col"><div className="min-h-0 flex-1 overflow-y-auto p-4 lg:p-5 space-y-4"><CustomerEditor form={form} setForm={setForm} customers={customers ?? []} onSelect={handleCustomerSelect} disabledCustomer={order.deposit > 0} /><OrderItemsEditor items={items} setItems={setItems} products={products} /><div className="grid gap-4 lg:grid-cols-[1fr_320px]"><DateNotesEditor form={form} setForm={setForm} /><div className="rounded-2xl border border-indigo-100 bg-indigo-50 p-4"><div className="flex justify-between"><span className="font-semibold">الإجمالي</span><span className="font-black text-xl text-indigo-700">{money(total)}</span></div><div className="flex justify-between text-sm mt-3"><span>العربون المحفوظ</span><span>{money(order.deposit)}</span></div><div className="flex justify-between text-sm mt-1"><span>المتبقي</span><span className="font-bold text-amber-700">{money(Math.max(0, total - order.deposit))}</span></div></div></div></div><div className="flex items-center justify-end gap-2 border-t border-slate-200 bg-slate-50 px-4 py-3 lg:px-5"><button type="button" disabled={saving} onClick={onClose} className="btn-secondary">إلغاء</button><button type="submit" disabled={saving} className="btn-primary min-w-40 disabled:opacity-50">{saving ? "جارٍ الحفظ..." : "حفظ التعديلات"}</button></div></form></OrderFormShell>;
 }
 
 type FormState = { customerName: string; customerPhone: string; customerId: string; expectedDate: string; notes: string; deposit: string };

@@ -38,7 +38,7 @@ const workflowStatusValidator = v.union(
   v.literal("completed"),
 );
 
-const rejectionPartyValidator = v.union(v.literal("customer"), v.literal("technician"));
+const rejectionPartyValidator = v.union(v.literal("customer"), v.literal("shipping"));
 
 const SOURCE_VIEW_PERMISSION: Partial<Record<FollowUpSourceType, Permission>> = {
   lead: "view_leads",
@@ -178,7 +178,7 @@ async function resolveSourceSnapshot(
       input.repairRejectionParty,
     );
     if (repair.status === "cancelled" && !sourceStatus) {
-      throw new ConvexError("حدد ما إذا كان رفض الصيانة من العميل أو من الفني");
+      throw new ConvexError("حدد ما إذا كان رفض الصيانة من العميل أو من شركة الشحن");
     }
     return {
       sourceId: String(id),

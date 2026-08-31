@@ -4,7 +4,7 @@ import type { MutationCtx } from "./_generated/server";
 import { v } from "convex/values";
 import { ConvexError } from "convex/values";
 import { assertBranchAccess, requireModulePermission, requirePermission, filterByBranch, resolveWriteBranch, logAction } from "./lib/auth";
-import { canTransition, ORDER_TRANSITIONS, roundMoney } from "../shared/businessRules";
+import { canTransition, normalizeOrderStatus, ORDER_TRANSITIONS, roundMoney } from "../shared/businessRules";
 import { nextDocumentNumber } from "./lib/documentNumbers";
 import { requireActiveBranch, requireActiveCustomer } from "./lib/references";
 import { postFinancialTransaction, requireActiveFinancialAccount, assertFinancialAccountBranch, findFinancialTransactionByRequest } from "./lib/finance";
@@ -13,6 +13,7 @@ import { assertOrderNotLockedByDelivery } from "./lib/deliveryLocks.ts";
 import { applyOrderStatsChange, getOrderStatsRebuildState, readOrderStats, rebuildOrderStatsBatch } from "./lib/orderStats.ts";
 
 const editableStatuses = new Set(["pending", "confirmed"]);
+const terminalOrderStatuses = new Set(["delivered_to_customer", "received", "cancelled"]);
 
 async function normalizeOrderItems(ctx: MutationCtx, branchId: Id<"branches"> | undefined, items: Array<{ productId?: Id<"products">; productName: string; quantity: number; unitPrice: number; notes?: string }>) {
   if (items.length === 0) throw new ConvexError("أضف صنفاً واحداً على الأقل");
@@ -257,7 +258,7 @@ export const update = mutation({
     const order = await ctx.db.get(args.id);
     if (!order || !order.branchId) throw new ConvexError("الطلب غير موجود أو غير مرتبط بفرع");
     assertBranchAccess(user, order);
-    if (!editableStatuses.has(order.status)) throw new ConvexError("لا يمكن تعديل بيانات الطلب بعد أن يصبح جاهزاً أو نهائياً");
+    if (!editableStatuses.has(order.status)) throw new ConvexError("لا يمكن تعديل بيانات الطلب بعد اكتمال التجهيز أو انتقاله للتسليم");
     if (order.linkedInvoiceId) throw new ConvexError("لا يمكن تعديل الطلب بعد ربطه بالفاتورة");
     await assertOrderNotLockedByDelivery(ctx, order._id);
 
@@ -301,15 +302,20 @@ export const update = mutation({
 });
 
 export const updateStatus = mutation({
-  args: { id: v.id("orders"), status: v.union(v.literal("pending"), v.literal("confirmed"), v.literal("ready"), v.literal("delivered"), v.literal("cancelled")), reason: v.optional(v.string()) },
+  args: { id: v.id("orders"), status: v.union(v.literal("pending"), v.literal("confirmed"), v.literal("preparing"), v.literal("ready"), v.literal("delivered_to_customer"), v.literal("handed_to_shipping"), v.literal("received"), v.literal("delivered"), v.literal("cancelled")), reason: v.optional(v.string()) },
   handler: async (ctx, args) => {
     const user = await requireModulePermission(ctx, "edit_orders", "orders");
     const order = await ctx.db.get(args.id);
     if (!order) throw new ConvexError("الطلب غير موجود");
     assertBranchAccess(user, order);
     if (args.status === "cancelled") throw new ConvexError("استخدم مسار إلغاء الطلب المخصص");
-    if (args.status === "delivered" && order.linkedInvoiceId) throw new ConvexError("يجب تأكيد التسليم من مسار التوصيل");
-    if (args.status === "delivered") await assertOrderNotLockedByDelivery(ctx, order._id);
+    if (args.status === "handed_to_shipping" || args.status === "received" || args.status === "delivered") {
+      throw new ConvexError("هذه الحالة تُحدّث تلقائيًا من مسار الشحن والتسليم");
+    }
+    if (args.status === "delivered_to_customer" && order.linkedInvoiceId) {
+      throw new ConvexError("الطلب المرتبط بالشحن يجب إتمامه من مسار الشحن والتسليم");
+    }
+    if (args.status === "delivered_to_customer") await assertOrderNotLockedByDelivery(ctx, order._id);
     if (!canTransition(ORDER_TRANSITIONS, order.status, args.status)) throw new ConvexError(`لا يمكن تغيير حالة الطلب من ${order.status} إلى ${args.status}`);
     await ctx.db.patch(args.id, { status: args.status });
     await applyOrderStatsChange(ctx, order, { ...order, status: args.status });
@@ -325,7 +331,8 @@ export const addPayment = mutation({
     if (!order) throw new ConvexError("الطلب غير موجود");
     assertBranchAccess(user, order);
     if (order.linkedInvoiceId) throw new ConvexError("لا يمكن إضافة عربون بعد ربط الطلب بالفاتورة");
-    if (order.status === "cancelled" || order.status === "delivered") throw new ConvexError("لا يمكن تسجيل دفعة لطلب ملغي أو مسلم");
+    const lifecycleStatus = normalizeOrderStatus(order.status);
+    if (lifecycleStatus && terminalOrderStatuses.has(lifecycleStatus)) throw new ConvexError("لا يمكن تسجيل دفعة لطلب ملغي أو تم تسليمه");
     if (!Number.isFinite(args.amount) || args.amount <= 0) throw new ConvexError("قيمة الدفعة يجب أن تكون أكبر من صفر");
     const newDeposit = roundMoney(order.deposit + args.amount);
     const newRemaining = roundMoney(order.total - newDeposit);
@@ -378,8 +385,9 @@ export const cancel = mutation({
     assertBranchAccess(user, order);
     const reason = args.reason.trim();
     if (!reason) throw new ConvexError("سبب الإلغاء مطلوب");
-    if (order.status === "cancelled") throw new ConvexError("الطلب ملغي بالفعل");
-    if (order.status === "delivered") throw new ConvexError("لا يمكن إلغاء طلب تم تسليمه");
+    const lifecycleStatus = normalizeOrderStatus(order.status);
+    if (lifecycleStatus === "cancelled") throw new ConvexError("الطلب ملغي بالفعل");
+    if (lifecycleStatus === "delivered_to_customer" || lifecycleStatus === "received") throw new ConvexError("لا يمكن إلغاء طلب تم تسليمه");
     if (order.linkedInvoiceId) throw new ConvexError("لا يمكن إلغاء الطلب بعد ربطه بالفاتورة؛ عالج الفاتورة والتوصيل أولاً");
     await assertOrderNotLockedByDelivery(ctx, order._id);
     if (order.deposit > 0) throw new ConvexError("الطلب يحتوي عربوناً ويحتاج معالجة استرداد مالي");

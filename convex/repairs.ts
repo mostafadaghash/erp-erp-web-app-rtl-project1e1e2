@@ -51,6 +51,10 @@ type RepairTransitionArgs = {
   warrantyDays?: number;
 };
 
+type RepairHistoryStatus = "received" | "under_inspection" | "awaiting_approval" | "in_progress" | "ready" | "delivered" | "cancelled";
+const historyStatus = (status: string): RepairHistoryStatus =>
+  status === "rejected_by_shipping" ? "ready" : status as RepairHistoryStatus;
+
 function assertMoney(value: number, label: string) {
   if (!Number.isFinite(value) || value < 0 || roundMoney(value) !== value) {
     throw new ConvexError(`${label} يجب أن يكون رقمًا غير سالب بدقة قرشين`);
@@ -712,8 +716,8 @@ export const updateDetails = mutation({
     const repair = await ctx.db.get(args.id);
     if (!repair) throw new ConvexError("أمر الصيانة غير موجود");
     assertBranchAccess(user, repair);
-    if (!["received", "in_progress"].includes(repair.status)) {
-      throw new ConvexError("لا يمكن تعديل تفاصيل الصيانة بعد الجاهزية أو الإغلاق");
+    if (!["received", "under_inspection", "awaiting_approval", "in_progress", "rejected_by_shipping"].includes(repair.status)) {
+      throw new ConvexError("لا يمكن تعديل تفاصيل الصيانة بعد التسليم أو رفض العميل");
     }
     const technician = args.technicianProfileId
       ? await requireRepairTechnician(
@@ -819,7 +823,10 @@ async function transitionRepair(
   }
   assertBranchAccess(user, repair);
   if (repair.status === "cancelled" && args.status === "cancelled") {
-    throw new ConvexError("تم إلغاء الصيانة سابقًا بطلب مختلف");
+    throw new ConvexError("تم رفض الصيانة من العميل سابقًا بطلب مختلف");
+  }
+  if (repair.status === "rejected_by_shipping" && args.status === "rejected_by_shipping") {
+    throw new ConvexError("تم تسجيل رفض شركة الشحن سابقًا بطلب مختلف");
   }
   if (!canTransition(REPAIR_TRANSITIONS, repair.status, args.status)) {
     throw new ConvexError(
@@ -837,6 +844,9 @@ async function transitionRepair(
   }
   if (args.status === "cancelled" && !reason) {
     throw new ConvexError("سبب الإلغاء مطلوب");
+  }
+  if (args.status === "rejected_by_shipping" && !reason) {
+    throw new ConvexError("سبب رفض شركة الشحن مطلوب");
   }
   if (args.status === "cancelled" && repair.deposit > 0) {
     throw new ConvexError("يجب استرداد عربون الصيانة بالكامل قبل الإلغاء");
@@ -862,7 +872,7 @@ async function transitionRepair(
         !Number.isFinite(part.inventoryValueRemoved)
       ) {
         throw new ConvexError(
-          "أمر الصيانة القديم يحتوي قطعًا بلا تكلفة مخزون تاريخية؛ راجعه يدويًا قبل الإلغاء",
+          "أمر الصيانة القديم يحتوي قطعًا بلا تكلفة مخزون تاريخية؛ راجعه يدويًا قبل رفض العميل",
         );
       }
       const product = await ctx.db.get(part.productId);
@@ -879,7 +889,7 @@ async function transitionRepair(
           part.inventoryValueRemoved / part.quantity,
         valueDelta: part.inventoryValueRemoved,
         type: INVENTORY_MOVEMENT_TYPES.repairPartReversal,
-        reason: `إلغاء قطع غيار الصيانة ${repair.repairNumber}`,
+        reason: `رفض العميل للصيانة ${repair.repairNumber}`,
         referenceId: String(repair._id),
         referenceType: "repair_cancellation",
       });
@@ -895,7 +905,7 @@ async function transitionRepair(
       receivableDelta: -repair.remaining,
       advanceDelta: 0,
       purchasesDelta: -repair.totalCost,
-      description: `إلغاء الصيانة ${repair.repairNumber}`,
+      description: `رفض العميل للصيانة ${repair.repairNumber}`,
       referenceType: "repair",
       referenceId: String(repair._id),
       referenceNumber: repair.repairNumber,
@@ -945,13 +955,13 @@ async function transitionRepair(
     repairId: repair._id,
     repairNumber: repair.repairNumber,
     branchId: repair.branchId,
-    fromStatus: repair.status as RepairStatus,
-    toStatus: args.status,
+    fromStatus: historyStatus(repair.status),
+    toStatus: historyStatus(args.status),
     date,
     diagnosisSnapshot: nextDiagnosis,
     technicianNameSnapshot: repair.technicianName,
     qualityCheckNotesSnapshot: nextQualityCheckNotes,
-    reason,
+    reason: args.status === "rejected_by_shipping" ? `شركة الشحن: ${reason}` : reason,
     idempotencyKey,
     requestFingerprint,
     changedAt: Date.now(),
@@ -976,18 +986,21 @@ async function transitionRepair(
   return args.id;
 }
 
+const repairStatusValidator = v.union(
+  v.literal("received"),
+  v.literal("under_inspection"),
+  v.literal("awaiting_approval"),
+  v.literal("in_progress"),
+  v.literal("ready"),
+  v.literal("delivered"),
+  v.literal("cancelled"),
+  v.literal("rejected_by_shipping"),
+);
+
 export const transitionStatus = mutation({
   args: {
     id: v.id("repairs"),
-    status: v.union(
-      v.literal("received"),
-      v.literal("under_inspection"),
-      v.literal("awaiting_approval"),
-      v.literal("in_progress"),
-      v.literal("ready"),
-      v.literal("delivered"),
-      v.literal("cancelled"),
-    ),
+    status: repairStatusValidator,
     date: v.string(),
     requestId: v.string(),
     diagnosis: v.optional(v.string()),
@@ -1005,15 +1018,7 @@ export const transitionStatus = mutation({
 export const updateStatus = mutation({
   args: {
     id: v.id("repairs"),
-    status: v.union(
-      v.literal("received"),
-      v.literal("under_inspection"),
-      v.literal("awaiting_approval"),
-      v.literal("in_progress"),
-      v.literal("ready"),
-      v.literal("delivered"),
-      v.literal("cancelled"),
-    ),
+    status: repairStatusValidator,
     diagnosis: v.optional(v.string()),
     reason: v.optional(v.string()),
     date: v.optional(v.string()),
@@ -1049,10 +1054,11 @@ export const getStats = query({
       ready: repairs.filter(r => r.status === "ready").length,
       delivered: repairs.filter(r => r.status === "delivered").length,
       cancelled: repairs.filter(r => r.status === "cancelled").length,
+      rejectedByShipping: repairs.filter(r => r.status === "rejected_by_shipping").length,
     };
   },
 });
 
-export const recordPayment = mutation({ args: { repairId: v.id("repairs"), amount: v.number(), accountId: v.id("financialAccounts"), paymentDate: v.string(), requestId: v.string(), notes: v.optional(v.string()) }, handler: async (ctx, args) => { const user = await requirePermission(ctx, "record_collections"); const repair = await ctx.db.get(args.repairId); if (!repair || !repair.branchId) throw new ConvexError("أمر الصيانة غير موجود"); assertBranchAccess(user, repair); if ((await repairPostingState(ctx)).financial && !repair.customerId) throw new ConvexError("يجب ربط الصيانة بعميل مسجل قبل التحصيل المحاسبي"); if (["cancelled", "delivered"].includes(repair.status)) throw new ConvexError("لا يمكن التحصيل لأمر ملغي أو مسلم"); if (!Number.isFinite(args.amount) || args.amount <= 0 || args.amount > repair.remaining) throw new ConvexError("مبلغ التحصيل غير صالح"); const account = await requireActiveFinancialAccount(ctx, args.accountId); assertFinancialAccountBranch(account, repair.branchId); const posted = await postFinancialTransaction(ctx, user, { type: "repair_payment", requestId: args.requestId, date: args.paymentDate, amount: args.amount, description: args.notes?.trim() || `تحصيل الصيانة ${repair.repairNumber}`, branchId: repair.branchId, referenceType: "repair", referenceId: String(repair._id), referenceNumber: repair.repairNumber, customerId: repair.customerId, movements: [{ accountId: account._id, signedAmount: args.amount }] }); if (!posted.duplicate) { if (repair.customerId) await postCustomerLedgerEntry(ctx, user, { type: "repair_payment", requestId: `${args.requestId}:ledger`, customerId: repair.customerId, branchId: repair.branchId, date: args.paymentDate, receivableDelta: -args.amount, advanceDelta: 0, purchasesDelta: 0, description: `تحصيل الصيانة ${repair.repairNumber}`, referenceType: "repair", referenceId: String(repair._id), referenceNumber: repair.repairNumber }); await ctx.db.patch(repair._id, { deposit: roundMoney(repair.deposit + args.amount), remaining: roundMoney(repair.remaining - args.amount) }); } return posted.transactionId; } });
+export const recordPayment = mutation({ args: { repairId: v.id("repairs"), amount: v.number(), accountId: v.id("financialAccounts"), paymentDate: v.string(), requestId: v.string(), notes: v.optional(v.string()) }, handler: async (ctx, args) => { const user = await requirePermission(ctx, "record_collections"); const repair = await ctx.db.get(args.repairId); if (!repair || !repair.branchId) throw new ConvexError("أمر الصيانة غير موجود"); assertBranchAccess(user, repair); if ((await repairPostingState(ctx)).financial && !repair.customerId) throw new ConvexError("يجب ربط الصيانة بعميل مسجل قبل التحصيل المحاسبي"); if (["cancelled", "delivered"].includes(repair.status)) throw new ConvexError("لا يمكن التحصيل لأمر مرفوض من العميل أو مسلم"); if (!Number.isFinite(args.amount) || args.amount <= 0 || args.amount > repair.remaining) throw new ConvexError("مبلغ التحصيل غير صالح"); const account = await requireActiveFinancialAccount(ctx, args.accountId); assertFinancialAccountBranch(account, repair.branchId); const posted = await postFinancialTransaction(ctx, user, { type: "repair_payment", requestId: args.requestId, date: args.paymentDate, amount: args.amount, description: args.notes?.trim() || `تحصيل الصيانة ${repair.repairNumber}`, branchId: repair.branchId, referenceType: "repair", referenceId: String(repair._id), referenceNumber: repair.repairNumber, customerId: repair.customerId, movements: [{ accountId: account._id, signedAmount: args.amount }] }); if (!posted.duplicate) { if (repair.customerId) await postCustomerLedgerEntry(ctx, user, { type: "repair_payment", requestId: `${args.requestId}:ledger`, customerId: repair.customerId, branchId: repair.branchId, date: args.paymentDate, receivableDelta: -args.amount, advanceDelta: 0, purchasesDelta: 0, description: `تحصيل الصيانة ${repair.repairNumber}`, referenceType: "repair", referenceId: String(repair._id), referenceNumber: repair.repairNumber }); await ctx.db.patch(repair._id, { deposit: roundMoney(repair.deposit + args.amount), remaining: roundMoney(repair.remaining - args.amount) }); } return posted.transactionId; } });
 
 export const refundPayment = mutation({ args: { repairId: v.id("repairs"), amount: v.number(), accountId: v.id("financialAccounts"), date: v.string(), reason: v.string(), requestId: v.string() }, handler: async (ctx, args) => { const user = await requirePermission(ctx, "refund_collections"); const repair = await ctx.db.get(args.repairId); if (!repair || !repair.branchId) throw new ConvexError("أمر الصيانة غير موجود"); assertBranchAccess(user, repair); if ((await repairPostingState(ctx)).financial && !repair.customerId) throw new ConvexError("يجب ربط الصيانة بعميل مسجل قبل الاسترداد المحاسبي"); const duplicate = await findFinancialTransactionByRequest(ctx, "repair_refund", user.userId, args.requestId); if (duplicate) return duplicate._id; const reason = args.reason.trim(); if (!reason) throw new ConvexError("سبب الاسترداد مطلوب"); if (!Number.isFinite(args.amount) || args.amount <= 0 || args.amount > repair.deposit) throw new ConvexError("مبلغ الاسترداد غير صالح"); const account = await requireActiveFinancialAccount(ctx, args.accountId); assertFinancialAccountBranch(account, repair.branchId); const posted = await postFinancialTransaction(ctx, user, { type: "repair_refund", requestId: args.requestId, date: args.date, amount: args.amount, description: reason, branchId: repair.branchId, referenceType: "repair", referenceId: String(repair._id), referenceNumber: repair.repairNumber, movements: [{ accountId: account._id, signedAmount: -args.amount }] }); if (repair.customerId) await postCustomerLedgerEntry(ctx, user, { type: "repair_refund", requestId: `${args.requestId}:ledger`, customerId: repair.customerId, branchId: repair.branchId, date: args.date, receivableDelta: args.amount, advanceDelta: 0, purchasesDelta: 0, description: reason, referenceType: "repair", referenceId: String(repair._id), referenceNumber: repair.repairNumber }); await ctx.db.patch(repair._id, { deposit: roundMoney(repair.deposit - args.amount), remaining: roundMoney(repair.remaining + args.amount) }); return posted.transactionId; } });

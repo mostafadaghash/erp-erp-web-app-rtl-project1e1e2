@@ -52,44 +52,51 @@ test("commercial follow-up statuses are derived from workflow state and date", (
   });
 });
 
-test("sales order source statuses match the requested Arabic workflow", () => {
+test("sales order source statuses match the unified requested Arabic workflow", () => {
   assert.deepEqual(SALES_ORDER_SOURCE_STATUS_LABELS, [
     "قيد الإنتظار",
-    "جارى التجهيز",
+    "مؤكد",
+    "جاري التجهيز",
     "تم التجهيز",
+    "تم التسليم للعميل",
     "تم التسليم لشركة الشحن",
-    "تم تسليم الأوردر",
+    "تم الإستلام",
     "ملغي",
   ]);
   assert.equal(mapOrderSourceStatus("pending"), "قيد الإنتظار");
-  assert.equal(mapOrderSourceStatus("confirmed"), "جارى التجهيز");
+  assert.equal(mapOrderSourceStatus("confirmed"), "مؤكد");
+  assert.equal(mapOrderSourceStatus("preparing"), "جاري التجهيز");
   assert.equal(mapOrderSourceStatus("ready"), "تم التجهيز");
+  assert.equal(mapOrderSourceStatus("delivered_to_customer"), "تم التسليم للعميل");
+  assert.equal(mapOrderSourceStatus("handed_to_shipping"), "تم التسليم لشركة الشحن");
   assert.equal(mapOrderSourceStatus("ready", true), "تم التسليم لشركة الشحن");
-  assert.equal(mapOrderSourceStatus("delivered", true), "تم تسليم الأوردر");
+  assert.equal(mapOrderSourceStatus("received"), "تم الإستلام");
+  assert.equal(mapOrderSourceStatus("delivered"), "تم الإستلام");
   assert.equal(mapOrderSourceStatus("cancelled", true), "ملغي");
 });
 
-test("repair source statuses match the requested Arabic workflow", () => {
+test("repair source statuses match the unified requested Arabic workflow", () => {
   assert.deepEqual(REPAIR_SOURCE_STATUS_LABELS, [
     "قيد الإنتظار",
     "جاري الصيانة",
     "ظهور مشكلة جديدة",
     "تم الإصلاح",
-    "تم التسليم",
+    "تم التسليم للعميل",
     "مرفوض من العميل",
-    "مرفوض من الفني",
+    "مرفوض من شركة الشحن",
   ]);
   assert.equal(mapRepairSourceStatus("received"), "قيد الإنتظار");
   assert.equal(mapRepairSourceStatus("under_inspection"), "جاري الصيانة");
   assert.equal(mapRepairSourceStatus("in_progress"), "جاري الصيانة");
   assert.equal(mapRepairSourceStatus("awaiting_approval"), "ظهور مشكلة جديدة");
   assert.equal(mapRepairSourceStatus("ready"), "تم الإصلاح");
-  assert.equal(mapRepairSourceStatus("delivered"), "تم التسليم");
+  assert.equal(mapRepairSourceStatus("delivered"), "تم التسليم للعميل");
   assert.equal(mapRepairSourceStatus("cancelled", "رفض العميل السعر"), "مرفوض من العميل");
-  assert.equal(mapRepairSourceStatus("cancelled", "قرار الفني"), "مرفوض من الفني");
-  assert.equal(mapRepairSourceStatus("cancelled"), undefined);
+  assert.equal(mapRepairSourceStatus("cancelled", "رفض شركة الشحن"), "مرفوض من شركة الشحن");
+  assert.equal(mapRepairSourceStatus("cancelled"), "مرفوض من العميل");
   assert.equal(mapRepairSourceStatus("cancelled", undefined, "customer"), "مرفوض من العميل");
-  assert.equal(mapRepairSourceStatus("cancelled", undefined, "technician"), "مرفوض من الفني");
+  assert.equal(mapRepairSourceStatus("cancelled", undefined, "shipping"), "مرفوض من شركة الشحن");
+  assert.equal(mapRepairSourceStatus("rejected_by_shipping"), "مرفوض من شركة الشحن");
 });
 
 test("operational roles receive follow-up permissions without widening unrelated roles", () => {

@@ -6,19 +6,15 @@ import { requireModulePermission } from "./lib/auth";
 const orderStatus = v.union(
   v.literal("pending"),
   v.literal("confirmed"),
+  v.literal("preparing"),
   v.literal("ready"),
-  v.literal("delivered"),
+  v.literal("delivered_to_customer"),
+  v.literal("handed_to_shipping"),
+  v.literal("received"),
   v.literal("cancelled"),
 );
 
-/**
- * Cursor-paginated Orders read model.
- *
- * The legacy orders.list query intentionally remains untouched during this
- * backend-first slice so existing callers keep their contract. The Orders UI
- * can migrate to this endpoint independently, then the legacy collector can be
- * removed once no callers remain.
- */
+/** Cursor-paginated Orders read model using the unified lifecycle. */
 export const list = query({
   args: {
     status: v.optional(orderStatus),
@@ -37,6 +33,15 @@ export const list = query({
 
     const baseQuery = (() => {
       if (user.role === "admin") {
+        if (args.status === "received") {
+          return ctx.db
+            .query("orders")
+            .filter((q) => q.or(
+              q.eq(q.field("status"), "received"),
+              q.eq(q.field("status"), "delivered"),
+            ))
+            .order("desc");
+        }
         return args.status
           ? ctx.db
               .query("orders")
@@ -46,6 +51,18 @@ export const list = query({
       }
 
       const branchId = user.branchId!;
+      if (args.status === "received") {
+        return ctx.db
+          .query("orders")
+          .filter((q) => q.and(
+            q.eq(q.field("branchId"), branchId),
+            q.or(
+              q.eq(q.field("status"), "received"),
+              q.eq(q.field("status"), "delivered"),
+            ),
+          ))
+          .order("desc");
+      }
       if (args.status) {
         return ctx.db
           .query("orders")
@@ -55,10 +72,6 @@ export const list = query({
           .order("desc");
       }
 
-      // There is no by_branch index in the current schema. Filtering the
-      // creation-time ordered query keeps the existing newest-first semantics
-      // while paginate() bounds the materialized result and exposes a server
-      // cursor. A dedicated by_branch index is the next schema optimization.
       return ctx.db
         .query("orders")
         .filter((q) => q.eq(q.field("branchId"), branchId))

@@ -53,12 +53,18 @@ export function isPostDeliveryAuditTrigger(input: {
 }): input is {
   module: "orders" | "repairs" | "deliveries";
   action: "update_status" | "confirm";
-  status: "delivered";
+  status: "delivered" | "delivered_to_customer" | "received";
 } {
-  if (input.status !== "delivered") return false;
-  if (input.module === "orders") return input.action === "update_status";
-  if (input.module === "repairs") return input.action === "update_status";
-  if (input.module === "deliveries") return input.action === "confirm";
+  if (input.module === "orders") {
+    return input.action === "update_status" &&
+      (input.status === "delivered_to_customer" || input.status === "received" || input.status === "delivered");
+  }
+  if (input.module === "repairs") {
+    return input.action === "update_status" && input.status === "delivered";
+  }
+  if (input.module === "deliveries") {
+    return input.action === "confirm" && input.status === "delivered";
+  }
   return false;
 }
 

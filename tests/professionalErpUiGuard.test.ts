@@ -177,7 +177,7 @@ test("sales orders use one professional document name and item terminology", () 
     "تعديل أمر البيع",
     "إلغاء أمر البيع",
     "تفاصيل أمر البيع",
-    "التسليم من عملية الشحن",
+    "الحالة التالية من مسار الشحن",
   ]) assert.match(orders, new RegExp(label));
 
   assert.doesNotMatch(orders, /لا توجد أمر بيعات|<th>المنتجات<\/th>|التسليم من التوصيل|تفاصيل الطلب/);
