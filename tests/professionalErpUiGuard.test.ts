@@ -83,7 +83,8 @@ test("white-label identity can be changed without source edits", () => {
   }
   assert.match(settingsApi, /generateBrandAssetUploadUrl/);
   assert.match(settingsApi, /setBrandAsset/);
-  assert.match(settingsPage, /غيّر الاسم والشعار والألوان في أي وقت بدون تعديل الكود/);
+  assert.match(settingsPage, /AssetCard title="شعار النظام"/);
+  assert.match(settingsPage, /AssetCard title="أيقونة المتصفح"/);
   assert.match(styles, /--brand-primary/);
   assert.match(styles, /--brand-secondary/);
 });
