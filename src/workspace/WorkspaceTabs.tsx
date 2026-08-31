@@ -60,11 +60,12 @@ export function WorkspaceTabs<Page extends string>({
   const requestRelativeClose = (tabId: string, mode: "self" | "others" | "right" | "left" | "all") => {
     const index = tabs.findIndex((tab) => tab.id === tabId);
     if (index < 0) return;
+    const rtl = document.documentElement.dir === "rtl";
     let targets: WorkspaceTab<Page>[] = [];
     if (mode === "self") targets = [tabs[index]];
     if (mode === "others") targets = tabs.filter((tab) => tab.id !== tabId);
-    if (mode === "right") targets = tabs.slice(index + 1);
-    if (mode === "left") targets = tabs.slice(0, index);
+    if (mode === "right") targets = rtl ? tabs.slice(0, index) : tabs.slice(index + 1);
+    if (mode === "left") targets = rtl ? tabs.slice(index + 1) : tabs.slice(0, index);
     if (mode === "all") targets = tabs;
     if (targets.length > 0) onRequestClose(targets.map((tab) => tab.id));
     setContextTabId(null);
