@@ -25,16 +25,11 @@ const UI_CONTEXT_SELECTOR = [
   "h4",
   "h5",
   "h6",
-  "nav",
-  "aside",
-  "header",
-  "footer",
   "[role='menuitem']",
   "[role='tab']",
   "[role='dialog']",
   "[role='alert']",
   "[role='status']",
-  "[data-testid='settings-page']",
   "[class*='toast']",
   "[class*='badge']",
   "[class*='filter']",
@@ -71,7 +66,7 @@ function isLikelyUiContext(element: Element): boolean {
   if (element.closest("tbody td")) return false;
   if (element.matches("p,span,div,li,dt,dd")) {
     const className = typeof element.className === "string" ? element.className : "";
-    return /(title|heading|label|caption|hint|help|empty|status|summary|metric|stat|section|modal|dialog|panel|card|form)/i.test(className);
+    return /(title|heading|label|caption|hint|help|empty|status|summary|metric|stat|section|modal|dialog|form)/i.test(className);
   }
   return false;
 }
@@ -125,6 +120,7 @@ function translateAttribute(element: Element, attribute: string, language: Langu
 }
 
 function syncElementDirection(element: HTMLElement, language: Language): void {
+  if (element === document.body || element === document.documentElement) return;
   if (element.hasAttribute("data-i18n-fixed-dir")) return;
   const current = element.getAttribute("dir");
 
@@ -142,6 +138,7 @@ function syncElementDirection(element: HTMLElement, language: Language): void {
 }
 
 function syncElementLanguage(element: HTMLElement, language: Language): void {
+  if (element === document.body || element === document.documentElement) return;
   const current = element.getAttribute("lang");
   if (language === "ar") {
     if (originalLanguages.has(element)) {
@@ -158,7 +155,8 @@ function syncElementLanguage(element: HTMLElement, language: Language): void {
 
 function processElement(element: Element, language: Language): void {
   for (const attribute of TRANSLATABLE_ATTRIBUTES) {
-    if (element.hasAttribute(attribute) || attributeStore(element).has(attribute)) {
+    const store = originalAttributes.get(element);
+    if (element.hasAttribute(attribute) || store?.has(attribute)) {
       translateAttribute(element, attribute, language);
     }
   }
