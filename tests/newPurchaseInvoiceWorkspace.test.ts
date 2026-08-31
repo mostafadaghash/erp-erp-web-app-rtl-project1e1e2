@@ -17,7 +17,8 @@ test("purchase navigation exposes a dedicated multi-instance new invoice workspa
   assert.match(app, /"new-purchase-invoice": \{ group: "المشتريات", title: "فاتورة مشتريات جديدة" \}/);
   assert.match(app, /page: "new-purchase-invoice", label: "فاتورة شراء"/);
   assert.match(app, /MULTI_INSTANCE_PAGES = new Set<Page>\(\["new-invoice", "new-purchase-invoice", "new-customer"\]\)/);
-  assert.match(app, /tab\.page === "new-purchase-invoice" && <NewPurchaseInvoicePage onNavigate=\{navigate\}/);
+  assert.match(app, /const navigateFromNewTab = \(page: Page\) => \{[\s\S]{0,120}markTabDirty\(tab\.id, false\);[\s\S]{0,80}navigate\(page\);/);
+  assert.match(app, /tab\.page === "new-purchase-invoice" && <NewPurchaseInvoicePage onNavigate=\{navigateFromNewTab\}/);
 });
 
 test("new purchase invoice uses the existing protected purchase creation contract", () => {
