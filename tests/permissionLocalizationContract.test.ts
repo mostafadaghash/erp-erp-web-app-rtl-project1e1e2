@@ -2,12 +2,12 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 
-import { PERMISSIONS, ROLE_PERMISSIONS } from "../convex/lib/permissions";
+import { PERMISSIONS, ROLE_PERMISSIONS } from "../convex/lib/permissions.ts";
 import {
   ALL_PERMISSION_OPTIONS,
   PERMISSION_CATALOG,
   PERMISSION_GROUP_ORDER,
-} from "../src/lib/permissionCatalog";
+} from "../src/lib/permissionCatalog.ts";
 
 const employeesSource = readFileSync("src/components/EmployeesPage.tsx", "utf8");
 
