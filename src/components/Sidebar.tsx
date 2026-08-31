@@ -288,7 +288,7 @@ export function Sidebar({
           <button
             onClick={onClose}
             className="mr-auto rounded-lg p-2 text-slate-500 transition hover:bg-slate-100 lg:hidden"
-            aria-label={t("nav.main")}
+            aria-label={`${t("common.close")} ${t("nav.main")}`}
           >
             <X className="h-4 w-4" />
           </button>
