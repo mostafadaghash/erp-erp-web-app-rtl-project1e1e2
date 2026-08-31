@@ -3,7 +3,7 @@ import {
   getCurrencyDefinition,
   normalizeCurrencyCode,
   type CurrencyCode,
-} from "../../shared/currency";
+} from "../../shared/currency.ts";
 
 export const APP_LOCALE = "ar-EG-u-nu-latn";
 
