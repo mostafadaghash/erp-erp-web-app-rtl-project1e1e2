@@ -313,14 +313,12 @@ export async function logAction(
 }
 
 // ──────────────────────────────────────────────
-// requireModuleEnabled — checks auth first, then module state.
-// Legacy public callers must not use module-enabled state as an authorization boundary.
+// requireModuleEnabled — checks if a module is enabled in settings
 // ──────────────────────────────────────────────
 export async function requireModuleEnabled(
   ctx: QueryCtx | MutationCtx,
   moduleName: string
 ): Promise<void> {
-  await requireAuth(ctx);
   const settings = await ctx.db.query("settings").first();
   if (settings?.modules) {
     const enabled = (settings.modules as Record<string, boolean>)[moduleName];
