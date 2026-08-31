@@ -94,6 +94,7 @@ test("CURRENCY-04 system settings persist an enabled base-currency selector", ()
   assert.match(settingsBackend, /baseCurrency !== normalizedArgs\.currency/);
   assert.match(schema, /baseCurrency:currencyValidator/);
   assert.match(schema, /currency: currencyValidator/);
+  assert.doesNotMatch(schema, /baseCurrency:v\.literal\("EGP"\)/);
 });
 
 test("CURRENCY-05 core financial surfaces use the central formatter", () => {
