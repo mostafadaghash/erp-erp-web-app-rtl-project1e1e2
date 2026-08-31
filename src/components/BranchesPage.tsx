@@ -5,7 +5,7 @@ import { usePermission } from "../lib/access";
 import { toast } from "sonner";
 import { Id } from "../../convex/_generated/dataModel";
 import {
-  Building2, Plus, X, Search, MapPin, Phone,
+  Building2, Plus, X, MapPin, Phone,
   CheckCircle, XCircle, Pencil, Trash2, Users,
   ToggleLeft, ToggleRight, DatabaseZap
 } from "lucide-react";
@@ -22,7 +22,6 @@ const emptyForm = (): BranchForm => ({ name: "", address: "", phone: "", isActiv
 export function BranchesPage() {
   const canManage = usePermission("manage_branches");
   const canViewEmployees = usePermission("view_employees");
-  const [search, setSearch] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState<Id<"branches"> | null>(null);
   const [form, setForm] = useState<BranchForm>(emptyForm());
@@ -36,9 +35,7 @@ export function BranchesPage() {
   const removeBranch = useMutation(api.branches.setActive);
   const assignLegacyData = useMutation(api.branches.assignLegacyData);
 
-  const filtered = (branches ?? []).filter(b =>
-    b.name.includes(search) || b.address.includes(search)
-  );
+  const filtered = branches ?? [];
 
   const openCreate = () => { setForm(emptyForm()); setEditId(null); setShowForm(true); };
   const openEdit = (b: NonNullable<typeof branches>[number]) => {
@@ -136,17 +133,6 @@ export function BranchesPage() {
             </div>
           );
         })}
-      </div>
-
-      {/* Search */}
-      <div className="relative max-w-sm">
-        <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-        <input
-          className="form-input pr-9"
-          placeholder="بحث بالاسم أو العنوان..."
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-        />
       </div>
 
       {/* Branches Grid */}

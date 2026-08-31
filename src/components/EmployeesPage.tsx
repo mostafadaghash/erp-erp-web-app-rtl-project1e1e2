@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { Id } from "../../convex/_generated/dataModel";
 import { PERMISSIONS, ROLE_PERMISSIONS } from "../../convex/lib/permissions";
 import {
-  Users, Plus, X, Search, Phone, Building2, Mail, Link, Copy,
+  Users, Plus, X, Phone, Building2, Mail, Link, Copy,
   Shield, Pencil, Trash2, CheckCircle, XCircle,
   ChevronDown, ChevronUp, Lock, Unlock
 } from "lucide-react";
@@ -89,7 +89,6 @@ const emptyForm = (): EmpForm => ({
 });
 
 export function EmployeesPage() {
-  const [search, setSearch] = useState("");
   const [filterRole, setFilterRole] = useState("all");
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState<Id<"userProfiles"> | null>(null);
@@ -106,14 +105,9 @@ export function EmployeesPage() {
   const toggleActive = useMutation(api.employees.toggleActive);
   const renewInvitation = useMutation(api.employees.renewInvitation);
 
-  const filtered = (employees ?? []).filter(e => {
-    const matchSearch =
-      e.name.includes(search) ||
-      (e.phone ?? "").includes(search) ||
-      (e.email ?? "").includes(search.toLowerCase());
-    const matchRole = filterRole === "all" || e.role === filterRole;
-    return matchSearch && matchRole;
-  });
+  const filtered = (employees ?? []).filter(e =>
+    filterRole === "all" || e.role === filterRole
+  );
 
   const getRoleInfo = (role: string) => ROLES.find(r => r.value === role) ?? ROLES[0];
   const getBranchName = (branchId?: Id<"branches">) =>
@@ -304,34 +298,23 @@ export function EmployeesPage() {
         </div>
       )}
 
-      {/* Filters */}
-      <div className="flex gap-3 flex-wrap">
-        <div className="relative flex-1 min-w-48">
-          <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-          <input
-            className="form-input pr-9"
-            placeholder="بحث بالاسم أو الهاتف..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-          />
-        </div>
-        <div className="flex gap-2 flex-wrap">
+      {/* Role filter */}
+      <div className="flex gap-2 flex-wrap">
+        <button
+          onClick={() => setFilterRole("all")}
+          className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${filterRole === "all" ? "bg-indigo-600 text-white" : "bg-white text-slate-600 border border-slate-200 hover:border-indigo-300"}`}
+        >
+          الكل
+        </button>
+        {ROLES.map(r => (
           <button
-            onClick={() => setFilterRole("all")}
-            className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${filterRole === "all" ? "bg-indigo-600 text-white" : "bg-white text-slate-600 border border-slate-200 hover:border-indigo-300"}`}
+            key={r.value}
+            onClick={() => setFilterRole(r.value)}
+            className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${filterRole === r.value ? "bg-indigo-600 text-white" : "bg-white text-slate-600 border border-slate-200 hover:border-indigo-300"}`}
           >
-            الكل
+            {r.label}
           </button>
-          {ROLES.map(r => (
-            <button
-              key={r.value}
-              onClick={() => setFilterRole(r.value)}
-              className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${filterRole === r.value ? "bg-indigo-600 text-white" : "bg-white text-slate-600 border border-slate-200 hover:border-indigo-300"}`}
-            >
-              {r.label}
-            </button>
-          ))}
-        </div>
+        ))}
       </div>
 
       {/* Table */}

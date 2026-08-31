@@ -51,6 +51,7 @@ export type Page =
   | "general-ledger" | "data-export" | "vouchers" | "payment-schedules";
 
 const FOLLOW_UP_ROLE_FALLBACK = new Set(["admin", "manager", "sales", "customer_service", "technician", "shipping"]);
+const PAGES_WITHOUT_GLOBAL_SEARCH = new Set<Page>(["branches", "employees", "settings"]);
 
 const PAGE_PERMISSIONS: Partial<Record<Page, Permission>> = {
   products: "view_products",
@@ -333,7 +334,7 @@ export function ERPApp() {
               </div>
             </div>
 
-            <GlobalSearch onNavigate={navigate} />
+            {!PAGES_WITHOUT_GLOBAL_SEARCH.has(currentPage) && <GlobalSearch onNavigate={navigate} />}
             <div className="mr-auto flex items-center gap-2.5">
               {canSelectWorkingBranch && (
                 <select

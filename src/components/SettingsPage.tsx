@@ -217,7 +217,6 @@ export function SettingsPage() {
           <Settings className="h-6 w-6 text-[var(--brand-primary)]" />
           إعدادات النظام
         </h1>
-        <p className="mt-1 text-sm text-slate-500">غيّر الاسم والشعار والألوان في أي وقت بدون تعديل الكود</p>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
