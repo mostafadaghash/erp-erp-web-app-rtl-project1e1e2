@@ -45,6 +45,6 @@ test("SET-C04 hides global search only on requested settings pages", () => {
   );
   assert.match(
     app,
-    /\{!PAGES_WITHOUT_GLOBAL_SEARCH\.has\(currentPage\)\s*&&\s*<GlobalSearch\s+onNavigate=\{navigate\}\s*\/>\}/,
+    /\{!PAGES_WITHOUT_GLOBAL_SEARCH\.has\(currentPage\)\s*&&\s*<GlobalSearch\s+onNavigate=\{navigate\}\s+onOpenRecord=\{openWorkspaceRecord\}\s*\/>\}/,
   );
 });
