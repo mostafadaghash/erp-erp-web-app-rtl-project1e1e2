@@ -1,0 +1,137 @@
+import { PERMISSIONS, type Permission } from "../../convex/lib/permissions";
+
+export const PERMISSION_GROUP_ORDER = [
+  "المبيعات",
+  "المشتريات",
+  "المخزون",
+  "الحسابات",
+  "العملاء",
+  "الصيانة",
+  "الشحن",
+  "الإدارة",
+  "التقارير",
+] as const;
+
+export type PermissionGroup = (typeof PERMISSION_GROUP_ORDER)[number];
+
+export interface PermissionPresentation {
+  label: string;
+  group: PermissionGroup;
+}
+
+/**
+ * Central presentation catalog for permission keys.
+ *
+ * Permission keys remain unchanged because they are part of the backend
+ * authorization contract. This catalog only controls the user-facing Arabic
+ * label and the visual business group used by the permissions editor.
+ *
+ * `satisfies Record<Permission, ...>` intentionally makes TypeScript fail when
+ * a backend permission is added without a corresponding Arabic presentation.
+ */
+export const PERMISSION_CATALOG = {
+  view_products: { label: "عرض المنتجات", group: "المخزون" },
+  view_customers: { label: "عرض العملاء", group: "العملاء" },
+  view_orders: { label: "عرض أوامر البيع", group: "المبيعات" },
+  view_invoices: { label: "عرض فواتير المبيعات", group: "المبيعات" },
+  view_quotes: { label: "عرض عروض الأسعار", group: "المبيعات" },
+  view_repairs: { label: "عرض أوامر الصيانة", group: "الصيانة" },
+  view_shipments: { label: "عرض عمليات الشراء", group: "المشتريات" },
+  view_deliveries: { label: "عرض عمليات الشحن والتسليم", group: "الشحن" },
+  view_suppliers: { label: "عرض الموردين", group: "المشتريات" },
+  view_expenses: { label: "عرض المصروفات", group: "الحسابات" },
+  view_leads: { label: "عرض العملاء المحتملين", group: "العملاء" },
+  view_follow_ups: { label: "عرض متابعات العملاء", group: "العملاء" },
+  view_branches: { label: "عرض الفروع", group: "الإدارة" },
+  view_employees: { label: "عرض المستخدمين", group: "الإدارة" },
+  view_reports: { label: "عرض التقارير", group: "التقارير" },
+  view_audit_logs: { label: "عرض سجل العمليات", group: "الإدارة" },
+  view_prices: { label: "عرض الأسعار", group: "المبيعات" },
+  view_profits: { label: "عرض الأرباح", group: "التقارير" },
+  view_finance: { label: "عرض الحسابات", group: "الحسابات" },
+  view_supplier_ledger: { label: "عرض حسابات الموردين", group: "المشتريات" },
+  view_customer_ledger: { label: "عرض حسابات العملاء", group: "العملاء" },
+  view_general_ledger: { label: "عرض الأستاذ العام", group: "الحسابات" },
+  initialize_general_ledger: { label: "تهيئة الأستاذ العام", group: "الحسابات" },
+  manage_chart_of_accounts: { label: "إدارة دليل الحسابات", group: "الحسابات" },
+  post_manual_journals: { label: "ترحيل القيود اليدوية", group: "الحسابات" },
+  reverse_journal_entries: { label: "عكس القيود المحاسبية", group: "الحسابات" },
+  close_accounting_periods: { label: "إغلاق الفترات المحاسبية", group: "الحسابات" },
+  reopen_accounting_periods: { label: "إعادة فتح الفترات المحاسبية", group: "الحسابات" },
+  print_general_ledger: { label: "طباعة الأستاذ العام", group: "الحسابات" },
+  initialize_customer_ledger: { label: "تهيئة حسابات العملاء", group: "العملاء" },
+  print_customer_statements: { label: "طباعة كشوف حسابات العملاء", group: "العملاء" },
+  post_purchase_receipts: { label: "ترحيل استلام المشتريات", group: "المشتريات" },
+  manage_financial_accounts: { label: "إدارة الحسابات المالية", group: "الحسابات" },
+  initialize_finance: { label: "تهيئة الحسابات المالية", group: "الحسابات" },
+  record_collections: { label: "تسجيل المقبوضات", group: "الحسابات" },
+  record_disbursements: { label: "تسجيل المدفوعات", group: "الحسابات" },
+  record_supplier_payments: { label: "تسجيل مدفوعات الموردين", group: "المشتريات" },
+  reverse_supplier_payments: { label: "عكس مدفوعات الموردين", group: "المشتريات" },
+  print_supplier_payments: { label: "طباعة مدفوعات الموردين", group: "المشتريات" },
+  transfer_funds: { label: "تحويل الأموال بين الحسابات", group: "الحسابات" },
+  settle_clearing_accounts: { label: "تسوية الحسابات المعلقة", group: "الحسابات" },
+  refund_collections: { label: "رد المقبوضات", group: "الحسابات" },
+  reverse_financial_transactions: { label: "عكس العمليات المالية", group: "الحسابات" },
+  view_financial_reports: { label: "عرض التقارير المالية", group: "التقارير" },
+  view_sales_returns: { label: "عرض مرتجعات المبيعات", group: "المبيعات" },
+  create_sales_returns: { label: "إنشاء مرتجع مبيعات", group: "المبيعات" },
+  print_credit_notes: { label: "طباعة إشعارات مرتجعات المبيعات", group: "المبيعات" },
+  view_purchase_returns: { label: "عرض مرتجعات المشتريات", group: "المشتريات" },
+  create_purchase_returns: { label: "إنشاء مرتجع مشتريات", group: "المشتريات" },
+  reverse_purchase_returns: { label: "عكس مرتجعات المشتريات", group: "المشتريات" },
+  print_purchase_returns: { label: "طباعة مرتجعات المشتريات", group: "المشتريات" },
+  record_supplier_refunds: { label: "تسجيل استردادات الموردين", group: "المشتريات" },
+  confirm_cod_deliveries: { label: "تأكيد تسليم الدفع عند الاستلام", group: "الشحن" },
+  view_cod_settlements: { label: "عرض تسويات الدفع عند الاستلام", group: "الشحن" },
+  settle_cod_collections: { label: "تسوية متحصلات الدفع عند الاستلام", group: "الشحن" },
+  reverse_cod_collections: { label: "عكس متحصلات الدفع عند الاستلام", group: "الشحن" },
+  print_cod_settlements: { label: "طباعة تسويات الدفع عند الاستلام", group: "الشحن" },
+  create_products: { label: "إضافة منتجات", group: "المخزون" },
+  create_customers: { label: "إضافة عملاء", group: "العملاء" },
+  create_orders: { label: "إنشاء أوامر بيع", group: "المبيعات" },
+  create_invoices: { label: "إنشاء فواتير مبيعات", group: "المبيعات" },
+  create_quotes: { label: "إنشاء عروض أسعار", group: "المبيعات" },
+  create_repairs: { label: "إنشاء أوامر صيانة", group: "الصيانة" },
+  create_shipments: { label: "إنشاء عمليات شراء", group: "المشتريات" },
+  create_deliveries: { label: "إنشاء عمليات شحن", group: "الشحن" },
+  create_suppliers: { label: "إضافة موردين", group: "المشتريات" },
+  create_expenses: { label: "إضافة مصروفات", group: "الحسابات" },
+  create_leads: { label: "إضافة عملاء محتملين", group: "العملاء" },
+  edit_products: { label: "تعديل المنتجات", group: "المخزون" },
+  edit_customers: { label: "تعديل العملاء", group: "العملاء" },
+  edit_orders: { label: "تعديل أوامر البيع", group: "المبيعات" },
+  edit_invoices: { label: "تعديل فواتير المبيعات", group: "المبيعات" },
+  edit_quotes: { label: "تعديل عروض الأسعار", group: "المبيعات" },
+  edit_repairs: { label: "تعديل أوامر الصيانة", group: "الصيانة" },
+  edit_shipments: { label: "تعديل عمليات الشراء", group: "المشتريات" },
+  edit_deliveries: { label: "تعديل عمليات الشحن", group: "الشحن" },
+  edit_suppliers: { label: "تعديل الموردين", group: "المشتريات" },
+  edit_expenses: { label: "تعديل المصروفات", group: "الحسابات" },
+  edit_leads: { label: "تعديل العملاء المحتملين", group: "العملاء" },
+  manage_follow_ups: { label: "إدارة متابعات العملاء", group: "العملاء" },
+  delete_products: { label: "حذف المنتجات", group: "المخزون" },
+  delete_customers: { label: "حذف العملاء", group: "العملاء" },
+  delete_orders: { label: "حذف أوامر البيع", group: "المبيعات" },
+  delete_invoices: { label: "حذف فواتير المبيعات", group: "المبيعات" },
+  delete_repairs: { label: "حذف أوامر الصيانة", group: "الصيانة" },
+  delete_shipments: { label: "حذف عمليات الشراء", group: "المشتريات" },
+  delete_deliveries: { label: "حذف عمليات الشحن", group: "الشحن" },
+  delete_suppliers: { label: "حذف الموردين", group: "المشتريات" },
+  delete_expenses: { label: "حذف المصروفات", group: "الحسابات" },
+  delete_leads: { label: "حذف العملاء المحتملين", group: "العملاء" },
+  manage_users: { label: "إدارة المستخدمين والصلاحيات", group: "الإدارة" },
+  manage_settings: { label: "إدارة إعدادات النظام", group: "الإدارة" },
+  manage_branches: { label: "إدارة الفروع", group: "الإدارة" },
+  export_data: { label: "تصدير البيانات", group: "التقارير" },
+  print_invoices: { label: "طباعة فواتير المبيعات", group: "المبيعات" },
+  print_quotes: { label: "طباعة عروض الأسعار", group: "المبيعات" },
+  print_orders: { label: "طباعة أوامر البيع", group: "المبيعات" },
+  print_repairs: { label: "طباعة أوامر الصيانة", group: "الصيانة" },
+  print_shipping: { label: "طباعة مستندات الشحن", group: "الشحن" },
+} satisfies Record<Permission, PermissionPresentation>;
+
+export const ALL_PERMISSION_OPTIONS = PERMISSIONS.map((key) => ({
+  key,
+  ...PERMISSION_CATALOG[key],
+}));
