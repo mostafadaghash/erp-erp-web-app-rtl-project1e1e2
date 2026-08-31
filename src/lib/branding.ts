@@ -73,7 +73,7 @@ export function useBrandingTheme(settings?: BrandingSettings | null) {
     } else {
       favicon.href = DEFAULT_FAVICON_PATH;
       favicon.type = "image/svg+xml";
-      favicon.sizes = "any";
+      favicon.setAttribute("sizes", "any");
     }
   }, [
     brand.faviconUrl,
