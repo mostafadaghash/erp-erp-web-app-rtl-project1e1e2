@@ -28,8 +28,10 @@ import type * as lib_auth from "../lib/auth.js";
 import type * as lib_permissions from "../lib/permissions.js";
 import type * as operationFollowUps from "../operationFollowUps.js";
 import type * as operationStatusDashboard from "../operationStatusDashboard.js";
+import type * as orderIntake from "../orderIntake.js";
 import type * as orderLifecycle from "../orderLifecycle.js";
 import type * as orders from "../orders.js";
+import type * as permissionMigrations from "../permissionMigrations.js";
 import type * as postDeliveryFollowUps from "../postDeliveryFollowUps.js";
 import type * as products from "../products.js";
 import type * as purchaseReturns from "../purchaseReturns.js";
@@ -50,11 +52,6 @@ import type {
 
 /**
  * A utility for referencing Convex functions in your app's API.
- *
- * Usage:
- * ```js
- * const myFunctionReference = api.myModule.myFunction;
- * ```
  */
 declare const fullApi: ApiFromModules<{
   auditLogs: typeof auditLogs;
@@ -77,8 +74,10 @@ declare const fullApi: ApiFromModules<{
   "lib/permissions": typeof lib_permissions;
   operationFollowUps: typeof operationFollowUps;
   operationStatusDashboard: typeof operationStatusDashboard;
+  orderIntake: typeof orderIntake;
   orderLifecycle: typeof orderLifecycle;
   orders: typeof orders;
+  permissionMigrations: typeof permissionMigrations;
   postDeliveryFollowUps: typeof postDeliveryFollowUps;
   products: typeof products;
   purchaseReturns: typeof purchaseReturns;
