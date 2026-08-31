@@ -1,0 +1,39 @@
+name: Stage 4 currency codemod
+
+on:
+  push:
+    branches:
+      - agent/central-currency-stage-4
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: ${{ github.actor != 'github-actions[bot]' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/central-currency-stage-4
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: Apply central currency migration
+        run: node scripts/stage4-currency-codemod.mjs
+      - name: Verify transformed project
+        run: npm run typecheck
+      - name: Remove temporary migration automation
+        run: rm scripts/stage4-currency-codemod.mjs .github/workflows/stage4-currency-codemod.yml
+      - name: Commit transformed files
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --quiet && exit 0
+          git commit -m "Centralize system currency across ERP"
+          git push origin HEAD:agent/central-currency-stage-4
