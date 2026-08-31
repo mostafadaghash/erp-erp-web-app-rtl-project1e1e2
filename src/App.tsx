@@ -1,4 +1,5 @@
-import { Authenticated, AuthLoading, Unauthenticated, useQuery } from "convex/react";
+import { useEffect, useRef } from "react";
+import { Authenticated, AuthLoading, Unauthenticated, useMutation, useQuery } from "convex/react";
 import { api } from "../convex/_generated/api";
 import { CustomSignInForm } from "./CustomSignInForm";
 import { Toaster } from "sonner";
@@ -8,6 +9,7 @@ import { SetupWizard, PendingApproval } from "./components/SetupWizard";
 import { BrandMark } from "./components/BrandMark";
 import { getBrand, useBrandingTheme, type BrandingSettings } from "./lib/branding";
 import { I18nProvider, LanguageSelect, useI18n } from "./i18n/I18nProvider";
+import { isLanguage } from "./i18n/catalog";
 
 export default function App() {
   return (
@@ -87,7 +89,62 @@ function AuthedRouter() {
     );
   }
 
-  return <ERPApp />;
+  return (
+    <>
+      <AuthenticatedLanguagePreference />
+      <ERPApp />
+    </>
+  );
+}
+
+function AuthenticatedLanguagePreference() {
+  const remoteLanguage = useQuery(api.userPreferences.getLanguage);
+  const persistLanguage = useMutation(api.userPreferences.setLanguage);
+  const { language, hydrateLanguage } = useI18n();
+  const hydrationComplete = useRef(false);
+  const userSelectedBeforeHydration = useRef(false);
+  const currentLanguage = useRef(language);
+
+  useEffect(() => {
+    currentLanguage.current = language;
+  }, [language]);
+
+  useEffect(() => {
+    const onSelected = (event: Event) => {
+      const nextLanguage = (event as CustomEvent<{ language?: unknown }>).detail?.language;
+      if (!isLanguage(nextLanguage)) return;
+      userSelectedBeforeHydration.current = !hydrationComplete.current;
+      void persistLanguage({ language: nextLanguage }).catch((error) => {
+        console.error("Unable to persist language preference", error);
+      });
+    };
+
+    window.addEventListener("erp-language-selected", onSelected);
+    return () => window.removeEventListener("erp-language-selected", onSelected);
+  }, [persistLanguage]);
+
+  useEffect(() => {
+    if (hydrationComplete.current || remoteLanguage === undefined) return;
+
+    if (userSelectedBeforeHydration.current) {
+      hydrationComplete.current = true;
+      void persistLanguage({ language: currentLanguage.current }).catch((error) => {
+        console.error("Unable to persist language preference", error);
+      });
+      return;
+    }
+
+    if (isLanguage(remoteLanguage)) {
+      hydrateLanguage(remoteLanguage);
+    } else {
+      void persistLanguage({ language: currentLanguage.current }).catch((error) => {
+        console.error("Unable to initialize language preference", error);
+      });
+    }
+    hydrationComplete.current = true;
+  }, [hydrateLanguage, persistLanguage, remoteLanguage]);
+
+  return null;
 }
 
 function LoginPage({
