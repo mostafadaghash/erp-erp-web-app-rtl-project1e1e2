@@ -56,13 +56,13 @@ export const ORDER_STATUSES = [...CURRENT_ORDER_STATUSES, "delivered"] as const;
 export type OrderStatus = (typeof ORDER_STATUSES)[number];
 
 export const ORDER_STATUS_LABELS: Readonly<Record<CanonicalOrderStatus, string>> = {
-  pending: "قيد الانتظار",
+  pending: "قيد الإنتظار",
   confirmed: "مؤكد",
   preparing: "جاري التجهيز",
   ready: "تم التجهيز",
   delivered_to_customer: "تم التسليم للعميل",
   handed_to_shipping: "تم التسليم لشركة الشحن",
-  received: "تم الاستلام",
+  received: "تم الإستلام",
   cancelled: "ملغي",
 };
 
@@ -125,7 +125,7 @@ export type RepairLifecycleStatus =
   | "rejected_by_shipping";
 
 export const REPAIR_STATUS_LABELS: Readonly<Record<RepairLifecycleStatus, string>> = {
-  pending: "قيد الانتظار",
+  pending: "قيد الإنتظار",
   in_progress: "جاري الصيانة",
   new_issue: "ظهور مشكلة جديدة",
   repaired: "تم الإصلاح",
