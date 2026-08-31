@@ -172,7 +172,7 @@ test("STG-10 load execution is bounded opt-in and follows browser acceptance", (
   assert.match(stagingWorkflow, /inputs\.run_load_test/);
   assert.match(stagingWorkflow, /needs:.*browser-e2e/);
   assert.match(stagingWorkflow, /needs:.*mutable-business-cycles/);
-  assert.match(stagingWorkflow, /E2E_LOAD_CONFIRMED: "isolated-staging-only"/);
+  assert.match(stagingWorkflow, /E2E_LOAD_CONFIRMED: isolated-staging-only/);
   assert.match(stagingWorkflow, /test:load-staging -- --validate-config/);
   assert.match(loadScript, /boundedInteger/);
   assert.match(loadScript, /failureRate > 0\.01/);
