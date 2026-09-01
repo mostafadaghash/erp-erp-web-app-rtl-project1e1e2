@@ -177,18 +177,18 @@ test("purchase workflows use grammatically correct professional terminology", ()
   assert.doesNotMatch(purchases, /العملية شراء|عملية شراء شراء/);
 });
 
-test("sales orders use one professional document name and item terminology", () => {
+test("sales orders use one professional sales-order vocabulary and item terminology", () => {
   for (const label of [
-    "رقم أمر البيع",
-    "لا توجد أوامر بيع",
+    "طلبات البيع",
+    "طلب بيع جديد",
     "<th>الأصناف</th>",
-    "تعديل أمر البيع",
-    "إلغاء أمر البيع",
-    "تفاصيل أمر البيع",
-    "الحالة التالية من مسار الشحن",
+    "تعديل بيانات",
+    "إلغاء الطلب",
+    "تفاصيل طلب البيع",
+    "أمر التجهيز",
   ]) assert.match(orders, new RegExp(label));
 
-  assert.doesNotMatch(orders, /لا توجد أمر بيعات|<th>المنتجات<\/th>|التسليم من التوصيل|تفاصيل الطلب/);
+  assert.doesNotMatch(orders, /لا توجد أمر بيعات|<th>المنتجات<\/th>|التسليم من التوصيل|الأوردر/);
 });
 
 test("shipping creation refers to sales orders consistently", () => {
