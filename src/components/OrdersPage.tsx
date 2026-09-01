@@ -5,7 +5,6 @@ import {
   CheckCircle,
   ChevronDown,
   Clock,
-  CreditCard,
   Eye,
   FileText,
   MessageCircle,
@@ -62,6 +61,20 @@ type CollectionDraft = {
   requestId: string;
 };
 
+type PreparationOrderData = {
+  orderId: Id<"orders">;
+  orderNumber: string;
+  customerName: string;
+  customerPhone?: string;
+  expectedDate?: string;
+  customerAddress?: string;
+  deliveryAddress?: string;
+  shippingCompany?: string;
+  deliveryNotes?: string;
+  internalNotes?: string;
+  items: Array<{ name: string; sku: string; quantity: number; notes?: string }>;
+};
+
 const statusTone: Record<OrderStatus, string> = {
   pending: "badge badge-warning",
   confirmed: "badge badge-info",
@@ -113,9 +126,9 @@ export function OrdersPage({ createRequestToken }: { createRequestToken?: number
   const canCreate = usePermission("create_order_intake");
   const canEditIntake = usePermission("edit_order_intake");
   const canPrice = usePermission("price_orders");
-  const canEditStatus = usePermission("edit_orders");
+  const canEditStatus = usePermission("manage_order_lifecycle");
   const canCollect = usePermission("record_collections");
-  const canCancel = usePermission("delete_orders");
+  const canCancel = usePermission("manage_order_lifecycle");
   const canRefund = usePermission("refund_collections");
   const canPrint = usePermission("print_orders");
 
@@ -447,7 +460,7 @@ function PricingDialog({ order, onClose }: { order: Doc<"orders">; onClose: () =
   return <Modal title={`تسعير ${order.orderNumber}`} onClose={onClose}><div className="space-y-3"><div className="rounded-xl bg-blue-50 p-3 text-sm text-blue-800">لا يمكن تأكيد الطلب قبل إدخال سعر لكل صنف. التحقق يتم في الـBackend أيضًا.</div>{order.items.map((item, index) => <div key={`${item.productName}-${index}`} className="grid grid-cols-[1fr_90px_150px] items-center gap-2 rounded-xl border border-slate-200 p-3"><div><strong>{item.productName}</strong><div className="text-xs text-slate-400">الكمية: {item.quantity}</div></div><div className="text-center font-bold">× {item.quantity}</div><input data-testid="order-price-input" className="form-input" type="number" min="0" step="0.01" value={prices[index]?.value ?? ""} onChange={event => setPrices(prices.map((row, rowIndex) => rowIndex === index ? { ...row, value: event.target.value } : row))} placeholder="سعر البيع" /></div>)}<div className="flex justify-between rounded-xl bg-slate-50 p-3"><span>إجمالي البنود قبل الضريبة</span><strong>{formatCurrency(subtotal)}</strong></div><button data-testid="order-price-submit" className="btn-primary w-full" disabled={busy} onClick={() => void submit()}>{busy ? "جارٍ التسعير..." : "حفظ تسعير جميع الأصناف"}</button></div></Modal>;
 }
 
-function PreparationPrintModal({ data, onClose }: { data: Awaited<ReturnType<typeof useQuery<typeof api.orderLifecycle.preparationOrder>>> | undefined; onClose: () => void }) {
+function PreparationPrintModal({ data, onClose }: { data: PreparationOrderData | undefined; onClose: () => void }) {
   if (!data) return <Modal title="أمر التجهيز" onClose={onClose}><div className="py-8 text-center text-slate-400">جارٍ تجهيز المستند...</div></Modal>;
   return <div className="fixed inset-0 z-[140] overflow-y-auto bg-slate-950/60 p-4"><div className="mx-auto max-w-3xl"><div className="mb-3 flex justify-end gap-2 print:hidden"><button className="btn-secondary" onClick={onClose}>إغلاق</button><button className="btn-primary" onClick={() => window.print()}><Printer className="h-4 w-4" />طباعة</button></div><article data-testid="preparation-order-print" className="min-h-[900px] bg-white p-8 text-slate-900 print:min-h-0 print:p-4"><header className="mb-6 border-b-2 border-slate-900 pb-4 text-center"><h1 className="text-2xl font-black">أمر تجهيز</h1><p className="mt-2 font-mono font-bold">{data.orderNumber}</p></header><div className="mb-5 grid grid-cols-2 gap-3 text-sm"><Info label="العميل" value={data.customerName} /><Info label="الهاتف" value={data.customerPhone ?? "—"} /><Info label="عنوان التسليم" value={data.deliveryAddress ?? data.customerAddress ?? "—"} /><Info label="شركة الشحن" value={data.shippingCompany ?? "—"} /></div><table className="w-full border-collapse text-sm"><thead><tr><th className="border p-2 text-right">الصنف</th><th className="border p-2">SKU / باركود</th><th className="border p-2">الكمية</th><th className="border p-2 text-right">ملاحظة</th></tr></thead><tbody>{data.items.map((item, index) => <tr key={index}><td className="border p-2 font-bold">{item.name}</td><td className="border p-2 text-center font-mono">{item.sku || "—"}</td><td className="border p-2 text-center text-lg font-black">{item.quantity}</td><td className="border p-2">{item.notes ?? "—"}</td></tr>)}</tbody></table>{(data.deliveryNotes || data.internalNotes) && <div className="mt-6 rounded-xl border p-4"><strong>ملاحظات التجهيز</strong><p className="mt-2 whitespace-pre-wrap text-sm">{[data.deliveryNotes, data.internalNotes].filter(Boolean).join("\n")}</p></div>}<p className="mt-8 text-center text-xs font-bold text-slate-500">هذا المستند تشغيلي ولا يحتوي على أسعار أو تكلفة أو ربح أو إجماليات مالية.</p></article></div></div>;
 }
