@@ -4,27 +4,25 @@ import test from "node:test";
 
 const ordersPath = "src/components/OrdersPage.tsx";
 const comboboxPath = "src/components/SearchableCombobox.tsx";
-const backendPath = "convex/orders.ts";
+const intakePath = "convex/orderIntake.ts";
 const schemaPath = "convex/schema.ts";
 
-test("محرر أمر البيع يستخدم بحث العميل ويعرض الهاتف", async () => {
+test("محرر طلب البيع يستخدم بحث العميل ويعرض الهاتف بدون تسعير", async () => {
   const source = await fs.readFile(ordersPath, "utf8");
-  assert.match(source, /order-customer-combobox/);
-  assert.match(source, /ابحث باسم العميل أو رقم الهاتف/);
+  assert.match(source, /SearchableCombobox value=\{form\.customerId\}/);
+  assert.match(source, /ابحث باسم العميل أو الهاتف/);
   assert.match(source, /description: customer\.phone/);
-  assert.match(source, /رقم الهاتف/);
+  assert.match(source, /هذه الشاشة لا تعرض ولا تقبل أسعار بيع/);
 });
 
-test("بنود أمر البيع مرتبطة بالأصناف المسجلة وتضيف سطرًا جديدًا تلقائيًا", async () => {
+test("بنود إدخال طلب البيع مرتبطة بالأصناف المسجلة وتعرض الكمية والمخزون دون السعر", async () => {
   const source = await fs.readFile(ordersPath, "utf8");
   assert.match(source, /useQuery\(api\.products\.list/);
-  assert.match(source, /order-item-product/);
+  assert.match(source, /data-testid="order-intake-item"/);
   assert.match(source, /product\.sku/);
   assert.match(source, /product\.barcode/);
-  assert.match(source, /productId,/);
-  assert.match(source, /if \(index === items\.length - 1\) next\.push\(emptyItem\(\)\)/);
-  assert.match(source, /الصنف موجود بالفعل وتمت زيادة الكمية/);
-  assert.doesNotMatch(source, /data-testid="order-item-name"/);
+  assert.match(source, /data-testid="order-intake-quantity"/);
+  assert.doesNotMatch(source.match(/function OrderIntakeDialog[\s\S]*?function PricingDialog/)?.[0] ?? "", /سعر البيع|order-price-input/);
 });
 
 test("القائمة المشتركة تدعم الكتابة والكيبورد والمسح", async () => {
@@ -38,14 +36,12 @@ test("القائمة المشتركة تدعم الكتابة والكيبورد
   assert.match(source, /normalizeSearch/);
 });
 
-test("الخادم يثبت اسم الصنف من كارت الصنف عند وجود productId", async () => {
-  const backend = await fs.readFile(backendPath, "utf8");
+test("خادم الإدخال يثبت هوية الصنف واسمه من كارت الصنف", async () => {
+  const backend = await fs.readFile(intakePath, "utf8");
   const schema = await fs.readFile(schemaPath, "utf8");
-  assert.match(backend, /productId\?: Id<"products">/);
-  assert.match(backend, /ctx\.db\.get\(item\.productId\)/);
-  assert.match(backend, /productName = product\.name/);
+  assert.match(backend, /ctx\.db\.get\(productId\)/);
   assert.match(backend, /product\.branchId !== branchId/);
-  assert.match(backend, /await normalizeOrderItems\(ctx, branchId, args\.items\)/);
-  assert.match(backend, /await normalizeOrderItems\(ctx, order\.branchId, args\.items\)/);
+  assert.match(backend, /productName: product\.name/);
+  assert.match(backend, /unitPrice: -1/);
   assert.match(schema, /productId: v\.optional\(v\.id\("products"\)\)/);
 });
