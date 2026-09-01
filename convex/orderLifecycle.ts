@@ -413,7 +413,7 @@ export const transition = mutation({
     collection: v.optional(v.object({ amount: v.number(), accountId: v.id("financialAccounts"), paymentDate: v.string(), requestId: v.string(), notes: v.optional(v.string()) })),
   },
   handler: async (ctx, args) => {
-    const user = await requireModulePermission(ctx, "edit_orders", "orders");
+    const user = await requireModulePermission(ctx, "manage_order_lifecycle", "orders");
     let order = await ctx.db.get(args.id);
     if (!order || !order.branchId) throw new ConvexError("الطلب غير موجود أو غير مرتبط بفرع");
     assertBranchAccess(user, order);
@@ -462,7 +462,7 @@ export const cancel = mutation({
     date: v.optional(v.string()), requestId: v.string(),
   },
   handler: async (ctx, args) => {
-    const user = await requireModulePermission(ctx, "delete_orders", "orders");
+    const user = await requireModulePermission(ctx, "manage_order_lifecycle", "orders");
     const requestId = ensureRequestId(args.requestId, "معرف إلغاء الطلب");
     const order = await ctx.db.get(args.id);
     if (!order || !order.branchId) throw new ConvexError("الطلب غير موجود أو غير مرتبط بفرع");
@@ -476,11 +476,30 @@ export const cancel = mutation({
     const disposition = order.deposit > 0 || order.linkedInvoiceId ? args.disposition : undefined;
     if ((order.deposit > 0 || order.linkedInvoiceId) && !disposition) throw new ConvexError("حدد هل المدفوع سيبقى رصيداً للعميل أم سيتم رده");
     const date = args.date ?? businessDate();
-    let invoice = order.linkedInvoiceId ? await ctx.db.get(order.linkedInvoiceId) : null;
+    const invoice = order.linkedInvoiceId ? await ctx.db.get(order.linkedInvoiceId) : null;
     let refundablePaid = order.deposit;
+
+    const orderTransactions = await ctx.db.query("financialTransactions")
+      .withIndex("by_reference", q => q.eq("referenceType", "order").eq("referenceId", String(order._id)))
+      .collect();
+    const invoiceTransactions = invoice
+      ? await ctx.db.query("financialTransactions")
+        .withIndex("by_reference", q => q.eq("referenceType", "invoice").eq("referenceId", String(invoice._id)))
+        .collect()
+      : [];
+    const hasPreviousRefund = [...orderTransactions, ...invoiceTransactions].some(tx =>
+      tx.status === "posted" && (tx.type === "order_refund" || tx.type === "invoice_refund"),
+    );
+    if (hasPreviousRefund) {
+      throw new ConvexError("الطلب يحتوي استرداداً سابقاً؛ راجع التسوية المالية قبل الإلغاء لتجنب رد المبلغ مرتين");
+    }
 
     if (invoice) {
       if (!order.customerId) throw new ConvexError("فاتورة الطلب غير مرتبطة بعميل صالح");
+      const invoiceReturns = await ctx.db.query("salesReturns").withIndex("by_invoice", q => q.eq("invoiceId", invoice._id)).collect();
+      if (invoiceReturns.some(salesReturn => salesReturn.status === "posted")) {
+        throw new ConvexError("لا يمكن إلغاء طلب لفاتورته مرتجع مبيعات نشط؛ عالج أو اعكس المرتجع أولاً");
+      }
       refundablePaid = roundMoney(invoice.paid);
       for (const item of invoice.items) {
         const product = await ctx.db.get(item.productId);
@@ -508,11 +527,9 @@ export const cancel = mutation({
     if (disposition === "refund" && refundablePaid > 0) {
       await requirePermission(ctx, "reverse_financial_transactions");
       await requirePermission(ctx, "refund_collections");
-      const orderTransactions = await ctx.db.query("financialTransactions").withIndex("by_reference", q => q.eq("referenceType", "order").eq("referenceId", String(order._id))).collect();
-      const invoiceTransactions = invoice
-        ? await ctx.db.query("financialTransactions").withIndex("by_reference", q => q.eq("referenceType", "invoice").eq("referenceId", String(invoice._id))).collect()
-        : [];
-      const originals = [...orderTransactions, ...invoiceTransactions].filter(tx => tx.status === "posted" && (tx.type === "order_deposit" || tx.type === "invoice_payment"));
+      const originals = [...orderTransactions, ...invoiceTransactions].filter(tx =>
+        tx.status === "posted" && (tx.type === "order_deposit" || tx.type === "invoice_payment"),
+      );
       for (const tx of originals) {
         await reversePostedFinancialTransaction(ctx, user, {
           transactionId: tx._id, reason: `رد مدفوعات الطلب ${order.orderNumber}: ${reason}`, date,
@@ -520,19 +537,14 @@ export const cancel = mutation({
         });
       }
       if (order.customerId) {
-        if (!invoice) {
-          await postCustomerLedgerEntry(ctx, user, {
-            type: "order_refund", requestId: `${requestId}:refund-ledger`, customerId: order.customerId,
-            branchId: order.branchId, date, receivableDelta: 0, advanceDelta: -refundablePaid, purchasesDelta: 0,
-            description: `رد عربون الطلب ${order.orderNumber}: ${reason}`, referenceType: "order", referenceId: String(order._id), referenceNumber: order.orderNumber,
-          });
-        } else {
-          await postCustomerLedgerEntry(ctx, user, {
-            type: "order_refund", requestId: `${requestId}:refund-ledger`, customerId: order.customerId,
-            branchId: order.branchId, date, receivableDelta: 0, advanceDelta: -refundablePaid, purchasesDelta: 0,
-            description: `رد مدفوعات الطلب الملغي ${order.orderNumber}: ${reason}`, referenceType: "order", referenceId: String(order._id), referenceNumber: order.orderNumber,
-          });
-        }
+        await postCustomerLedgerEntry(ctx, user, {
+          type: "order_refund", requestId: `${requestId}:refund-ledger`, customerId: order.customerId,
+          branchId: order.branchId, date, receivableDelta: 0, advanceDelta: -refundablePaid, purchasesDelta: 0,
+          description: invoice
+            ? `رد مدفوعات الطلب الملغي ${order.orderNumber}: ${reason}`
+            : `رد عربون الطلب ${order.orderNumber}: ${reason}`,
+          referenceType: "order", referenceId: String(order._id), referenceNumber: order.orderNumber,
+        });
       }
     }
 
