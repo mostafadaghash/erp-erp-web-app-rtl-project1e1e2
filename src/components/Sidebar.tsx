@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useMutation, useQuery } from "convex/react";
 import type { Page } from "./ERPApp";
 import {
   BarChart3,
@@ -25,6 +26,7 @@ import {
   Wrench,
   X,
 } from "lucide-react";
+import { api } from "../../convex/_generated/api";
 import type { Permission } from "../../convex/lib/permissions";
 import { SignOutButton } from "../SignOutButton";
 import { useI18n } from "../i18n/I18nProvider";
@@ -218,7 +220,46 @@ export function Sidebar({
 }: SidebarProps) {
   const [openGroup, setOpenGroup] = useState<string | null>(null);
   const restoreAttemptedRef = useRef(false);
+  const followUpSyncRunningRef = useRef(false);
   const { t } = useI18n();
+  const canViewOrders = permissions.includes("view_orders");
+  const canViewFollowUps = permissions.includes("view_follow_ups");
+  const pendingOrders = useQuery(api.orderLifecycle.pendingNotifications, canViewOrders ? {} : "skip") ?? [];
+  const pendingFollowUps = useQuery(api.customerFollowUps.list, canViewFollowUps ? { status: "pending", limit: 25 } : "skip") ?? [];
+  const syncOpenOperations = useMutation(api.operationFollowUps.syncOpenOperations);
+  const derivedNotificationCounts: Partial<Record<Page, number>> = {
+    orders: pendingOrders.length,
+    "follow-ups": pendingFollowUps.length,
+  };
+
+  useEffect(() => {
+    if (!canViewFollowUps) return;
+    let disposed = false;
+    const runSync = async () => {
+      if (disposed || followUpSyncRunningRef.current || !navigator.onLine || document.visibilityState === "hidden") return;
+      followUpSyncRunningRef.current = true;
+      try {
+        await syncOpenOperations({});
+      } catch {
+        // Reconciliation is best effort; operational actions remain usable if sync is temporarily unavailable.
+      } finally {
+        followUpSyncRunningRef.current = false;
+      }
+    };
+    void runSync();
+    const timer = window.setInterval(() => void runSync(), 5 * 60 * 1000);
+    const onResume = () => void runSync();
+    window.addEventListener("online", onResume);
+    window.addEventListener("focus", onResume);
+    document.addEventListener("visibilitychange", onResume);
+    return () => {
+      disposed = true;
+      window.clearInterval(timer);
+      window.removeEventListener("online", onResume);
+      window.removeEventListener("focus", onResume);
+      document.removeEventListener("visibilitychange", onResume);
+    };
+  }, [canViewFollowUps, syncOpenOperations]);
 
   useEffect(() => {
     try {
@@ -339,7 +380,7 @@ export function Sidebar({
                     {group.items.map((item) => {
                       const Icon = item.icon;
                       const isActive = item.id === currentPage;
-                      const badgeCount = notificationCounts?.[item.id] ?? 0;
+                      const badgeCount = notificationCounts?.[item.id] ?? derivedNotificationCounts[item.id] ?? 0;
                       return (
                         <button
                           key={item.id}
