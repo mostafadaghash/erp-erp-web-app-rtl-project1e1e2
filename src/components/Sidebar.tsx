@@ -39,6 +39,7 @@ interface SidebarProps {
   userName: string;
   role: string;
   modules: Record<string, boolean | undefined>;
+  notificationCounts?: Partial<Record<Page, number>>;
   brand: {
     storeName: string;
     shortName: string;
@@ -212,6 +213,7 @@ export function Sidebar({
   userName,
   role,
   modules,
+  notificationCounts,
   brand,
 }: SidebarProps) {
   const [openGroup, setOpenGroup] = useState<string | null>(null);
@@ -337,6 +339,7 @@ export function Sidebar({
                     {group.items.map((item) => {
                       const Icon = item.icon;
                       const isActive = item.id === currentPage;
+                      const badgeCount = notificationCounts?.[item.id] ?? 0;
                       return (
                         <button
                           key={item.id}
@@ -348,6 +351,15 @@ export function Sidebar({
                         >
                           <Icon className="h-4 w-4 shrink-0" />
                           <span className="truncate">{t(item.labelKey)}</span>
+                          {badgeCount > 0 && (
+                            <span
+                              data-testid={`nav-badge-${item.id}`}
+                              className="mr-auto grid min-h-5 min-w-5 place-items-center rounded-full bg-rose-600 px-1.5 text-[10px] font-black text-white"
+                              aria-label={`${badgeCount} تنبيه`}
+                            >
+                              {badgeCount > 99 ? "99+" : badgeCount}
+                            </span>
+                          )}
                         </button>
                       );
                     })}
@@ -358,25 +370,10 @@ export function Sidebar({
           })}
         </nav>
 
-        <div className="erp-user-panel">
-          <div className="mb-2 flex items-center gap-2 lg:mb-0">
-            <div
-              className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-xs font-black text-white"
-              style={{ background: `linear-gradient(135deg, ${brand.primaryColor}, ${brand.secondaryColor})` }}
-              data-user-content
-            >
-              {userName.trim().charAt(0) || "م"}
-            </div>
-            <div className="min-w-0">
-              <p className="max-w-28 truncate text-xs font-black text-slate-800" data-user-content>{userName}</p>
-              <p
-                data-testid="current-user-role"
-                data-user-role={role}
-                className="mt-0.5 max-w-28 truncate text-[10px] text-slate-500"
-              >
-                {ROLE_LABELS[role] ?? role}
-              </p>
-            </div>
+        <div className="erp-nav-user mt-auto">
+          <div className="min-w-0">
+            <p className="truncate text-xs font-black text-slate-800">{userName}</p>
+            <p className="mt-0.5 truncate text-[10px] text-slate-400">{ROLE_LABELS[role] ?? role}</p>
           </div>
           <SignOutButton />
         </div>
