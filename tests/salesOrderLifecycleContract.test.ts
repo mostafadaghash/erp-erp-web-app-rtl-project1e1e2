@@ -22,7 +22,7 @@ const ordersUiSource = readFileSync("src/components/OrdersPage.tsx", "utf8");
 const headerSource = readFileSync("src/components/GlobalSearch.tsx", "utf8");
 const sidebarSource = readFileSync("src/components/Sidebar.tsx", "utf8");
 
-test("SO-01 customer service intake is separated from sales pricing permissions", () => {
+test("SO-01 customer service intake is separated from sales pricing and lifecycle permissions", () => {
   const customerServiceBlock = permissionsSource.match(/customer_service:\s*\[([\s\S]*?)\],\n\s*technician:/)?.[1] ?? "";
   assert.match(customerServiceBlock, /"create_order_intake"/);
   assert.match(customerServiceBlock, /"edit_order_intake"/);
@@ -30,9 +30,18 @@ test("SO-01 customer service intake is separated from sales pricing permissions"
   assert.doesNotMatch(customerServiceBlock, /"create_orders"/);
   assert.doesNotMatch(customerServiceBlock, /"edit_orders"/);
   assert.doesNotMatch(customerServiceBlock, /"price_orders"/);
+  assert.doesNotMatch(customerServiceBlock, /"manage_order_lifecycle"/);
+
   const salesBlock = permissionsSource.match(/sales:\s*\[([\s\S]*?)\],\n\s*customer_service:/)?.[1] ?? "";
+  assert.match(salesBlock, /"create_order_intake"/);
+  assert.match(salesBlock, /"edit_order_intake"/);
   assert.match(salesBlock, /"price_orders"/);
-  assert.match(salesBlock, /"edit_orders"/);
+  assert.match(salesBlock, /"manage_order_lifecycle"/);
+  assert.doesNotMatch(salesBlock, /"create_orders"/);
+  assert.doesNotMatch(salesBlock, /"edit_orders"/);
+
+  assert.match(lifecycleSource, /requireModulePermission\(ctx,\s*"manage_order_lifecycle",\s*"orders"\)/);
+  assert.match(ordersUiSource, /usePermission\("manage_order_lifecycle"\)/);
 });
 
 test("SO-02 order intake accepts registered customer, products and quantities without any selling price input", () => {
@@ -104,7 +113,9 @@ test("SO-09 preparation order is an operational DTO without pricing or profit fi
   assert.match(preparationSection, /customerPhone/);
   assert.match(preparationSection, /sku:/);
   assert.match(preparationSection, /quantity:/);
-  assert.doesNotMatch(preparationSection.match(/return \{([\s\S]*?)\};\n\s*\},/)?.[1] ?? "", /unitPrice|sellPrice|costPrice|profit|deposit|remaining|total:/);
+  const returnBody = preparationSection.match(/return \{([\s\S]*?)\n\s*\};/)?.[1] ?? "";
+  assert.ok(returnBody.length > 0);
+  assert.doesNotMatch(returnBody, /unitPrice|sellPrice|costPrice|profit|deposit|remaining|\btotal\s*:/);
   assert.match(ordersUiSource, /هذا المستند تشغيلي ولا يحتوي على أسعار أو تكلفة أو ربح أو إجماليات مالية/);
 });
 
@@ -161,4 +172,11 @@ test("SO-14 operational metadata preserves legacy notes and structured shipping 
     deliveryNotes: "اتصل قبل الوصول",
   });
   assert.deepEqual(decodeOrderOperationalMeta("legacy free text"), { internalNotes: "legacy free text" });
+});
+
+test("SO-15 automated cancellation refuses active sales returns or prior refunds", () => {
+  assert.match(lifecycleSource, /invoiceReturns\.some\(salesReturn => salesReturn\.status === "posted"\)/);
+  assert.match(lifecycleSource, /مرتجع مبيعات نشط/);
+  assert.match(lifecycleSource, /tx\.type === "order_refund" \|\| tx\.type === "invoice_refund"/);
+  assert.match(lifecycleSource, /لتجنب رد المبلغ مرتين/);
 });
