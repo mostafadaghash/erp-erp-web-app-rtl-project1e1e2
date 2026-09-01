@@ -78,13 +78,17 @@ export function orderStatusLabel(value: string): string {
   return normalized ? ORDER_STATUS_LABELS[normalized] : value;
 }
 
+/**
+ * الانتقالات المرنة المسموح بها تجاريًا. الرجوع للخلف يظل محتاج سبب في الـBackend.
+ * القيم المخزنة القديمة لا تتغير: `ready` تعني "تم التجهيز".
+ */
 export const ORDER_TRANSITIONS: Readonly<Record<OrderStatus, readonly OrderStatus[]>> = {
   pending: ["confirmed", "cancelled"],
   confirmed: ["preparing", "cancelled"],
   preparing: ["ready", "cancelled"],
-  ready: ["delivered_to_customer", "cancelled"],
-  delivered_to_customer: [],
-  handed_to_shipping: [],
+  ready: ["preparing", "handed_to_shipping", "delivered_to_customer", "cancelled"],
+  delivered_to_customer: ["received"],
+  handed_to_shipping: ["ready", "received", "cancelled"],
   received: [],
   delivered: [],
   cancelled: [],

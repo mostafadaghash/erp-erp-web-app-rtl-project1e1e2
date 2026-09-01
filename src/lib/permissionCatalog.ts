@@ -21,13 +21,8 @@ export interface PermissionPresentation {
 
 /**
  * Central presentation catalog for permission keys.
- *
  * Permission keys remain unchanged because they are part of the backend
- * authorization contract. This catalog only controls the user-facing Arabic
- * label and the visual business group used by the permissions editor.
- *
- * `satisfies Record<Permission, ...>` intentionally makes TypeScript fail when
- * a backend permission is added without a corresponding Arabic presentation.
+ * authorization contract. This catalog controls only Arabic presentation.
  */
 export const PERMISSION_CATALOG = {
   view_products: { label: "عرض المنتجات", group: "المخزون" },
@@ -65,6 +60,7 @@ export const PERMISSION_CATALOG = {
   manage_financial_accounts: { label: "إدارة الحسابات المالية", group: "الحسابات" },
   initialize_finance: { label: "تهيئة الحسابات المالية", group: "الحسابات" },
   record_collections: { label: "تسجيل المقبوضات", group: "الحسابات" },
+  record_order_deposits: { label: "تسجيل عربون طلب البيع", group: "المبيعات" },
   record_disbursements: { label: "تسجيل المدفوعات", group: "الحسابات" },
   record_supplier_payments: { label: "تسجيل مدفوعات الموردين", group: "المشتريات" },
   reverse_supplier_payments: { label: "إلغاء مدفوعات الموردين", group: "المشتريات" },
@@ -89,7 +85,8 @@ export const PERMISSION_CATALOG = {
   print_cod_settlements: { label: "طباعة تسويات الدفع عند الاستلام", group: "الشحن" },
   create_products: { label: "إضافة منتجات", group: "المخزون" },
   create_customers: { label: "إضافة عملاء", group: "العملاء" },
-  create_orders: { label: "إنشاء أوامر بيع", group: "المبيعات" },
+  create_orders: { label: "إنشاء أوامر بيع قديمة", group: "المبيعات" },
+  create_order_intake: { label: "إدخال طلب بيع", group: "المبيعات" },
   create_invoices: { label: "إنشاء فواتير مبيعات", group: "المبيعات" },
   create_quotes: { label: "إنشاء عروض أسعار", group: "المبيعات" },
   create_repairs: { label: "إنشاء أوامر صيانة", group: "الصيانة" },
@@ -100,7 +97,10 @@ export const PERMISSION_CATALOG = {
   create_leads: { label: "إضافة عملاء محتملين", group: "العملاء" },
   edit_products: { label: "تعديل المنتجات", group: "المخزون" },
   edit_customers: { label: "تعديل العملاء", group: "العملاء" },
-  edit_orders: { label: "تعديل أوامر البيع", group: "المبيعات" },
+  edit_orders: { label: "تعديل أوامر البيع القديمة", group: "المبيعات" },
+  edit_order_intake: { label: "تعديل بيانات إدخال طلب البيع", group: "المبيعات" },
+  price_orders: { label: "تسعير طلبات البيع", group: "المبيعات" },
+  manage_order_lifecycle: { label: "إدارة دورة حالة طلب البيع", group: "المبيعات" },
   edit_invoices: { label: "تعديل فواتير المبيعات", group: "المبيعات" },
   edit_quotes: { label: "تعديل عروض الأسعار", group: "المبيعات" },
   edit_repairs: { label: "تعديل أوامر الصيانة", group: "الصيانة" },

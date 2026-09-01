@@ -3,46 +3,49 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
 const page = readFileSync(new URL("../src/components/OrdersPage.tsx", import.meta.url), "utf8");
+const intake = readFileSync(new URL("../convex/orderIntake.ts", import.meta.url), "utf8");
+const lifecycle = readFileSync(new URL("../convex/orderLifecycle.ts", import.meta.url), "utf8");
 
-test("ORU-01 edit form is wired to orders.update", () => {
-  assert.match(page, /useMutation\(api\.orders\.update\)/);
-  assert.match(page, /await updateOrder\(\{/);
+test("ORU-01 edit form is wired to the dedicated order intake update", () => {
+  assert.match(page, /useMutation\(api\.orderIntake\.update\)/);
+  assert.match(page, /await update\(\{ id: order\._id/);
 });
 
-test("ORU-02 edit action is limited before invoice linkage", () => {
-  assert.match(page, /\["pending", "confirmed"\]\.includes\(currentStatus\)/);
-  assert.match(page, /!order\.linkedInvoiceId/);
+test("ORU-02 intake edit action is limited to pending orders before invoice linkage", () => {
+  assert.match(page, /current === "pending" && canEditIntake && !order\.linkedInvoiceId/);
+  assert.match(intake, /if \(order\.status !== "pending" \|\| order\.linkedInvoiceId\)/);
 });
 
-test("ORU-03 order edit submits selected linked items and trusted server-recalculated fields", () => {
-  assert.match(page, /items: selectedItems\.map/);
+test("ORU-03 intake edit submits linked products and quantities without client totals or prices", () => {
+  assert.match(page, /items: selected\.map/);
   assert.match(page, /productId: item\.productId/);
   assert.match(page, /expectedDate: form\.expectedDate/);
-  assert.doesNotMatch(page, /updateOrder\([\s\S]{0,500}total,/);
+  assert.doesNotMatch(page, /await update\(\{[\s\S]{0,700}\btotal\s*:/);
+  assert.doesNotMatch(page, /await update\(\{[\s\S]{0,700}\bunitPrice\s*:/);
 });
 
-test("ORU-04 cancellation uses a dedicated modal, never prompt or confirm", () => {
-  assert.match(page, /cancelTarget/);
-  assert.match(page, /handleCancel/);
-  assert.match(page, /useMutation\(api\.orders\.cancel\)/);
+test("ORU-04 cancellation uses a dedicated modal and atomic lifecycle mutation", () => {
+  assert.match(page, /cancelOrder/);
+  assert.match(page, /submitCancel/);
+  assert.match(page, /useMutation\(api\.orderLifecycle\.cancel\)/);
   assert.doesNotMatch(page, /\bprompt\s*\(|\bconfirm\s*\(|window\.prompt|window\.confirm/);
 });
 
-test("ORU-05 cancellation action is permission-aligned to delete_orders", () => {
-  assert.match(page, /usePermission\("delete_orders"\)/);
-  assert.match(page, /const canCancelThis = canDelete && !\["cancelled", "delivered_to_customer", "received", "handed_to_shipping"\]\.includes\(currentStatus\)/);
+test("ORU-05 lifecycle transitions and cancellation use the dedicated lifecycle permission", () => {
+  assert.match(page, /usePermission\("manage_order_lifecycle"\)/);
+  assert.match(lifecycle, /requireModulePermission\(ctx, "manage_order_lifecycle", "orders"\)/);
 });
 
-test("ORU-06 cancellation modal explains deposit and invoice blockers", () => {
-  assert.match(page, /يوجد عربون بقيمة/);
-  assert.match(page, /أمر البيع مرتبط بفاتورة/);
-  assert.match(page, /cancelTarget\.deposit > 0/);
-  assert.match(page, /Boolean\(cancelTarget\.linkedInvoiceId\)/);
+test("ORU-06 cancellation modal explains the two supported payment dispositions", () => {
+  assert.match(page, /معالجة المدفوعات/);
+  assert.match(page, /يظل رصيدًا مقدمًا للعميل/);
+  assert.match(page, /رد المدفوعات من الخزائن الأصلية/);
+  assert.match(page, /cancelOrder\.deposit > 0 \|\| cancelOrder\.linkedInvoiceId/);
 });
 
-test("ORU-07 linked delivery orders do not offer direct delivered transition", () => {
-  assert.match(page, /candidate === "delivered_to_customer" && order\.linkedInvoiceId \? null : candidate/);
-  assert.match(page, /الحالة التالية من مسار الشحن/);
+test("ORU-07 direct delivery remains protected by the server delivery lock", () => {
+  assert.match(lifecycle, /if \(args\.status === "delivered_to_customer"\) await assertOrderNotLockedByDelivery/);
+  assert.match(lifecycle, /canTransition\(ORDER_TRANSITIONS, current, args\.status\)/);
 });
 
 test("ORU-08 details modal uses the server-owned order details read model", () => {
@@ -57,32 +60,33 @@ test("ORU-09 financial history remains linked to the order reference", () => {
   assert.match(page, /referenceId=\{String\(details\.order\._id\)\}/);
 });
 
-test("ORU-10 payment and refund UI are hidden after invoice linkage", () => {
-  assert.match(page, /const financialEditable = !order\.linkedInvoiceId/);
-  assert.match(page, /canCollect && financialEditable/);
-  assert.match(page, /canRefund && financialEditable/);
+test("ORU-10 final collection and cancellation refund are exposed only in their lifecycle dialogs", () => {
+  assert.match(page, /canCollect && collection \? \{\} : "skip"/);
+  assert.match(page, /collection\.order\.remaining/);
+  assert.match(page, /canRefund && <option value="refund"/);
+  assert.doesNotMatch(page, /api\.orders\.addPayment|api\.orders\.refundDeposit/);
 });
 
-test("ORU-11 financial actions keep stable request IDs while submitting", () => {
-  assert.match(page, /paymentRequestId/);
-  assert.match(page, /refundRequestId/);
-  assert.match(page, /requestId: paymentRequestId/);
-  assert.match(page, /requestId: refundRequestId/);
+test("ORU-11 lifecycle financial actions keep stable request IDs while submitting", () => {
+  assert.match(page, /requestId: collection\.requestId/);
+  assert.match(page, /requestId: cancelRequestId/);
+  assert.match(page, /setCancelRequestId\(uuid\(\)\)/);
 });
 
 test("ORU-12 shared busy guards disable financial and cancellation actions", () => {
-  assert.match(page, /if \(busy\) return/);
+  assert.match(page, /if \(!collection \|\| busy\) return/);
+  assert.match(page, /if \(!cancelOrder \|\| busy/);
   assert.match(page, /disabled=\{busy/);
 });
 
-test("ORU-13 customer is visibly locked after a deposit", () => {
-  assert.match(page, /disabledCustomer=\{order\.deposit > 0\}/);
-  assert.match(page, /لا يمكن تغيير العميل بعد تسجيل عربون/);
+test("ORU-13 customer identity cannot change after a deposit", () => {
+  assert.match(intake, /if \(order\.deposit > 0 && order\.customerId && args\.customerId !== order\.customerId\)/);
+  assert.match(intake, /لا يمكن تغيير العميل بعد تسجيل عربون/);
 });
 
-test("ORU-14 status failures surface real Convex errors", () => {
-  assert.match(page, /getErrorMessage\(error, "تعذر تحديث حالة أمر البيع"\)/);
-  assert.match(page, /getErrorMessage\(error, "تعذر إلغاء أمر البيع"\)/);
+test("ORU-14 lifecycle failures surface real Convex errors", () => {
+  assert.match(page, /getErrorMessage\(error, "تعذر تغيير حالة الطلب"\)/);
+  assert.match(page, /getErrorMessage\(error, "تعذر إلغاء الطلب"\)/);
 });
 
 test("ORU-15 order UI has no unsafe TypeScript escapes", () => {

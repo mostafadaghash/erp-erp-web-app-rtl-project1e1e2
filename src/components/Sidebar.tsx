@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useMutation, useQuery } from "convex/react";
 import type { Page } from "./ERPApp";
 import {
   BarChart3,
@@ -25,6 +26,7 @@ import {
   Wrench,
   X,
 } from "lucide-react";
+import { api } from "../../convex/_generated/api";
 import type { Permission } from "../../convex/lib/permissions";
 import { SignOutButton } from "../SignOutButton";
 import { useI18n } from "../i18n/I18nProvider";
@@ -39,6 +41,7 @@ interface SidebarProps {
   userName: string;
   role: string;
   modules: Record<string, boolean | undefined>;
+  notificationCounts?: Partial<Record<Page, number>>;
   brand: {
     storeName: string;
     shortName: string;
@@ -69,49 +72,18 @@ const HOME_ITEM: NavItem = { id: "dashboard", labelKey: "nav.dashboard", icon: H
 const FOLLOW_UP_ROLES = ["admin", "manager", "sales", "customer_service", "technician", "shipping"];
 const PAGE_SESSION_KEY = "business-tech-erp.current-page";
 const PAGE_IDS = new Set<Page>([
-  "dashboard",
-  "products",
-  "inventory",
-  "customers",
-  "new-customer",
-  "follow-ups",
-  "invoices",
-  "sales-returns",
-  "quotes",
-  "credit-invoices",
-  "new-invoice",
-  "new-purchase-invoice",
-  "repairs",
-  "expenses",
-  "suppliers",
-  "orders",
-  "deliveries",
-  "shipments",
-  "branches",
-  "employees",
-  "crm",
-  "reports",
-  "settings",
-  "audit-logs",
-  "accounts-home",
-  "treasury",
-  "supplier-payments",
-  "purchase-returns",
-  "customer-ledger",
-  "general-ledger",
-  "data-export",
-  "vouchers",
-  "payment-schedules",
+  "dashboard", "products", "inventory", "customers", "new-customer", "follow-ups", "invoices",
+  "sales-returns", "quotes", "credit-invoices", "new-invoice", "new-purchase-invoice", "repairs",
+  "expenses", "suppliers", "orders", "deliveries", "shipments", "branches", "employees", "crm",
+  "reports", "settings", "audit-logs", "accounts-home", "treasury", "supplier-payments",
+  "purchase-returns", "customer-ledger", "general-ledger", "data-export", "vouchers", "payment-schedules",
 ]);
 
-const isPage = (value: string | null): value is Page =>
-  value !== null && PAGE_IDS.has(value as Page);
+const isPage = (value: string | null): value is Page => value !== null && PAGE_IDS.has(value as Page);
 
 const NAV_GROUPS: NavGroup[] = [
   {
-    key: "sales",
-    labelKey: "nav.sales",
-    icon: ShoppingBag,
+    key: "sales", labelKey: "nav.sales", icon: ShoppingBag,
     items: [
       { id: "new-invoice", labelKey: "nav.newSalesInvoice", icon: ReceiptText, moduleKey: "invoices", permission: "create_invoices" },
       { id: "invoices", labelKey: "nav.salesInvoices", icon: ReceiptText, moduleKey: "invoices", permission: "view_invoices" },
@@ -121,9 +93,7 @@ const NAV_GROUPS: NavGroup[] = [
     ],
   },
   {
-    key: "customers",
-    labelKey: "nav.customers",
-    icon: Users,
+    key: "customers", labelKey: "nav.customers", icon: Users,
     items: [
       { id: "new-customer", labelKey: "nav.addCustomer", icon: UserPlus, permission: "create_customers" },
       { id: "customers", labelKey: "nav.customerList", icon: Users, permission: "view_customers" },
@@ -131,9 +101,7 @@ const NAV_GROUPS: NavGroup[] = [
     ],
   },
   {
-    key: "purchases",
-    labelKey: "nav.purchases",
-    icon: ShoppingBag,
+    key: "purchases", labelKey: "nav.purchases", icon: ShoppingBag,
     items: [
       { id: "new-purchase-invoice", labelKey: "nav.newPurchaseInvoice", icon: ReceiptText, moduleKey: "shipments", permission: "create_shipments" },
       { id: "shipments", labelKey: "nav.purchaseInvoices", icon: ShoppingBag, moduleKey: "shipments", permission: "view_shipments" },
@@ -141,28 +109,11 @@ const NAV_GROUPS: NavGroup[] = [
       { id: "suppliers", labelKey: "nav.suppliers", icon: Truck, moduleKey: "suppliers", permission: "view_suppliers" },
     ],
   },
+  { key: "inventory", labelKey: "nav.inventory", icon: Boxes, items: [{ id: "inventory", labelKey: "nav.inventoryManagement", icon: Package, permission: "view_products" }] },
+  { key: "service", labelKey: "nav.repairs", icon: Wrench, items: [{ id: "repairs", labelKey: "nav.repairOrders", icon: Wrench, moduleKey: "repairs", permission: "view_repairs" }] },
+  { key: "shipping", labelKey: "nav.shipping", icon: Truck, items: [{ id: "deliveries", labelKey: "nav.shippingSettlements", icon: Truck, moduleKey: "deliveries", permission: "view_deliveries" }] },
   {
-    key: "inventory",
-    labelKey: "nav.inventory",
-    icon: Boxes,
-    items: [{ id: "inventory", labelKey: "nav.inventoryManagement", icon: Package, permission: "view_products" }],
-  },
-  {
-    key: "service",
-    labelKey: "nav.repairs",
-    icon: Wrench,
-    items: [{ id: "repairs", labelKey: "nav.repairOrders", icon: Wrench, moduleKey: "repairs", permission: "view_repairs" }],
-  },
-  {
-    key: "shipping",
-    labelKey: "nav.shipping",
-    icon: Truck,
-    items: [{ id: "deliveries", labelKey: "nav.shippingSettlements", icon: Truck, moduleKey: "deliveries", permission: "view_deliveries" }],
-  },
-  {
-    key: "accounting",
-    labelKey: "nav.accounts",
-    icon: Landmark,
+    key: "accounting", labelKey: "nav.accounts", icon: Landmark,
     items: [
       { id: "accounts-home", labelKey: "nav.overview", icon: Landmark, permission: "view_finance" },
       { id: "treasury", labelKey: "nav.treasury", icon: Landmark, permission: "view_finance" },
@@ -174,16 +125,9 @@ const NAV_GROUPS: NavGroup[] = [
       { id: "expenses", labelKey: "nav.expenses", icon: CircleDollarSign, moduleKey: "expenses", permission: "view_expenses" },
     ],
   },
+  { key: "reports", labelKey: "nav.reports", icon: BarChart3, items: [{ id: "reports", labelKey: "nav.reportCenter", icon: BarChart3, moduleKey: "reports", permission: "view_reports" }] },
   {
-    key: "reports",
-    labelKey: "nav.reports",
-    icon: BarChart3,
-    items: [{ id: "reports", labelKey: "nav.reportCenter", icon: BarChart3, moduleKey: "reports", permission: "view_reports" }],
-  },
-  {
-    key: "administration",
-    labelKey: "nav.settings",
-    icon: Settings,
+    key: "administration", labelKey: "nav.settings", icon: Settings,
     items: [
       { id: "branches", labelKey: "nav.branches", icon: Building2, moduleKey: "branches", permission: "view_branches" },
       { id: "employees", labelKey: "nav.usersPermissions", icon: UserCog, moduleKey: "employees", permission: "view_employees" },
@@ -194,29 +138,46 @@ const NAV_GROUPS: NavGroup[] = [
 ];
 
 const ROLE_LABELS: Record<string, string> = {
-  admin: "مدير النظام",
-  manager: "مدير",
-  accountant: "محاسب",
-  sales: "مسؤول مبيعات",
-  customer_service: "خدمة العملاء",
-  technician: "فني صيانة",
-  shipping: "مسؤول الشحن",
-  viewer: "مشاهدة فقط",
+  admin: "مدير النظام", manager: "مدير", accountant: "محاسب", sales: "مسؤول مبيعات",
+  customer_service: "خدمة العملاء", technician: "فني صيانة", shipping: "مسؤول الشحن", viewer: "مشاهدة فقط",
 };
 
-export function Sidebar({
-  currentPage,
-  onNavigate,
-  onClose,
-  permissions,
-  userName,
-  role,
-  modules,
-  brand,
-}: SidebarProps) {
+export function Sidebar({ currentPage, onNavigate, onClose, permissions, userName, role, modules, notificationCounts, brand }: SidebarProps) {
   const [openGroup, setOpenGroup] = useState<string | null>(null);
   const restoreAttemptedRef = useRef(false);
+  const followUpSyncRunningRef = useRef(false);
   const { t } = useI18n();
+  const canViewOrders = permissions.includes("view_orders");
+  const canViewFollowUps = permissions.includes("view_follow_ups");
+  const pendingOrders = useQuery(api.orderLifecycle.pendingNotifications, canViewOrders ? {} : "skip") ?? [];
+  const pendingFollowUps = useQuery(api.customerFollowUps.list, canViewFollowUps ? { status: "pending", limit: 25 } : "skip") ?? [];
+  const syncOpenOperations = useMutation(api.operationFollowUps.syncOpenOperations);
+  const derivedNotificationCounts: Partial<Record<Page, number>> = { orders: pendingOrders.length, "follow-ups": pendingFollowUps.length };
+
+  useEffect(() => {
+    if (!canViewFollowUps) return;
+    let disposed = false;
+    const runSync = async () => {
+      if (disposed || followUpSyncRunningRef.current || !navigator.onLine || document.visibilityState === "hidden") return;
+      followUpSyncRunningRef.current = true;
+      try { await syncOpenOperations({}); }
+      catch { /* best effort reconciliation */ }
+      finally { followUpSyncRunningRef.current = false; }
+    };
+    void runSync();
+    const timer = window.setInterval(() => void runSync(), 5 * 60 * 1000);
+    const onResume = () => void runSync();
+    window.addEventListener("online", onResume);
+    window.addEventListener("focus", onResume);
+    document.addEventListener("visibilitychange", onResume);
+    return () => {
+      disposed = true;
+      window.clearInterval(timer);
+      window.removeEventListener("online", onResume);
+      window.removeEventListener("focus", onResume);
+      document.removeEventListener("visibilitychange", onResume);
+    };
+  }, [canViewFollowUps, syncOpenOperations]);
 
   useEffect(() => {
     try {
@@ -230,129 +191,62 @@ export function Sidebar({
         }
       }
       window.sessionStorage.setItem(PAGE_SESSION_KEY, currentPage);
-    } catch {
-      // Navigation must remain usable even when browser storage is unavailable.
-    }
+    } catch { /* browser storage is optional */ }
   }, [currentPage, onNavigate]);
 
   useEffect(() => {
     if (!openGroup) return;
     const closeOnOutsidePress = (event: PointerEvent) => {
-      const openSection = document.querySelector<HTMLElement>(
-        `[data-nav-group-section="${openGroup}"]`,
-      );
-      if (event.target instanceof Node && !openSection?.contains(event.target)) {
-        setOpenGroup(null);
-      }
+      const openSection = document.querySelector<HTMLElement>(`[data-nav-group-section="${openGroup}"]`);
+      if (event.target instanceof Node && !openSection?.contains(event.target)) setOpenGroup(null);
     };
     document.addEventListener("pointerdown", closeOnOutsidePress);
     return () => document.removeEventListener("pointerdown", closeOnOutsidePress);
   }, [openGroup]);
 
-  const isModuleEnabled = (moduleKey?: string) =>
-    !moduleKey || modules[moduleKey] !== false;
-
-  const groups = NAV_GROUPS.map((group) => ({
+  const isModuleEnabled = (moduleKey?: string) => !moduleKey || modules[moduleKey] !== false;
+  const groups = NAV_GROUPS.map(group => ({
     ...group,
-    items: group.items.filter(
-      (item) =>
-        isModuleEnabled(item.moduleKey) &&
-        (
-          !item.permission ||
-          permissions.includes(item.permission) ||
-          Boolean(item.roleFallback?.includes(role))
-        ),
-    ),
-  })).filter((group) => group.items.length > 0);
-
-  const navigateTo = (page: Page) => {
-    setOpenGroup(null);
-    onNavigate(page);
-  };
+    items: group.items.filter(item => isModuleEnabled(item.moduleKey) && (!item.permission || permissions.includes(item.permission) || Boolean(item.roleFallback?.includes(role)))),
+  })).filter(group => group.items.length > 0);
+  const navigateTo = (page: Page) => { setOpenGroup(null); onNavigate(page); };
 
   return (
     <aside className="erp-navigation h-full w-full" aria-label={t("nav.main")}>
       <div className="erp-navigation-inner">
         <div className="erp-nav-brand">
-          <BrandMark
-            name={brand.storeName}
-            logoUrl={brand.logoUrl}
-            primaryColor={brand.primaryColor}
-            secondaryColor={brand.secondaryColor}
-            size="md"
-          />
+          <BrandMark name={brand.storeName} logoUrl={brand.logoUrl} primaryColor={brand.primaryColor} secondaryColor={brand.secondaryColor} size="md" />
           <div className="min-w-0" data-i18n-skip>
             <p className="max-w-36 truncate text-sm font-black text-slate-900">{brand.shortName}</p>
             <p className="mt-0.5 hidden max-w-40 truncate text-[10px] text-slate-400 xl:block">{brand.tagline}</p>
           </div>
-          <button
-            onClick={onClose}
-            className="mr-auto rounded-lg p-2 text-slate-500 transition hover:bg-slate-100 lg:hidden"
-            aria-label={`${t("common.close")} ${t("nav.main")}`}
-          >
-            <X className="h-4 w-4" />
-          </button>
+          <button onClick={onClose} className="mr-auto rounded-lg p-2 text-slate-500 transition hover:bg-slate-100 lg:hidden" aria-label={`${t("common.close")} ${t("nav.main")}`}><X className="h-4 w-4" /></button>
         </div>
 
         <nav aria-label={t("nav.main")} className="erp-nav-groups">
-          <button
-            type="button"
-            data-testid="nav-dashboard"
-            onClick={() => navigateTo(HOME_ITEM.id)}
-            aria-current={currentPage === HOME_ITEM.id ? "page" : undefined}
-            className={`erp-nav-home-button ${currentPage === HOME_ITEM.id ? "active" : ""}`}
-          >
-            <Home className="h-4 w-4" />
-            <span>{t(HOME_ITEM.labelKey)}</span>
+          <button type="button" data-testid="nav-dashboard" onClick={() => navigateTo(HOME_ITEM.id)} aria-current={currentPage === HOME_ITEM.id ? "page" : undefined} className={`erp-nav-home-button ${currentPage === HOME_ITEM.id ? "active" : ""}`}>
+            <Home className="h-4 w-4" /><span>{t(HOME_ITEM.labelKey)}</span>
           </button>
 
-          {groups.map((group) => {
-            const hasActive = group.items.some((item) => item.id === currentPage);
+          {groups.map(group => {
+            const hasActive = group.items.some(item => item.id === currentPage);
             const isOpen = openGroup === group.key;
             const GroupIcon = group.icon;
-
             return (
-              <section
-                key={group.key}
-                className="erp-nav-section"
-                data-nav-group-section={group.key}
-              >
-                <button
-                  type="button"
-                  data-testid={`nav-group-${group.key}`}
-                  onClick={() => setOpenGroup((value) => (value === group.key ? null : group.key))}
-                  className={`erp-nav-group-button ${hasActive ? "active" : ""}`}
-                  aria-expanded={isOpen}
-                  aria-label={t(group.labelKey)}
-                >
-                  <span className="flex items-center gap-2">
-                    <GroupIcon className="h-4 w-4" />
-                    {t(group.labelKey)}
-                  </span>
+              <section key={group.key} className="erp-nav-section" data-nav-group-section={group.key}>
+                <button type="button" data-testid={`nav-group-${group.key}`} onClick={() => setOpenGroup(value => value === group.key ? null : group.key)} className={`erp-nav-group-button ${hasActive ? "active" : ""}`} aria-expanded={isOpen} aria-label={t(group.labelKey)}>
+                  <span className="flex items-center gap-2"><GroupIcon className="h-4 w-4" />{t(group.labelKey)}</span>
                   <ChevronDown className={`h-3.5 w-3.5 transition-transform ${isOpen ? "rotate-180" : ""}`} />
                 </button>
-
-                {isOpen && (
-                  <div className="erp-nav-dropdown">
-                    {group.items.map((item) => {
-                      const Icon = item.icon;
-                      const isActive = item.id === currentPage;
-                      return (
-                        <button
-                          key={item.id}
-                          type="button"
-                          data-testid={`nav-${item.id}`}
-                          onClick={() => navigateTo(item.id)}
-                          aria-current={isActive ? "page" : undefined}
-                          className={`erp-nav-item ${isActive ? "active" : ""}`}
-                        >
-                          <Icon className="h-4 w-4 shrink-0" />
-                          <span className="truncate">{t(item.labelKey)}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
+                {isOpen && <div className="erp-nav-dropdown">{group.items.map(item => {
+                  const Icon = item.icon;
+                  const isActive = item.id === currentPage;
+                  const badgeCount = notificationCounts?.[item.id] ?? derivedNotificationCounts[item.id] ?? 0;
+                  return <button key={item.id} type="button" data-testid={`nav-${item.id}`} onClick={() => navigateTo(item.id)} aria-current={isActive ? "page" : undefined} className={`erp-nav-item ${isActive ? "active" : ""}`}>
+                    <Icon className="h-4 w-4 shrink-0" /><span className="truncate">{t(item.labelKey)}</span>
+                    {badgeCount > 0 && <span data-testid={`nav-badge-${item.id}`} className="mr-auto grid min-h-5 min-w-5 place-items-center rounded-full bg-rose-600 px-1.5 text-[10px] font-black text-white" aria-label={`${badgeCount} تنبيه`}>{badgeCount > 99 ? "99+" : badgeCount}</span>}
+                  </button>;
+                })}</div>}
               </section>
             );
           })}
@@ -360,22 +254,12 @@ export function Sidebar({
 
         <div className="erp-user-panel">
           <div className="mb-2 flex items-center gap-2 lg:mb-0">
-            <div
-              className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-xs font-black text-white"
-              style={{ background: `linear-gradient(135deg, ${brand.primaryColor}, ${brand.secondaryColor})` }}
-              data-user-content
-            >
+            <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-xs font-black text-white" style={{ background: `linear-gradient(135deg, ${brand.primaryColor}, ${brand.secondaryColor})` }} data-user-content>
               {userName.trim().charAt(0) || "م"}
             </div>
             <div className="min-w-0">
               <p className="max-w-28 truncate text-xs font-black text-slate-800" data-user-content>{userName}</p>
-              <p
-                data-testid="current-user-role"
-                data-user-role={role}
-                className="mt-0.5 max-w-28 truncate text-[10px] text-slate-500"
-              >
-                {ROLE_LABELS[role] ?? role}
-              </p>
+              <p data-testid="current-user-role" data-user-role={role} className="mt-0.5 max-w-28 truncate text-[10px] text-slate-500">{ROLE_LABELS[role] ?? role}</p>
             </div>
           </div>
           <SignOutButton />
