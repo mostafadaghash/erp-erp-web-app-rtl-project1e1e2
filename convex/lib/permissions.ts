@@ -52,6 +52,8 @@ export const PERMISSIONS = [
   // ── Create ──
   "create_products",
   "create_customers",
+  // Legacy order mutation permission. Kept in the type registry for old code only;
+  // normal roles use create_order_intake instead.
   "create_orders",
   "create_order_intake",
   "create_invoices",
@@ -65,9 +67,11 @@ export const PERMISSIONS = [
   // ── Edit ──
   "edit_products",
   "edit_customers",
+  // Legacy order mutation permission. Normal roles do not receive it after reconciliation.
   "edit_orders",
   "edit_order_intake",
   "price_orders",
+  "manage_order_lifecycle",
   "edit_invoices",
   "edit_quotes",
   "edit_repairs",
@@ -115,10 +119,10 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
     "view_repairs", "view_shipments", "view_deliveries", "view_suppliers",
     "view_expenses", "view_leads", "view_follow_ups", "view_branches", "view_reports",
     "view_prices", "view_profits",
-    "create_products", "create_customers", "create_orders", "create_order_intake", "create_invoices", "create_quotes",
+    "create_products", "create_customers", "create_order_intake", "create_invoices", "create_quotes",
     "create_repairs", "create_shipments", "create_deliveries", "create_suppliers",
     "create_expenses", "create_leads",
-    "edit_products", "edit_customers", "edit_orders", "edit_order_intake", "price_orders", "edit_invoices", "edit_quotes",
+    "edit_products", "edit_customers", "edit_order_intake", "price_orders", "manage_order_lifecycle", "edit_invoices", "edit_quotes",
     "edit_repairs", "edit_shipments", "edit_deliveries", "edit_suppliers",
     "edit_expenses", "edit_leads", "manage_follow_ups",
     "export_data", "print_invoices", "print_quotes", "print_orders", "print_repairs", "print_shipping",
@@ -132,8 +136,8 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
   sales: [
     "view_products", "view_customers", "view_orders", "view_invoices", "view_quotes", "view_leads", "view_follow_ups",
     "view_prices",
-    "create_orders", "create_order_intake", "create_invoices", "create_quotes", "create_customers",
-    "edit_orders", "edit_order_intake", "price_orders", "edit_quotes", "manage_follow_ups",
+    "create_order_intake", "create_invoices", "create_quotes", "create_customers",
+    "edit_order_intake", "price_orders", "manage_order_lifecycle", "edit_quotes", "manage_follow_ups",
     "print_invoices", "print_quotes", "print_orders",
     "record_collections", "record_order_deposits",
   ],
