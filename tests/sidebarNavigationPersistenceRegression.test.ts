@@ -6,7 +6,7 @@ const sidebar = readFileSync("src/components/Sidebar.tsx", "utf8");
 const stagingBrowser = readFileSync("scripts/staging-browser-e2e.mjs", "utf8");
 
 test("sidebar collapses the selected navigation group after page navigation", () => {
-  const navigateTo = sidebar.match(/const navigateTo = \(page: Page\) => \{([\s\S]*?)\n  \};/);
+  const navigateTo = sidebar.match(/const navigateTo = \(page: Page\) => \{([\s\S]*?)\};/);
   assert.ok(navigateTo, "Sidebar navigateTo handler must exist");
   assert.match(navigateTo[1], /setOpenGroup\(null\)/);
   assert.match(navigateTo[1], /onNavigate\(page\)/);
@@ -23,5 +23,5 @@ test("staging navigation waits for the sidebar group to finish collapsing", () =
 
 test("sidebar group expansion remains controlled by the explicit group button", () => {
   assert.match(sidebar, /aria-expanded=\{isOpen\}/);
-  assert.match(sidebar, /setOpenGroup\(\(value\) => \(value === group\.key \? null : group\.key\)\)/);
+  assert.match(sidebar, /setOpenGroup\(\(?value\)?\s*=>\s*\(?value === group\.key \? null : group\.key\)?\)/);
 });
