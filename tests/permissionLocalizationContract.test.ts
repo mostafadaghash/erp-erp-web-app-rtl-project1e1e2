@@ -28,7 +28,7 @@ test("PERM-AR01 every backend permission has one Arabic presentation", () => {
   const catalogKeys = Object.keys(PERMISSION_CATALOG).sort();
   const optionKeys = ALL_PERMISSION_OPTIONS.map((permission) => permission.key).sort();
 
-  assert.equal(PERMISSIONS.length, 99, "permission inventory changed; update the Arabic catalog contract intentionally");
+  assert.equal(PERMISSIONS.length, 104, "permission inventory changed; update the Arabic catalog contract intentionally");
   assert.deepEqual(catalogKeys, backendKeys);
   assert.deepEqual(optionKeys, backendKeys);
 
