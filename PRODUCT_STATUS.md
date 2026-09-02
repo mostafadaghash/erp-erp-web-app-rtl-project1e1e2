@@ -33,9 +33,9 @@ Convex remains the current authority. No Wave 1+, PostgreSQL, Tenant/Company, In
 | Inventory Reconciliation Pack | CODE COMPLETE | PR #164 open; current/staging execution still required |
 | Golden Dataset | CODE COMPLETE | PR #165 open; exact-SHA CI still required |
 | Golden Business Journey executable vectors | CODE COMPLETE | PR #165 open; exact-SHA CI still required |
-| ADR set | CODE COMPLETE | `wave0/04-adrs-exit-report`; final documentation PR pending |
-| Wave 0 Exit Report | CODE COMPLETE | Exit status remains BLOCKED until required evidence is complete |
-| Repository PRODUCT_STATUS | CODE COMPLETE | This file; final documentation PR pending |
+| ADR set | CODE COMPLETE | PR #166 open |
+| Wave 0 Exit Report | CODE COMPLETE | PR #166 open; Exit status remains BLOCKED until required evidence is complete |
+| Repository PRODUCT_STATUS | CODE COMPLETE | PR #166 open |
 
 ## 4. Wave status overview
 
