@@ -26,9 +26,9 @@ The Wave 0 artifacts are deliberately additive. No production business path, sch
 | Inventory Reconciliation Pack | `docs/wave0/INVENTORY_RECONCILIATION_PACK.md` + normalized replay runner — PR #164 | CODE COMPLETE / PR OPEN; LIVE RUN PENDING |
 | Golden Dataset | `tests/fixtures/wave0-golden-snapshot.json` — PR #165 | CODE COMPLETE / PR OPEN; CI PENDING |
 | Golden Business Journey executable vectors | manifest + `tests/wave0GoldenReconciliation.test.ts` + existing integration test mappings — PR #165 | CODE COMPLETE / PR OPEN; CI PENDING |
-| ADR set | ADR-0001 through ADR-0004 on `wave0/04-adrs-exit-report` | CODE COMPLETE / PR PENDING |
-| Wave 0 Exit Report | this document | CODE COMPLETE / PR PENDING |
-| PRODUCT_STATUS update | repository `PRODUCT_STATUS.md` on final Wave 0 documentation PR | CODE COMPLETE / PR PENDING |
+| ADR set | ADR-0001 through ADR-0004 — PR #166 | CODE COMPLETE / PR OPEN |
+| Wave 0 Exit Report | this document — PR #166 | CODE COMPLETE / PR OPEN |
+| PRODUCT_STATUS update | repository `PRODUCT_STATUS.md` — PR #166 | CODE COMPLETE / PR OPEN |
 
 `CODE COMPLETE` here never means merged, staging verified, production verified or accepted.
 
@@ -72,7 +72,7 @@ Wave 0 is **not accepted** until all of the following are true:
 
 ### B-01 — PR integration and exact-SHA CI
 
-PRs #163, #164, #165 and the final ADR/exit-report PR must be merged through the normal gate, and the final candidate SHA must pass the repository-required CI. A locally inferred result is not sufficient.
+PRs #163, #164, #165 and #166 must be merged through the normal gate, and the final candidate SHA must pass the repository-required CI. A locally inferred result is not sufficient.
 
 ### B-02 — Current/staging accounting reconciliation
 
