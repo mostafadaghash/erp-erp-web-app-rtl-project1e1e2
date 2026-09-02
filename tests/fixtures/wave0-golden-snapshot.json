@@ -1,0 +1,166 @@
+{
+  "metadata": {
+    "formatVersion": 1,
+    "datasetId": "wave0-golden-v1",
+    "repositorySha": "5b77e8695a5d1d3d8de4dcec00c619110bdee214",
+    "businessDate": "2026-09-01",
+    "currency": "EGP",
+    "purpose": "Deterministic Wave 0 reconciliation fixture. It is not production data."
+  },
+  "gl": {
+    "journalEntries": [
+      { "id": "je-sale", "status": "posted", "sourceType": "invoice", "sourceId": "inv-001" },
+      { "id": "je-payment", "status": "posted", "sourceType": "customer_payment", "sourceId": "pay-c-001" },
+      { "id": "je-return", "status": "posted", "sourceType": "sales_return", "sourceId": "ret-001" },
+      { "id": "je-purchase", "status": "posted", "sourceType": "purchase_receipt", "sourceId": "pur-001" },
+      { "id": "je-supplier-payment", "status": "posted", "sourceType": "supplier_payment", "sourceId": "pay-s-001" }
+    ],
+    "journalLines": [
+      { "id": "jl-sale-ar", "journalEntryId": "je-sale", "account": "AR", "debit": 400, "credit": 0 },
+      { "id": "jl-sale-revenue", "journalEntryId": "je-sale", "account": "SALES", "debit": 0, "credit": 400 },
+      { "id": "jl-sale-cogs", "journalEntryId": "je-sale", "account": "COGS", "debit": 220, "credit": 0 },
+      { "id": "jl-sale-inventory", "journalEntryId": "je-sale", "account": "INVENTORY", "debit": 0, "credit": 220 },
+
+      { "id": "jl-payment-cash", "journalEntryId": "je-payment", "account": "CASH", "debit": 150, "credit": 0 },
+      { "id": "jl-payment-ar", "journalEntryId": "je-payment", "account": "AR", "debit": 0, "credit": 150 },
+
+      { "id": "jl-return-sales", "journalEntryId": "je-return", "account": "SALES_RETURNS", "debit": 200, "credit": 0 },
+      { "id": "jl-return-ar", "journalEntryId": "je-return", "account": "AR", "debit": 0, "credit": 200 },
+      { "id": "jl-return-inventory", "journalEntryId": "je-return", "account": "INVENTORY", "debit": 110, "credit": 0 },
+      { "id": "jl-return-cogs", "journalEntryId": "je-return", "account": "COGS", "debit": 0, "credit": 110 },
+
+      { "id": "jl-purchase-inventory", "journalEntryId": "je-purchase", "account": "INVENTORY", "debit": 1200, "credit": 0 },
+      { "id": "jl-purchase-ap", "journalEntryId": "je-purchase", "account": "AP", "debit": 0, "credit": 1200 },
+
+      { "id": "jl-supplier-pay-ap", "journalEntryId": "je-supplier-payment", "account": "AP", "debit": 500, "credit": 0 },
+      { "id": "jl-supplier-pay-bank", "journalEntryId": "je-supplier-payment", "account": "BANK", "debit": 0, "credit": 500 }
+    ]
+  },
+  "customer": {
+    "entries": [
+      { "id": "cl-invoice", "key": "customer-1|branch-a", "receivableDelta": 400, "advanceDelta": 0, "purchasesDelta": 400, "sourceId": "inv-001" },
+      { "id": "cl-payment", "key": "customer-1|branch-a", "receivableDelta": -150, "advanceDelta": 0, "purchasesDelta": 0, "sourceId": "pay-c-001" },
+      { "id": "cl-return", "key": "customer-1|branch-a", "receivableDelta": -200, "advanceDelta": 0, "purchasesDelta": -200, "sourceId": "ret-001" }
+    ],
+    "projections": [
+      { "key": "customer-1|branch-a", "receivableBalance": 50, "advanceBalance": 0, "totalPurchases": 200 }
+    ]
+  },
+  "supplier": {
+    "entries": [
+      { "id": "sl-purchase", "key": "supplier-1|branch-a", "amountDelta": 1200, "sourceId": "pur-001" },
+      { "id": "sl-payment", "key": "supplier-1|branch-a", "amountDelta": -500, "sourceId": "pay-s-001" }
+    ],
+    "projections": [
+      { "key": "supplier-1|branch-a", "balance": 700 }
+    ]
+  },
+  "finance": {
+    "accounts": [
+      { "key": "cash|branch-a", "openingBalance": 0, "currentBalance": 150 },
+      { "key": "bank|branch-a", "openingBalance": 1000, "currentBalance": 500 }
+    ],
+    "movements": [
+      { "id": "fm-customer-payment", "key": "cash|branch-a", "signedAmount": 150, "balanceBefore": 0, "balanceAfter": 150, "sourceId": "pay-c-001" },
+      { "id": "fm-supplier-payment", "key": "bank|branch-a", "signedAmount": -500, "balanceBefore": 1000, "balanceAfter": 500, "sourceId": "pay-s-001" }
+    ]
+  },
+  "inventory": {
+    "products": [
+      {
+        "key": "product-1|branch-a",
+        "openingStock": 10,
+        "openingValue": 1000,
+        "openingAverageCost": 100,
+        "stock": 21,
+        "inventoryValue": 2370,
+        "costPrice": 112.8571
+      }
+    ],
+    "movements": [
+      {
+        "id": "im-receipt-120",
+        "key": "product-1|branch-a",
+        "type": "purchase",
+        "sourceId": "pur-001",
+        "quantityDelta": 10,
+        "valueDelta": 1200,
+        "stockBefore": 10,
+        "stockAfter": 20,
+        "inventoryValueBefore": 1000,
+        "inventoryValueAfter": 2200,
+        "averageCostBefore": 100,
+        "averageCostAfter": 110
+      },
+      {
+        "id": "im-sale",
+        "key": "product-1|branch-a",
+        "type": "sale",
+        "sourceId": "inv-001",
+        "quantityDelta": -2,
+        "valueDelta": -220,
+        "stockBefore": 20,
+        "stockAfter": 18,
+        "inventoryValueBefore": 2200,
+        "inventoryValueAfter": 1980,
+        "averageCostBefore": 110,
+        "averageCostAfter": 110
+      },
+      {
+        "id": "im-receipt-140",
+        "key": "product-1|branch-a",
+        "type": "purchase",
+        "sourceId": "pur-002",
+        "quantityDelta": 2,
+        "valueDelta": 280,
+        "stockBefore": 18,
+        "stockAfter": 20,
+        "inventoryValueBefore": 1980,
+        "inventoryValueAfter": 2260,
+        "averageCostBefore": 110,
+        "averageCostAfter": 113
+      },
+      {
+        "id": "im-return",
+        "key": "product-1|branch-a",
+        "type": "sales_return",
+        "sourceId": "ret-001",
+        "quantityDelta": 1,
+        "valueDelta": 110,
+        "stockBefore": 20,
+        "stockAfter": 21,
+        "inventoryValueBefore": 2260,
+        "inventoryValueAfter": 2370,
+        "averageCostBefore": 113,
+        "averageCostAfter": 112.8571
+      }
+    ]
+  },
+  "businessFacts": {
+    "movingWeightedAverage": {
+      "opening": { "qty": 10, "unitCost": 100, "value": 1000 },
+      "receipt": { "qty": 10, "unitCost": 120, "value": 1200 },
+      "afterReceipt": { "qty": 20, "value": 2200, "averageCost": 110 }
+    },
+    "sale": {
+      "invoiceId": "inv-001",
+      "qty": 2,
+      "frozenUnitCost": 110,
+      "historicalCogs": 220
+    },
+    "costChangeAfterSale": {
+      "receiptQty": 2,
+      "receiptUnitCost": 140,
+      "averageCostBeforeReturn": 113
+    },
+    "salesReturn": {
+      "returnId": "ret-001",
+      "originalInvoiceId": "inv-001",
+      "qty": 1,
+      "historicalUnitCost": 110,
+      "returnedCost": 110,
+      "currentAverageBeforeReturn": 113,
+      "rule": "restore original invoice historical cost, not current average cost"
+    }
+  }
+}
