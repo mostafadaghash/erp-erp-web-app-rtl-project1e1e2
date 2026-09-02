@@ -1,0 +1,155 @@
+{
+  "formatVersion": 1,
+  "suiteId": "wave0-golden-business-v1",
+  "baselineSha": "5b77e8695a5d1d3d8de4dcec00c619110bdee214",
+  "purpose": "Executable evidence index for protected legacy behavior during Wave 0. These vectors do not claim that later-wave target journeys are implemented.",
+  "executionContract": {
+    "goldenReconciliationTest": "tests/wave0GoldenReconciliation.test.ts",
+    "repositorySuiteCommand": "npm test",
+    "rule": "Every adapterTests path must exist and is executed by the repository test suite; numeric golden assertions are executed by wave0GoldenReconciliation.test.ts."
+  },
+  "vectors": [
+    {
+      "id": "W0-BJ-INV-01",
+      "referenceJourneys": ["J-03", "J-04"],
+      "name": "Opening stock and purchase receipt preserve MWA",
+      "priority": "P0",
+      "preconditions": ["opening 10 units @ 100", "receipt 10 units @ 120"],
+      "expected": ["qty=20", "inventoryValue=2200", "averageCost=110", "movement snapshots remain replayable"],
+      "goldenFacts": ["businessFacts.movingWeightedAverage"],
+      "adapterTests": ["tests/inventoryRules.test.ts", "tests/purchaseReceiptsIntegration.test.ts"],
+      "wave0Evidence": "EXECUTABLE"
+    },
+    {
+      "id": "W0-BJ-SALE-01",
+      "referenceJourneys": ["J-05", "J-06"],
+      "name": "Posted sale freezes historical COGS and decreases inventory",
+      "priority": "P0",
+      "preconditions": ["current average cost=110", "sell quantity=2"],
+      "expected": ["historical COGS=220", "stock/value decrease by frozen cost", "server-owned totals", "GL remains balanced"],
+      "goldenFacts": ["businessFacts.sale"],
+      "adapterTests": ["tests/cogsSalesReturnsIntegration.test.ts", "tests/customerLedgerIntegration.test.ts", "tests/generalLedgerFoundationIntegration.test.ts"],
+      "wave0Evidence": "EXECUTABLE"
+    },
+    {
+      "id": "W0-BJ-PAY-01",
+      "referenceJourneys": ["J-07"],
+      "name": "Customer collection reduces receivable and moves treasury exactly once",
+      "priority": "P0",
+      "preconditions": ["customer receivable exists", "cash/financial account exists"],
+      "expected": ["customer receivable delta matches payment", "financial movement matches payment", "retry does not duplicate economic effect"],
+      "adapterTests": ["tests/customerLedgerIntegration.test.ts", "tests/financeIntegration.test.ts"],
+      "wave0Evidence": "EXECUTABLE"
+    },
+    {
+      "id": "W0-BJ-RETURN-01",
+      "referenceJourneys": ["J-12", "J-13"],
+      "name": "Sales return restores original historical cost after current average changes",
+      "priority": "P0",
+      "preconditions": ["original sale frozen unit cost=110", "later receipt changes current average to 113", "return quantity=1"],
+      "expected": ["returned inventory value=110", "historicalUnitCost=110", "current average 113 is not substituted", "customer/GL effects reconcile to return"],
+      "goldenFacts": ["businessFacts.sale", "businessFacts.costChangeAfterSale", "businessFacts.salesReturn"],
+      "adapterTests": ["tests/cogsSalesReturnsIntegration.test.ts", "tests/customerLedgerIntegration.test.ts"],
+      "wave0Evidence": "EXECUTABLE"
+    },
+    {
+      "id": "W0-BJ-RETURN-REV-01",
+      "referenceJourneys": ["J-14"],
+      "name": "Reversal retains original history and compensates once",
+      "priority": "P0",
+      "expected": ["original return remains", "reversal lineage exists", "second retry does not create a second economic reversal"],
+      "adapterTests": ["tests/cogsSalesReturnsIntegration.test.ts", "tests/generalLedgerFoundationIntegration.test.ts"],
+      "wave0Evidence": "EXECUTABLE"
+    },
+    {
+      "id": "W0-BJ-PURCHASE-01",
+      "referenceJourneys": ["J-15"],
+      "name": "Purchase receipt plus supplier payment reconciles inventory, supplier ledger, treasury and GL",
+      "priority": "P0",
+      "expected": ["receipt increases stock/value using current costing rules", "supplier payable increases then decreases by payment", "cash/bank decreases", "journals are balanced"],
+      "adapterTests": ["tests/purchaseReceiptsIntegration.test.ts", "tests/supplierPaymentsIntegration.test.ts", "tests/generalLedgerPurchasesIntegration.test.ts"],
+      "wave0Evidence": "EXECUTABLE"
+    },
+    {
+      "id": "W0-BJ-PURCHASE-RETURN-01",
+      "referenceJourneys": ["J-16"],
+      "name": "Purchase return preserves defined historical valuation and supplier effect",
+      "priority": "P0",
+      "expected": ["stock/value decrease follows stored historical policy", "supplier ledger adjusts", "GL bridge remains balanced", "retry/reversal semantics stay intact"],
+      "adapterTests": ["tests/purchaseReturnsIntegration.test.ts", "tests/generalLedgerPurchasesIntegration.test.ts"],
+      "wave0Evidence": "EXECUTABLE"
+    },
+    {
+      "id": "W0-BJ-FINANCE-01",
+      "referenceJourneys": ["J-19"],
+      "name": "Treasury movement replay owns financial account balance",
+      "priority": "P0",
+      "expected": ["financial movement signed deltas reproduce currentBalance", "before/after chain is continuous", "GL bridge balances"],
+      "adapterTests": ["tests/financeIntegration.test.ts", "tests/generalLedgerFoundationIntegration.test.ts"],
+      "wave0Evidence": "EXECUTABLE"
+    },
+    {
+      "id": "W0-BJ-COD-01",
+      "referenceJourneys": ["J-21"],
+      "name": "COD delivery and settlement keep operational status separate from financial authority",
+      "priority": "P0",
+      "expected": ["COD financial effects are represented by finance/ledger records", "shipment status alone is not a posting", "settlement is idempotent"],
+      "adapterTests": ["tests/deliveryCodIntegration.test.ts"],
+      "wave0Evidence": "EXECUTABLE"
+    },
+    {
+      "id": "W0-BJ-REPAIR-01",
+      "referenceJourneys": ["J-23"],
+      "name": "Repair part consumption preserves inventory cost and accounting bridge",
+      "priority": "P0",
+      "expected": ["part inventory decreases through movement", "cost is tied to repair source", "financial/GL effects follow current behavior"],
+      "adapterTests": ["tests/repairWorkflowIntegration.test.ts", "tests/generalLedgerRepairPartsIntegration.test.ts", "tests/generalLedgerRepairsIntegration.test.ts"],
+      "wave0Evidence": "EXECUTABLE"
+    },
+    {
+      "id": "W0-BJ-PERMISSION-01",
+      "referenceJourneys": ["J-24"],
+      "name": "Cost and profit remain server-redacted for roles without permission",
+      "priority": "P0",
+      "expected": ["backend/DTO does not expose protected cost/profit", "UI hiding is not the only control"],
+      "adapterTests": ["tests/financialPermissionRegressions.test.ts", "tests/productVisibility.test.ts"],
+      "wave0Evidence": "EXECUTABLE"
+    },
+    {
+      "id": "W0-BJ-MIGRATION-01",
+      "referenceJourneys": ["J-32"],
+      "name": "Migration rehearsal preserves explicit control totals and fails closed on invalid data",
+      "priority": "P0",
+      "expected": ["control totals are explicit", "invalid records are reported rather than silently altered", "rehearsal remains deterministic"],
+      "adapterTests": ["tests/migrationRehearsalIntegration.test.ts", "tests/migrationToolkit.test.ts"],
+      "wave0Evidence": "EXECUTABLE"
+    },
+    {
+      "id": "W0-BJ-REPORTING-01",
+      "referenceJourneys": ["J-36"],
+      "name": "Historical reporting uses historical COGS rather than current product cost",
+      "priority": "P0",
+      "expected": ["historical COGS is frozen from posted documents", "returns/reversals are included", "revenue is not equated with collections"],
+      "adapterTests": ["tests/reportingIntegration.test.ts", "tests/cogsSalesReturnsIntegration.test.ts"],
+      "wave0Evidence": "EXECUTABLE"
+    }
+  ],
+  "deferredReferenceJourneys": [
+    {
+      "ids": ["J-01", "J-02"],
+      "reason": "The acceptance reference assumes true Company/Tenant setup. Current legacy branch/auth behavior is preserved, but Tenant/Company implementation belongs to Wave 2."
+    },
+    {
+      "ids": ["J-27", "J-28"],
+      "reason": "Tax Engine and ETA eInvoice/eReceipt belong to Waves 5-6 and are explicitly out of Wave 0 scope."
+    },
+    {
+      "ids": ["J-29", "J-30"],
+      "reason": "Local Server/WAN operation belongs to Wave 7 and is explicitly out of Wave 0 scope."
+    },
+    {
+      "ids": ["J-40"],
+      "reason": "Same-SHA release acceptance remains a release discipline requirement; Wave 0 records it but does not claim a General Release gate."
+    }
+  ]
+}
