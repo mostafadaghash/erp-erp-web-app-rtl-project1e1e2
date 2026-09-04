@@ -132,7 +132,6 @@ test("business cycles wait for the current ERP success copy", () => {
   for (const message of [
     "تم إنشاء طلب البيع وإضافته للمتابعة",
     "تم تسعير جميع أصناف الطلب",
-    "تم تغيير الحالة إلى",
     "تم إنشاء الشحنة بنجاح",
     "تم تسجيل إرسال الشحنة",
     "تم تسجيل التسليم والتحصيل بنجاح",
@@ -142,6 +141,10 @@ test("business cycles wait for the current ERP success copy", () => {
     "تم ترحيل مرتجع المشتريات",
     "تم إنشاء أمر الصيانة بنجاح",
   ]) assert.match(script, new RegExp(message));
+  assert.match(
+    script,
+    /async function transitionOrder[\s\S]{0,1500}waitForEntityState\(page, "order-row"/,
+  );
 
   assert.doesNotMatch(
     script,
