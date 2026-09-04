@@ -20,14 +20,14 @@ function Read-Or-CreateLocalAdminSecret {
       }
     }
     catch {
-      throw "تعذر قراءة ملف اعتماد الاختبارات المحلية. احذف .local-e2e-admin.local ثم أعد التشغيل لإعداده من جديد."
+      throw "Unable to read the local E2E credential file. Delete .local-e2e-admin.local and run setup again."
     }
   }
 
-  Write-Host "تهيئة اختبارات Local Server لأول مرة فقط." -ForegroundColor Cyan
+  Write-Host "First-time Local Server E2E setup." -ForegroundColor Cyan
   $email = (Read-Host "Local admin email").Trim().ToLowerInvariant()
   if ($email -notmatch '^[^\s@]+@[^\s@]+\.[^\s@]+$') {
-    throw "صيغة البريد الإلكتروني غير صحيحة"
+    throw "Invalid email address"
   }
 
   $securePassword = Read-Host "Local admin password" -AsSecureString
@@ -37,7 +37,7 @@ function Read-Or-CreateLocalAdminSecret {
     protectedPassword = $protectedPassword
   } | ConvertTo-Json | Set-Content $secretPath -Encoding UTF8
 
-  Write-Host "تم حفظ اعتماد المدير مشفرًا لحساب Windows الحالي داخل ملف *.local ignored." -ForegroundColor Green
+  Write-Host "Local admin credentials saved encrypted for the current Windows account in an ignored *.local file." -ForegroundColor Green
   return [pscustomobject]@{
     Email = $email
     SecurePassword = $securePassword
