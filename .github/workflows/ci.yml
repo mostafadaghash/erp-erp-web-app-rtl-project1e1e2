@@ -44,6 +44,14 @@ jobs:
           path: test-output.txt
           if-no-files-found: error
           retention-days: 1
+      - name: Upload browser printing evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: printing-acceptance
+          path: test-results/printing
+          if-no-files-found: error
+          retention-days: 1
       - name: Security check
         if: always()
         run: npm run security:check
