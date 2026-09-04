@@ -45,7 +45,7 @@ function Read-Or-CreateLocalAdminSecret {
 }
 
 if (-not $SkipVerify) {
-  Write-Host "" 
+  Write-Host ""
   Write-Host "=== Local Suite: repository verification ===" -ForegroundColor Cyan
   & npm.cmd run verify
   $verifyExitCode = $LASTEXITCODE
@@ -65,6 +65,12 @@ try {
   # Repository verification is handled above by PowerShell on Windows.
   # Keep the Node harness focused on local runtime and business E2E.
   $env:LOCAL_E2E_SKIP_VERIFY = "true"
+
+  Write-Host ""
+  Write-Host "=== Local Suite: base fixture bootstrap ===" -ForegroundColor Cyan
+  & node "scripts/local/fixture-bootstrap.mjs"
+  $bootstrapExitCode = $LASTEXITCODE
+  if ($bootstrapExitCode -ne 0) { exit $bootstrapExitCode }
 
   & node "scripts/local/full-suite.mjs"
   $exitCode = $LASTEXITCODE
