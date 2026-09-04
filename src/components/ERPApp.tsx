@@ -562,7 +562,7 @@ export function ERPApp() {
   };
 
   const requestClose = (tabIds: string[]) => {
-    const existingIds = [...new Set(tabIds)].filter((id) => workspace.tabs.some((tab) => existingIds.includes(tab.id));
+    const existingIds = [...new Set(tabIds)].filter((id) => workspace.tabs.some((tab) => tab.id === id));
     if (existingIds.length === 0) return;
     if (workspace.tabs.some((tab) => existingIds.includes(tab.id) && tab.dirty)) {
       setPendingCloseIds(existingIds);
