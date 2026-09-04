@@ -8,6 +8,9 @@ const email = process.env.LOCAL_ACCEPTANCE_EMAIL?.trim();
 const password = process.env.LOCAL_ACCEPTANCE_PASSWORD;
 const branchName = process.env.LOCAL_ACCEPTANCE_BRANCH_NAME?.trim() || "فرع التجربة";
 const branchAddress = process.env.LOCAL_ACCEPTANCE_BRANCH_ADDRESS?.trim() || "عنوان تجريبي";
+const customerName = process.env.LOCAL_ACCEPTANCE_CUSTOMER_NAME?.trim() || "عميل التجربة المحلي";
+const customerPhone = process.env.LOCAL_ACCEPTANCE_CUSTOMER_PHONE?.trim() || "01000000001";
+const customerAddress = process.env.LOCAL_ACCEPTANCE_CUSTOMER_ADDRESS?.trim() || "عنوان عميل تجريبي";
 
 function validateLocalTarget(value) {
   const url = new URL(value);
@@ -53,13 +56,18 @@ async function resolveBrowser() {
   throw new Error("لم يتم العثور على Chrome أو Edge على Windows");
 }
 
-async function gotoBranches(page) {
+async function openNavigationGroup(page, testId) {
   const navigation = page.getByRole("navigation", { name: "القائمة الرئيسية" });
-  const administration = navigation.getByTestId("nav-group-administration");
-  await administration.waitFor({ state: "visible", timeout: 30_000 });
-  if ((await administration.getAttribute("aria-expanded")) !== "true") {
-    await administration.click();
+  const group = navigation.getByTestId(testId);
+  await group.waitFor({ state: "visible", timeout: 30_000 });
+  if ((await group.getAttribute("aria-expanded")) !== "true") {
+    await group.click();
   }
+  return navigation;
+}
+
+async function gotoBranches(page) {
+  const navigation = await openNavigationGroup(page, "nav-group-administration");
   const branches = navigation.getByRole("button", { name: "الفروع", exact: true });
   await branches.waitFor({ state: "visible", timeout: 30_000 });
   await branches.click();
@@ -67,6 +75,14 @@ async function gotoBranches(page) {
     .getByRole("main")
     .getByRole("heading", { name: "الفروع", exact: true })
     .waitFor({ timeout: 30_000 });
+}
+
+async function gotoCustomers(page) {
+  const navigation = await openNavigationGroup(page, "nav-group-sales");
+  const customers = navigation.getByRole("button", { name: "العملاء", exact: true });
+  await customers.waitFor({ state: "visible", timeout: 30_000 });
+  await customers.click();
+  await page.getByTestId("customers-page").waitFor({ state: "visible", timeout: 30_000 });
 }
 
 async function signIn(page, origin) {
@@ -111,6 +127,51 @@ async function ensureBranch(page) {
   assert.ok(await page.getByText("نشط", { exact: true }).first().isVisible(), "Expected an active branch state");
 }
 
+async function selectWorkingBranch(page) {
+  const select = page.getByTestId("working-branch-select");
+  await select.waitFor({ state: "visible", timeout: 30_000 });
+  const options = await select.locator("option").evaluateAll((rows) =>
+    rows.map((row) => ({ value: row.value, label: row.textContent?.trim() ?? "" })),
+  );
+  const match = options.find((option) => option.value && option.label === branchName);
+  assert.ok(match, `Working branch option not found: ${branchName}`);
+
+  if ((await select.inputValue()) !== match.value) {
+    await select.selectOption(match.value);
+    await page.getByText("تم تغيير فرع العمل", { exact: true }).waitFor({ timeout: 30_000 });
+  }
+  await page.waitForFunction(
+    ({ testId, value }) => document.querySelector(`[data-testid="${testId}"]`)?.value === value,
+    { testId: "working-branch-select", value: match.value },
+    { timeout: 30_000 },
+  );
+}
+
+async function ensureCustomer(page) {
+  await gotoCustomers(page);
+  const existing = page
+    .getByTestId("customer-card")
+    .filter({ has: page.locator(`td:first-child p`, { hasText: customerName }) });
+
+  if ((await existing.count()) === 0) {
+    await page.getByTestId("customer-create-open").click();
+    await page.getByTestId("new-customer-page").waitFor({ state: "visible", timeout: 30_000 });
+    await page.getByTestId("new-customer-name").fill(customerName);
+    await page.getByTestId("new-customer-phone").fill(customerPhone);
+    await page.getByTestId("new-customer-address").fill(customerAddress);
+    await page.getByTestId("new-customer-save").click();
+    await page.getByText("تمت إضافة العميل بنجاح", { exact: true }).waitFor({ timeout: 30_000 });
+    await page.getByTestId("customers-page").waitFor({ state: "visible", timeout: 30_000 });
+  }
+
+  const row = page.locator(
+    `[data-testid="customer-card"][data-customer-name="${customerName.replaceAll('"', '\\"')}"]`,
+  );
+  await row.waitFor({ state: "visible", timeout: 30_000 });
+  assert.equal((await row.getAttribute("data-customer-active")), "true", "Expected an active customer");
+  assert.match((await row.innerText()), new RegExp(customerPhone.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+}
+
 async function main() {
   const origin = validateLocalTarget(baseUrl);
   const browserPath = await resolveBrowser();
@@ -134,9 +195,12 @@ async function main() {
   try {
     await signIn(page, origin);
     await ensureBranch(page);
+    await selectWorkingBranch(page);
+    await ensureCustomer(page);
     assert.deepEqual(runtimeFailures, [], `Runtime failures detected:\n${runtimeFailures.join("\n")}`);
     console.log("Local acceptance: PASS");
-    console.log(`Branch: ${branchName} (${branchAddress}) - active`);
+    console.log(`Branch: ${branchName} (${branchAddress}) - active and selected`);
+    console.log(`Customer: ${customerName} (${customerPhone}) - active`);
   } finally {
     await context.close();
     await browser.close();
