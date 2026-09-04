@@ -307,7 +307,7 @@ async function postOpeningBalance(page, row, amount) {
   await row.getByTestId("finance-opening-balance").click();
   const heading = page.getByRole("heading", { name: "تسجيل الرصيد الافتتاحي", exact: true });
   await heading.waitFor({ state: "visible", timeout: 30_000 });
-  const dialog = heading.locator("..").locator("..");
+  const dialog = page.locator("div.fixed.inset-0").filter({ has: heading }).last();
   await dialog.locator('input[type="number"]').fill(String(amount));
   await dialog.getByRole("button", { name: "حفظ", exact: true }).click();
   await page.waitForFunction(
