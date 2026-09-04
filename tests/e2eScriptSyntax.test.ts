@@ -4,11 +4,17 @@ import { resolve } from "node:path";
 import test from "node:test";
 
 const scripts = [
+  "scripts/local/acceptance.mjs",
   "scripts/local/fixture-bootstrap.mjs",
   "scripts/local/full-suite.mjs",
   "scripts/staging-account-setup.mjs",
   "scripts/staging-browser-e2e.mjs",
   "scripts/staging-business-e2e.mjs",
+  "scripts/staging-fixtures-setup.mjs",
+  "scripts/staging-all.mjs",
+  "scripts/staging-env-check.mjs",
+  "scripts/staging-preflight.mjs",
+  "scripts/load-staging.mjs",
   "scripts/lib/staging-safety.mjs",
 ];
 
