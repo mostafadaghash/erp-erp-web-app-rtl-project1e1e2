@@ -10,6 +10,7 @@ $cliFile = Join-Path $projectRoot "infra\local\cli.env.local"
 $authFile = Join-Path $projectRoot "infra\local\auth.env.local"
 $keyGenerator = Join-Path $scriptDir "generate-auth-keys.mjs"
 $convexCli = Join-Path $projectRoot "node_modules\.bin\convex.cmd"
+$cloudEnvFile = Join-Path $projectRoot ".env.local"
 
 function Read-LocalEnv {
   param([string]$Path)
@@ -70,12 +71,14 @@ if (-not $cliSettings.ContainsKey("CONVEX_SELF_HOSTED_URL") -or
 
 $previousUrl = [Environment]::GetEnvironmentVariable("CONVEX_SELF_HOSTED_URL", "Process")
 $previousAdminKey = [Environment]::GetEnvironmentVariable("CONVEX_SELF_HOSTED_ADMIN_KEY", "Process")
+$cloudEnvExisted = Test-Path $cloudEnvFile
+$cloudEnvContent = if ($cloudEnvExisted) { [System.IO.File]::ReadAllText($cloudEnvFile) } else { $null }
 try {
   $env:CONVEX_SELF_HOSTED_URL = $cliSettings["CONVEX_SELF_HOSTED_URL"]
   $env:CONVEX_SELF_HOSTED_ADMIN_KEY = $cliSettings["CONVEX_SELF_HOSTED_ADMIN_KEY"]
 
   Invoke-NativeCommand -FilePath $convexCli -Arguments @("env", "set", "--from-file", $authFile, "--force", "--env-file", $cliFile) -FailureMessage "Could not configure Convex Auth variables on the local deployment."
-  Invoke-NativeCommand -FilePath $convexCli -Arguments @("dev", "--once", "--env-file", $cliFile, "--typecheck", "enable", "--tail-logs", "disable") -FailureMessage "Could not deploy the ERP functions to local Convex."
+  Invoke-NativeCommand -FilePath $convexCli -Arguments @("deploy", "--env-file", $cliFile, "--typecheck", "enable", "--codegen", "enable", "--message", "Local Server Edition configuration") -FailureMessage "Could not deploy the ERP functions to local Convex."
 } finally {
   if ($null -eq $previousUrl) {
     Remove-Item Env:CONVEX_SELF_HOSTED_URL -ErrorAction SilentlyContinue
@@ -86,6 +89,11 @@ try {
     Remove-Item Env:CONVEX_SELF_HOSTED_ADMIN_KEY -ErrorAction SilentlyContinue
   } else {
     $env:CONVEX_SELF_HOSTED_ADMIN_KEY = $previousAdminKey
+  }
+  if ($cloudEnvExisted) {
+    [System.IO.File]::WriteAllText($cloudEnvFile, $cloudEnvContent, [System.Text.UTF8Encoding]::new($false))
+  } elseif (Test-Path $cloudEnvFile) {
+    Remove-Item $cloudEnvFile -Force
   }
 }
 

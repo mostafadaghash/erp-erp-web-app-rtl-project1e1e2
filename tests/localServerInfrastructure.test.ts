@@ -128,8 +128,10 @@ test("local configuration targets self-hosted Convex without exposing secrets", 
   );
   assert.match(
     configure,
-    /@\("dev", "--once", "--env-file", \$cliFile, "--typecheck", "enable", "--tail-logs", "disable"\)/,
+    /@\("deploy", "--env-file", \$cliFile, "--typecheck", "enable", "--codegen", "enable"/,
   );
+  assert.match(configure, /\$cloudEnvContent = if \(\$cloudEnvExisted\)/);
+  assert.match(configure, /WriteAllText\(\$cloudEnvFile, \$cloudEnvContent/);
   assert.doesNotMatch(configure, /CONVEX_DEPLOYMENT/);
   assert.doesNotMatch(configure, /Write-Host[^\n]*(AdminKey|JWT|JWKS)/i);
 });

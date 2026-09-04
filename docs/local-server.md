@@ -36,4 +36,4 @@ Configure Convex Auth and deploy the project's functions to the empty local depl
 npm run local:configure
 ```
 
-The Auth key pair is generated once and retained in the ignored `infra/local/auth.env.local` file. The command targets the local URL and admin key explicitly and does not change the existing Cloud deployment.
+The Auth key pair is generated once and retained in the ignored `infra/local/auth.env.local` file. The command targets the local URL and admin key explicitly, preserves the existing `.env.local` file, and does not change the existing Cloud deployment.
