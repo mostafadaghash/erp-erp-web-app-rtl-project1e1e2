@@ -38,6 +38,7 @@ const navigationTargets = {
   salesInvoices: { group: "sales", item: "invoices", page: "invoices-page" },
   salesReturns: { group: "sales", item: "sales-returns", page: "sales-returns-page" },
   orders: { group: "sales", item: "orders", page: "orders-page" },
+  newPurchase: { group: "purchases", item: "new-purchase-invoice", page: "new-purchase-invoice-page" },
   purchases: { group: "purchases", item: "shipments", page: "shipments-page" },
   purchaseReturns: { group: "purchases", item: "purchase-returns", page: "purchase-returns-page" },
   supplierPayments: { group: "accounting", item: "supplier-payments", page: "supplier-payments-page" },
@@ -474,18 +475,21 @@ async function createDeliveryCycle(page, fixtures, marker, orderNumber, invoiceN
 async function createPurchaseCycle(page, fixtures, marker) {
   await navigate(page, "purchases");
   const before = await attributeSet(page.getByTestId("shipment-row"), "data-shipment-number");
-  await page.getByTestId("shipment-create-open").click();
-  await page.getByTestId("shipment-create-form").waitFor();
-  await selectContaining(page.getByTestId("shipment-supplier-select"), fixtures.supplierName);
-  const item = page.getByTestId("shipment-item-row").first();
-  await selectContaining(item.getByTestId("shipment-product-select"), fixtures.productName);
-  await item.getByTestId("shipment-item-quantity").fill("3");
-  await item.getByTestId("shipment-item-unit-cost").fill(String(fixtures.purchaseUnitCost));
-  await page.getByTestId("shipment-shipping-cost").fill("0");
-  await page.getByTestId("shipment-notes").fill(marker);
-  await page.getByTestId("shipment-submit").click();
-  await waitForToast(page, "تم إنشاء عملية الشراء بنجاح");
-  await page.getByTestId("shipment-create-form").waitFor({ state: "detached" });
+
+  await navigate(page, "newPurchase");
+  await selectContaining(page.getByTestId("purchase-supplier-select"), fixtures.supplierName);
+  await page.getByTestId("purchase-product-search").fill(fixtures.productName);
+  const result = page.getByTestId("purchase-product-result").filter({ hasText: fixtures.productName }).first();
+  await result.waitFor({ state: "visible", timeout: 30_000 });
+  await result.click();
+  await page.locator("[data-purchase-quantity]").first().fill("3");
+  await page.locator("[data-purchase-unit-cost]").first().fill(String(fixtures.purchaseUnitCost));
+  await page.getByTestId("purchase-shipping-cost").fill("0");
+  await page.getByTestId("purchase-notes").fill(marker);
+  await page.getByTestId("purchase-submit").click();
+  await waitForToast(page, "تم إنشاء فاتورة المشتريات وحفظها بانتظار الاستلام");
+  await page.getByTestId("shipments-page").waitFor({ state: "visible", timeout: 45_000 });
+
   const created = await waitForNewEntity(page, "shipment-row", "data-shipment-number", before);
   let row = created.locator;
   await row.locator('[data-testid="shipment-status-next"][data-next-status="in_transit"]').click();
