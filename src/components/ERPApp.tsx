@@ -562,7 +562,7 @@ export function ERPApp() {
   };
 
   const requestClose = (tabIds: string[]) => {
-    const existingIds = [...new Set(tabIds)].filter((id) => workspace.tabs.some((tab) => tab.id === id));
+    const existingIds = [...new Set(tabIds)].filter((id) => workspace.tabs.some((tab) => existingIds.includes(tab.id));
     if (existingIds.length === 0) return;
     if (workspace.tabs.some((tab) => existingIds.includes(tab.id) && tab.dirty)) {
       setPendingCloseIds(existingIds);
@@ -701,10 +701,10 @@ export function ERPApp() {
         aria-hidden={tab.id !== workspace.activeId}
         hidden={tab.id !== workspace.activeId}
         className="min-h-full"
-        onChangeCapture={() => {
+        onChange={() => {
           if (tab.kind === "new" && !tab.dirty) markTabDirty(tab.id, true);
         }}
-        onInputCapture={() => {
+        onInput={() => {
           if (tab.kind === "new" && !tab.dirty) markTabDirty(tab.id, true);
         }}
       >
