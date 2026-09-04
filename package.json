@@ -43,6 +43,7 @@
     "test:e2e:flows": "playwright test --grep @flows",
     "test:e2e:staging": "npm run staging:check && playwright test",
     "local:bootstrap": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/local/bootstrap.ps1",
+    "local:configure": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/local/configure.ps1",
     "local:status": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/local/status.ps1",
     "local:up": "docker compose --env-file infra/local/runtime.env.local -f infra/local/docker-compose.yml up -d",
     "local:down": "docker compose --env-file infra/local/runtime.env.local -f infra/local/docker-compose.yml down",

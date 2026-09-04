@@ -5,6 +5,11 @@ import test from "node:test";
 const compose = readFileSync("infra/local/docker-compose.yml", "utf8");
 const runtimeTemplate = readFileSync("infra/local/runtime.env.example", "utf8");
 const bootstrap = readFileSync("scripts/local/bootstrap.ps1", "utf8");
+const configure = readFileSync("scripts/local/configure.ps1", "utf8");
+const authKeyGenerator = readFileSync(
+  "scripts/local/generate-auth-keys.mjs",
+  "utf8",
+);
 const gitignore = readFileSync(".gitignore", "utf8");
 const packageJson = JSON.parse(readFileSync("package.json", "utf8")) as {
   scripts: Record<string, string>;
@@ -46,6 +51,7 @@ test("runtime secrets are generated locally and ignored by git", () => {
   assert.match(bootstrap, /generate_admin_key\.sh/);
   assert.match(gitignore, /infra\/local\/runtime\.env\.local/);
   assert.match(gitignore, /infra\/local\/cli\.env\.local/);
+  assert.match(gitignore, /infra\/local\/auth\.env\.local/);
   assert.match(gitignore, /\.env\.local-server\.local/);
   assert.doesNotMatch(bootstrap, /Write-Host\s+\$password/);
   assert.doesNotMatch(bootstrap, /Write-Host\s+\$adminKey/);
@@ -69,6 +75,10 @@ test("package scripts expose controlled local lifecycle commands", () => {
   assert.match(
     packageJson.scripts["local:status"],
     /scripts\/local\/status\.ps1/,
+  );
+  assert.match(
+    packageJson.scripts["local:configure"],
+    /scripts\/local\/configure\.ps1/,
   );
   assert.match(packageJson.scripts["local:up"], /docker compose/);
   assert.match(packageJson.scripts["local:down"], /docker compose/);
@@ -97,4 +107,29 @@ test("Windows PowerShell captures only the generated admin key without leaking i
   );
   assert.match(bootstrap, /\$adminExitCode = \$LASTEXITCODE/);
   assert.doesNotMatch(bootstrap, /Write-Host\s+\$adminKey/);
+});
+
+test("local Auth keys use an RSA key pair and are generated only once", () => {
+  assert.match(authKeyGenerator, /generateKeyPairSync\("rsa"/);
+  assert.match(authKeyGenerator, /modulusLength: 2048/);
+  assert.match(authKeyGenerator, /type: "pkcs8", format: "pem"/);
+  assert.match(authKeyGenerator, /publicKey\.export\(\{ format: "jwk" \}\)/);
+  assert.match(authKeyGenerator, /keys: \[\{ use: "sig", \.\.\.publicJwk \}\]/);
+  assert.match(authKeyGenerator, /flag: "wx"/);
+  assert.doesNotMatch(configure, /Remove-Item\s+\$authFile/);
+});
+
+test("local configuration targets self-hosted Convex without exposing secrets", () => {
+  assert.match(configure, /CONVEX_SELF_HOSTED_URL/);
+  assert.match(configure, /CONVEX_SELF_HOSTED_ADMIN_KEY/);
+  assert.match(
+    configure,
+    /@\("env", "set", "--from-file", \$authFile, "--force"\)/,
+  );
+  assert.match(
+    configure,
+    /@\("dev", "--once", "--env-file", \$cliFile, "--typecheck", "enable", "--tail-logs", "disable"\)/,
+  );
+  assert.doesNotMatch(configure, /CONVEX_DEPLOYMENT/);
+  assert.doesNotMatch(configure, /Write-Host[^\n]*(AdminKey|JWT|JWKS)/i);
 });

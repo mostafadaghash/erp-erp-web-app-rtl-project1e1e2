@@ -18,6 +18,7 @@ test-results/
 # Local Server Edition secrets and machine-specific runtime configuration.
 infra/local/runtime.env.local
 infra/local/cli.env.local
+infra/local/auth.env.local
 .env.local-server.local
 
 # Migration inputs/outputs may contain business or personal data.
