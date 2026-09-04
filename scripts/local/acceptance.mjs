@@ -68,7 +68,7 @@ async function openNavigationGroup(page, testId) {
 
 async function gotoBranches(page) {
   const navigation = await openNavigationGroup(page, "nav-group-administration");
-  const branches = navigation.getByRole("button", { name: "الفروع", exact: true });
+  const branches = navigation.getByTestId("nav-branches");
   await branches.waitFor({ state: "visible", timeout: 30_000 });
   await branches.click();
   await page
@@ -78,8 +78,8 @@ async function gotoBranches(page) {
 }
 
 async function gotoCustomers(page) {
-  const navigation = await openNavigationGroup(page, "nav-group-sales");
-  const customers = navigation.getByRole("button", { name: "العملاء", exact: true });
+  const navigation = await openNavigationGroup(page, "nav-group-customers");
+  const customers = navigation.getByTestId("nav-customers");
   await customers.waitFor({ state: "visible", timeout: 30_000 });
   await customers.click();
   await page.getByTestId("customers-page").waitFor({ state: "visible", timeout: 30_000 });
@@ -161,7 +161,7 @@ async function ensureCustomer(page) {
     await page.getByTestId("new-customer-address").fill(customerAddress);
     await page.getByTestId("new-customer-save").click();
     await page.getByText("تمت إضافة العميل بنجاح", { exact: true }).waitFor({ timeout: 30_000 });
-    await page.getByTestId("customers-page").waitFor({ state: "visible", timeout: 30_000 });
+    await gotoCustomers(page);
   }
 
   const row = page.locator(
