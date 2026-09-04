@@ -64,9 +64,11 @@ test("existing Staging role accounts are reconciled to one unambiguous branch", 
 });
 
 test("fixture setup follows current ERP navigation and synchronizes the Admin working branch", () => {
-  assert.match(fixtures, /navigate\(page, "الأصناف", "products-page"\)/);
-  assert.match(fixtures, /navigate\(page, "الخزائن والبنوك", "treasury-page"\)/);
-  assert.doesNotMatch(fixtures, /المنتجات والمخزون|الخزائن والحسابات/);
+  assert.match(fixtures, /navigate\(page, "قائمة العملاء", "customers-page"\)/);
+  assert.match(fixtures, /navigate\(page, "إدارة المخزون", "inventory-workspace-page"\)/);
+  assert.match(fixtures, /getByTestId\("products-page"\)\.waitFor/);
+  assert.match(fixtures, /navigate\(page, "الخزائن والحسابات", "treasury-page"\)/);
+  assert.doesNotMatch(fixtures, /دليل الأصناف|الخزائن والبنوك/);
   assert.match(fixtures, /async function ensureAdminWorkingBranch/);
   const synchronize = fixtures.indexOf("await ensureAdminWorkingBranch(page, config.fixtures, finance.branchId)");
   const customer = fixtures.indexOf("ensureCustomer(page, config.fixtures, finance.branchId)");
