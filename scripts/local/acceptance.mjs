@@ -63,7 +63,10 @@ async function gotoBranches(page) {
   const branches = navigation.getByRole("button", { name: "الفروع", exact: true });
   await branches.waitFor({ state: "visible", timeout: 30_000 });
   await branches.click();
-  await page.getByRole("heading", { name: "الفروع", exact: true }).waitFor({ timeout: 30_000 });
+  await page
+    .getByRole("main")
+    .getByRole("heading", { name: "الفروع", exact: true })
+    .waitFor({ timeout: 30_000 });
 }
 
 async function signIn(page, origin) {
