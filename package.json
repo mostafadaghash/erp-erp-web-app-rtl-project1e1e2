@@ -45,6 +45,7 @@
     "local:bootstrap": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/local/bootstrap.ps1",
     "local:configure": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/local/configure.ps1",
     "local:status": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/local/status.ps1",
+    "local:acceptance": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/local/acceptance.ps1",
     "local:up": "docker compose --env-file infra/local/runtime.env.local -f infra/local/docker-compose.yml up -d",
     "local:down": "docker compose --env-file infra/local/runtime.env.local -f infra/local/docker-compose.yml down",
     "local:frontend": "vite --mode local-server --open"
