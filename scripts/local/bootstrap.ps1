@@ -15,7 +15,7 @@ $cliFile = Join-Path $projectRoot "infra\local\cli.env.local"
 $viteFile = Join-Path $projectRoot ".env.local-server.local"
 
 function Invoke-Compose {
-  param([Parameter(ValueFromRemainingArguments = $true)][string[]]$ComposeArgs)
+  param([Parameter(Mandatory = $true)][string[]]$ComposeArgs)
   & docker compose --env-file $runtimeFile -f $composeFile @ComposeArgs
   if ($LASTEXITCODE -ne 0) {
     throw "Docker Compose failed: $($ComposeArgs -join ' ')"
@@ -52,10 +52,10 @@ if (-not (Test-Path $runtimeFile)) {
 }
 
 if (-not $SkipPull) {
-  Invoke-Compose pull
+  Invoke-Compose -ComposeArgs @("pull")
 }
 
-Invoke-Compose up -d
+Invoke-Compose -ComposeArgs @("up", "-d")
 
 $ready = $false
 for ($attempt = 1; $attempt -le 60; $attempt++) {
@@ -71,8 +71,8 @@ for ($attempt = 1; $attempt -le 60; $attempt++) {
 }
 
 if (-not $ready) {
-  Invoke-Compose ps
-  Invoke-Compose logs --tail 120 backend postgres
+  Invoke-Compose -ComposeArgs @("ps")
+  Invoke-Compose -ComposeArgs @("logs", "--tail", "120", "backend", "postgres")
   throw "The local Convex backend did not become healthy within 120 seconds."
 }
 

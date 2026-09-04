@@ -74,3 +74,12 @@ test("package scripts expose controlled local lifecycle commands", () => {
   assert.match(packageJson.scripts["local:down"], /docker compose/);
   assert.match(packageJson.scripts["local:frontend"], /--mode local-server/);
 });
+
+test("PowerShell forwards Docker detach and log flags as literal Compose arguments", () => {
+  assert.match(bootstrap, /Invoke-Compose -ComposeArgs @\("up", "-d"\)/);
+  assert.match(
+    bootstrap,
+    /Invoke-Compose -ComposeArgs @\("logs", "--tail", "120", "backend", "postgres"\)/,
+  );
+  assert.doesNotMatch(bootstrap, /Invoke-Compose up -d/);
+});
