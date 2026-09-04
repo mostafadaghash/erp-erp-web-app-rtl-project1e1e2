@@ -124,7 +124,7 @@ test("local configuration targets self-hosted Convex without exposing secrets", 
   assert.match(configure, /CONVEX_SELF_HOSTED_ADMIN_KEY/);
   assert.match(
     configure,
-    /@\("env", "set", "--from-file", \$authFile, "--force"\)/,
+    /@\("env", "set", "--from-file", \$authFile, "--force", "--env-file", \$cliFile\)/,
   );
   assert.match(
     configure,

@@ -74,7 +74,7 @@ try {
   $env:CONVEX_SELF_HOSTED_URL = $cliSettings["CONVEX_SELF_HOSTED_URL"]
   $env:CONVEX_SELF_HOSTED_ADMIN_KEY = $cliSettings["CONVEX_SELF_HOSTED_ADMIN_KEY"]
 
-  Invoke-NativeCommand -FilePath $convexCli -Arguments @("env", "set", "--from-file", $authFile, "--force") -FailureMessage "Could not configure Convex Auth variables on the local deployment."
+  Invoke-NativeCommand -FilePath $convexCli -Arguments @("env", "set", "--from-file", $authFile, "--force", "--env-file", $cliFile) -FailureMessage "Could not configure Convex Auth variables on the local deployment."
   Invoke-NativeCommand -FilePath $convexCli -Arguments @("dev", "--once", "--env-file", $cliFile, "--typecheck", "enable", "--tail-logs", "disable") -FailureMessage "Could not deploy the ERP functions to local Convex."
 } finally {
   if ($null -eq $previousUrl) {
