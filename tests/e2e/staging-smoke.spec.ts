@@ -7,13 +7,13 @@ test.describe("staging browser smoke", () => {
     await expectRtlAndNoHorizontalOverflow(page);
 
     for (const label of [
-      "المبيعات",
-      "الأصناف",
+      "فواتير المبيعات",
+      "إدارة المخزون",
       "أوامر الصيانة",
-      "عمليات الشحن",
-      "الخزائن والبنوك",
+      "طلبات الشحن والتسويات",
+      "الخزائن والحسابات",
       "مركز التقارير",
-    ]) {
+    ] as const) {
       await navigateTo(page, label);
       await expectRtlAndNoHorizontalOverflow(page);
     }
@@ -23,7 +23,7 @@ test.describe("staging browser smoke", () => {
     await login(page, "admin");
     await expectRtlAndNoHorizontalOverflow(page);
     await openNavigation(page);
-    await expect(page.getByRole("button", { name: "لوحة التحكم", exact: true })).toBeVisible();
+    await expect(page.getByTestId("nav-dashboard")).toBeVisible();
 
     await page.keyboard.press("Tab");
     const focusedTag = await page.evaluate(() => document.activeElement?.tagName ?? "");
