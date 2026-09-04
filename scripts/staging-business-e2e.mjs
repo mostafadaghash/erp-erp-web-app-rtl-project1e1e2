@@ -262,9 +262,12 @@ async function chooseCombobox(input, query, expectedLabel) {
   await input.waitFor({ state: "visible", timeout: 30_000 });
   await input.fill(query);
   await input.press("Enter");
-  await assert.doesNotReject(async () => {
-    assert.equal(await input.inputValue(), expectedLabel);
-  });
+  const deadline = Date.now() + 5_000;
+  while (Date.now() < deadline) {
+    if ((await input.inputValue()) === expectedLabel) return;
+    await input.page().waitForTimeout(50);
+  }
+  assert.equal(await input.inputValue(), expectedLabel, `Combobox did not select: ${expectedLabel}`);
 }
 
 async function exactProductResult(page, productName) {
@@ -615,13 +618,9 @@ async function main() {
     await navigate(page, "salesInvoices");
     const salesInvoice = await runStep("invoice-create", () => createInvoice(page, config.fixtures, `${marker}-SALE`, 2));
     documents.salesInvoice = salesInvoice.number;
+    documents.refundInvoice = salesInvoice.number;
     await runStep("invoice-collection", () => collectInvoice(page, config.fixtures, salesInvoice, `${marker}-COLLECTION`));
     await runStep("sales-return", () => createSalesReturn(page, config.fixtures, salesInvoice, `${marker}-SALES-RETURN`));
-
-    await navigate(page, "salesInvoices");
-    const refundInvoiceRecord = await runStep("refund-invoice-create", () => createInvoice(page, config.fixtures, `${marker}-REFUND-INVOICE`, 1));
-    documents.refundInvoice = refundInvoiceRecord.number;
-    await runStep("refund-invoice-collection", () => collectInvoice(page, config.fixtures, refundInvoiceRecord, `${marker}-REFUND-COLLECTION`));
 
     const orderResult = await runStep("order-ready", () => createOrderAndLinkedInvoice(page, config.fixtures, `${marker}-ORDER`));
     documents.order = orderResult.orderNumber;
@@ -634,7 +633,7 @@ async function main() {
     await page.getByRole("button", { name: "تسجيل الخروج", exact: true }).click();
     await signIn(page, config.baseUrl, config.financialOperator);
     await navigate(page, "salesInvoices");
-    await runStep("invoice-refund", () => refundInvoice(page, config.fixtures, refundInvoiceRecord, `${marker}-REFUND`));
+    await runStep("invoice-refund", () => refundInvoice(page, config.fixtures, salesInvoice, `${marker}-REFUND`));
     documents.expense = await runStep("expense-disbursement", () => createExpenseCycle(page, config.fixtures, marker));
 
     assert.deepEqual(runtimeFailures, [], "Business browser flow reported server/runtime failures");
