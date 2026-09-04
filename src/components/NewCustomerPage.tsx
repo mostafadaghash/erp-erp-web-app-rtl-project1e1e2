@@ -171,7 +171,7 @@ export function NewCustomerPage({
                 autoFocus
                 className={`form-input ${fieldError("name") ? "border-rose-300" : ""}`}
                 value={form.name}
-                onInput={(event) => updateField("name", event.currentTarget.value)}
+                onChange={(event) => updateField("name", event.target.value)}
                 placeholder="مثال: أحمد محمد"
                 maxLength={100}
                 disabled={saving}
@@ -185,7 +185,7 @@ export function NewCustomerPage({
                   data-testid="new-customer-phone"
                   className={`form-input pr-10 ${fieldError("phone") ? "border-rose-300" : ""}`}
                   value={form.phone}
-                  onInput={(event) => updateField("phone", event.currentTarget.value)}
+                  onChange={(event) => updateField("phone", event.target.value)}
                   inputMode="tel"
                   dir="ltr"
                   placeholder="01000000000"
@@ -201,7 +201,7 @@ export function NewCustomerPage({
                   data-testid="new-customer-email"
                   className={`form-input pr-10 ${fieldError("email") ? "border-rose-300" : ""}`}
                   value={form.email}
-                  onInput={(event) => updateField("email", event.currentTarget.value)}
+                  onChange={(event) => updateField("email", event.target.value)}
                   type="email"
                   dir="ltr"
                   placeholder="customer@example.com"
@@ -250,7 +250,7 @@ export function NewCustomerPage({
                   <input
                     className="form-input pr-10"
                     value={categoryName}
-                    onInput={(event) => setCategoryName(event.currentTarget.value)}
+                    onChange={(event) => setCategoryName(event.target.value)}
                     onKeyDown={(event) => {
                       if (event.key !== "Enter") return;
                       event.preventDefault();
@@ -289,7 +289,7 @@ export function NewCustomerPage({
                   data-testid="new-customer-address"
                   className={`form-input min-h-24 resize-y pr-10 ${fieldError("address") ? "border-rose-300" : ""}`}
                   value={form.address}
-                  onInput={(event) => updateField("address", event.currentTarget.value)}
+                  onChange={(event) => updateField("address", event.target.value)}
                   placeholder="المحافظة، المدينة، المنطقة، الشارع..."
                   maxLength={300}
                   disabled={saving}
@@ -341,7 +341,7 @@ export function NewCustomerPage({
                 data-testid="new-customer-notes"
                 className={`form-input min-h-28 resize-y ${fieldError("notes") ? "border-rose-300" : ""}`}
                 value={form.notes}
-                onInput={(event) => updateField("notes", event.currentTarget.value)}
+                onChange={(event) => updateField("notes", event.target.value)}
                 placeholder="أي ملاحظات مهمة عن العميل تظهر لفريق العمل..."
                 maxLength={1000}
                 disabled={saving}
