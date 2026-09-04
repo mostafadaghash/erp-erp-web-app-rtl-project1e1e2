@@ -7,7 +7,7 @@ const read = (path) => readFileSync(new URL(path, import.meta.url), "utf8");
 const business = read("../scripts/staging-business-e2e.mjs");
 const workflow = read("../.github/workflows/staging-acceptance.yml");
 const matrix = read("./STAGING_BUSINESS_E2E_MATRIX.md");
-const runbook = read("./STAGING_MUTABLE_BUSINESS_RUNBOOK.md");
+const runbook = read("../docs/STAGING_ACCEPTANCE_RUNBOOK.md");
 
 // The broad contract assertions intentionally stay source-based: they protect the
 // mutation safety fences, stable browser selectors, and documented business flow
