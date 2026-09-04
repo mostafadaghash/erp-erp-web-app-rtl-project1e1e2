@@ -76,11 +76,23 @@ if (-not $ready) {
   throw "The local Convex backend did not become healthy within 120 seconds."
 }
 
-$adminOutput = & docker compose --env-file $runtimeFile -f $composeFile exec -T backend ./generate_admin_key.sh 2>&1
-if ($LASTEXITCODE -ne 0) {
+$previousErrorActionPreference = $ErrorActionPreference
+$adminOutput = @()
+$adminExitCode = -1
+try {
+  # The Convex key generator writes the harmless label "Admin key:" to stderr.
+  # Windows PowerShell converts native stderr into a terminating error when the
+  # global preference is Stop, so capture stdout only while this command runs.
+  $ErrorActionPreference = "Continue"
+  $adminOutput = & docker compose --env-file $runtimeFile -f $composeFile exec -T backend ./generate_admin_key.sh 2>$null
+  $adminExitCode = $LASTEXITCODE
+} finally {
+  $ErrorActionPreference = $previousErrorActionPreference
+}
+if ($adminExitCode -ne 0) {
   throw "Could not generate the local Convex admin key."
 }
-$adminKey = ($adminOutput | Select-Object -Last 1).ToString().Trim()
+$adminKey = (@($adminOutput) | Select-Object -Last 1).ToString().Trim()
 if ($adminKey.Length -lt 20) {
   throw "The generated Convex admin key was not valid."
 }

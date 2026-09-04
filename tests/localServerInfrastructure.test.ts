@@ -83,3 +83,18 @@ test("PowerShell forwards Docker detach and log flags as literal Compose argumen
   );
   assert.doesNotMatch(bootstrap, /Invoke-Compose up -d/);
 });
+
+test("Windows PowerShell captures only the generated admin key without leaking it", () => {
+  assert.match(
+    bootstrap,
+    /\$previousErrorActionPreference = \$ErrorActionPreference/,
+  );
+  assert.match(bootstrap, /\$ErrorActionPreference = "Continue"/);
+  assert.match(bootstrap, /generate_admin_key\.sh 2>\$null/);
+  assert.match(
+    bootstrap,
+    /\$ErrorActionPreference = \$previousErrorActionPreference/,
+  );
+  assert.match(bootstrap, /\$adminExitCode = \$LASTEXITCODE/);
+  assert.doesNotMatch(bootstrap, /Write-Host\s+\$adminKey/);
+});
