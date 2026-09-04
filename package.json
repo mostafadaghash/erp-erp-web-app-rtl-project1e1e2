@@ -41,7 +41,12 @@
     "test:e2e:smoke": "playwright test --grep @smoke",
     "test:e2e:roles": "playwright test --grep @roles",
     "test:e2e:flows": "playwright test --grep @flows",
-    "test:e2e:staging": "npm run staging:check && playwright test"
+    "test:e2e:staging": "npm run staging:check && playwright test",
+    "local:bootstrap": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/local/bootstrap.ps1",
+    "local:status": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/local/status.ps1",
+    "local:up": "docker compose --env-file infra/local/runtime.env.local -f infra/local/docker-compose.yml up -d",
+    "local:down": "docker compose --env-file infra/local/runtime.env.local -f infra/local/docker-compose.yml down",
+    "local:frontend": "vite --mode local-server --open"
   },
   "dependencies": {
     "@convex-dev/auth": "^0.0.95",

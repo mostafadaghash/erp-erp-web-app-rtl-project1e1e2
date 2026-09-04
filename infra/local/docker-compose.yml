@@ -1,0 +1,66 @@
+services:
+  postgres:
+    image: ${POSTGRES_IMAGE:-postgres:17-alpine}
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+
+  backend:
+    image: ${CONVEX_BACKEND_IMAGE:-ghcr.io/get-convex/convex-backend:latest}
+    restart: unless-stopped
+    stop_grace_period: 10s
+    stop_signal: SIGINT
+    ports:
+      - "127.0.0.1:${PORT:-3210}:3210"
+      - "127.0.0.1:${SITE_PROXY_PORT:-3211}:3211"
+    volumes:
+      - convex_data:/convex/data
+    environment:
+      POSTGRES_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432
+      DO_NOT_REQUIRE_SSL: "1"
+      INSTANCE_NAME: ${INSTANCE_NAME}
+      CONVEX_CLOUD_ORIGIN: ${CONVEX_CLOUD_ORIGIN:-http://127.0.0.1:3210}
+      CONVEX_SITE_ORIGIN: ${CONVEX_SITE_ORIGIN:-http://127.0.0.1:3211}
+      DISABLE_BEACON: "true"
+      DISABLE_METRICS_ENDPOINT: "true"
+      REDACT_LOGS_TO_CLIENT: "true"
+      APPLICATION_MAX_CONCURRENT_MUTATIONS: ${APPLICATION_MAX_CONCURRENT_MUTATIONS:-16}
+      APPLICATION_MAX_CONCURRENT_NODE_ACTIONS: ${APPLICATION_MAX_CONCURRENT_NODE_ACTIONS:-16}
+      APPLICATION_MAX_CONCURRENT_QUERIES: ${APPLICATION_MAX_CONCURRENT_QUERIES:-16}
+      APPLICATION_MAX_CONCURRENT_V8_ACTIONS: ${APPLICATION_MAX_CONCURRENT_V8_ACTIONS:-16}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:3210/version >/dev/null"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 15s
+
+  dashboard:
+    image: ${CONVEX_DASHBOARD_IMAGE:-ghcr.io/get-convex/convex-dashboard:latest}
+    restart: unless-stopped
+    stop_grace_period: 10s
+    stop_signal: SIGINT
+    ports:
+      - "127.0.0.1:${DASHBOARD_PORT:-6791}:6791"
+    environment:
+      NEXT_PUBLIC_DEPLOYMENT_URL: ${NEXT_PUBLIC_DEPLOYMENT_URL:-http://127.0.0.1:3210}
+    depends_on:
+      backend:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+  convex_data:
