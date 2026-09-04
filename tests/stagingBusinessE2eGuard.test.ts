@@ -92,7 +92,8 @@ test("business browser script executes all required public UI cycles and stores 
     "collectInvoice(",
     "refundInvoice(",
     "createSalesReturn(",
-    "createOrder(",
+    "createOrderAndLinkedInvoice(",
+    "transitionOrder(",
     "createDeliveryCycle(",
     "createPurchaseCycle(",
     "createRepairCycle(",
@@ -119,14 +120,19 @@ test("shared staging sign-in scopes the dashboard heading to main content", () =
 test("sales return cycle opens the standalone returns page", () => {
   assert.match(
     script,
-    /async function createSalesReturn[\s\S]{0,200}navigate\(page, "مرتجعات المبيعات", "sales-returns-page"\)/,
+    /async function createSalesReturn[\s\S]{0,200}navigate\(page, "salesReturns"\)/,
+  );
+  assert.match(
+    script,
+    /salesReturns: \{ group: "sales", item: "sales-returns", page: "sales-returns-page" \}/,
   );
 });
 
 test("business cycles wait for the current ERP success copy", () => {
   for (const message of [
-    "تم إنشاء أمر البيع بنجاح",
-    "تم تحديث حالة أمر البيع",
+    "تم إنشاء طلب البيع وإضافته للمتابعة",
+    "تم تسعير جميع أصناف الطلب",
+    "تم تغيير الحالة إلى",
     "تم إنشاء الشحنة بنجاح",
     "تم تسجيل إرسال الشحنة",
     "تم تسجيل التسليم والتحصيل بنجاح",
