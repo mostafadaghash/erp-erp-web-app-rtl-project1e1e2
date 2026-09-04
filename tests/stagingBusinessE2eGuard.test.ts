@@ -12,6 +12,7 @@ const matrix = read("tests/STAGING_BUSINESS_E2E_MATRIX.md");
 const executableAcceptanceCopy = [
   script,
   browserScript,
+  read("tests/e2e/helpers.ts"),
   read("tests/e2e/operational-flows.spec.ts"),
   read("tests/e2e/roles-branches.spec.ts"),
   read("tests/e2e/staging-smoke.spec.ts"),
@@ -128,6 +129,22 @@ test("sales return cycle opens the standalone returns page", () => {
   );
 });
 
+test("purchase cycle uses the dedicated current purchase invoice page before receipt", () => {
+  assert.match(
+    script,
+    /newPurchase: \{ group: "purchases", item: "new-purchase-invoice", page: "new-purchase-invoice-page" \}/,
+  );
+  assert.match(
+    script,
+    /async function createPurchaseCycle[\s\S]{0,1200}navigate\(page, "newPurchase"\)[\s\S]{0,1200}getByTestId\("purchase-submit"\)/,
+  );
+  assert.match(script, /تم إنشاء فاتورة المشتريات وحفظها بانتظار الاستلام/);
+  assert.doesNotMatch(
+    script,
+    /getByTestId\("shipment-create-form"\)|getByTestId\("shipment-create-open"\)/,
+  );
+});
+
 test("business cycles wait for the current ERP success copy", () => {
   for (const message of [
     "تم إنشاء طلب البيع وإضافته للمتابعة",
@@ -136,7 +153,7 @@ test("business cycles wait for the current ERP success copy", () => {
     "تم تسجيل إرسال الشحنة",
     "تم تسجيل التسليم والتحصيل بنجاح",
     "تمت تسوية مبالغ التحصيل بنجاح",
-    "تم إنشاء عملية الشراء بنجاح",
+    "تم إنشاء فاتورة المشتريات وحفظها بانتظار الاستلام",
     "تم تحديث حالة عملية الشراء",
     "تم ترحيل مرتجع المشتريات",
     "تم إنشاء أمر الصيانة بنجاح",
@@ -152,33 +169,37 @@ test("business cycles wait for the current ERP success copy", () => {
   );
 });
 
-test("all executable browser acceptance paths use the professional module names", () => {
+test("all executable browser acceptance paths use the current professional module names", () => {
   for (const label of [
-    "المبيعات",
+    "فواتير المبيعات",
     "مرتجعات المبيعات",
-    "أوامر البيع",
-    "المشتريات",
+    "طلبات البيع",
+    "فاتورة مشتريات جديدة",
+    "فواتير المشتريات",
     "مرتجعات المشتريات",
-    "عمليات الشحن",
+    "إدارة المخزون",
+    "طلبات الشحن والتسويات",
     "أوامر الصيانة",
     "حسابات الموردين",
-    "الخزائن والبنوك",
+    "الخزائن والحسابات",
+    "مركز التقارير",
     "المستخدمون والصلاحيات",
-    "سجل المراجعة",
+    "سجل العمليات",
   ]) assert.match(executableAcceptanceCopy, new RegExp(label));
 
   assert.doesNotMatch(
     executableAcceptanceCopy,
-    /المبيعات والفواتير|الأوردرات|الشحنات الواردة|التوصيلات|مدفوعات الموردين|الموظفون والصلاحيات|سجل العمليات|Sign Out/,
+    /أوامر البيع|دليل الأصناف|إدارة الشحن|عمليات الشحن|الخزائن والبنوك|سجل المراجعة|المحاسبة العامة|تصدير البيانات|المبيعات والفواتير|الأوردرات|الشحنات الواردة|التوصيلات|مدفوعات الموردين|الموظفون والصلاحيات|Sign Out/,
   );
 });
 
-test("mutable UI selectors cover sales, purchase, repair, and COD forms", () => {
+test("mutable UI selectors cover current sales, purchase, repair, and COD forms", () => {
   const sources = [
     "src/components/NewInvoicePage.tsx",
     "src/components/InvoicesPage.tsx",
     "src/components/SalesReturnsPanel.tsx",
     "src/components/OrdersPage.tsx",
+    "src/components/NewPurchaseInvoicePage.tsx",
     "src/components/DeliveriesPage.tsx",
     "src/components/ShipmentsPage.tsx",
     "src/components/SupplierPaymentsPage.tsx",
@@ -193,8 +214,11 @@ test("mutable UI selectors cover sales, purchase, repair, and COD forms", () => 
     "sales-return-submit",
     "order-intake-submit",
     "order-price-submit",
-    "delivery-action-submit",
+    "purchase-supplier-select",
+    "purchase-product-search",
+    "purchase-submit",
     "shipment-receive-submit",
+    "delivery-action-submit",
     "supplier-payment-submit",
     "purchase-return-submit",
     "repair-collection-submit",
@@ -232,7 +256,7 @@ test("staging business matrix contains fourteen honest not-yet-run acceptance ro
   assert.equal(rows.length, 14);
   assert.deepEqual(rows.map((row) => row.match(/SBE-\d{2}/)?.[0]), Array.from({ length: 14 }, (_, index) => `SBE-${String(index + 1).padStart(2, "0")}`));
   assert.doesNotMatch(matrix, /PASSED|COMPLETE|EXECUTED/);
-  for (const label of ["فاتورة مبيعات", "مرتجع مبيعات", "أمر بيع", "عملية شحن", "مشتريات", "مرتجع مشتريات", "أمر صيانة"]) {
+  for (const label of ["فاتورة مبيعات", "مرتجع مبيعات", "طلب بيع", "شحنة", "فاتورة مشتريات", "مرتجع مشتريات", "أمر صيانة"]) {
     assert.match(matrix, new RegExp(label));
   }
   assert.doesNotMatch(matrix, /سند توصيل|إنشاء شحنة|رقما الشحنة|رقم الصيانة/);
