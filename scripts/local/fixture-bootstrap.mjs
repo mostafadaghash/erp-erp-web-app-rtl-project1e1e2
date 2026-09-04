@@ -86,23 +86,12 @@ async function selectWorkingBranch(page) {
   );
 }
 
-async function typeLikeUser(locator, value) {
+async function fillAndVerify(locator, value, label) {
   await locator.waitFor({ state: "visible", timeout: 30_000 });
-  await locator.click();
-  await locator.press("Control+A");
-  await locator.press("Backspace");
-  await locator.pressSequentially(value, { delay: 20 });
-  await locator.press("Tab");
-  await locator.page().waitForFunction(
-    ({ testId, expected }) => {
-      const field = document.querySelector(`[data-testid="${testId}"]`);
-      return field instanceof HTMLInputElement || field instanceof HTMLTextAreaElement
-        ? field.value === expected
-        : false;
-    },
-    { testId: await locator.getAttribute("data-testid"), expected: value },
-    { timeout: 10_000 },
-  );
+  await locator.fill(value);
+  await locator.blur();
+  const actual = await locator.inputValue();
+  assert.equal(actual, value, `${label} field value did not persist`);
 }
 
 async function ensureCustomer(page) {
@@ -125,9 +114,9 @@ async function ensureCustomer(page) {
   const form = activePanel.getByTestId("new-customer-page");
   await form.waitFor({ state: "visible", timeout: 30_000 });
 
-  await typeLikeUser(form.getByTestId("new-customer-name"), fixture.customerName);
-  await typeLikeUser(form.getByTestId("new-customer-phone"), fixture.customerPhone);
-  await typeLikeUser(form.getByTestId("new-customer-address"), fixture.customerAddress);
+  await fillAndVerify(form.getByTestId("new-customer-name"), fixture.customerName, "customer name");
+  await fillAndVerify(form.getByTestId("new-customer-phone"), fixture.customerPhone, "customer phone");
+  await fillAndVerify(form.getByTestId("new-customer-address"), fixture.customerAddress, "customer address");
 
   const branch = form.getByTestId("new-customer-branch");
   if (await branch.count()) {
@@ -141,7 +130,7 @@ async function ensureCustomer(page) {
 
   const save = form.getByTestId("new-customer-save");
   await save.waitFor({ state: "visible", timeout: 30_000 });
-  await page.waitForTimeout(100);
+  await page.waitForTimeout(150);
   await save.click();
   await waitForToast(page, "تمت إضافة العميل بنجاح");
 
