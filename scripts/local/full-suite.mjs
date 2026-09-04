@@ -81,9 +81,7 @@ async function runCommand(command, args, environment = process.env) {
     shell: false,
   });
   const [code] = await once(child, "close");
-  if (code !== 0) {
-    throw new Error(`${command} ${args.join(" ")} failed with exit code ${code}`);
-  }
+  if (code !== 0) throw new Error(`${command} ${args.join(" ")} failed with exit code ${code}`);
 }
 
 async function runNpm(script) {
@@ -132,14 +130,24 @@ async function navigate(page, groupKey, pageId, expectedTestId) {
   await page.getByTestId(expectedTestId).waitFor({ state: "visible", timeout: 45_000 });
 }
 
+async function navigateBranches(page) {
+  const navigation = await openGroup(page, "administration");
+  const button = navigation.getByTestId("nav-branches");
+  await button.waitFor({ state: "visible", timeout: 30_000 });
+  await button.click();
+  await page.getByRole("main").getByRole("heading", { name: "الفروع", exact: true }).waitFor({ timeout: 30_000 });
+}
+
 async function selectExact(select, label) {
   await select.waitFor({ state: "visible", timeout: 30_000 });
+  const testId = await select.getAttribute("data-testid");
+  assert.ok(testId, "Select used by local E2E requires data-testid");
   await select.page().waitForFunction(
-    ({ testId, label: expected }) => {
-      const element = document.querySelector(`[data-testid="${testId}"]`);
+    ({ testId: id, label: expected }) => {
+      const element = document.querySelector(`[data-testid="${id}"]`);
       return element instanceof HTMLSelectElement && [...element.options].some((option) => option.value && option.text.trim() === expected);
     },
-    { testId: await select.getAttribute("data-testid"), label },
+    { testId, label },
     { timeout: 30_000 },
   );
   const options = await select.locator("option").evaluateAll((rows) => rows.map((row) => ({ value: row.value, label: row.textContent?.trim() ?? "" })));
@@ -150,12 +158,7 @@ async function selectExact(select, label) {
 }
 
 async function ensureBranch(page) {
-  await navigate(page, "administration", "branches", "branches-page").catch(async () => {
-    const navigation = await openGroup(page, "administration");
-    await navigation.getByTestId("nav-branches").click();
-    await page.getByRole("main").getByRole("heading", { name: "الفروع", exact: true }).waitFor({ timeout: 30_000 });
-  });
-
+  await navigateBranches(page);
   const existing = page.getByRole("heading", { name: fixtures.branchName, exact: true });
   if (!(await existing.isVisible().catch(() => false))) {
     const create = page.getByRole("button", { name: "فرع جديد", exact: true });
@@ -172,11 +175,15 @@ async function ensureBranch(page) {
 
 async function selectWorkingBranch(page) {
   const select = page.getByTestId("working-branch-select");
+  await select.waitFor({ state: "visible", timeout: 30_000 });
+  const before = await select.inputValue();
   const branch = await selectExact(select, fixtures.branchName);
-  if ((await select.inputValue()) !== branch.value) {
-    await select.selectOption(branch.value);
-    await waitForToast(page, "تم تغيير فرع العمل");
-  }
+  if (before !== branch.value) await waitForToast(page, "تم تغيير فرع العمل");
+  await page.waitForFunction(
+    (value) => document.querySelector('[data-testid="working-branch-select"]')?.value === value,
+    branch.value,
+    { timeout: 30_000 },
+  );
   return branch.value;
 }
 
@@ -282,6 +289,11 @@ async function ensureFinanceAccount(page, branch, name, code, type) {
     await page.getByTestId("finance-account-type").selectOption(type);
     await page.getByTestId("finance-account-create").click();
     await waitForToast(page, "تم إنشاء الحساب بنجاح");
+    await page.waitForFunction(
+      ({ name: expectedName, branchId }) => [...document.querySelectorAll('[data-testid="finance-account-row"]')].some((element) => element.getAttribute("data-account-name") === expectedName && element.getAttribute("data-account-branch-id") === branchId),
+      { name, branchId: branch.value },
+      { timeout: 30_000 },
+    );
     row = await financeAccountRow(page, name, branch.value);
   }
   assert.ok(row, `Missing finance account: ${name}`);
@@ -290,13 +302,19 @@ async function ensureFinanceAccount(page, branch, name, code, type) {
 
 async function postOpeningBalance(page, row, amount) {
   if ((await row.getAttribute("data-opening-posted")) === "true") return;
+  const accountName = await row.getAttribute("data-account-name");
+  const branchId = await row.getAttribute("data-account-branch-id");
   await row.getByTestId("finance-opening-balance").click();
   const heading = page.getByRole("heading", { name: "تسجيل الرصيد الافتتاحي", exact: true });
   await heading.waitFor({ state: "visible", timeout: 30_000 });
   const dialog = heading.locator("..").locator("..");
   await dialog.locator('input[type="number"]').fill(String(amount));
   await dialog.getByRole("button", { name: "حفظ", exact: true }).click();
-  await page.waitForTimeout(250);
+  await page.waitForFunction(
+    ({ accountName: expectedName, branchId: expectedBranch }) => [...document.querySelectorAll('[data-testid="finance-account-row"]')].some((element) => element.getAttribute("data-account-name") === expectedName && element.getAttribute("data-account-branch-id") === expectedBranch && element.getAttribute("data-opening-posted") === "true"),
+    { accountName, branchId },
+    { timeout: 30_000 },
+  );
 }
 
 async function ensureFinance(page) {
@@ -323,7 +341,7 @@ async function ensureFinance(page) {
     await waitForToast(page, "تم حفظ تاريخ بدء التسجيل المالي");
   }
 
-  const targetCash = await ensureFinanceAccount(page, targetBranch, fixtures.cashAccountName, "LOCAL-E2E-CASH", "cash");
+  await ensureFinanceAccount(page, targetBranch, fixtures.cashAccountName, "LOCAL-E2E-CASH", "cash");
   await ensureFinanceAccount(page, targetBranch, fixtures.codAccountName, "LOCAL-E2E-COD", "cod_clearing");
   await ensureFinanceAccount(page, targetBranch, fixtures.settlementAccountName, "LOCAL-E2E-BANK", "bank");
 
@@ -354,6 +372,29 @@ async function ensureFinance(page) {
   assert.ok(refreshedCash, "Local cash fixture is missing");
   const balance = Number(await refreshedCash.getAttribute("data-account-balance"));
   assert.ok(balance >= 100, "Local E2E cash account needs funding before business scenarios");
+}
+
+async function withAdminBrowser(admin, action) {
+  const browser = await launchStagingBrowser();
+  const context = await browser.newContext({ viewport: { width: 1440, height: 1100 }, locale: "ar-EG", timezoneId: "Africa/Cairo" });
+  const page = await context.newPage();
+  const runtimeFailures = observeRuntimeFailures(page, frontendUrl);
+  try {
+    await signIn(page, frontendUrl, admin);
+    await action(page);
+    assert.deepEqual(runtimeFailures, [], `Local browser failures:\n${runtimeFailures.join("\n")}`);
+    return page;
+  } finally {
+    await context.close();
+    await browser.close();
+  }
+}
+
+async function bootstrapBranch(admin) {
+  await withAdminBrowser(admin, async (page) => {
+    await ensureBranch(page);
+    await selectWorkingBranch(page);
+  });
 }
 
 async function setupBusinessFixtures(admin) {
@@ -405,10 +446,7 @@ async function main() {
 
   try {
     console.log("\n=== Local Suite: branch bootstrap ===");
-    await setupBusinessFixtures(admin).catch(async (error) => {
-      if (!String(error?.message ?? error).includes("Local E2E cash account needs funding")) throw error;
-      throw error;
-    });
+    await bootstrapBranch(admin);
 
     console.log("\n=== Local Suite: role account provisioning ===");
     await writeFile(stagingRoleAccountsPath, `${JSON.stringify([admin, ...localRoles], null, 2)}\n`, { mode: 0o600 });
@@ -417,7 +455,7 @@ async function main() {
     const nonAdmin = provisioned.filter((account) => account?.role !== "admin");
     await writeFile(localRoleAccountsPath, `${JSON.stringify(nonAdmin, null, 2)}\n`, { mode: 0o600 });
 
-    console.log("\n=== Local Suite: fixture verification ===");
+    console.log("\n=== Local Suite: business fixtures ===");
     await setupBusinessFixtures(admin);
 
     console.log("\n=== Local Suite: full business browser scenarios ===");
