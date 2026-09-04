@@ -44,6 +44,14 @@ function Read-Or-CreateLocalAdminSecret {
   }
 }
 
+if (-not $SkipVerify) {
+  Write-Host "" 
+  Write-Host "=== Local Suite: repository verification ===" -ForegroundColor Cyan
+  & npm.cmd run verify
+  $verifyExitCode = $LASTEXITCODE
+  if ($verifyExitCode -ne 0) { exit $verifyExitCode }
+}
+
 $admin = Read-Or-CreateLocalAdminSecret
 $bstr = [IntPtr]::Zero
 $plainPassword = $null
@@ -53,7 +61,10 @@ try {
   $plainPassword = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($bstr)
   $env:LOCAL_E2E_ADMIN_EMAIL = $admin.Email
   $env:LOCAL_E2E_ADMIN_PASSWORD = $plainPassword
-  $env:LOCAL_E2E_SKIP_VERIFY = if ($SkipVerify) { "true" } else { "false" }
+
+  # Repository verification is handled above by PowerShell on Windows.
+  # Keep the Node harness focused on local runtime and business E2E.
+  $env:LOCAL_E2E_SKIP_VERIFY = "true"
 
   & node "scripts/local/full-suite.mjs"
   $exitCode = $LASTEXITCODE
