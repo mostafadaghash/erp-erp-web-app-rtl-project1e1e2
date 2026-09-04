@@ -21,8 +21,8 @@ services:
     stop_grace_period: 10s
     stop_signal: SIGINT
     ports:
-      - "127.0.0.1:${PORT:-3210}:3210"
-      - "127.0.0.1:${SITE_PROXY_PORT:-3211}:3211"
+      - "${BACKEND_BIND_HOST:-127.0.0.1}:${PORT:-3210}:3210"
+      - "${BACKEND_BIND_HOST:-127.0.0.1}:${SITE_PROXY_PORT:-3211}:3211"
     volumes:
       - convex_data:/convex/data
     environment:
