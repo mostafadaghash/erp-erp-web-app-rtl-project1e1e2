@@ -23,6 +23,26 @@ jobs:
         run: |
           cat .github/dashboard-redesign/part0* | base64 -d | xz -d > /tmp/apply_dashboard_redesign.py
           python3 -m py_compile /tmp/apply_dashboard_redesign.py
+      - name: Patch current repair UI anchors
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('/tmp/apply_dashboard_redesign.py')
+          s = p.read_text(encoding='utf-8')
+          old = "pattern = r'(  useEffect\\(\\(\\) => \\{\\n    if \\(createRequestToken && canCreate\\) setShowForm\\(true\\);\\n  \\}, \\[createRequestToken, canCreate\\]\\);\\n)'"
+          new = "pattern = r'(  useEffect\\(\\(\\) => \\{\\n    if \\(createRequestToken && canCreate\\) openNewRepair\\(\\);\\n  \\}, \\[createRequestToken, canCreate\\]\\);\\n)'"
+          if old not in s:
+              raise SystemExit('old RepairsPage effect pattern not found in transformer')
+          s = s.replace(old, new, 1)
+          marker = "write('src/components/RepairsPage.tsx', repair_ui)"
+          injection = '''repair_ui = repair_ui.replace(\n    '    { key: "pending", label: "قيد الإنتظار", value: repairCounts?.pending ?? 0, icon: Clock },',\n    '    { key: "pending", label: "قيد الإنتظار", value: repairCounts?.pending ?? 0, icon: Clock },\\n    { key: "technician_received", label: "تم الاستلام من الفني", value: repairCounts?.received_by_technician ?? 0, icon: CheckCircle },',\n    1,\n)\nrepair_ui = repair_ui.replace('shipping_rejected', 'technician_rejected').replace('مرفوض من شركة الشحن', 'مرفوض من الفني').replace('rejected_by_shipping', 'rejected_by_technician')\n'''
+          if marker not in s:
+              raise SystemExit('RepairsPage write marker not found in transformer')
+          s = s.replace(marker, injection + marker, 1)
+          p.write_text(s, encoding='utf-8')
+          PY
+          python3 -m py_compile /tmp/apply_dashboard_redesign.py
       - name: Apply redesign
         shell: bash
         run: python3 /tmp/apply_dashboard_redesign.py
