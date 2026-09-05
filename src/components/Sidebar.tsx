@@ -68,11 +68,10 @@ interface NavGroup {
   items: NavItem[];
 }
 
-const HOME_ITEM: NavItem = { id: "dashboard", labelKey: "nav.dashboard", icon: Home };
 const FOLLOW_UP_ROLES = ["admin", "manager", "sales", "customer_service", "technician", "shipping"];
 const PAGE_SESSION_KEY = "business-tech-erp.current-page";
 const PAGE_IDS = new Set<Page>([
-  "dashboard", "products", "inventory", "customers", "new-customer", "follow-ups", "invoices",
+  "dashboard", "executive-dashboard", "products", "inventory", "customers", "new-customer", "follow-ups", "invoices",
   "sales-returns", "quotes", "credit-invoices", "new-invoice", "new-purchase-invoice", "repairs",
   "expenses", "suppliers", "orders", "deliveries", "shipments", "branches", "employees", "crm",
   "reports", "settings", "audit-logs", "accounts-home", "treasury", "supplier-payments",
@@ -82,6 +81,13 @@ const PAGE_IDS = new Set<Page>([
 const isPage = (value: string | null): value is Page => value !== null && PAGE_IDS.has(value as Page);
 
 const NAV_GROUPS: NavGroup[] = [
+  {
+    key: "dashboard", labelKey: "nav.dashboard", icon: Home,
+    items: [
+      { id: "dashboard", labelKey: "nav.operationalDashboard", icon: Home, permission: "view_operational_dashboard" },
+      { id: "executive-dashboard", labelKey: "nav.executiveDashboard", icon: BarChart3, permission: "view_executive_dashboard" },
+    ],
+  },
   {
     key: "sales", labelKey: "nav.sales", icon: ShoppingBag,
     items: [
@@ -224,10 +230,6 @@ export function Sidebar({ currentPage, onNavigate, onClose, permissions, userNam
         </div>
 
         <nav aria-label={t("nav.main")} className="erp-nav-groups">
-          <button type="button" data-testid="nav-dashboard" onClick={() => navigateTo(HOME_ITEM.id)} aria-current={currentPage === HOME_ITEM.id ? "page" : undefined} className={`erp-nav-home-button ${currentPage === HOME_ITEM.id ? "active" : ""}`}>
-            <Home className="h-4 w-4" /><span>{t(HOME_ITEM.labelKey)}</span>
-          </button>
-
           {groups.map(group => {
             const hasActive = group.items.some(item => item.id === currentPage);
             const isOpen = openGroup === group.key;
@@ -253,13 +255,13 @@ export function Sidebar({ currentPage, onNavigate, onClose, permissions, userNam
         </nav>
 
         <div className="erp-user-panel">
-          <div className="mb-2 flex items-center gap-2 lg:mb-0">
-            <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-xs font-black text-white" style={{ background: `linear-gradient(135deg, ${brand.primaryColor}, ${brand.secondaryColor})` }} data-user-content>
+          <div className="mb-2 flex min-w-0 items-center gap-2.5 lg:mb-0">
+            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-full text-sm font-black text-white" style={{ background: `linear-gradient(135deg, ${brand.primaryColor}, ${brand.secondaryColor})` }} data-user-content>
               {userName.trim().charAt(0) || "م"}
             </div>
-            <div className="min-w-0">
-              <p className="max-w-28 truncate text-xs font-black text-slate-800" data-user-content>{userName}</p>
-              <p data-testid="current-user-role" data-user-role={role} className="mt-0.5 max-w-28 truncate text-[10px] text-slate-500">{ROLE_LABELS[role] ?? role}</p>
+            <div className="min-w-0 flex-1">
+              <p className="max-w-48 truncate text-sm font-black text-slate-800 xl:max-w-56" title={userName} data-user-content>{userName}</p>
+              <p data-testid="current-user-role" data-user-role={role} className="mt-0.5 max-w-48 truncate text-[11px] font-medium text-slate-500 xl:max-w-56">{ROLE_LABELS[role] ?? role}</p>
             </div>
           </div>
           <SignOutButton />
