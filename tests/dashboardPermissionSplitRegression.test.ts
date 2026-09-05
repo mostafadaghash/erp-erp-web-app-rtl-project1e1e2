@@ -33,10 +33,19 @@ test("DBS-03 operational dashboard contains no executive financial summary", () 
 test("DBS-04 executive dashboard can render without report-center permission", () => {
   assert.match(executive, /api\.reporting\.overview, canViewExecutiveDashboard/);
   assert.doesNotMatch(executive, /canViewExecutiveDashboard && canViewReports && reportArgs/);
-  assert.match(executive, /disabled=\{!canViewReports\}/);
+  assert.match(executive, /disabled=\{!canViewReports \|\| card\.protected\}/);
 });
 
-test("DBS-05 desktop top bar is enlarged and user identity has reserved space", () => {
+test("DBS-05 executive cards also honor their underlying data permissions", () => {
+  for (const permission of ["view_invoices", "view_shipments", "view_expenses", "view_finance", "view_customer_ledger", "view_supplier_ledger", "view_profits", "view_products"]) {
+    assert.match(executive, new RegExp(`permissions\\.includes\\("${permission}"\\)`));
+  }
+  assert.match(executive, /protected: !canViewFinance/);
+  assert.match(executive, /protected: !canViewCustomerLedger/);
+  assert.match(executive, /protected: !canViewSupplierLedger/);
+});
+
+test("DBS-06 desktop top bar is enlarged and user identity has reserved space", () => {
   assert.match(main, /import "\.\/topbar-polish\.css"/);
   assert.match(topbar, /\.erp-navigation-inner\s*\{[\s\S]*min-height: 68px/);
   assert.match(topbar, /\.erp-user-panel\s*\{[\s\S]*min-width: 260px/);
