@@ -50,10 +50,11 @@ test("DBS-05 executive cards also honor their underlying data permissions", () =
 
 test("DBS-06 desktop top bar preserves user identity and logout without horizontal clipping", () => {
   assert.match(main, /import "\.\/topbar-polish\.css"/);
-  assert.match(topbar, /\.erp-navigation-inner\s*\{[\s\S]*min-height: 70px[\s\S]*overflow: hidden/);
+  assert.match(topbar, /\.erp-navigation-inner\s*\{[\s\S]*min-height: 70px/);
+  assert.doesNotMatch(topbar, /\.erp-navigation-inner\s*\{[^}]*overflow:\s*hidden/);
   assert.match(topbar, /\.erp-user-panel\s*\{[\s\S]*flex: 0 0 auto/);
   assert.match(topbar, /\.erp-user-panel > div:first-child\s*\{[\s\S]*width: 200px/);
-  assert.match(topbar, /p:first-child\s*\{[\s\S]*overflow: visible !important[\s\S]*white-space: nowrap !important/);
+  assert.match(topbar, /p:first-child\s*\{[\s\S]*text-overflow: ellipsis !important[\s\S]*white-space: nowrap !important/);
   assert.match(topbar, /\.erp-user-panel > button\s*\{[\s\S]*width: auto !important[\s\S]*min-width: 116px/);
   assert.match(sidebar, /title=\{userName\}/);
 });
