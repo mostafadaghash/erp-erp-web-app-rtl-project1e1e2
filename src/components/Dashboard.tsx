@@ -5,13 +5,24 @@ import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import type { Permission } from "../../convex/lib/permissions";
 import { validateReportingRange } from "../../shared/reportingRules";
-import type { ReportingOverview } from "../../shared/reportingView";
 import { useCurrency } from "../lib/utils";
 import type { ReportKind } from "./ReportsPage";
 
 interface DashboardProps { onOpenReport: (report: ReportKind) => void; permissions: Permission[]; }
 type Period = "today" | "week" | "month" | "year" | "custom";
 type DashboardCard = { key: string; title: string; value: number | null | undefined; note: string; report: ReportKind; icon: React.ElementType; tone: string; comparisonValue?: number | null; protected?: boolean; };
+type ExecutiveOverview = {
+  sales: { invoiceCount: number; netSales: number } | null;
+  purchases: { receiptCount: number; landedPurchases: number } | null;
+  profitability: { netProfit: number | null; netMargin: number | null; complete: boolean } | null;
+  expenses: { totalExpenses: number } | null;
+  balances: {
+    liquidAccounts: number | null;
+    customerReceivables: number | null;
+    supplierPayables: number | null;
+    inventoryValue: number | null;
+  };
+};
 
 const periodLabels: Record<Period, string> = { today: "اليوم", week: "آخر 7 أيام", month: "هذا الشهر", year: "هذه السنة", custom: "فترة مخصصة" };
 function isoDate(date: Date) { const year = date.getFullYear(); const month = String(date.getMonth() + 1).padStart(2, "0"); const day = String(date.getDate()).padStart(2, "0"); return `${year}-${month}-${day}`; }
@@ -33,22 +44,22 @@ export function Dashboard({ onOpenReport, permissions }: DashboardProps) {
   const canViewProducts = permissions.includes("view_products");
   const now = useMemo(() => new Date(), []); const today = isoDate(now);
   const [period, setPeriod] = useState<Period>("month"); const [from, setFrom] = useState(periodStart("month", now)); const [to, setTo] = useState(today); const [branchId, setBranchId] = useState<Id<"branches"> | "">(""); const [compare, setCompare] = useState(true); const [refreshedAt, setRefreshedAt] = useState(Date.now());
-  const me = useQuery(api.employees.me); const branches = useQuery(api.reporting.availableBranches, canViewExecutiveDashboard ? {} : "skip") ?? []; const canSelectBranch = me?.role === "admin" || me?.role === "accountant"; const rangeIsValid = validRange(from, to);
+  const me = useQuery(api.employees.me); const branches = useQuery(api.executiveDashboard.availableBranches, canViewExecutiveDashboard ? {} : "skip") ?? []; const canSelectBranch = me?.role === "admin" || me?.role === "accountant"; const rangeIsValid = validRange(from, to);
   const reportArgs = rangeIsValid ? { from, to, branchId: canSelectBranch && branchId ? branchId : undefined } : null;
-  const report = useQuery(api.reporting.overview, canViewExecutiveDashboard && reportArgs ? reportArgs : "skip") as ReportingOverview | undefined;
+  const report = useQuery(api.executiveDashboard.overview, canViewExecutiveDashboard && reportArgs ? reportArgs : "skip") as ExecutiveOverview | undefined;
   const comparisonRange = rangeIsValid ? previousRange(from, to) : null;
-  const previousReport = useQuery(api.reporting.overview, canViewExecutiveDashboard && compare && comparisonRange ? { ...comparisonRange, branchId: canSelectBranch && branchId ? branchId : undefined } : "skip") as ReportingOverview | undefined;
+  const previousReport = useQuery(api.executiveDashboard.overview, canViewExecutiveDashboard && compare && comparisonRange ? { ...comparisonRange, branchId: canSelectBranch && branchId ? branchId : undefined } : "skip") as ExecutiveOverview | undefined;
   const lowStockProducts = useQuery(api.products.list, canViewExecutiveDashboard && canViewProducts ? { lowStock: true } : "skip"); const { formatCurrency, formatAmount } = useCurrency();
   const changePeriod = (next: Period) => { setPeriod(next); if (next === "custom") return; setFrom(periodStart(next, new Date())); setTo(isoDate(new Date())); };
   const cards: DashboardCard[] = report ? [
-    { key: "sales", title: "إجمالي المبيعات", value: report.sales.netSales, comparisonValue: previousReport?.sales.netSales, note: canViewSales ? `${formatAmount(report.sales.invoiceCount)} فاتورة بعد المرتجعات` : "تحتاج صلاحية عرض فواتير المبيعات", report: "sales", icon: ReceiptText, tone: "emerald", protected: !canViewSales },
-    { key: "purchases", title: "إجمالي المشتريات", value: report.purchases.landedPurchases, comparisonValue: previousReport?.purchases.landedPurchases, note: canViewPurchases ? `${formatAmount(report.purchases.receiptCount)} مستند شراء` : "تحتاج صلاحية عرض المشتريات", report: "purchases", icon: ShoppingBag, tone: "blue", protected: !canViewPurchases },
-    { key: "profit", title: "صافي الربح", value: report.profitability?.netProfit, comparisonValue: previousReport?.profitability?.netProfit, note: report.completeness.profitabilityAvailable ? `هامش ${formatAmount(report.profitability?.netMargin ?? 0)}٪` : "تحتاج صلاحية الأرباح أو مراجعة التكاليف التاريخية", report: "profit", icon: TrendingUp, tone: "violet", protected: !canViewProfits },
-    { key: "expenses", title: "إجمالي المصروفات", value: report.expenses.totalExpenses, comparisonValue: previousReport?.expenses.totalExpenses, note: canViewExpenses ? "مصروفات التشغيل ورسوم الشحن" : "تحتاج صلاحية عرض المصروفات", report: "treasury", icon: CircleDollarSign, tone: "rose", protected: !canViewExpenses },
-    { key: "treasury", title: "أرصدة الخزائن", value: report.currentBalances.liquidAccounts, note: canViewFinance ? "الخزائن النقدية والبنوك والحسابات" : "تحتاج صلاحية عرض الحسابات", report: "treasury", icon: Landmark, tone: "cyan", protected: !canViewFinance },
-    { key: "customers", title: "مديونيات العملاء", value: report.currentBalances.customerReceivables, note: canViewCustomerLedger ? "إجمالي الأرصدة المطلوب تحصيلها" : "تحتاج صلاحية حسابات العملاء", report: "customers", icon: Users, tone: "amber", protected: !canViewCustomerLedger },
-    { key: "suppliers", title: "مستحقات الموردين", value: report.currentBalances.supplierPayables, note: canViewSupplierLedger ? "إجمالي الالتزامات الحالية للموردين" : "تحتاج صلاحية حسابات الموردين", report: "suppliers", icon: Truck, tone: "orange", protected: !canViewSupplierLedger },
-    { key: "inventory", title: "قيمة المخزون", value: report.currentBalances.inventoryValue, note: canViewProducts ? `${formatAmount(lowStockProducts?.length ?? 0)} صنف تحت حد الطلب` : "تحتاج صلاحية عرض المخزون", report: "inventory", icon: Boxes, tone: "slate", protected: !canViewProfits || !canViewProducts },
+    { key: "sales", title: "إجمالي المبيعات", value: report.sales?.netSales, comparisonValue: previousReport?.sales?.netSales, note: canViewSales ? `${formatAmount(report.sales?.invoiceCount ?? 0)} فاتورة بعد المرتجعات` : "تحتاج صلاحية عرض فواتير المبيعات", report: "sales", icon: ReceiptText, tone: "emerald", protected: !canViewSales },
+    { key: "purchases", title: "إجمالي المشتريات", value: report.purchases?.landedPurchases, comparisonValue: previousReport?.purchases?.landedPurchases, note: canViewPurchases ? `${formatAmount(report.purchases?.receiptCount ?? 0)} مستند شراء` : "تحتاج صلاحية عرض المشتريات", report: "purchases", icon: ShoppingBag, tone: "blue", protected: !canViewPurchases },
+    { key: "profit", title: "صافي الربح", value: report.profitability?.netProfit, comparisonValue: previousReport?.profitability?.netProfit, note: report.profitability?.complete ? `هامش ${formatAmount(report.profitability.netMargin ?? 0)}٪` : "تحتاج صلاحية الأرباح أو مراجعة التكاليف التاريخية", report: "profit", icon: TrendingUp, tone: "violet", protected: !canViewProfits },
+    { key: "expenses", title: "إجمالي المصروفات", value: report.expenses?.totalExpenses, comparisonValue: previousReport?.expenses?.totalExpenses, note: canViewExpenses ? "مصروفات التشغيل ورسوم الشحن" : "تحتاج صلاحية عرض المصروفات", report: "treasury", icon: CircleDollarSign, tone: "rose", protected: !canViewExpenses },
+    { key: "treasury", title: "أرصدة الخزائن", value: report.balances.liquidAccounts, note: canViewFinance ? "الخزائن النقدية والبنوك والحسابات" : "تحتاج صلاحية عرض الحسابات", report: "treasury", icon: Landmark, tone: "cyan", protected: !canViewFinance },
+    { key: "customers", title: "مديونيات العملاء", value: report.balances.customerReceivables, note: canViewCustomerLedger ? "إجمالي الأرصدة المطلوب تحصيلها" : "تحتاج صلاحية حسابات العملاء", report: "customers", icon: Users, tone: "amber", protected: !canViewCustomerLedger },
+    { key: "suppliers", title: "مستحقات الموردين", value: report.balances.supplierPayables, note: canViewSupplierLedger ? "إجمالي الالتزامات الحالية للموردين" : "تحتاج صلاحية حسابات الموردين", report: "suppliers", icon: Truck, tone: "orange", protected: !canViewSupplierLedger },
+    { key: "inventory", title: "قيمة المخزون", value: report.balances.inventoryValue, note: canViewProducts ? `${formatAmount(lowStockProducts?.length ?? 0)} صنف تحت حد الطلب` : "تحتاج صلاحية عرض المخزون", report: "inventory", icon: Boxes, tone: "slate", protected: !canViewProfits || !canViewProducts },
   ] : [];
   return <div className="erp-dashboard-compact" data-refreshed-at={refreshedAt} data-testid="executive-dashboard">
     <section className="erp-dashboard-controls" aria-label="فلاتر اللوحة التنفيذية"><div className="erp-dashboard-title-block"><span className="erp-dashboard-title-icon" aria-hidden="true"><LayoutDashboard /></span><div className="min-w-0"><p className="erp-dashboard-breadcrumb">لوحة التحكم</p><h1 className="erp-page-title">اللوحة التنفيذية</h1><p className="erp-dashboard-subtitle">ملخص الأداء المالي والإداري</p></div></div><div className="erp-dashboard-filter-grid">
