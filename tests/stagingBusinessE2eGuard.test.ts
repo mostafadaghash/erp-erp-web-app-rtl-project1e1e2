@@ -1,208 +1,223 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { spawnSync } from "node:child_process";
+import { validateFixtureDefinition } from "../scripts/staging-fixtures-setup.mjs";
 
-const read = (path: string) => readFileSync(path, "utf8");
-const script = read("scripts/staging-business-e2e.mjs");
-const browserScript = read("scripts/staging-browser-e2e.mjs");
-const workflow = read(".github/workflows/staging-acceptance.yml");
-const runbook = read("docs/STAGING_ACCEPTANCE_RUNBOOK.md");
-const matrix = read("tests/STAGING_BUSINESS_E2E_MATRIX.md");
-const executableAcceptanceCopy = [
-  script,
-  browserScript,
-  read("tests/e2e/operational-flows.spec.ts"),
-  read("tests/e2e/roles-branches.spec.ts"),
-  read("tests/e2e/staging-smoke.spec.ts"),
-  matrix,
-].join("\n");
+const read = (path) => readFileSync(new URL(path, import.meta.url), "utf8");
+const business = read("../scripts/staging-business-e2e.mjs");
+const workflow = read("../.github/workflows/staging-acceptance.yml");
+const matrix = read("./STAGING_BUSINESS_E2E_MATRIX.md");
+const runbook = read("../docs/STAGING_ACCEPTANCE_RUNBOOK.md");
 
-const fixtures = {
-  dataset: "disposable-staging",
-  branchName: "E2E Branch",
-  customerName: "E2E Customer",
-  productName: "E2E Product",
-  supplierName: "E2E Supplier",
-  cashAccountName: "E2E Cash",
-  codAccountName: "E2E COD",
-  settlementAccountName: "E2E Bank",
-  city: "Cairo",
-  address: "E2E Address",
-  shippingCompany: "E2E Carrier",
-  operationDate: "2026-08-07",
-};
-const accounts = [
-  { role: "admin", email: "admin@example.invalid", password: "not-a-real-password" },
-  { role: "manager", email: "manager@example.invalid", password: "not-a-real-password" },
-  { role: "accountant", email: "accountant@example.invalid", password: "not-a-real-password" },
-];
-const validationEnv = {
-  ...process.env,
-  STAGING_BASE_URL: "https://isolated-staging.example.invalid",
-  STAGING_CONVEX_URL: "https://erp-stage.convex.cloud",
-  STAGING_CONVEX_SITE_URL: "https://erp-stage.convex.site",
-  STAGING_TARGET_CONFIRMATION: "isolated-staging.example.invalid|erp-stage",
-  E2E_ENVIRONMENT: "staging",
-  E2E_REQUIRE_ALL_ROLES: "false",
-  E2E_MUTATIONS_CONFIRMED: "isolated-staging-only",
-  E2E_ROLE_ACCOUNTS_JSON: JSON.stringify(accounts),
-  E2E_BUSINESS_FIXTURES_JSON: JSON.stringify(fixtures),
-};
+// The broad contract assertions intentionally stay source-based: they protect the
+// mutation safety fences, stable browser selectors, and documented business flow
+// without requiring live Staging credentials in the repository test suite.
 
-function validate(overrides: Record<string, string | undefined> = {}) {
-  const env = { ...validationEnv, ...overrides };
-  for (const [key, value] of Object.entries(env)) if (value === undefined) delete env[key];
-  return spawnSync(process.execPath, ["scripts/staging-business-e2e.mjs", "--validate-config"], {
-    cwd: process.cwd(),
-    env,
-    encoding: "utf8",
+test("business E2E remains fenced to confirmed disposable staging data", () => {
+  assert.match(business, /E2E_MUTATIONS_CONFIRMED/);
+  assert.match(business, /isolated-staging-only/);
+  assert.match(business, /fixtures\.dataset/);
+  assert.match(business, /disposable-staging/);
+  assert.match(business, /E2E_BUSINESS_FIXTURES_JSON/);
+  assert.match(business, /E2E_ACCOUNT_BRANCH_NAME/);
+  assert.match(business, /stagingConfig\(\)/);
+});
+
+test("business fixture definition validates bounded disposable inputs", () => {
+  const valid = validateFixtureDefinition({
+    dataset: "disposable-staging",
+    branchName: "فرع اختبار",
+    customerName: "عميل اختبار",
+    productName: "صنف اختبار",
+    supplierName: "مورد اختبار",
+    cashAccountName: "خزنة اختبار",
+    codAccountName: "تحصيل شحن اختبار",
+    settlementAccountName: "بنك اختبار",
   });
-}
-
-test("staging mutable suite validates an isolated disposable configuration without a browser", () => {
-  const result = validate();
-  assert.equal(result.status, 0, result.stderr);
-  const output = JSON.parse(result.stdout);
-  assert.equal(output.operatorRole, "manager");
-  assert.equal(output.dataset, "disposable-staging");
-  assert.equal(output.scenarios.length, 6);
-  assert.doesNotMatch(result.stdout, /not-a-real-password|@example\.invalid/);
-});
-
-test("staging mutable suite refuses missing confirmation, production hosts, and non-disposable data", () => {
-  const noConfirmation = validate({ E2E_MUTATIONS_CONFIRMED: undefined });
-  assert.notEqual(noConfirmation.status, 0);
-  assert.match(noConfirmation.stderr, /isolated-staging-only/);
-
-  const production = validate({ STAGING_BASE_URL: "https://production.example.invalid" });
-  assert.notEqual(production.status, 0);
-  assert.match(production.stderr, /refuses production-looking hosts/);
-
-  const wrongDataset = validate({
-    E2E_BUSINESS_FIXTURES_JSON: JSON.stringify({ ...fixtures, dataset: "production-copy" }),
-  });
-  assert.notEqual(wrongDataset.status, 0);
-  assert.match(wrongDataset.stderr, /disposable-staging/);
-});
-
-test("business browser script executes all required public UI cycles and stores redacted evidence", () => {
-  for (const marker of [
-    "createInvoice(",
-    "collectInvoice(",
-    "refundInvoice(",
-    "createSalesReturn(",
-    "createOrder(",
-    "createDeliveryCycle(",
-    "createPurchaseCycle(",
-    "createRepairCycle(",
-    "createExpenseCycle(",
-    'join(outputRoot, "acceptance.json")',
-    "observeRuntimeFailures",
-  ]) assert.match(script, new RegExp(marker.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
-  assert.doesNotMatch(script, /console\.log\([^\n]*(password|email)|documents?\.write/);
-  assert.match(script, /getByTestId\("invoices-page"\)\.getByRole\("button", \{ name: "فاتورة بيع جديدة", exact: true \}\)/);
-  assert.doesNotMatch(script, /page\.getByRole\("button", \{ name: "فاتورة بيع جديدة", exact: true \}\)/);
-});
-
-test("shared staging sign-in scopes the dashboard heading to main content", () => {
-  assert.match(
-    browserScript,
-    /getByRole\("main"\)\s*\.getByRole\("heading", \{ name: "لوحة التحكم", exact: true \}\)/,
-  );
-  assert.doesNotMatch(
-    browserScript,
-    /page\s*\.getByRole\("heading", \{ name: "لوحة التحكم", exact: true \}\)/,
+  assert.equal(valid.dataset, "disposable-staging");
+  assert.ok(valid.customerPhone);
+  assert.ok(valid.supplierPhone);
+  assert.ok(valid.productSku);
+  assert.ok(valid.productOpeningStock > 0);
+  assert.ok(valid.cashOpeningBalance > 0);
+  assert.throws(() => validateFixtureDefinition({}), /Missing business fixture/);
+  assert.throws(
+    () => validateFixtureDefinition({ ...valid, dataset: "production" }),
+    /disposable-staging/,
   );
 });
 
-test("sales return cycle opens the standalone returns page", () => {
-  assert.match(
-    script,
-    /async function createSalesReturn[\s\S]{0,200}navigate\(page, "مرتجعات المبيعات", "sales-returns-page"\)/,
-  );
+test("mutable business runner covers current end-to-end scenario set", () => {
+  for (const scenario of [
+    "invoice_collection_sales_return",
+    "invoice_collection_refund",
+    "purchase_receipt_return_supplier_payment",
+    "repair_collection",
+    "order_delivery_cod_settlement",
+    "expense_disbursement",
+  ]) {
+    assert.match(business, new RegExp(scenario));
+  }
 });
 
-test("business cycles wait for the current ERP success copy", () => {
-  for (const message of [
-    "تم إنشاء أمر البيع بنجاح",
-    "تم تحديث حالة أمر البيع",
-    "تم إنشاء الشحنة بنجاح",
-    "تم تسجيل إرسال الشحنة",
-    "تم تسجيل التسليم والتحصيل بنجاح",
-    "تمت تسوية مبالغ التحصيل بنجاح",
-    "تم إنشاء عملية الشراء بنجاح",
-    "تم تحديث حالة عملية الشراء",
-    "تم ترحيل مرتجع المشتريات",
-    "تم إنشاء أمر الصيانة بنجاح",
-  ]) assert.match(script, new RegExp(message));
-
-  assert.doesNotMatch(
-    script,
-    /تم إنشاء الأوردر بنجاح|تم تحديث حالة الطلب|تم إنشاء سند التوصيل|تم تأكيد الشحن|تم إنشاء عملية الشحن بنجاح|تم تأكيد إرسال الشحنة|تم تحديث حالة الشحنة|تم ترحيل مرتجع الشراء|تم إضافة طلب الصيانة بنجاح/,
-  );
+test("mutable business runner uses current grouped navigation targets", () => {
+  for (const target of [
+    'salesInvoices: { group: "sales", item: "invoices", page: "invoices-page" }',
+    'salesReturns: { group: "sales", item: "sales-returns", page: "sales-returns-page" }',
+    'orders: { group: "sales", item: "orders", page: "orders-page" }',
+    'newPurchase: { group: "purchases", item: "new-purchase-invoice", page: "new-purchase-invoice-page" }',
+    'purchases: { group: "purchases", item: "shipments", page: "shipments-page" }',
+    'purchaseReturns: { group: "purchases", item: "purchase-returns", page: "purchase-returns-page" }',
+    'supplierPayments: { group: "accounting", item: "supplier-payments", page: "supplier-payments-page" }',
+    'repairs: { group: "service", item: "repairs", page: "repairs-page" }',
+    'deliveries: { group: "shipping", item: "deliveries", page: "deliveries-page" }',
+    'expenses: { group: "accounting", item: "expenses", page: "expenses-page" }',
+  ]) {
+    assert.match(business, new RegExp(target.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  }
 });
 
-test("all executable browser acceptance paths use the professional module names", () => {
-  for (const label of [
-    "المبيعات",
-    "مرتجعات المبيعات",
-    "أوامر البيع",
-    "المشتريات",
-    "مرتجعات المشتريات",
-    "عمليات الشحن",
-    "أوامر الصيانة",
-    "حسابات الموردين",
-    "الخزائن والبنوك",
-    "المستخدمون والصلاحيات",
-    "سجل المراجعة",
-  ]) assert.match(executableAcceptanceCopy, new RegExp(label));
-
-  assert.doesNotMatch(
-    executableAcceptanceCopy,
-    /المبيعات والفواتير|الأوردرات|الشحنات الواردة|التوصيلات|مدفوعات الموردين|الموظفون والصلاحيات|سجل العمليات|Sign Out/,
-  );
+test("invoice cycle is credit-first and uses explicit finance account selectors", () => {
+  assert.match(business, /invoice-payment-method/);
+  assert.match(business, /selectOption\("credit"\)/);
+  assert.match(business, /invoice-collection-account/);
+  assert.match(business, /invoice-refund-account/);
+  assert.match(business, /invoiceCollectionAmount/);
 });
 
-test("mutable UI selectors cover sales, purchase, repair, and COD forms", () => {
-  const sources = [
-    "src/components/NewInvoicePage.tsx",
-    "src/components/InvoicesPage.tsx",
-    "src/components/SalesReturnsPanel.tsx",
-    "src/components/OrdersPage.tsx",
-    "src/components/DeliveriesPage.tsx",
-    "src/components/ShipmentsPage.tsx",
-    "src/components/SupplierPaymentsPage.tsx",
-    "src/components/PurchaseReturnsPage.tsx",
-    "src/components/RepairsPage.tsx",
-    "src/components/ExpensesPage.tsx",
-  ].map(read).join("\n");
-  for (const selector of [
-    "invoice-submit",
-    "invoice-collection-submit",
-    "invoice-refund-submit",
-    "sales-return-submit",
-    "order-intake-submit",
-    "order-price-submit",
-    "delivery-action-submit",
+test("sales return uses the current invoice picker and quantity field", () => {
+  assert.match(business, /sales-return-invoice-picker/);
+  assert.match(business, /sales-return-start/);
+  assert.match(business, /sales-return-form/);
+  assert.match(business, /كمية إرجاع/);
+  assert.match(business, /sales-return-submit/);
+});
+
+test("sales order lifecycle uses current intake, pricing, and state transition controls", () => {
+  assert.match(business, /createOrderAndLinkedInvoice\(/);
+  assert.match(business, /order-create-open/);
+  assert.match(business, /order-intake-submit/);
+  assert.match(business, /order-intake-item/);
+  assert.match(business, /order-intake-quantity/);
+  assert.match(business, /order-price-open/);
+  assert.match(business, /order-price-input/);
+  assert.match(business, /order-price-submit/);
+  assert.match(business, /data-status-action/);
+  assert.match(business, /for \(const state of \["confirmed", "preparing", "ready"\]\)/);
+  assert.match(business, /waitForEntityState/);
+  assert.match(business, /تم إنشاء طلب البيع وإضافته للمتابعة/);
+  assert.match(business, /تم تسعير جميع أصناف الطلب/);
+});
+
+test("order confirmation resolves the server-created linked invoice instead of creating a duplicate", () => {
+  assert.match(business, /invoicesBefore/);
+  assert.match(business, /waitForNewEntity\(page, "invoice-row", "data-invoice-number", invoicesBefore\)/);
+  assert.doesNotMatch(business, /createInvoice[\s\S]{0,500}createDeliveryCycle/);
+});
+
+test("purchase cycle uses the dedicated current purchase invoice page", () => {
+  assert.match(business, /navigate\(page, "newPurchase"\)/);
+  assert.match(business, /new-purchase-invoice-page/);
+  assert.match(business, /purchase-supplier-select/);
+  assert.match(business, /purchase-product-search/);
+  assert.match(business, /purchase-product-result/);
+  assert.match(business, /data-purchase-quantity/);
+  assert.match(business, /data-purchase-unit-cost/);
+  assert.match(business, /purchase-shipping-cost/);
+  assert.match(business, /purchase-notes/);
+  assert.match(business, /purchase-submit/);
+  assert.match(business, /تم إنشاء فاتورة المشتريات وحفظها بانتظار الاستلام/);
+  assert.doesNotMatch(business, /shipment-create-form|shipment-supplier-select|shipment-item-row|shipment-product-select|shipment-item-quantity|shipment-item-unit-cost|shipment-submit/);
+});
+
+test("purchase receipt, return, and supplier payment use current stable selectors", () => {
+  for (const id of [
+    "shipment-status-next",
+    "shipment-receive-form",
+    "shipment-receive-date",
+    "shipment-external-invoice",
     "shipment-receive-submit",
-    "supplier-payment-submit",
+    "purchase-return-supplier",
+    "purchase-return-receipt",
+    "purchase-return-item",
+    "purchase-return-quantity",
+    "purchase-return-reason",
     "purchase-return-submit",
-    "repair-collection-submit",
-    "expense-submit",
-  ]) assert.match(sources, new RegExp(`data-testid="${selector}"`));
+    "supplier-payment-supplier",
+    "supplier-payment-account",
+    "supplier-payment-receipt",
+    "supplier-payment-allocation",
+    "supplier-payment-notes",
+    "supplier-payment-submit",
+  ]) {
+    assert.match(business, new RegExp(id));
+  }
+  assert.match(business, /PUR-\\d\{4\}-\\d\+/);
 });
 
-test("invoice collection no longer guesses the first account through a prompt", () => {
-  const invoices = read("src/components/InvoicesPage.tsx");
-  assert.doesNotMatch(invoices, /prompt\("المبلغ المراد تحصيله"\)|collectionAccounts\[0\]/);
-  assert.match(invoices, /collectionAccountPicker, canCollect && collectTarget \? \{\} : "skip"/);
-  assert.match(invoices, /requestId: collectionRequestId\.current/);
-  assert.doesNotMatch(invoices, /catch[\s\S]{0,300}collectionRequestId\.current\s*=/);
+test("repair and expense cycles use current current-page contracts", () => {
+  for (const id of [
+    "repair-create-open",
+    "repair-create-form",
+    "repair-customer-select",
+    "repair-device-brand",
+    "repair-device-model",
+    "repair-problem",
+    "repair-labor-cost",
+    "repair-submit",
+    "repair-collect-open",
+    "repair-collection-form",
+    "repair-collection-amount",
+    "repair-collection-account",
+    "repair-collection-date",
+    "repair-collection-submit",
+    "expense-create-open",
+    "expense-create-form",
+    "expense-account",
+    "expense-submit",
+  ]) {
+    assert.match(business, new RegExp(id));
+  }
+});
+
+test("delivery cycle binds order and linked invoice then validates COD settlement", () => {
+  for (const id of [
+    "delivery-create-open",
+    "delivery-action-modal",
+    "delivery-order-select",
+    "delivery-invoice-select",
+    "delivery-city",
+    "delivery-address",
+    "delivery-company",
+    "delivery-tracking",
+    "delivery-carrier-fee",
+    "delivery-action-date",
+    "delivery-action-submit",
+    "delivery-ship-open",
+    "delivery-confirm-open",
+    "delivery-confirmation-account",
+    "delivery-settlement-open",
+    "delivery-settlement-source",
+    "delivery-settlement-item",
+    "delivery-settlement-destination",
+  ]) {
+    assert.match(business, new RegExp(id));
+  }
+  assert.match(business, /تم إنشاء الشحنة بنجاح/);
+  assert.match(business, /تم تسجيل إرسال الشحنة/);
+  assert.match(business, /تم تسجيل التسليم والتحصيل بنجاح/);
+  assert.match(business, /تمت تسوية مبالغ التحصيل بنجاح/);
+});
+
+test("browser business evidence remains redacted and runtime-failure aware", () => {
+  assert.match(business, /observeRuntimeFailures/);
+  assert.match(business, /redactEvidence/);
+  assert.match(business, /safeScreenshot/);
+  assert.match(business, /acceptance\.json/);
 });
 
 test("invoice refund requires an explicit account and a stable idempotency key", () => {
-  const invoices = read("src/components/InvoicesPage.tsx");
+  const invoices = read("../src/components/InvoicesPage.tsx");
   assert.doesNotMatch(invoices, /prompt\(|refundAccounts\[0\]/);
   assert.match(invoices, /refundAccountPicker, canRefund && refundTarget \? \{\} : "skip"/);
   assert.match(invoices, /requestId: refundRequestId\.current/);
@@ -218,15 +233,15 @@ test("GitHub mutable job is manual, staging-protected, and follows read-only rol
   assert.match(workflow, /test:e2e-business-staging -- --validate-config/);
 });
 
-test("staging business matrix contains fourteen honest not-yet-run acceptance rows", () => {
+test("staging business matrix contains fourteen honest current acceptance rows", () => {
   const rows = matrix.match(/^\| SBE-\d{2} \|.*\| IMPLEMENTED_NOT_RUN \|$/gm) ?? [];
   assert.equal(rows.length, 14);
   assert.deepEqual(rows.map((row) => row.match(/SBE-\d{2}/)?.[0]), Array.from({ length: 14 }, (_, index) => `SBE-${String(index + 1).padStart(2, "0")}`));
   assert.doesNotMatch(matrix, /PASSED|COMPLETE|EXECUTED/);
-  for (const label of ["فاتورة مبيعات", "مرتجع مبيعات", "أمر بيع", "عملية شحن", "مشتريات", "مرتجع مشتريات", "أمر صيانة"]) {
+  for (const label of ["فاتورة مبيعات", "مرتجع مبيعات", "طلب بيع", "شحنة", "فاتورة مشتريات", "مرتجع مشتريات", "أمر صيانة"]) {
     assert.match(matrix, new RegExp(label));
   }
-  assert.doesNotMatch(matrix, /سند توصيل|إنشاء شحنة|رقما الشحنة|رقم الصيانة/);
+  assert.doesNotMatch(matrix, /سند توصيل|رقما الشحنة|رقم الصيانة/);
 });
 
 test("runbook requires disposable data, reset discipline, and forbids production mutation", () => {

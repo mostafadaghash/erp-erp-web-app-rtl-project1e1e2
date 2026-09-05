@@ -92,14 +92,9 @@ async function waitForToast(page, message) {
       if (toasts.some((toast) => toast.textContent?.includes(expected))) {
         return { ok: true, text: expected };
       }
-      const errorToast = toasts.find(
-        (toast) => toast.getAttribute("data-type") === "error",
-      );
+      const errorToast = toasts.find((toast) => toast.getAttribute("data-type") === "error");
       if (errorToast) {
-        return {
-          ok: false,
-          text: errorToast.textContent?.trim() || "Unknown UI error",
-        };
+        return { ok: false, text: errorToast.textContent?.trim() || "Unknown UI error" };
       }
       return null;
     },
@@ -109,18 +104,12 @@ async function waitForToast(page, message) {
   const outcome = await handle.jsonValue();
   await handle.dispose();
   if (!outcome?.ok) {
-    throw new Error(
-      `UI error while waiting for success message "${message}": ${outcome?.text ?? "unknown"}`,
-    );
+    throw new Error(`UI error while waiting for success message "${message}": ${outcome?.text ?? "unknown"}`);
   }
 }
 
-const professionalNavigationLabel = {
-  "الأصناف": "دليل الأصناف",
-};
-
 async function navigate(page, label, testId) {
-  await navigateSidebar(page, professionalNavigationLabel[label] ?? label);
+  await navigateSidebar(page, label);
   await page.getByTestId(testId).waitFor({ state: "visible", timeout: 30_000 });
 }
 
@@ -155,9 +144,7 @@ async function exactRow(page, testId, attribute, value) {
 async function waitForExactRow(page, testId, attribute, value) {
   await page.waitForFunction(
     ({ testId: id, attribute: field, value: expected }) =>
-      [...document.querySelectorAll(`[data-testid="${id}"]`)].some(
-        (element) => element.getAttribute(field) === expected,
-      ),
+      [...document.querySelectorAll(`[data-testid="${id}"]`)].some((element) => element.getAttribute(field) === expected),
     { testId, attribute, value },
     { timeout: 45_000 },
   );
@@ -172,29 +159,29 @@ async function ensureAdminWorkingBranch(page, fixtures, targetBranchId) {
     assert.equal(selected.value, targetBranchId, "Named fixture branch resolved to a different branch ID");
     await waitForToast(page, "تم تغيير فرع العمل");
   }
-  assert.equal(
-    await workingBranch.inputValue(),
-    targetBranchId,
-    "Admin working branch does not match the fixture branch",
-  );
+  assert.equal(await workingBranch.inputValue(), targetBranchId, "Admin working branch does not match the fixture branch");
 }
 
 async function ensureCustomer(page, fixtures, targetBranchId) {
-  await navigate(page, "العملاء", "customers-page");
+  await navigate(page, "قائمة العملاء", "customers-page");
   const branchSelect = page.getByTestId("customer-branch-select");
   const branch = await branchSelect.count()
     ? await selectExact(branchSelect, fixtures.branchName)
     : { value: targetBranchId, label: fixtures.branchName };
   assert.equal(branch.value, targetBranchId, "Customer fixture branch does not match the finance fixture branch");
-  await page.getByTestId("customer-search").fill(fixtures.customerName);
+  const search = page.getByTestId("customer-search");
+  await search.fill(fixtures.customerName);
   let row = await exactRow(page, "customer-card", "data-customer-name", fixtures.customerName);
   if (!row) {
     await page.getByTestId("customer-create-open").click();
-    await page.locator("#contact-name").fill(fixtures.customerName);
-    await page.locator("#contact-phone").fill(fixtures.customerPhone);
-    await page.locator("#contact-address").fill("E2E fixture - disposable Staging only");
-    await page.getByRole("button", { name: "حفظ", exact: true }).click();
-    await waitForToast(page, "تمت إضافة العميل");
+    await page.getByTestId("new-customer-page").waitFor({ state: "visible", timeout: 30_000 });
+    await page.getByTestId("new-customer-name").fill(fixtures.customerName);
+    await page.getByTestId("new-customer-phone").fill(fixtures.customerPhone);
+    await page.getByTestId("new-customer-address").fill("E2E fixture - disposable Staging only");
+    await page.getByTestId("new-customer-save").click();
+    await waitForToast(page, "تمت إضافة العميل بنجاح");
+    await page.getByTestId("customers-page").waitFor({ state: "visible", timeout: 30_000 });
+    await search.fill(fixtures.customerName);
     row = await waitForExactRow(page, "customer-card", "data-customer-name", fixtures.customerName);
   }
   assert.ok(row, "Customer fixture did not appear after setup");
@@ -223,17 +210,15 @@ async function ensureSupplier(page, fixtures) {
 
 async function ensureProduct(page, fixtures, targetBranchId) {
   await ensureAdminWorkingBranch(page, fixtures, targetBranchId);
-  await navigate(page, "الأصناف", "products-page");
+  await navigate(page, "إدارة المخزون", "inventory-workspace-page");
+  await page.getByTestId("products-page").waitFor({ state: "visible", timeout: 30_000 });
   const search = page.getByTestId("product-search");
 
-  // SKU is globally unique, so use it as the primary idempotency key. Give the
-  // reactive query a short grace period before deciding the fixture is absent.
   await search.fill(fixtures.productSku);
   let row = null;
   try {
     row = await page.waitForFunction(
-      (sku) => [...document.querySelectorAll('[data-testid="product-row"]')]
-        .find((element) => element.getAttribute("data-product-sku") === sku) ?? null,
+      (sku) => [...document.querySelectorAll('[data-testid="product-row"]')].find((element) => element.getAttribute("data-product-sku") === sku) ?? null,
       fixtures.productSku,
       { timeout: 10_000 },
     );
@@ -245,11 +230,7 @@ async function ensureProduct(page, fixtures, targetBranchId) {
   }
 
   if (row) {
-    assert.equal(
-      await row.getAttribute("data-product-name"),
-      fixtures.productName,
-      `Fixture SKU ${fixtures.productSku} belongs to a different product name`,
-    );
+    assert.equal(await row.getAttribute("data-product-name"), fixtures.productName, `Fixture SKU ${fixtures.productSku} belongs to a different product name`);
   } else {
     await search.fill(fixtures.productName);
     row = await exactRow(page, "product-row", "data-product-name", fixtures.productName);
@@ -306,10 +287,9 @@ async function ensureAccount(page, branch, name, code, type) {
     await page.getByTestId("finance-account-create").click();
     await waitForToast(page, "تم إنشاء الحساب بنجاح");
     await page.waitForFunction(
-      ({ name: expectedName, branchId }) =>
-        [...document.querySelectorAll('[data-testid="finance-account-row"]')].some(
-          (element) => element.getAttribute("data-account-name") === expectedName && element.getAttribute("data-account-branch-id") === branchId,
-        ),
+      ({ name: expectedName, branchId }) => [...document.querySelectorAll('[data-testid="finance-account-row"]')].some(
+        (element) => element.getAttribute("data-account-name") === expectedName && element.getAttribute("data-account-branch-id") === branchId,
+      ),
       { name, branchId: branch.value },
       { timeout: 45_000 },
     );
@@ -328,18 +308,20 @@ async function postOpeningBalance(page, row, amount) {
   await row.getByTestId("finance-opening-balance").click();
   const heading = page.getByRole("heading", { name: "تسجيل الرصيد الافتتاحي", exact: true });
   await heading.waitFor({ state: "visible", timeout: 30_000 });
-  const modal = heading.locator("..").locator("..").locator("..");
+  const modal = page.locator("div.fixed.inset-0").filter({ has: heading }).last();
   await modal.locator('input[type="number"]').fill(String(amount));
   await modal.getByRole("button", { name: "حفظ", exact: true }).click();
   await page.waitForFunction(
-    ({ name, branchId: targetBranchId }) => [...document.querySelectorAll('[data-testid="finance-account-row"]')].some((element) => element.getAttribute("data-account-name") === name && element.getAttribute("data-account-branch-id") === targetBranchId && element.getAttribute("data-opening-posted") === "true"),
+    ({ name, branchId: targetBranchId }) => [...document.querySelectorAll('[data-testid="finance-account-row"]')].some(
+      (element) => element.getAttribute("data-account-name") === name && element.getAttribute("data-account-branch-id") === targetBranchId && element.getAttribute("data-opening-posted") === "true",
+    ),
     { name: accountName, branchId },
     { timeout: 45_000 },
   );
 }
 
 async function ensureFinance(page, fixtures) {
-  await navigate(page, "الخزائن والبنوك", "treasury-page");
+  await navigate(page, "الخزائن والحسابات", "treasury-page");
   const branchSelect = page.getByTestId("finance-account-branch");
   const targetBranch = await selectExact(branchSelect, fixtures.branchName);
   const options = (await branchSelect.locator("option").evaluateAll((rows) => rows.map((row) => ({ value: row.value, label: row.textContent?.trim() ?? "" })))).filter((option) => option.value);
@@ -353,14 +335,12 @@ async function ensureFinance(page, fixtures) {
     { timeout: 30_000 },
   );
   const initializationMarker = page.getByTestId("finance-initialization");
-  let state = (await initializationMarker.count())
-    ? await initializationMarker.getAttribute("data-state")
-    : "initialized";
+  let state = (await initializationMarker.count()) ? await initializationMarker.getAttribute("data-state") : "initialized";
   if (state !== "initialized") {
     await page.getByTestId("finance-cutover-date").fill(fixtures.operationDate ?? new Date().toISOString().slice(0, 10));
     await page.getByTestId("finance-configure").click();
-    await page.waitForFunction(() => document.querySelector('[data-testid="finance-initialization"]')?.getAttribute("data-state") === "configuring", undefined, { timeout: 30_000 });
-    state = "configuring";
+    await waitForToast(page, "تم حفظ تاريخ بدء التسجيل المالي");
+    state = (await initializationMarker.getAttribute("data-state")) ?? state;
   }
 
   if (state === "initialized") {
@@ -370,7 +350,7 @@ async function ensureFinance(page, fixtures) {
     assert.ok(existingBalance >= 100, "Finance is already initialized and the named E2E cash account is not funded; reset this disposable Staging dataset before fixture setup");
   }
 
-  const targetCash = await ensureAccount(page, targetBranch, fixtures.cashAccountName, "E2E-CASH", "cash");
+  await ensureAccount(page, targetBranch, fixtures.cashAccountName, "E2E-CASH", "cash");
   await ensureAccount(page, targetBranch, fixtures.codAccountName, "E2E-COD", "cod_clearing");
   await ensureAccount(page, targetBranch, fixtures.settlementAccountName, "E2E-BANK", "bank");
   if (state !== "initialized") {
@@ -388,11 +368,7 @@ async function ensureFinance(page, fixtures) {
     await page.getByTestId("finance-confirm").click();
     await page.getByTestId("finance-confirmation-dialog").waitFor({ state: "visible", timeout: 30_000 });
     await page.getByTestId("finance-confirm-final").click();
-    await page.waitForFunction(
-      () => !document.querySelector('[data-testid="finance-initialization"]'),
-      undefined,
-      { timeout: 45_000 },
-    );
+    await page.waitForFunction(() => !document.querySelector('[data-testid="finance-initialization"]'), undefined, { timeout: 45_000 });
   }
 
   const refreshedCash = await accountRow(page, fixtures.cashAccountName, targetBranch.value);

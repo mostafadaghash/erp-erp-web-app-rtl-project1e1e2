@@ -3,7 +3,6 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import {
   launchStagingBrowser,
-  navigateSidebar,
   observeRuntimeFailures,
   redactEvidence,
   safeScreenshot,
@@ -34,6 +33,19 @@ const scenarios = [
   "order_delivery_cod_settlement",
   "expense_disbursement",
 ];
+
+const navigationTargets = {
+  salesInvoices: { group: "sales", item: "invoices", page: "invoices-page" },
+  salesReturns: { group: "sales", item: "sales-returns", page: "sales-returns-page" },
+  orders: { group: "sales", item: "orders", page: "orders-page" },
+  newPurchase: { group: "purchases", item: "new-purchase-invoice", page: "new-purchase-invoice-page" },
+  purchases: { group: "purchases", item: "shipments", page: "shipments-page" },
+  purchaseReturns: { group: "purchases", item: "purchase-returns", page: "purchase-returns-page" },
+  supplierPayments: { group: "accounting", item: "supplier-payments", page: "supplier-payments-page" },
+  repairs: { group: "service", item: "repairs", page: "repairs-page" },
+  deliveries: { group: "shipping", item: "deliveries", page: "deliveries-page" },
+  expenses: { group: "accounting", item: "expenses", page: "expenses-page" },
+};
 
 function isIsoDate(value) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
@@ -75,6 +87,7 @@ function businessConfig() {
       "E2E_ACCOUNT_BRANCH_NAME must match E2E_BUSINESS_FIXTURES_JSON.branchName",
     );
   }
+
   const operationDate = fixtures.operationDate ?? new Date().toISOString().slice(0, 10);
   assert.ok(isIsoDate(operationDate), "operationDate must be a real ISO date");
   const purchaseUnitCost = fixtures.purchaseUnitCost ?? 10;
@@ -82,12 +95,14 @@ function businessConfig() {
   const repairLaborCost = fixtures.repairLaborCost ?? 20;
   const repairCollectionAmount = fixtures.repairCollectionAmount ?? 5;
   const expenseAmount = fixtures.expenseAmount ?? 1;
+  const orderUnitPrice = fixtures.orderUnitPrice ?? 100;
   for (const [name, value] of Object.entries({
     purchaseUnitCost,
     invoiceCollectionAmount,
     repairLaborCost,
     repairCollectionAmount,
     expenseAmount,
+    orderUnitPrice,
   })) {
     assert.ok(Number.isFinite(value) && value > 0 && value <= 100_000, `${name} must be a bounded positive number`);
     assert.equal(Math.round(value * 100), value * 100, `${name} must have at most two decimals`);
@@ -110,8 +125,17 @@ function businessConfig() {
       repairLaborCost,
       repairCollectionAmount,
       expenseAmount,
+      orderUnitPrice,
     },
   };
+}
+
+async function stableSelector(locator) {
+  const testId = await locator.getAttribute("data-testid");
+  if (testId) return `[data-testid="${testId}"]`;
+  const aria = await locator.getAttribute("aria-label");
+  if (aria) return `[aria-label="${aria.replaceAll('"', '\\"')}"]`;
+  throw new Error("Mutable E2E select requires a stable selector");
 }
 
 async function selectContaining(select, expected) {
@@ -150,14 +174,6 @@ async function selectExact(select, expected) {
   assert.equal(matches.length, 1, `Expected exactly one option named: ${expected}`);
   await select.selectOption(matches[0].value);
   return matches[0];
-}
-
-async function stableSelector(locator) {
-  const testId = await locator.getAttribute("data-testid");
-  if (testId) return `[data-testid="${testId}"]`;
-  const aria = await locator.getAttribute("aria-label");
-  if (aria) return `[aria-label="${aria.replaceAll('"', '\\"')}"]`;
-  throw new Error("Mutable E2E select requires a stable selector");
 }
 
 async function attributeSet(locator, attribute) {
@@ -225,15 +241,34 @@ async function waitForToast(page, message) {
   return toast.innerText();
 }
 
-const professionalNavigationLabel = {
-  "المبيعات": "فواتير المبيعات",
-  "عمليات الشحن": "إدارة الشحن",
-  "المشتريات": "فواتير المشتريات",
-};
+async function openNavigationGroup(page, groupKey) {
+  const navigation = page.getByRole("navigation", { name: "القائمة الرئيسية" });
+  const group = navigation.getByTestId(`nav-group-${groupKey}`);
+  await group.waitFor({ state: "visible", timeout: 30_000 });
+  if ((await group.getAttribute("aria-expanded")) !== "true") await group.click();
+  return navigation;
+}
 
-async function navigate(page, label, testId) {
-  await navigateSidebar(page, professionalNavigationLabel[label] ?? label);
-  await page.getByTestId(testId).waitFor({ state: "visible", timeout: 30_000 });
+async function navigate(page, targetKey) {
+  const target = navigationTargets[targetKey];
+  assert.ok(target, `Unknown navigation target: ${targetKey}`);
+  const navigation = await openNavigationGroup(page, target.group);
+  const button = navigation.getByTestId(`nav-${target.item}`);
+  await button.waitFor({ state: "visible", timeout: 30_000 });
+  await button.click();
+  await page.getByTestId(target.page).waitFor({ state: "visible", timeout: 45_000 });
+}
+
+async function chooseCombobox(input, query, expectedLabel) {
+  await input.waitFor({ state: "visible", timeout: 30_000 });
+  await input.fill(query);
+  await input.press("Enter");
+  const deadline = Date.now() + 5_000;
+  while (Date.now() < deadline) {
+    if ((await input.inputValue()) === expectedLabel) return;
+    await input.page().waitForTimeout(50);
+  }
+  assert.equal(await input.inputValue(), expectedLabel, `Combobox did not select: ${expectedLabel}`);
 }
 
 async function exactProductResult(page, productName) {
@@ -258,16 +293,17 @@ async function addInvoiceProduct(page, productName) {
 async function createInvoice(page, fixtures, marker, quantity) {
   const before = await attributeSet(page.getByTestId("invoice-row"), "data-invoice-number");
   await page.getByTestId("invoices-page").getByRole("button", { name: "فاتورة بيع جديدة", exact: true }).click();
-  await page.getByTestId("new-invoice-page").waitFor();
+  await page.getByTestId("new-invoice-page").waitFor({ state: "visible", timeout: 30_000 });
   await selectContaining(page.getByTestId("invoice-customer-select"), fixtures.customerName);
   for (let index = 0; index < quantity; index += 1) await addInvoiceProduct(page, fixtures.productName);
   await page.getByTestId("invoice-notes").fill(marker);
   const rawTotal = Number(await page.getByTestId("new-invoice-total").getAttribute("data-value"));
   assert.ok(Number.isFinite(rawTotal) && rawTotal > fixtures.invoiceCollectionAmount);
   const total = Number(rawTotal.toFixed(2));
+  await page.getByTestId("invoice-payment-method").selectOption("credit");
   await page.getByTestId("invoice-submit").click();
   await waitForToast(page, "تم إنشاء الفاتورة بنجاح");
-  await page.getByTestId("invoices-page").waitFor();
+  await page.getByTestId("invoices-page").waitFor({ state: "visible", timeout: 30_000 });
   const created = await waitForNewEntity(page, "invoice-row", "data-invoice-number", before);
   return { number: created.value, total };
 }
@@ -310,57 +346,89 @@ async function refundInvoice(page, fixtures, invoice, marker) {
 }
 
 async function createSalesReturn(page, fixtures, invoice, marker) {
-  await navigate(page, "مرتجعات المبيعات", "sales-returns-page");
-  const start = page.getByTestId("sales-return-start");
+  await navigate(page, "salesReturns");
+  await page.getByTestId("sales-return-new").click();
+  const picker = page.getByTestId("sales-return-invoice-picker");
+  await picker.waitFor({ state: "visible", timeout: 30_000 });
+  const starts = picker.getByTestId("sales-return-start");
   await page.waitForFunction(
-    (number) => [...document.querySelectorAll('[data-testid="sales-return-start"]')].some((element) => element.getAttribute("data-invoice-number") === number),
+    (number) => [...document.querySelectorAll('[data-testid="sales-return-invoice-picker"] [data-testid="sales-return-start"]')].some((element) => element.getAttribute("data-invoice-number") === number),
     invoice.number,
     { timeout: 45_000 },
   );
-  const count = await start.count();
+  const count = await starts.count();
+  let selected = false;
   for (let index = 0; index < count; index += 1) {
-    if ((await start.nth(index).getAttribute("data-invoice-number")) === invoice.number) {
-      await start.nth(index).click();
+    if ((await starts.nth(index).getAttribute("data-invoice-number")) === invoice.number) {
+      await starts.nth(index).click();
+      selected = true;
       break;
     }
   }
+  assert.ok(selected, `Sales return picker did not expose invoice ${invoice.number}`);
   const form = page.getByTestId("sales-return-form");
-  await form.waitFor();
+  await form.waitFor({ state: "visible", timeout: 30_000 });
   await form.getByLabel(`كمية إرجاع ${fixtures.productName}`).fill("1");
   await page.getByTestId("sales-return-reason").fill(marker);
   await page.getByTestId("sales-return-submit").click();
-  await waitForToast(page, "تم إنشاء الإشعار الدائن وإعادة المخزون");
+  await waitForToast(page, "تم إنشاء مرتجع البيع وإعادة المخزون");
   await form.waitFor({ state: "detached" });
 }
 
-async function createOrder(page, fixtures, marker, total) {
-  await navigate(page, "أوامر البيع", "orders-page");
-  const before = await attributeSet(page.getByTestId("order-row"), "data-order-number");
+async function transitionOrder(page, orderNumber, state) {
+  let row = await entityByAttribute(page, "order-row", "data-order-number", orderNumber);
+  await row.getByTestId("order-action-toggle").click();
+  const menu = row.getByTestId("order-actions-menu");
+  await menu.waitFor({ state: "visible", timeout: 30_000 });
+  const action = menu.locator(`[data-status-action="${state}"]`);
+  await action.waitFor({ state: "visible", timeout: 30_000 });
+  await action.click();
+  row = await waitForEntityState(page, "order-row", "data-order-number", orderNumber, "data-status", state);
+  assert.equal(await row.getAttribute("data-status"), state);
+}
+
+async function createOrderAndLinkedInvoice(page, fixtures, marker) {
+  await navigate(page, "salesInvoices");
+  const invoicesBefore = await attributeSet(page.getByTestId("invoice-row"), "data-invoice-number");
+  await navigate(page, "orders");
+  const ordersBefore = await attributeSet(page.getByTestId("order-row"), "data-order-number");
   await page.getByTestId("order-create-open").click();
-  const form = page.getByTestId("order-create-form");
-  await form.waitFor();
-  await selectContaining(page.getByTestId("order-customer-select"), fixtures.customerName);
-  const item = form.getByTestId("order-item-row").first();
-  await item.getByTestId("order-item-name").fill(`توصيل ${marker}`);
-  await item.getByTestId("order-item-quantity").fill("1");
-  await item.getByTestId("order-item-price").fill(total.toFixed(2));
-  assert.equal(Number(await page.getByTestId("order-total").getAttribute("data-value")), total);
-  await page.getByTestId("order-submit").click();
-  await waitForToast(page, "تم إنشاء أمر البيع بنجاح");
-  await form.waitFor({ state: "detached" });
-  const created = await waitForNewEntity(page, "order-row", "data-order-number", before);
-  for (const state of ["confirmed", "ready"]) {
-    let row = await entityByAttribute(page, "order-row", "data-order-number", created.value);
-    await row.locator(`[data-testid="order-status-next"][data-next-status="${state}"]`).click();
-    await waitForToast(page, "تم تحديث حالة أمر البيع");
-    row = await waitForEntityState(page, "order-row", "data-order-number", created.value, "data-status", state);
-    assert.equal(await row.getAttribute("data-status"), state);
+  const submit = page.getByTestId("order-intake-submit");
+  await submit.waitFor({ state: "visible", timeout: 30_000 });
+
+  const customerInput = page.getByPlaceholder("ابحث باسم العميل أو الهاتف...", { exact: true });
+  await chooseCombobox(customerInput, fixtures.customerName, fixtures.customerName);
+  const item = page.getByTestId("order-intake-item").first();
+  const productInput = item.getByPlaceholder("الصنف...", { exact: true });
+  await chooseCombobox(productInput, fixtures.productName, fixtures.productName);
+  await item.getByTestId("order-intake-quantity").fill("1");
+  await page.getByTestId("order-internal-notes").fill(marker);
+  await submit.click();
+  await waitForToast(page, "تم إنشاء طلب البيع وإضافته للمتابعة");
+
+  const createdOrder = await waitForNewEntity(page, "order-row", "data-order-number", ordersBefore);
+  let row = createdOrder.locator;
+  await row.getByTestId("order-price-open").click();
+  const price = page.getByTestId("order-price-input").first();
+  await price.waitFor({ state: "visible", timeout: 30_000 });
+  await price.fill(String(fixtures.orderUnitPrice));
+  await page.getByTestId("order-price-submit").click();
+  await waitForToast(page, "تم تسعير جميع أصناف الطلب");
+
+  for (const state of ["confirmed", "preparing", "ready"]) {
+    await transitionOrder(page, createdOrder.value, state);
   }
-  return created.value;
+
+  await navigate(page, "salesInvoices");
+  const linkedInvoice = await waitForNewEntity(page, "invoice-row", "data-invoice-number", invoicesBefore);
+  const invoiceRow = linkedInvoice.locator;
+  const linkedTotal = Number(await invoiceRow.getAttribute("data-remaining"));
+  assert.ok(Number.isFinite(linkedTotal) && linkedTotal > 0, "Order-linked invoice must have a positive COD balance");
+  return { orderNumber: createdOrder.value, invoiceNumber: linkedInvoice.value };
 }
 
 async function createDeliveryCycle(page, fixtures, marker, orderNumber, invoiceNumber) {
-  await navigate(page, "عمليات الشحن", "deliveries-page");
+  await navigate(page, "deliveries");
   const branch = page.getByTestId("delivery-branch-select");
   await branch.waitFor({ state: "visible", timeout: 30_000 });
   await selectExact(branch, fixtures.branchName);
@@ -394,9 +462,9 @@ async function createDeliveryCycle(page, fixtures, marker, orderNumber, invoiceN
 
   await page.getByTestId("delivery-settlement-open").click();
   await selectContaining(page.getByTestId("delivery-settlement-source"), fixtures.codAccountName);
-  const item = page.locator(`[data-testid="delivery-settlement-item"][data-delivery-number="${created.value}"]`);
-  await item.waitFor({ timeout: 30_000 });
-  await item.check();
+  const settlementItem = page.locator(`[data-testid="delivery-settlement-item"][data-delivery-number="${created.value}"]`);
+  await settlementItem.waitFor({ timeout: 30_000 });
+  await settlementItem.check();
   await selectContaining(page.getByTestId("delivery-settlement-destination"), fixtures.settlementAccountName);
   await page.getByTestId("delivery-action-date").fill(fixtures.operationDate);
   await page.getByTestId("delivery-action-submit").click();
@@ -405,20 +473,23 @@ async function createDeliveryCycle(page, fixtures, marker, orderNumber, invoiceN
 }
 
 async function createPurchaseCycle(page, fixtures, marker) {
-  await navigate(page, "المشتريات", "shipments-page");
+  await navigate(page, "purchases");
   const before = await attributeSet(page.getByTestId("shipment-row"), "data-shipment-number");
-  await page.getByTestId("shipment-create-open").click();
-  await page.getByTestId("shipment-create-form").waitFor();
-  await selectContaining(page.getByTestId("shipment-supplier-select"), fixtures.supplierName);
-  const item = page.getByTestId("shipment-item-row").first();
-  await selectContaining(item.getByTestId("shipment-product-select"), fixtures.productName);
-  await item.getByTestId("shipment-item-quantity").fill("3");
-  await item.getByTestId("shipment-item-unit-cost").fill(String(fixtures.purchaseUnitCost));
-  await page.getByTestId("shipment-shipping-cost").fill("0");
-  await page.getByTestId("shipment-notes").fill(marker);
-  await page.getByTestId("shipment-submit").click();
-  await waitForToast(page, "تم إنشاء عملية الشراء بنجاح");
-  await page.getByTestId("shipment-create-form").waitFor({ state: "detached" });
+
+  await navigate(page, "newPurchase");
+  await selectContaining(page.getByTestId("purchase-supplier-select"), fixtures.supplierName);
+  await page.getByTestId("purchase-product-search").fill(fixtures.productName);
+  const result = page.getByTestId("purchase-product-result").filter({ hasText: fixtures.productName }).first();
+  await result.waitFor({ state: "visible", timeout: 30_000 });
+  await result.click();
+  await page.locator("[data-purchase-quantity]").first().fill("3");
+  await page.locator("[data-purchase-unit-cost]").first().fill(String(fixtures.purchaseUnitCost));
+  await page.getByTestId("purchase-shipping-cost").fill("0");
+  await page.getByTestId("purchase-notes").fill(marker);
+  await page.getByTestId("purchase-submit").click();
+  await waitForToast(page, "تم إنشاء فاتورة المشتريات وحفظها بانتظار الاستلام");
+  await page.getByTestId("shipments-page").waitFor({ state: "visible", timeout: 45_000 });
+
   const created = await waitForNewEntity(page, "shipment-row", "data-shipment-number", before);
   let row = created.locator;
   await row.locator('[data-testid="shipment-status-next"][data-next-status="in_transit"]').click();
@@ -435,7 +506,7 @@ async function createPurchaseCycle(page, fixtures, marker) {
   assert.ok(receiptNumber, "Receive toast must expose the created purchase receipt number");
   await receive.waitFor({ state: "detached" });
 
-  await navigate(page, "مرتجعات المشتريات", "purchase-returns-page");
+  await navigate(page, "purchaseReturns");
   await selectContaining(page.getByTestId("purchase-return-supplier"), fixtures.supplierName);
   await selectContaining(page.getByTestId("purchase-return-receipt"), receiptNumber);
   const returnItem = page.getByTestId("purchase-return-item").filter({ hasText: fixtures.productName }).first();
@@ -445,7 +516,7 @@ async function createPurchaseCycle(page, fixtures, marker) {
   await page.getByTestId("purchase-return-submit").click();
   await waitForToast(page, "تم ترحيل مرتجع المشتريات");
 
-  await navigate(page, "حسابات الموردين", "supplier-payments-page");
+  await navigate(page, "supplierPayments");
   await selectContaining(page.getByTestId("supplier-payment-supplier"), fixtures.supplierName);
   await selectContaining(page.getByTestId("supplier-payment-account"), fixtures.cashAccountName);
   const receipt = page.locator(`[data-testid="supplier-payment-receipt"][data-receipt-number="${receiptNumber}"]`);
@@ -461,10 +532,12 @@ async function createPurchaseCycle(page, fixtures, marker) {
 }
 
 async function createRepairCycle(page, fixtures, marker) {
-  await navigate(page, "أوامر الصيانة", "repairs-page");
+  await navigate(page, "repairs");
   const branch = page.getByTestId("repair-branch-select");
-  await branch.waitFor({ state: "visible", timeout: 30_000 });
-  await selectExact(branch, fixtures.branchName);
+  if (await branch.count()) {
+    await branch.waitFor({ state: "visible", timeout: 30_000 });
+    await selectExact(branch, fixtures.branchName);
+  }
   const before = await attributeSet(page.getByTestId("repair-card"), "data-repair-number");
   await page.getByTestId("repair-create-open").click();
   await page.getByTestId("repair-create-form").waitFor();
@@ -489,7 +562,7 @@ async function createRepairCycle(page, fixtures, marker) {
 }
 
 async function createExpenseCycle(page, fixtures, marker) {
-  await navigate(page, "المصروفات", "expenses-page");
+  await navigate(page, "expenses");
   const title = `${marker}-EXPENSE`;
   const before = await attributeSet(page.getByTestId("expense-row"), "data-expense-title");
   await page.getByTestId("expense-create-open").click();
@@ -546,30 +619,25 @@ async function main() {
 
   try {
     await signIn(page, config.baseUrl, config.operator);
-    await navigate(page, "المبيعات", "invoices-page");
+    await navigate(page, "salesInvoices");
     const salesInvoice = await runStep("invoice-create", () => createInvoice(page, config.fixtures, `${marker}-SALE`, 2));
     documents.salesInvoice = salesInvoice.number;
+    documents.refundInvoice = salesInvoice.number;
     await runStep("invoice-collection", () => collectInvoice(page, config.fixtures, salesInvoice, `${marker}-COLLECTION`));
     await runStep("sales-return", () => createSalesReturn(page, config.fixtures, salesInvoice, `${marker}-SALES-RETURN`));
 
-    await navigate(page, "المبيعات", "invoices-page");
-    const refundInvoiceRecord = await runStep("refund-invoice-create", () => createInvoice(page, config.fixtures, `${marker}-REFUND-INVOICE`, 1));
-    documents.refundInvoice = refundInvoiceRecord.number;
-    await runStep("refund-invoice-collection", () => collectInvoice(page, config.fixtures, refundInvoiceRecord, `${marker}-REFUND-COLLECTION`));
-
-    await navigate(page, "المبيعات", "invoices-page");
-    const deliveryInvoice = await runStep("delivery-invoice-create", () => createInvoice(page, config.fixtures, `${marker}-DELIVERY-INVOICE`, 1));
-    documents.deliveryInvoice = deliveryInvoice.number;
-    documents.order = await runStep("order-ready", () => createOrder(page, config.fixtures, marker, deliveryInvoice.total));
-    documents.delivery = await runStep("delivery-cod-settlement", () => createDeliveryCycle(page, config.fixtures, marker, documents.order, deliveryInvoice.number));
+    const orderResult = await runStep("order-ready", () => createOrderAndLinkedInvoice(page, config.fixtures, `${marker}-ORDER`));
+    documents.order = orderResult.orderNumber;
+    documents.deliveryInvoice = orderResult.invoiceNumber;
+    documents.delivery = await runStep("delivery-cod-settlement", () => createDeliveryCycle(page, config.fixtures, marker, orderResult.orderNumber, orderResult.invoiceNumber));
 
     Object.assign(documents, await runStep("purchase-return-payment", () => createPurchaseCycle(page, config.fixtures, `${marker}-PURCHASE`)));
     documents.repair = await runStep("repair-collection", () => createRepairCycle(page, config.fixtures, `${marker}-REPAIR`));
 
     await page.getByRole("button", { name: "تسجيل الخروج", exact: true }).click();
     await signIn(page, config.baseUrl, config.financialOperator);
-    await navigate(page, "المبيعات", "invoices-page");
-    await runStep("invoice-refund", () => refundInvoice(page, config.fixtures, refundInvoiceRecord, `${marker}-REFUND`));
+    await navigate(page, "salesInvoices");
+    await runStep("invoice-refund", () => refundInvoice(page, config.fixtures, salesInvoice, `${marker}-REFUND`));
     documents.expense = await runStep("expense-disbursement", () => createExpenseCycle(page, config.fixtures, marker));
 
     assert.deepEqual(runtimeFailures, [], "Business browser flow reported server/runtime failures");

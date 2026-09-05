@@ -12,10 +12,11 @@ test("sidebar collapses the selected navigation group after page navigation", ()
   assert.match(navigateTo[1], /onNavigate\(page\)/);
 });
 
-test("staging navigation waits for the sidebar group to finish collapsing", () => {
+test("staging navigation waits for the current sidebar target group to finish collapsing", () => {
   const navigateSidebar = stagingBrowser.match(/export async function navigateSidebar\(page, label\) \{([\s\S]*?)\n\}/);
   assert.ok(navigateSidebar, "navigateSidebar helper must exist");
-  assert.match(navigateSidebar[1], /navigationGroupByLabel\[label\]/);
+  assert.match(navigateSidebar[1], /navigationTargets\[label\]/);
+  assert.match(navigateSidebar[1], /target\.group/);
   assert.match(navigateSidebar[1], /waitForFunction/);
   assert.match(navigateSidebar[1], /aria-expanded/);
   assert.match(navigateSidebar[1], /=== "false"/);

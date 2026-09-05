@@ -23,150 +23,93 @@ export const roles = [
   "viewer",
 ];
 
+const navigationTargets = {
+  "لوحة التحكم": { item: "dashboard" },
+  "فاتورة بيع جديدة": { group: "sales", item: "new-invoice" },
+  "فواتير المبيعات": { group: "sales", item: "invoices" },
+  "مرتجعات المبيعات": { group: "sales", item: "sales-returns" },
+  "عروض الأسعار": { group: "sales", item: "quotes" },
+  "طلبات البيع": { group: "sales", item: "orders" },
+  "إضافة عميل": { group: "customers", item: "new-customer" },
+  "قائمة العملاء": { group: "customers", item: "customers" },
+  "متابعة العملاء": { group: "customers", item: "follow-ups" },
+  "فاتورة مشتريات جديدة": { group: "purchases", item: "new-purchase-invoice" },
+  "فواتير المشتريات": { group: "purchases", item: "shipments" },
+  "مرتجعات المشتريات": { group: "purchases", item: "purchase-returns" },
+  "الموردون": { group: "purchases", item: "suppliers" },
+  "إدارة المخزون": { group: "inventory", item: "inventory" },
+  "أوامر الصيانة": { group: "service", item: "repairs" },
+  "طلبات الشحن والتسويات": { group: "shipping", item: "deliveries" },
+  "نظرة عامة": { group: "accounting", item: "accounts-home" },
+  "الخزائن والحسابات": { group: "accounting", item: "treasury" },
+  "سندات القبض والصرف": { group: "accounting", item: "vouchers" },
+  "حسابات العملاء": { group: "accounting", item: "customer-ledger" },
+  "حسابات الموردين": { group: "accounting", item: "supplier-payments" },
+  "الفواتير الآجلة": { group: "accounting", item: "credit-invoices" },
+  "الشيكات والأقساط": { group: "accounting", item: "payment-schedules" },
+  "المصروفات": { group: "accounting", item: "expenses" },
+  "مركز التقارير": { group: "reports", item: "reports" },
+  "الفروع": { group: "administration", item: "branches" },
+  "المستخدمون والصلاحيات": { group: "administration", item: "employees" },
+  "سجل العمليات": { group: "administration", item: "audit-logs" },
+  "إعدادات النظام": { group: "administration", item: "settings" },
+};
+
 const navigationByRole = {
   admin: {
-    visible: [
-      "لوحة التحكم",
-      "فواتير المبيعات",
-      "مرتجعات المبيعات",
-      "أوامر البيع",
-      "العملاء",
-      "إدارة علاقات العملاء",
-      "فواتير المشتريات",
-      "مرتجعات المشتريات",
-      "الموردون",
-      "دليل الأصناف",
-      "إدارة الشحن",
-      "أوامر الصيانة",
-      "نظرة عامة",
-      "الخزائن والبنوك",
-      "حسابات العملاء",
-      "حسابات الموردين",
-      "المصروفات",
-      "المحاسبة العامة",
-      "مركز التقارير",
-      "الفروع",
-      "المستخدمون والصلاحيات",
-      "سجل المراجعة",
-      "تصدير البيانات",
-      "إعدادات النظام",
-    ],
+    visible: Object.keys(navigationTargets),
     hidden: [],
-    smoke: ["مركز التقارير", "سجل المراجعة", "تصدير البيانات"],
+    smoke: ["فواتير المبيعات", "إدارة المخزون", "مركز التقارير"],
   },
   manager: {
     visible: [
-      "فواتير المبيعات",
-      "دليل الأصناف",
-      "إدارة الشحن",
-      "الموردون",
-      "مركز التقارير",
-      "الفروع",
+      "فاتورة بيع جديدة", "فواتير المبيعات", "مرتجعات المبيعات", "عروض الأسعار", "طلبات البيع",
+      "إضافة عميل", "قائمة العملاء", "متابعة العملاء",
+      "فاتورة مشتريات جديدة", "فواتير المشتريات", "مرتجعات المشتريات", "الموردون",
+      "إدارة المخزون", "أوامر الصيانة", "طلبات الشحن والتسويات",
+      "نظرة عامة", "الخزائن والحسابات", "سندات القبض والصرف", "حسابات العملاء", "حسابات الموردين",
+      "الفواتير الآجلة", "الشيكات والأقساط", "المصروفات", "مركز التقارير", "الفروع",
     ],
-    hidden: ["المستخدمون والصلاحيات", "سجل المراجعة", "إعدادات النظام"],
-    smoke: ["فواتير المبيعات", "دليل الأصناف", "مركز التقارير"],
+    hidden: ["المستخدمون والصلاحيات", "سجل العمليات", "إعدادات النظام"],
+    smoke: ["فواتير المبيعات", "إدارة المخزون", "مركز التقارير"],
   },
   sales: {
     visible: [
-      "دليل الأصناف",
-      "العملاء",
-      "فواتير المبيعات",
-      "أوامر البيع",
+      "فاتورة بيع جديدة", "فواتير المبيعات", "عروض الأسعار", "طلبات البيع",
+      "إضافة عميل", "قائمة العملاء", "متابعة العملاء", "إدارة المخزون", "الفواتير الآجلة",
     ],
-    hidden: [
-      "مركز التقارير",
-      "الخزائن والبنوك",
-      "المستخدمون والصلاحيات",
-      "إعدادات النظام",
-    ],
-    smoke: ["فواتير المبيعات", "أوامر البيع", "العملاء"],
+    hidden: ["مرتجعات المبيعات", "أوامر الصيانة", "طلبات الشحن والتسويات", "مركز التقارير", "الخزائن والحسابات", "المستخدمون والصلاحيات", "إعدادات النظام"],
+    smoke: ["فواتير المبيعات", "طلبات البيع", "قائمة العملاء"],
   },
   customer_service: {
-    visible: ["العملاء", "أوامر البيع", "أوامر الصيانة"],
-    hidden: [
-      "مركز التقارير",
-      "الخزائن والبنوك",
-      "المستخدمون والصلاحيات",
-      "إعدادات النظام",
-    ],
-    smoke: ["أوامر البيع", "أوامر الصيانة", "العملاء"],
+    visible: ["إضافة عميل", "قائمة العملاء", "متابعة العملاء", "طلبات البيع", "أوامر الصيانة"],
+    hidden: ["فواتير المبيعات", "إدارة المخزون", "الخزائن والحسابات", "مركز التقارير", "المستخدمون والصلاحيات", "إعدادات النظام"],
+    smoke: ["طلبات البيع", "أوامر الصيانة", "قائمة العملاء"],
   },
   technician: {
-    visible: ["دليل الأصناف", "أوامر الصيانة"],
-    hidden: [
-      "فواتير المبيعات",
-      "مركز التقارير",
-      "الخزائن والبنوك",
-      "المستخدمون والصلاحيات",
-    ],
-    smoke: ["أوامر الصيانة", "دليل الأصناف"],
+    visible: ["إدارة المخزون", "أوامر الصيانة", "متابعة العملاء"],
+    hidden: ["فواتير المبيعات", "طلبات البيع", "الخزائن والحسابات", "مركز التقارير", "المستخدمون والصلاحيات"],
+    smoke: ["أوامر الصيانة", "إدارة المخزون"],
   },
   accountant: {
     visible: [
-      "دليل الأصناف",
-      "العملاء",
-      "فواتير المبيعات",
-      "المصروفات",
-      "الخزائن والبنوك",
-      "المحاسبة العامة",
-      "مركز التقارير",
+      "فواتير المبيعات", "مرتجعات المبيعات", "عروض الأسعار", "قائمة العملاء", "مرتجعات المشتريات", "إدارة المخزون",
+      "نظرة عامة", "الخزائن والحسابات", "سندات القبض والصرف", "حسابات العملاء", "حسابات الموردين",
+      "الفواتير الآجلة", "الشيكات والأقساط", "المصروفات", "مركز التقارير",
     ],
-    hidden: ["المستخدمون والصلاحيات", "سجل المراجعة", "إعدادات النظام"],
-    smoke: ["الخزائن والبنوك", "المحاسبة العامة", "مركز التقارير"],
+    hidden: ["طلبات البيع", "أوامر الصيانة", "فواتير المشتريات", "الموردون", "الفروع", "المستخدمون والصلاحيات", "سجل العمليات", "إعدادات النظام"],
+    smoke: ["الخزائن والحسابات", "حسابات الموردين", "مركز التقارير"],
   },
   shipping: {
-    visible: ["أوامر البيع", "فواتير المشتريات", "إدارة الشحن"],
-    hidden: [
-      "فواتير المبيعات",
-      "مركز التقارير",
-      "الخزائن والبنوك",
-      "المستخدمون والصلاحيات",
-    ],
-    smoke: ["أوامر البيع", "فواتير المشتريات", "إدارة الشحن"],
+    visible: ["طلبات البيع", "متابعة العملاء", "فاتورة مشتريات جديدة", "فواتير المشتريات", "طلبات الشحن والتسويات"],
+    hidden: ["فواتير المبيعات", "إدارة المخزون", "أوامر الصيانة", "الخزائن والحسابات", "مركز التقارير", "المستخدمون والصلاحيات"],
+    smoke: ["طلبات البيع", "فواتير المشتريات", "طلبات الشحن والتسويات"],
   },
   viewer: {
-    visible: [
-      "دليل الأصناف",
-      "العملاء",
-      "أوامر البيع",
-      "أوامر الصيانة",
-      "فواتير المبيعات",
-    ],
-    hidden: [
-      "مركز التقارير",
-      "الخزائن والبنوك",
-      "المستخدمون والصلاحيات",
-      "إعدادات النظام",
-    ],
-    smoke: ["دليل الأصناف", "العملاء", "فواتير المبيعات"],
+    visible: ["فواتير المبيعات", "عروض الأسعار", "طلبات البيع", "قائمة العملاء", "إدارة المخزون", "أوامر الصيانة", "الفواتير الآجلة"],
+    hidden: ["فاتورة بيع جديدة", "متابعة العملاء", "المصروفات", "مركز التقارير", "الخزائن والحسابات", "المستخدمون والصلاحيات", "إعدادات النظام"],
+    smoke: ["إدارة المخزون", "قائمة العملاء", "فواتير المبيعات"],
   },
-};
-
-const navigationGroupByLabel = {
-  "لوحة التحكم": "home",
-  "فواتير المبيعات": "sales",
-  "مرتجعات المبيعات": "sales",
-  "أوامر البيع": "sales",
-  "العملاء": "sales",
-  "إدارة علاقات العملاء": "sales",
-  "فواتير المشتريات": "purchases",
-  "مرتجعات المشتريات": "purchases",
-  "الموردون": "purchases",
-  "دليل الأصناف": "inventory",
-  "إدارة الشحن": "shipping",
-  "أوامر الصيانة": "service",
-  "نظرة عامة": "accounting",
-  "الخزائن والبنوك": "accounting",
-  "حسابات العملاء": "accounting",
-  "حسابات الموردين": "accounting",
-  "المصروفات": "accounting",
-  "المحاسبة العامة": "accounting",
-  "مركز التقارير": "reports",
-  "الفروع": "administration",
-  "المستخدمون والصلاحيات": "administration",
-  "سجل المراجعة": "administration",
-  "تصدير البيانات": "administration",
-  "إعدادات النظام": "administration",
 };
 
 const outputRoot = resolve("test-results/staging-e2e");
@@ -294,7 +237,7 @@ export function stagingConfig() {
       roles.includes(account.role),
       `Unsupported E2E role: ${account.role}`,
     );
-    assert.match(account.email ?? "", /^[^\s@]+@[^\s@]+\.[^\s@]+$/);
+    assert.match(account.email ?? "", /^[^\s@]+@[^\s@]+\.[a-z]{2,}$/i);
     assert.ok(
       typeof account.password === "string" && account.password.length >= 8,
       `Missing password for ${account.role}`,
@@ -397,27 +340,34 @@ async function openNavigationGroup(navigation, groupKey, required) {
 }
 
 export async function sidebarNavigationButton(page, label, { required = true } = {}) {
-  const groupKey = navigationGroupByLabel[label];
-  assert.ok(groupKey, `Missing navigation group mapping for: ${label}`);
+  const target = navigationTargets[label];
+  assert.ok(target, `Missing navigation target mapping for: ${label}`);
   const navigation = page.getByRole("navigation", { name: "القائمة الرئيسية" });
-  const available = await openNavigationGroup(navigation, groupKey, required);
+  if (!target.group) {
+    const button = navigation.getByTestId(`nav-${target.item}`);
+    if (required) await button.waitFor({ state: "visible", timeout: 30_000 });
+    return button;
+  }
+  const available = await openNavigationGroup(navigation, target.group, required);
   if (!available) return null;
-  const button = navigation.getByRole("button", { name: label, exact: true });
+  const button = navigation.getByTestId(`nav-${target.item}`);
   if (required) await button.waitFor({ state: "visible", timeout: 30_000 });
   return button;
 }
 
 export async function navigateSidebar(page, label) {
-  const groupKey = navigationGroupByLabel[label];
-  assert.ok(groupKey, `Missing navigation group mapping for: ${label}`);
+  const target = navigationTargets[label];
+  assert.ok(target, `Missing navigation target mapping for: ${label}`);
   const button = await sidebarNavigationButton(page, label);
   assert.ok(button);
   await button.click();
-  await page.waitForFunction(
-    (key) => document.querySelector(`[data-testid="nav-group-${key}"]`)?.getAttribute("aria-expanded") === "false",
-    groupKey,
-    { timeout: 30_000 },
-  );
+  if (target.group) {
+    await page.waitForFunction(
+      (key) => document.querySelector(`[data-testid="nav-group-${key}"]`)?.getAttribute("aria-expanded") === "false",
+      target.group,
+      { timeout: 30_000 },
+    );
+  }
 }
 
 async function assertRoleNavigation(page, role) {

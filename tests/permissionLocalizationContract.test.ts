@@ -10,6 +10,7 @@ import {
 } from "../src/lib/permissionCatalog.ts";
 
 const employeesSource = readFileSync("src/components/EmployeesPage.tsx", "utf8");
+const dashboardSource = readFileSync("src/components/Dashboard.tsx", "utf8");
 
 const EXPECTED_GROUPS = [
   "المبيعات",
@@ -28,7 +29,7 @@ test("PERM-AR01 every backend permission has one Arabic presentation", () => {
   const catalogKeys = Object.keys(PERMISSION_CATALOG).sort();
   const optionKeys = ALL_PERMISSION_OPTIONS.map((permission) => permission.key).sort();
 
-  assert.equal(PERMISSIONS.length, 104, "permission inventory changed; update the Arabic catalog contract intentionally");
+  assert.equal(PERMISSIONS.length, 105, "permission inventory changed; update the Arabic catalog contract intentionally");
   assert.deepEqual(catalogKeys, backendKeys);
   assert.deepEqual(optionKeys, backendKeys);
 
@@ -72,4 +73,24 @@ test("PERM-AR04 employees UI consumes the central catalog without raw-key fallba
   assert.doesNotMatch(employeesSource, /PERMISSION_LABELS_SOURCE/);
   assert.doesNotMatch(employeesSource, /existing\?\.label \?\? key/);
   assert.doesNotMatch(employeesSource, /permissionGroup\s*=/);
+});
+
+test("PERM-AR05 executive dashboard permission is restricted to approved default roles", () => {
+  for (const role of ["admin", "manager", "accountant"] as const) {
+    assert.ok(
+      ROLE_PERMISSIONS[role].includes("view_executive_dashboard"),
+      `${role} must receive view_executive_dashboard by default`,
+    );
+  }
+
+  for (const role of ["sales", "viewer", "customer_service"] as const) {
+    assert.ok(
+      !ROLE_PERMISSIONS[role].includes("view_executive_dashboard"),
+      `${role} must not receive view_executive_dashboard by default`,
+    );
+  }
+
+  assert.match(dashboardSource, /permissions\.includes\("view_executive_dashboard"\)/);
+  assert.match(dashboardSource, /canViewExecutiveDashboard && canViewReports/);
+  assert.match(dashboardSource, /api\.reporting\.overview, canViewExecutiveData/);
 });

@@ -356,6 +356,7 @@ export function ShipmentsPage({ createRequestToken }: { createRequestToken?: num
 }
 
 function NewShipmentForm({ onClose }: { onClose: () => void }) {
+  const { formatCurrency, currencyCode } = useCurrency();
   const createShipment = useMutation(api.shipments.create);
   const options = useQuery(api.shipments.creationOptions);
   const suppliers = options?.suppliers;
@@ -560,6 +561,7 @@ function NewShipmentForm({ onClose }: { onClose: () => void }) {
 }
 
 function ReceiveShipmentModal({ shipment, onClose }: { shipment: { _id: Id<"shipments">; shipmentNumber: string; supplierName: string; totalCost: number; shippingCost: number; grandTotal: number }; onClose: () => void }) {
+  const { formatCurrency } = useCurrency();
   const receiveShipment = useMutation(api.shipments.receive);
   const [requestId] = useState(() => crypto.randomUUID());
   const [submitting, setSubmitting] = useState(false);

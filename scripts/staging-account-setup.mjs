@@ -361,11 +361,6 @@ async function reconcileExistingBranch(page, row, branchName) {
 }
 
 async function ensureRoleAccount(browser, adminPage, config, account) {
-  const search = adminPage.locator(
-    'input[placeholder="بحث بالاسم أو الهاتف..."]',
-  );
-  await search.fill(account.email);
-  await adminPage.waitForTimeout(150);
   let row = employeeRow(adminPage, account.email);
 
   let invitationUrl = null;
@@ -394,13 +389,14 @@ async function ensureRoleAccount(browser, adminPage, config, account) {
       if ((await row.getAttribute("data-employee-active")) !== "true") {
         await row.getByTitle("تفعيل").click();
         await adminPage.waitForFunction(
-          (role) =>
+          (email) =>
             [...document.querySelectorAll('[data-testid="employee-row"]')].some(
               (element) =>
-                element.getAttribute("data-employee-role") === role &&
+                element.textContent?.includes(email) &&
                 element.getAttribute("data-employee-active") === "true",
             ),
-          account.role,
+          account.email,
+          { timeout: 30_000 },
         );
         reactivated = true;
       }
@@ -429,7 +425,6 @@ async function ensureRoleAccount(browser, adminPage, config, account) {
 
   await verifyRoleLogin(browser, config.baseUrl, account, invitationUrl);
   await adminPage.getByTestId("employee-invite-close").click();
-  await search.fill("");
   return { role: account.role, status: result };
 }
 
