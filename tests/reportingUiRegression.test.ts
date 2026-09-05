@@ -177,19 +177,18 @@ test("RUI-23 executive dashboard exposes period branch comparison and refresh co
   assert.match(home, /تحديث البيانات/);
 });
 
-test("RUI-24 executive dashboard keeps drill-down profit and inventory permissions independent", () => {
-  assert.match(home, /permissions\.includes\("view_executive_dashboard"\)/);
-  assert.match(home, /permissions\.includes\("view_reports"\)/);
-  assert.match(home, /permissions\.includes\("view_profits"\)/);
-  assert.match(home, /permissions\.includes\("view_products"\)/);
-  assert.match(home, /disabled=\{!canViewReports\}/);
+test("RUI-24 executive dashboard keeps drill-down and underlying data permissions independent", () => {
+  for (const permission of ["view_executive_dashboard", "view_reports", "view_invoices", "view_shipments", "view_expenses", "view_finance", "view_customer_ledger", "view_supplier_ledger", "view_profits", "view_products"]) {
+    assert.match(home, new RegExp(`permissions\\.includes\\("${permission}"\\)`));
+  }
+  assert.match(home, /disabled=\{!canViewReports \|\| card\.protected\}/);
   assert.match(home, /التقرير التفصيلي غير متاح حسب الصلاحية/);
   assert.match(home, /لا تملك صلاحية عرض لوحة التحكم التنفيذية/);
 });
 
-test("RUI-25 each executive indicator opens its detailed report only with report permission", () => {
+test("RUI-25 each executive indicator opens its detailed report only when both layers allow it", () => {
   assert.match(home, /onOpenReport: \(report: ReportKind\) => void/);
-  assert.match(home, /if \(canViewReports\) onOpenReport\(card\.report\)/);
+  assert.match(home, /if \(canViewReports && !card\.protected\) onOpenReport\(card\.report\)/);
   assert.match(home, /فتح التقرير التفصيلي/);
 });
 
