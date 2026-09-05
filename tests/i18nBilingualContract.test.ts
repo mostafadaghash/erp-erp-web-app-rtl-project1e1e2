@@ -103,8 +103,9 @@ test("I18N-08 language setting is persistent locally and injected into the exist
   assert.match(providerSource, /language-setting-select/);
 });
 
-test("I18N-09 Settings page keeps its translation-safe integration hooks", () => {
+test("I18N-09 Settings page keeps its translation-safe portal integration contract", () => {
   assert.match(settingsSource, /data-testid="settings-page"/);
-  assert.match(settingsSource, /data-i18n-language-settings-host/);
-  assert.match(settingsSource, /data-i18n-skip/);
+  assert.match(providerSource, /document\.querySelector<HTMLElement>\("\[data-testid='settings-page'\]"\)/);
+  assert.match(providerSource, /settingsPage\.querySelector<HTMLElement>\("\[data-i18n-language-settings-host\]"\)/);
+  assert.match(providerSource, /createPortal\(/);
 });
