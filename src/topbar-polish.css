@@ -4,7 +4,6 @@
     min-height: 70px;
     gap: 8px;
     padding: 9px 16px 8px;
-    overflow: hidden;
   }
 
   .erp-nav-brand {
@@ -53,15 +52,17 @@
 
   .erp-user-panel > div:first-child > div:last-child {
     min-width: 0;
+    width: 100%;
   }
 
   .erp-user-panel > div:first-child > div:last-child > p {
+    width: 100%;
     max-width: none !important;
   }
 
   .erp-user-panel > div:first-child > div:last-child > p:first-child {
-    overflow: visible !important;
-    text-overflow: clip !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
     white-space: nowrap !important;
     unicode-bidi: plaintext;
     font-size: 14px;
