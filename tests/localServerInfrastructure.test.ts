@@ -6,6 +6,7 @@ const compose = readFileSync("infra/local/docker-compose.yml", "utf8");
 const runtimeTemplate = readFileSync("infra/local/runtime.env.example", "utf8");
 const bootstrap = readFileSync("scripts/local/bootstrap.ps1", "utf8");
 const configure = readFileSync("scripts/local/configure.ps1", "utf8");
+const fullSuite = readFileSync("scripts/local/full-suite.ps1", "utf8");
 const authKeyGenerator = readFileSync(
   "scripts/local/generate-auth-keys.mjs",
   "utf8",
@@ -84,6 +85,19 @@ test("package scripts expose controlled local lifecycle commands", () => {
   assert.match(packageJson.scripts["local:up"], /docker compose/);
   assert.match(packageJson.scripts["local:down"], /docker compose/);
   assert.match(packageJson.scripts["local:frontend"], /--mode local-server/);
+});
+
+test("local full suite starts and cleans up its own frontend when needed", () => {
+  assert.match(fullSuite, /function Test-LocalFrontend/);
+  assert.match(fullSuite, /function Start-LocalFrontendForSuite/);
+  assert.match(fullSuite, /node_modules\\\.bin\\vite\.cmd/);
+  assert.match(fullSuite, /"--mode", "local-server"/);
+  assert.match(fullSuite, /"--host", "127\.0\.0\.1"/);
+  assert.match(fullSuite, /"--port", "5173"/);
+  assert.match(fullSuite, /"--strictPort"/);
+  assert.match(fullSuite, /\$frontendProcess = Start-LocalFrontendForSuite/);
+  assert.match(fullSuite, /Stop-LocalFrontendForSuite -Process \$frontendProcess/);
+  assert.match(fullSuite, /taskkill\.exe \/PID \$Process\.Id \/T \/F/);
 });
 
 test("PowerShell forwards Docker detach and log flags as literal Compose arguments", () => {
