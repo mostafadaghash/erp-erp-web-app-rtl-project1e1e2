@@ -50,12 +50,15 @@ test("DBS-05 executive cards also honor their underlying data permissions", () =
 
 test("DBS-06 desktop top bar preserves user identity and logout without horizontal clipping", () => {
   assert.match(main, /import "\.\/topbar-polish\.css"/);
-  assert.match(topbar, /\.erp-navigation-inner\s*\{[\s\S]*min-height: 70px/);
+  assert.match(topbar, /\.erp-navigation-inner\s*\{[\s\S]*min-height: 80px/);
   assert.doesNotMatch(topbar, /\.erp-navigation-inner\s*\{[^}]*overflow:\s*hidden/);
+  assert.match(topbar, /\.erp-nav-group-button\s*\{[\s\S]*min-height: 48px[\s\S]*font-size: 13px/);
+  assert.match(topbar, /@media \(min-width: 1536px\)[\s\S]*\.erp-nav-group-button\s*\{[\s\S]*font-size: 14\.5px/);
   assert.match(topbar, /\.erp-user-panel\s*\{[\s\S]*flex: 0 0 auto/);
-  assert.match(topbar, /\.erp-user-panel > div:first-child\s*\{[\s\S]*width: 200px/);
-  assert.match(topbar, /p:first-child\s*\{[\s\S]*text-overflow: ellipsis !important[\s\S]*white-space: nowrap !important/);
-  assert.match(topbar, /\.erp-user-panel > button\s*\{[\s\S]*width: auto !important[\s\S]*min-width: 116px/);
+  assert.match(topbar, /\.erp-user-panel > div:first-child\s*\{[\s\S]*width: 215px/);
+  assert.match(topbar, /p:first-child\s*\{[\s\S]*text-overflow: ellipsis !important[\s\S]*font-size: 16px !important/);
+  assert.match(topbar, /@media \(min-width: 1536px\)[\s\S]*p:first-child\s*\{[\s\S]*font-size: 17px !important/);
+  assert.match(topbar, /\.erp-user-panel > button\s*\{[\s\S]*width: auto !important[\s\S]*min-height: 44px/);
   assert.match(sidebar, /title=\{userName\}/);
 });
 
@@ -64,4 +67,12 @@ test("DBS-07 operational cards auto-fit instead of leaving a broken second row o
   assert.match(operational, /فتح التفاصيل/);
   assert.match(operational, /min-h-\[158px\]/);
   assert.doesNotMatch(operational, /xl:grid-cols-4/);
+});
+
+test("DBS-08 workspace context bar has readable desktop scale", () => {
+  assert.match(topbar, /\.erp-contextbar\s*\{[\s\S]*min-height: 68px/);
+  assert.match(topbar, /\.erp-contextbar > div:first-child h1\s*\{[\s\S]*font-size: 20px/);
+  assert.match(topbar, /\.erp-contextbar \.form-input\s*\{[\s\S]*min-height: 46px[\s\S]*font-size: 14px/);
+  assert.match(topbar, /select\[data-testid="working-branch-select"\][\s\S]*min-height: 46px/);
+  assert.match(topbar, /\.erp-contextbar \.btn-primary\s*\{[\s\S]*min-height: 46px[\s\S]*font-size: 14px/);
 });
