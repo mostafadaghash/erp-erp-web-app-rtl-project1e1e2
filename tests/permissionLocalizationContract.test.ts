@@ -10,7 +10,10 @@ import {
 } from "../src/lib/permissionCatalog.ts";
 
 const employeesSource = readFileSync("src/components/EmployeesPage.tsx", "utf8");
-const dashboardSource = readFileSync("src/components/Dashboard.tsx", "utf8");
+const executiveDashboardSource = readFileSync("src/components/Dashboard.tsx", "utf8");
+const operationalDashboardSource = readFileSync("src/components/OperationalDashboard.tsx", "utf8");
+const appSource = readFileSync("src/components/ERPApp.tsx", "utf8");
+const sidebarSource = readFileSync("src/components/Sidebar.tsx", "utf8");
 
 const EXPECTED_GROUPS = [
   "المبيعات",
@@ -29,7 +32,7 @@ test("PERM-AR01 every backend permission has one Arabic presentation", () => {
   const catalogKeys = Object.keys(PERMISSION_CATALOG).sort();
   const optionKeys = ALL_PERMISSION_OPTIONS.map((permission) => permission.key).sort();
 
-  assert.equal(PERMISSIONS.length, 105, "permission inventory changed; update the Arabic catalog contract intentionally");
+  assert.equal(PERMISSIONS.length, 106, "permission inventory changed; update the Arabic catalog contract intentionally");
   assert.deepEqual(catalogKeys, backendKeys);
   assert.deepEqual(optionKeys, backendKeys);
 
@@ -75,7 +78,7 @@ test("PERM-AR04 employees UI consumes the central catalog without raw-key fallba
   assert.doesNotMatch(employeesSource, /permissionGroup\s*=/);
 });
 
-test("PERM-AR05 executive dashboard permission is restricted to approved default roles", () => {
+test("PERM-AR05 executive dashboard permission keeps approved role defaults", () => {
   for (const role of ["admin", "manager", "accountant"] as const) {
     assert.ok(
       ROLE_PERMISSIONS[role].includes("view_executive_dashboard"),
@@ -83,14 +86,37 @@ test("PERM-AR05 executive dashboard permission is restricted to approved default
     );
   }
 
-  for (const role of ["sales", "viewer", "customer_service"] as const) {
+  for (const role of ["sales", "viewer", "customer_service", "technician", "shipping"] as const) {
     assert.ok(
       !ROLE_PERMISSIONS[role].includes("view_executive_dashboard"),
       `${role} must not receive view_executive_dashboard by default`,
     );
   }
 
-  assert.match(dashboardSource, /permissions\.includes\("view_executive_dashboard"\)/);
-  assert.match(dashboardSource, /canViewExecutiveDashboard && canViewReports/);
-  assert.match(dashboardSource, /api\.reporting\.overview, canViewExecutiveData/);
+  assert.match(executiveDashboardSource, /permissions\.includes\("view_executive_dashboard"\)/);
+  assert.match(executiveDashboardSource, /api\.reporting\.overview, canViewExecutiveDashboard/);
+  assert.match(executiveDashboardSource, /disabled=\{!canViewReports\}/);
+});
+
+test("PERM-AR06 operational dashboard is an independent default for every role", () => {
+  for (const role of ["admin", "manager", "accountant", "sales", "viewer", "customer_service", "technician", "shipping"] as const) {
+    assert.ok(
+      ROLE_PERMISSIONS[role].includes("view_operational_dashboard"),
+      `${role} must receive view_operational_dashboard by default`,
+    );
+  }
+
+  assert.match(operationalDashboardSource, /permissions\.includes\("view_operational_dashboard"\)/);
+  assert.doesNotMatch(operationalDashboardSource, /api\.reporting\.overview|view_profits|currentBalances|netProfit/);
+});
+
+test("PERM-AR07 workspace and navigation expose the two dashboards through separate permissions", () => {
+  assert.match(appSource, /dashboard: "view_operational_dashboard"/);
+  assert.match(appSource, /"executive-dashboard": "view_executive_dashboard"/);
+  assert.match(appSource, /tab\.page === "dashboard" && <OperationalDashboard/);
+  assert.match(appSource, /tab\.page === "executive-dashboard" && <Dashboard/);
+  assert.match(sidebarSource, /id: "dashboard"[\s\S]*permission: "view_operational_dashboard"/);
+  assert.match(sidebarSource, /id: "executive-dashboard"[\s\S]*permission: "view_executive_dashboard"/);
+  assert.match(sidebarSource, /لوحة التشغيل/);
+  assert.match(sidebarSource, /اللوحة التنفيذية/);
 });
