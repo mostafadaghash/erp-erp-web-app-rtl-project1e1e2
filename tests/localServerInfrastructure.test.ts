@@ -87,14 +87,20 @@ test("package scripts expose controlled local lifecycle commands", () => {
   assert.match(packageJson.scripts["local:frontend"], /--mode local-server/);
 });
 
-test("local full suite starts and cleans up its own frontend when needed", () => {
+test("local full suite starts Vite with Node directly and cleans up its own frontend", () => {
   assert.match(fullSuite, /function Test-LocalFrontend/);
   assert.match(fullSuite, /function Start-LocalFrontendForSuite/);
-  assert.match(fullSuite, /node_modules\\\.bin\\vite\.cmd/);
-  assert.match(fullSuite, /"--mode", "local-server"/);
-  assert.match(fullSuite, /"--host", "127\.0\.0\.1"/);
+  assert.match(fullSuite, /node_modules\\vite\\bin\\vite\.js/);
+  assert.match(fullSuite, /Get-Command node\.exe/);
+  assert.match(fullSuite, /-FilePath \$nodeCommand/);
+  assert.match(fullSuite, /"node_modules\/vite\/bin\/vite\.js", "--mode", "local-server"/);
+  assert.match(fullSuite, /"--host", "localhost"/);
   assert.match(fullSuite, /"--port", "5173"/);
   assert.match(fullSuite, /"--strictPort"/);
+  assert.match(fullSuite, /RedirectStandardOutput \$viteStdoutLog/);
+  assert.match(fullSuite, /RedirectStandardError \$viteStderrLog/);
+  assert.match(fullSuite, /Get-ViteStartupDiagnostics/);
+  assert.doesNotMatch(fullSuite, /node_modules\\\.bin\\vite\.cmd/);
   assert.match(fullSuite, /\$frontendProcess = Start-LocalFrontendForSuite/);
   assert.match(fullSuite, /Stop-LocalFrontendForSuite -Process \$frontendProcess/);
   assert.match(fullSuite, /taskkill\.exe \/PID \$Process\.Id \/T \/F/);
