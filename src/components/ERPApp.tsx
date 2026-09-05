@@ -701,10 +701,10 @@ export function ERPApp() {
         aria-hidden={tab.id !== workspace.activeId}
         hidden={tab.id !== workspace.activeId}
         className="min-h-full"
-        onChangeCapture={() => {
+        onChange={() => {
           if (tab.kind === "new" && !tab.dirty) markTabDirty(tab.id, true);
         }}
-        onInputCapture={() => {
+        onInput={() => {
           if (tab.kind === "new" && !tab.dirty) markTabDirty(tab.id, true);
         }}
       >

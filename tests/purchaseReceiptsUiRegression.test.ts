@@ -25,6 +25,17 @@ test("receipt action is hidden without post permission", () => {
   assert.match(shipments, /post_purchase_receipts/);
 });
 
+test("purchase forms own their currency formatter scope", () => {
+  assert.match(
+    shipments,
+    /function NewShipmentForm[\s\S]{0,220}const \{ formatCurrency, currencyCode \} = useCurrency\(\)/,
+  );
+  assert.match(
+    shipments,
+    /function ReceiveShipmentModal[\s\S]{0,320}const \{ formatCurrency \} = useCurrency\(\)/,
+  );
+});
+
 test("supplier balance query is skipped without permission or an explicit effective branch", () => {
   assert.match(
     suppliers,

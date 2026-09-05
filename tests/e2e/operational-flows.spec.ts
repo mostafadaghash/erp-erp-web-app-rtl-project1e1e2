@@ -1,9 +1,5 @@
-import { expect, test, type Locator, type Page } from "@playwright/test";
+import { expect, test, type Locator } from "@playwright/test";
 import { login, navigateTo } from "./helpers";
-
-function inputNextToLabel(page: Page, label: string) {
-  return page.getByText(label, { exact: true }).locator("..").locator("input, textarea").first();
-}
 
 async function selectFirstRealOption(select: Locator) {
   await expect(select).toBeVisible();
@@ -21,39 +17,39 @@ test.describe("critical operational flow readiness", () => {
     const productQuery = process.env.E2E_PRODUCT_QUERY?.trim();
     expect(productQuery, "E2E_PRODUCT_QUERY must identify a seeded staging product").toBeTruthy();
 
-    await navigateTo(page, "المبيعات");
-    await page
-      .getByTestId("invoices-page")
-      .getByRole("button", { name: "فاتورة بيع جديدة", exact: true })
-      .click();
+    await navigateTo(page, "فواتير المبيعات");
+    await page.getByTestId("invoices-page").getByRole("button", { name: "فاتورة بيع جديدة", exact: true }).click();
     await expect(page.getByTestId("new-invoice-page")).toBeVisible();
 
-    await inputNextToLabel(page, "اسم العميل *").fill(`E2E Invoice ${Date.now()}`);
+    await selectFirstRealOption(page.getByTestId("invoice-customer-select"));
     const search = page.getByTestId("invoice-product-search");
     await search.fill(productQuery!);
-
     const productResult = page.getByTestId("invoice-product-result").first();
     await expect(productResult).toBeVisible();
     await productResult.click();
 
-    const issue = page.getByTestId("invoice-submit");
-    await expect(issue).toBeEnabled();
+    await page.getByTestId("invoice-payment-method").selectOption("credit");
+    await expect(page.getByTestId("invoice-submit")).toBeEnabled();
     await expect(page.getByText("ملخص الفاتورة", { exact: true })).toBeVisible();
   });
 
-  test("@flows purchase form resolves staging supplier and costs", async ({ page }) => {
+  test("@flows purchase invoice resolves staging supplier, product, and cost", async ({ page }) => {
     await login(page, "admin");
-    await navigateTo(page, "المشتريات");
-    await page.getByTestId("shipment-create-open").click();
-    await expect(page.getByTestId("shipment-create-form")).toBeVisible();
+    const productQuery = process.env.E2E_PRODUCT_QUERY?.trim();
+    expect(productQuery, "E2E_PRODUCT_QUERY must identify a seeded staging product").toBeTruthy();
 
-    await selectFirstRealOption(page.getByTestId("shipment-supplier-select"));
-    const item = page.getByTestId("shipment-item-row").first();
-    await item.getByPlaceholder("اسم الصنف *").fill(`E2E Purchase Item ${Date.now()}`);
-    await item.getByTestId("shipment-item-unit-cost").fill("100");
+    await navigateTo(page, "فاتورة مشتريات جديدة");
+    await expect(page.getByTestId("new-purchase-invoice-page")).toBeVisible();
+    await selectFirstRealOption(page.getByTestId("purchase-supplier-select"));
+
+    await page.getByTestId("purchase-product-search").fill(productQuery!);
+    const productResult = page.getByTestId("purchase-product-result").first();
+    await expect(productResult).toBeVisible();
+    await productResult.click();
+    await page.locator("[data-purchase-unit-cost]").first().fill("100");
 
     await expect(page.getByText("الإجمالي الكلي", { exact: true })).toBeVisible();
-    await expect(page.getByTestId("shipment-submit")).toBeVisible();
+    await expect(page.getByTestId("purchase-submit")).toBeEnabled();
   });
 
   test("@flows repair intake reaches a valid pre-submit state", async ({ page }) => {
@@ -65,10 +61,7 @@ test.describe("critical operational flow readiness", () => {
 
     await page.getByTestId("repair-create-open").click();
     await expect(page.getByTestId("repair-create-form")).toBeVisible();
-
-    const suffix = Date.now().toString().slice(-7);
-    await inputNextToLabel(page, "اسم العميل *").fill(`E2E Repair ${suffix}`);
-    await inputNextToLabel(page, "رقم الهاتف *").fill(`010${suffix}`);
+    await selectFirstRealOption(page.getByTestId("repair-customer-select"));
     await page.getByTestId("repair-device-brand").fill("Sony");
     await page.getByTestId("repair-device-model").fill("PlayStation 5");
     await page.getByTestId("repair-problem").fill("E2E staging intake validation");
@@ -79,7 +72,7 @@ test.describe("critical operational flow readiness", () => {
 
   test("@flows shipping COD surface is bound to a staging branch and creation flow", async ({ page }) => {
     await login(page, "admin");
-    await navigateTo(page, "عمليات الشحن");
+    await navigateTo(page, "طلبات الشحن والتسويات");
     await expect(page.getByTestId("deliveries-page")).toBeVisible();
 
     const branch = page.getByTestId("delivery-branch-select");

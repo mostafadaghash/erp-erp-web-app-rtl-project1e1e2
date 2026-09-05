@@ -155,7 +155,9 @@ test("RUI-20 reports have explicit loading invalid-range and unauthorized states
 
 test("RUI-21 dashboard loads only protected reporting and low-stock summaries", () => {
   assert.match(home, /api\.reporting\.overview/);
-  assert.match(home, /canViewReports && reportArgs/);
+  assert.match(home, /permissions\.includes\("view_executive_dashboard"\)/);
+  assert.match(home, /canViewExecutiveDashboard && canViewReports/);
+  assert.match(home, /canViewExecutiveData && reportArgs/);
   assert.match(home, /api\.products\.list, canViewProducts \? \{ lowStock: true \} : "skip"/);
   assert.doesNotMatch(home, /api\.(?:invoices|expenses|customers|repairs)\.(?:list|stats|getStats)/);
 });
@@ -175,11 +177,12 @@ test("RUI-23 dashboard exposes period branch comparison and refresh controls", (
   assert.match(home, /تحديث البيانات/);
 });
 
-test("RUI-24 dashboard keeps reporting profit and inventory permissions", () => {
+test("RUI-24 dashboard keeps executive reporting profit and inventory permissions", () => {
+  assert.match(home, /permissions\.includes\("view_executive_dashboard"\)/);
   assert.match(home, /permissions\.includes\("view_reports"\)/);
   assert.match(home, /permissions\.includes\("view_profits"\)/);
   assert.match(home, /permissions\.includes\("view_products"\)/);
-  assert.match(home, /لا تملك صلاحية عرض مؤشرات الإدارة والتقارير/);
+  assert.match(home, /لا تملك صلاحية عرض لوحة التحكم التنفيذية/);
 });
 
 test("RUI-25 each dashboard indicator opens its detailed report", () => {

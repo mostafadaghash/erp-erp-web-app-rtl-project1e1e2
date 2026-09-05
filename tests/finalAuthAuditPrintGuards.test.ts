@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync, existsSync } from "node:fs";
+import { readFileSync } from "node:fs";
 
 const read = (path: string) => readFileSync(path, "utf8");
 
@@ -66,7 +66,10 @@ test("AUTH-AUD-09 role permission and activity updates target employee records",
 
 test("AUTH-AUD-10 rejected auth attempts do not write partial invitation claims", () => {
   const auth = read("convex/auth.ts");
-  assert.ok(auth.indexOf("throw new Error(\"رابط الدعوة غير صالح أو منتهي\")") < auth.indexOf("appCtx.db.patch(invitation._id"));
+  assert.ok(
+    auth.indexOf('throw new Error("رابط الدعوة غير صالح أو منتهي")') <
+      auth.indexOf("appCtx.db.patch(invitation._id"),
+  );
 });
 
 test("PRH-GUARD-01 no document.write remains in application code", () => {
@@ -75,7 +78,34 @@ test("PRH-GUARD-01 no document.write remains in application code", () => {
 });
 
 test("PRH-GUARD-02 browser print acceptance artifacts are real files", () => {
-  assert.ok(existsSync("test-results/printing/a4-invoice.pdf"));
-  assert.ok(existsSync("test-results/printing/thermal-receipt.pdf"));
-  assert.ok(existsSync("test-results/printing/screenshots/a4-invoice.png"));
+  for (const path of [
+    "test-results/printing/a4-invoice.pdf",
+    "test-results/printing/thermal-receipt.pdf",
+  ]) {
+    const pdf = readFileSync(path);
+    assert.ok(pdf.length > 10_000);
+    assert.equal(pdf.subarray(0, 5).toString("ascii"), "%PDF-");
+    assert.match(pdf.subarray(-1024).toString("latin1"), /%%EOF/);
+    assert.doesNotMatch(pdf.toString("latin1"), /placeholder/i);
+  }
+
+  const screenshot = readFileSync(
+    "test-results/printing/screenshots/a4-invoice.png",
+  );
+  assert.ok(screenshot.length > 10_000);
+  assert.deepEqual(
+    [...screenshot.subarray(0, 8)],
+    [137, 80, 78, 71, 13, 10, 26, 10],
+  );
+  assert.ok(screenshot.readUInt32BE(16) >= 600);
+  assert.ok(screenshot.readUInt32BE(20) >= 800);
+
+  const manifest = JSON.parse(read("test-results/printing/manifest.json")) as {
+    generatedBy?: string;
+    browserVersion?: string;
+    syntheticDataOnly?: boolean;
+  };
+  assert.equal(manifest.generatedBy, "Chromium");
+  assert.match(manifest.browserVersion ?? "", /^\d+\./);
+  assert.equal(manifest.syntheticDataOnly, true);
 });

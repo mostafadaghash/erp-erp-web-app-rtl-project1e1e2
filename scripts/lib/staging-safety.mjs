@@ -50,6 +50,16 @@ function optionalProductionOrigin(name) {
   return value ? exactOrigin(value, name) : null;
 }
 
+function isExactLocalServerAdapter(frontend, convexCloud, convexSite, deploymentId) {
+  return (
+    frontend.hostname === "localhost" &&
+    frontend.protocol === "http:" &&
+    deploymentId === "local-selfhosted" &&
+    convexCloud.origin === "https://local-selfhosted.convex.cloud" &&
+    convexSite.origin === "https://local-selfhosted.convex.site"
+  );
+}
+
 export function stagingOrigins() {
   if (process.env.E2E_ENVIRONMENT !== "staging") {
     throw new Error("E2E_ENVIRONMENT must equal staging");
@@ -101,8 +111,15 @@ export function stagingOrigins() {
     }
   }
 
+  const localServerAdapter = isExactLocalServerAdapter(
+    frontend,
+    convexCloud,
+    convexSite,
+    cloudId,
+  );
+
   const viteConvex = process.env.VITE_CONVEX_URL?.trim();
-  if (viteConvex) {
+  if (viteConvex && !localServerAdapter) {
     const configured = exactOrigin(viteConvex, "VITE_CONVEX_URL");
     if (configured.origin !== convexCloud.origin) {
       throw new Error("VITE_CONVEX_URL must equal STAGING_CONVEX_URL");
@@ -112,7 +129,11 @@ export function stagingOrigins() {
     .split(",")
     .map((host) => host.trim().toLowerCase())
     .filter(Boolean);
-  if (allowedHosts.length && !allowedHosts.includes(frontend.hostname.toLowerCase())) {
+  if (
+    allowedHosts.length &&
+    !localServerAdapter &&
+    !allowedHosts.includes(frontend.hostname.toLowerCase())
+  ) {
     throw new Error("VITE_ALLOWED_HOSTS must include the Staging frontend host");
   }
 
