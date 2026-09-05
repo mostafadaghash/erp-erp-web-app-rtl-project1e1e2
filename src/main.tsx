@@ -11,6 +11,7 @@ import "./new-invoice-redesign.css";
 import "./new-invoice-pos-final.css";
 import "./invoice-customer-fields-polish.css";
 import "./invoice-list-filter-polish.css";
+import "./topbar-polish.css";
 import App from "./App";
 import { getDirection } from "./i18n/catalog";
 import { getInitialLanguage } from "./i18n/I18nProvider";
