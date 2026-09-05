@@ -21,6 +21,7 @@ export const PERMISSIONS = [
   "view_branches",
   "view_employees",
   "view_reports",
+  "view_operational_dashboard",
   "view_executive_dashboard",
   "view_audit_logs",
   "view_prices",
@@ -118,7 +119,7 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
     "view_general_ledger", "print_general_ledger",
     "view_products", "view_customers", "view_orders", "view_invoices", "view_quotes",
     "view_repairs", "view_shipments", "view_deliveries", "view_suppliers",
-    "view_expenses", "view_leads", "view_follow_ups", "view_branches", "view_reports", "view_executive_dashboard",
+    "view_expenses", "view_leads", "view_follow_ups", "view_branches", "view_reports", "view_operational_dashboard", "view_executive_dashboard",
     "view_prices", "view_profits",
     "create_products", "create_customers", "create_order_intake", "create_invoices", "create_quotes",
     "create_repairs", "create_shipments", "create_deliveries", "create_suppliers",
@@ -135,6 +136,7 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
     "confirm_cod_deliveries", "view_cod_settlements", "settle_cod_collections", "print_cod_settlements",
   ],
   sales: [
+    "view_operational_dashboard",
     "view_products", "view_customers", "view_orders", "view_invoices", "view_quotes", "view_leads", "view_follow_ups",
     "view_prices",
     "create_order_intake", "create_invoices", "create_quotes", "create_customers",
@@ -143,6 +145,7 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
     "record_collections", "record_order_deposits",
   ],
   customer_service: [
+    "view_operational_dashboard",
     "view_customers", "view_orders", "view_repairs", "view_leads", "view_follow_ups",
     "create_customers", "edit_customers",
     "create_order_intake", "edit_order_intake",
@@ -150,14 +153,16 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
     "record_order_deposits", "print_orders",
   ],
   technician: [
+    "view_operational_dashboard",
     "view_repairs", "view_products", "view_prices", "view_follow_ups",
     "create_repairs", "edit_repairs", "manage_follow_ups",
     "print_repairs",
   ],
   accountant: [
+    "view_operational_dashboard", "view_executive_dashboard",
     "view_general_ledger", "initialize_general_ledger", "manage_chart_of_accounts", "post_manual_journals", "reverse_journal_entries", "close_accounting_periods", "reopen_accounting_periods", "print_general_ledger",
     "view_products", "view_customers", "view_invoices", "view_quotes", "view_expenses",
-    "view_reports", "view_executive_dashboard", "view_prices", "view_profits",
+    "view_reports", "view_prices", "view_profits",
     "create_expenses", "edit_expenses",
     "export_data",
     "view_finance", "manage_financial_accounts", "initialize_finance", "record_collections", "record_order_deposits",
@@ -170,6 +175,7 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
     "view_cod_settlements", "settle_cod_collections", "reverse_cod_collections", "print_cod_settlements",
   ],
   shipping: [
+    "view_operational_dashboard",
     "view_orders", "view_shipments", "view_deliveries", "view_follow_ups",
     "create_shipments", "edit_shipments",
     "create_deliveries", "edit_deliveries", "manage_follow_ups",
@@ -178,6 +184,7 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
     "confirm_cod_deliveries", "print_cod_settlements",
   ],
   viewer: [
+    "view_operational_dashboard",
     "view_products", "view_customers", "view_orders", "view_quotes",
     "view_repairs", "view_invoices",
   ],
