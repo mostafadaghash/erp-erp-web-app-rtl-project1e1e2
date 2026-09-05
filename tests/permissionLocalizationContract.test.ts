@@ -95,7 +95,7 @@ test("PERM-AR05 executive dashboard permission keeps approved role defaults", ()
 
   assert.match(executiveDashboardSource, /permissions\.includes\("view_executive_dashboard"\)/);
   assert.match(executiveDashboardSource, /api\.reporting\.overview, canViewExecutiveDashboard/);
-  assert.match(executiveDashboardSource, /disabled=\{!canViewReports\}/);
+  assert.match(executiveDashboardSource, /disabled=\{!canViewReports \|\| card\.protected\}/);
 });
 
 test("PERM-AR06 operational dashboard is an independent default for every role", () => {
