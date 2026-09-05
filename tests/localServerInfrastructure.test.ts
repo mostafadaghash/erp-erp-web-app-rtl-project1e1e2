@@ -31,8 +31,9 @@ test("local server keeps the database private and initially binds application po
     compose.match(/  postgres:[\s\S]*?\n  backend:/)?.[0] ?? "";
   assert.ok(postgresService);
   assert.doesNotMatch(postgresService, /\n    ports:/);
-  assert.match(compose, /127\.0\.0\.1:\$\{PORT:-3210\}:3210/);
-  assert.match(compose, /127\.0\.0\.1:\$\{SITE_PROXY_PORT:-3211\}:3211/);
+  assert.match(runtimeTemplate, /^BACKEND_BIND_HOST=127\.0\.0\.1$/m);
+  assert.match(compose, /\$\{BACKEND_BIND_HOST:-127\.0\.0\.1\}:\$\{PORT:-3210\}:3210/);
+  assert.match(compose, /\$\{BACKEND_BIND_HOST:-127\.0\.0\.1\}:\$\{SITE_PROXY_PORT:-3211\}:3211/);
   assert.match(compose, /127\.0\.0\.1:\$\{DASHBOARD_PORT:-6791\}:6791/);
 });
 
