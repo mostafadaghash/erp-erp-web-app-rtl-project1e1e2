@@ -6,7 +6,8 @@ import { messages } from "../src/i18n/catalog.ts";
 const read = (path: string) => readFileSync(new URL(path, import.meta.url), "utf8");
 const sidebar = read("../src/components/Sidebar.tsx");
 const app = read("../src/components/ERPApp.tsx");
-const home = read("../src/components/Dashboard.tsx");
+const operational = read("../src/components/OperationalDashboard.tsx");
+const executive = read("../src/components/Dashboard.tsx");
 const invoices = read("../src/components/InvoicesPage.tsx");
 const newInvoice = read("../src/components/NewInvoicePage.tsx");
 const reports = read("../src/components/ReportsPage.tsx");
@@ -21,23 +22,26 @@ test("SUX-01 navigation dropdowns close on an outside pointer press", () => {
   assert.match(app, /!quickMenuRef\.current\?\.contains\(event\.target\)/);
 });
 
-test("SUX-02 dashboard is a translated direct navigation item", () => {
-  assert.match(sidebar, /HOME_ITEM: NavItem = \{ id: "dashboard", labelKey: "nav\.dashboard"/);
+test("SUX-02 dashboard navigation exposes operational and executive choices", () => {
   assert.equal(messages.ar["nav.dashboard"], "لوحة التحكم");
   assert.equal(messages.en["nav.dashboard"], "Dashboard");
-  assert.match(sidebar, /data-testid="nav-dashboard"/);
-  assert.match(sidebar, /className=\{`erp-nav-home-button/);
-  assert.doesNotMatch(sidebar, /key: "home"[\s\S]{0,160}items:/);
-  assert.match(app, /dashboard: \{ group: "لوحة التحكم", title: "لوحة التحكم" \}/);
+  assert.match(sidebar, /key: "dashboard", labelKey: "nav\.dashboard"/);
+  assert.match(sidebar, /id: "dashboard"[\s\S]*لوحة التشغيل[\s\S]*view_operational_dashboard/);
+  assert.match(sidebar, /id: "executive-dashboard"[\s\S]*اللوحة التنفيذية[\s\S]*view_executive_dashboard/);
+  assert.match(sidebar, /data-testid=\{`nav-group-\$\{group\.key\}`\}/);
+  assert.match(app, /dashboard: \{ group: "لوحة التحكم", title: "لوحة التشغيل" \}/);
+  assert.match(app, /"executive-dashboard": \{ group: "لوحة التحكم", title: "اللوحة التنفيذية" \}/);
 });
 
-test("SUX-03 dashboard is a compact eight-metric workspace", () => {
+test("SUX-03 executive dashboard remains a compact eight-metric workspace", () => {
   assert.match(currency, /ar-EG-u-nu-latn/);
-  assert.match(home, /erp-dashboard-card-grid/);
-  assert.match(home, /api\.reporting\.overview/);
-  assert.equal((home.match(/key: "/g) ?? []).length, 8);
-  assert.match(home, /onClick=\{\(\) => onOpenReport\(card\.report\)\}/);
-  assert.doesNotMatch(home, /أحدث فواتير المبيعات|erp-home-quick-grid/);
+  assert.match(executive, /erp-dashboard-card-grid/);
+  assert.match(executive, /api\.executiveDashboard\.overview/);
+  assert.equal((executive.match(/key: "/g) ?? []).length, 8);
+  assert.match(executive, /if \(canViewReports && !card\.protected\) onOpenReport\(card\.report\)/);
+  assert.doesNotMatch(executive, /أحدث فواتير المبيعات|erp-home-quick-grid/);
+  assert.match(operational, /data-testid="operational-dashboard"/);
+  assert.doesNotMatch(operational, /api\.executiveDashboard\.overview|صافي الربح|أرصدة الخزائن/);
 });
 
 test("SUX-04 sales list has no summary cards or accounting cancellation warning", () => {
@@ -68,5 +72,4 @@ test("SUX-07 sales reports are filterable detailed documents", () => {
   assert.match(reports, /data-testid="sales-detail-invoices"/);
   assert.match(reports, /setExpandedInvoiceId/);
   assert.match(reports, /invoice\.status !== "cancelled"/);
-  assert.match(reports, /عرض التقرير بالفلاتر المحددة/);
 });

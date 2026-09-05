@@ -40,6 +40,7 @@ export const PERMISSION_CATALOG = {
   view_branches: { label: "عرض الفروع", group: "الإدارة" },
   view_employees: { label: "عرض المستخدمين", group: "الإدارة" },
   view_reports: { label: "عرض التقارير", group: "التقارير" },
+  view_operational_dashboard: { label: "عرض لوحة التحكم التشغيلية", group: "التقارير" },
   view_executive_dashboard: { label: "عرض لوحة التحكم التنفيذية", group: "التقارير" },
   view_audit_logs: { label: "عرض سجل العمليات", group: "الإدارة" },
   view_prices: { label: "عرض الأسعار", group: "المبيعات" },

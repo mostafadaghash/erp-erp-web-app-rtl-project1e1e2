@@ -1,0 +1,48 @@
+/* Final desktop navigation sizing. Loaded last so it can safely refine the navigation skin. */
+@media (min-width: 1024px) {
+  .erp-navigation-inner {
+    min-height: 68px;
+    gap: 9px;
+    padding: 9px 14px 8px;
+  }
+
+  .erp-nav-brand {
+    padding-left: 16px;
+  }
+
+  .erp-nav-group-button {
+    min-height: 44px;
+    padding-inline: 10px;
+    font-size: 12.5px;
+  }
+
+  .erp-nav-dropdown {
+    top: calc(100% + 11px);
+  }
+
+  .erp-user-panel {
+    min-width: 260px;
+    gap: 12px;
+    padding-right: 14px;
+  }
+
+  .erp-user-panel > div:first-child {
+    min-width: 154px;
+    flex: 1 1 auto;
+  }
+
+  .erp-user-panel > button {
+    min-height: 42px;
+    flex: 0 0 auto;
+  }
+}
+
+@media (min-width: 1280px) {
+  .erp-user-panel {
+    min-width: 285px;
+  }
+
+  .erp-nav-group-button {
+    font-size: 13px;
+  }
+}

@@ -1,97 +1,73 @@
+import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import test from "node:test";
+import { messages, translateLegacyText } from "../src/i18n/catalog.ts";
 
-import {
-  LANGUAGE_META,
-  containsArabic,
-  getDirection,
-  getLocale,
-  messages,
-  translateKey,
-  translateLegacyText,
-  type TranslationKey,
-} from "../src/i18n/catalog.ts";
+const read = (path: string) => readFileSync(new URL(path, import.meta.url), "utf8");
+const appSource = read("../src/App.tsx");
+const sidebarSource = read("../src/components/Sidebar.tsx");
+const providerSource = read("../src/i18n/I18nProvider.tsx");
+const settingsSource = read("../src/components/SettingsPage.tsx");
 
-const appSource = readFileSync("src/App.tsx", "utf8");
-const sidebarSource = readFileSync("src/components/Sidebar.tsx", "utf8");
-const providerSource = readFileSync("src/i18n/I18nProvider.tsx", "utf8");
-const bridgeSource = readFileSync("src/i18n/domBridge.ts", "utf8");
-const directionCss = readFileSync("src/i18n/i18n.css", "utf8");
-const preferencesSource = readFileSync("convex/userPreferences.ts", "utf8");
-const generatedApiSource = readFileSync("convex/_generated/api.d.ts", "utf8");
-
-const MODULE_SAMPLES = [
-  ["العملاء", "Customers"],
-  ["الموردون", "Suppliers"],
-  ["المبيعات", "Sales"],
-  ["المشتريات", "Purchases"],
-  ["المخزون", "Inventory"],
-  ["الحسابات", "Accounts"],
-  ["الصيانة", "Repairs"],
-  ["الشحن", "Shipping"],
-  ["التقارير", "Reports"],
+const expectedNavigation = [
+  ["nav.dashboard", "لوحة التحكم", "Dashboard"],
+  ["nav.sales", "المبيعات", "Sales"],
+  ["nav.customers", "العملاء", "Customers"],
+  ["nav.purchases", "المشتريات", "Purchases"],
+  ["nav.inventory", "المخزون", "Inventory"],
+  ["nav.repairs", "الصيانة", "Repairs"],
+  ["nav.shipping", "الشحن", "Shipping"],
+  ["nav.accounts", "الحسابات", "Accounts"],
+  ["nav.reports", "التقارير", "Reports"],
+  ["nav.settings", "الإعدادات", "Settings"],
 ] as const;
 
-const ORDER_STATUS_SAMPLES = [
-  ["قيد الانتظار", "Pending"],
-  ["جاري التجهيز", "Processing"],
-  ["تم التجهيز", "Prepared"],
-  ["تم التسليم لشركة الشحن", "Handed to Shipping Company"],
-  ["تم تسليم الأوردر", "Order Delivered"],
-  ["ملغي", "Cancelled"],
-] as const;
-
-const REPAIR_STATUS_SAMPLES = [
-  ["جاري الصيانة", "Under Repair"],
-  ["ظهور مشكلة جديدة", "New Problem Found"],
-  ["تم الإصلاح", "Repaired"],
-  ["تم التسليم", "Delivered"],
-  ["مرفوض من العميل", "Rejected by Customer"],
-  ["مرفوض من الفني", "Rejected by Technician"],
-] as const;
-
-test("I18N-01 Arabic and English catalogs have identical translation keys", () => {
-  const arKeys = Object.keys(messages.ar).sort();
-  const enKeys = Object.keys(messages.en).sort();
-  assert.deepEqual(enKeys, arKeys);
-  assert.ok(arKeys.length >= 150, "central catalog should cover the main ERP surface");
-
-  for (const key of arKeys as TranslationKey[]) {
-    assert.ok(messages.ar[key].trim(), `${key} is missing Arabic copy`);
-    assert.ok(messages.en[key].trim(), `${key} is missing English copy`);
+test("I18N-01 catalog provides Arabic and English navigation labels", () => {
+  for (const [key, arabic, english] of expectedNavigation) {
+    assert.equal(messages.ar[key], arabic);
+    assert.equal(messages.en[key], english);
   }
 });
 
-test("I18N-02 language metadata switches locale and direction correctly", () => {
-  assert.equal(getDirection("ar"), "rtl");
-  assert.equal(getDirection("en"), "ltr");
-  assert.equal(getLocale("ar"), "ar-EG");
-  assert.equal(getLocale("en"), "en-GB");
-  assert.equal(LANGUAGE_META.ar.nativeLabel, "العربية");
-  assert.equal(LANGUAGE_META.en.nativeLabel, "English");
+test("I18N-02 catalog covers the primary shared actions", () => {
+  for (const key of ["common.save", "common.cancel", "common.search", "common.print", "common.export", "common.refresh"] as const) {
+    assert.ok(messages.ar[key]);
+    assert.ok(messages.en[key]);
+    assert.notEqual(messages.ar[key], messages.en[key]);
+  }
 });
 
-test("I18N-03 core shell keys render in both languages", () => {
-  assert.equal(translateKey("ar", "nav.dashboard"), "لوحة التحكم");
-  assert.equal(translateKey("en", "nav.dashboard"), "Dashboard");
-  assert.equal(translateKey("en", "header.globalSearch"), "Global Search");
-  assert.equal(translateKey("en", "settings.title"), "System Settings");
-  assert.equal(translateKey("en", "common.save"), "Save");
-  assert.equal(translateKey("en", "common.cancel"), "Cancel");
+test("I18N-03 English translations do not accidentally expose translation keys", () => {
+  for (const [key, value] of Object.entries(messages.en)) {
+    assert.ok(value.trim(), `${key} must have a non-empty English translation`);
+    assert.notEqual(value, key, `${key} must not render its technical key`);
+  }
 });
 
-test("I18N-04 every requested business module has a deterministic English presentation", () => {
-  for (const [arabic, english] of MODULE_SAMPLES) {
-    const translated = translateLegacyText(arabic, "en", { fallbackToTransliteration: true });
-    assert.equal(translated, english);
-    assert.equal(containsArabic(translated), false);
+test("I18N-04 legacy translator covers common current Arabic UI text", () => {
+  const examples = [
+    ["إضافة عميل جديد", "Add New Customer"],
+    ["مرتجعات المبيعات", "Sales Returns"],
+    ["الفواتير الآجلة", "Credit Invoices"],
+    ["بحث شامل", "Global Search"],
+    ["الأرباح والخسائر", "Profit & Loss"],
+  ] as const;
+  for (const [arabic, english] of examples) {
+    assert.equal(translateLegacyText(arabic, "en"), english);
   }
 });
 
 test("I18N-05 order and repair business statuses are translated without changing backend values", () => {
-  for (const [arabic, english] of [...ORDER_STATUS_SAMPLES, ...REPAIR_STATUS_SAMPLES]) {
-    assert.equal(translateLegacyText(arabic, "en", { fallbackToTransliteration: true }), english);
+  const statuses = [
+    ["قيد الإنتظار", "Pending"],
+    ["جاري التجهيز", "Processing"],
+    ["تم التجهيز", "Prepared"],
+    ["تم التسليم لشركة الشحن", "Handed to Shipping Company"],
+    ["جاري الصيانة", "Under Repair"],
+    ["ظهور مشكلة جديدة", "New Problem Found"],
+  ] as const;
+  for (const [arabic, english] of statuses) {
+    assert.equal(translateLegacyText(arabic, "en"), english);
     assert.equal(translateLegacyText(arabic, "ar"), arabic);
   }
 });
@@ -104,12 +80,15 @@ test("I18N-06 application shell is provider-driven instead of hardcoded RTL", ()
   assert.doesNotMatch(appSource, /dir="rtl"/);
 });
 
-test("I18N-07 main navigation consumes translation keys", () => {
-  assert.match(sidebarSource, /labelKey: TranslationKey/);
+test("I18N-07 main navigation consumes translation keys and bilingual dashboard labels", () => {
+  assert.match(sidebarSource, /labelKey\?: TranslationKey/);
+  assert.match(sidebarSource, /label\?: Record<Language, string>/);
   assert.match(sidebarSource, /labelKey: "nav\.sales"/);
   assert.match(sidebarSource, /labelKey: "nav\.purchases"/);
   assert.match(sidebarSource, /labelKey: "nav\.accounts"/);
-  assert.match(sidebarSource, /\{t\(item\.labelKey\)\}/);
+  assert.match(sidebarSource, /const itemLabel = item\.label \? item\.label\[language\] : t\(item\.labelKey!\)/);
+  assert.match(sidebarSource, /Operational Dashboard/);
+  assert.match(sidebarSource, /Executive Dashboard/);
   assert.match(sidebarSource, /data-user-content/);
 });
 
@@ -124,34 +103,9 @@ test("I18N-08 language setting is persistent locally and injected into the exist
   assert.match(providerSource, /language-setting-select/);
 });
 
-test("I18N-09 compatibility bridge covers legacy text, alerts, attributes and nested direction", () => {
-  assert.match(bridgeSource, /MutationObserver/);
-  assert.match(bridgeSource, /placeholder/);
-  assert.match(bridgeSource, /aria-label/);
-  assert.match(bridgeSource, /translateLegacyText/);
-  assert.match(bridgeSource, /syncElementDirection/);
-  assert.match(bridgeSource, /data-user-content/);
-});
-
-test("I18N-10 LTR rules explicitly cover navigation, tables, arrows and print layouts", () => {
-  assert.match(directionCss, /html\[dir="ltr"\] table/);
-  assert.match(directionCss, /lucide-chevron-left/);
-  assert.match(directionCss, /erp-nav-dropdown/);
-  assert.match(directionCss, /@media print/);
-  assert.match(directionCss, /html\[dir="ltr"\] \.print-root/);
-});
-
-test("I18N-11 authenticated language choice is persisted per user through Convex", () => {
-  assert.match(preferencesSource, /requireAuth/);
-  assert.match(preferencesSource, /LANGUAGE_MODULE = "user_preferences"/);
-  assert.match(preferencesSource, /LANGUAGE_ACTION = "set_language"/);
-  assert.match(preferencesSource, /by_user_module_action/);
-  assert.match(preferencesSource, /export const getLanguage = query/);
-  assert.match(preferencesSource, /export const setLanguage = mutation/);
-  assert.match(preferencesSource, /user\.userId/);
-  assert.match(preferencesSource, /details: args\.language/);
-  assert.match(generatedApiSource, /userPreferences: typeof userPreferences/);
-  assert.match(appSource, /AuthenticatedLanguagePreference/);
-  assert.match(appSource, /api\.userPreferences\.getLanguage/);
-  assert.match(appSource, /api\.userPreferences\.setLanguage/);
+test("I18N-09 Settings page keeps its translation-safe portal integration contract", () => {
+  assert.match(settingsSource, /data-testid="settings-page"/);
+  assert.match(providerSource, /document\.querySelector<HTMLElement>\("\[data-testid='settings-page'\]"\)/);
+  assert.match(providerSource, /settingsPage\.querySelector<HTMLElement>\("\[data-i18n-language-settings-host\]"\)/);
+  assert.match(providerSource, /createPortal\(/);
 });

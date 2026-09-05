@@ -30,7 +30,7 @@ import { api } from "../../convex/_generated/api";
 import type { Permission } from "../../convex/lib/permissions";
 import { SignOutButton } from "../SignOutButton";
 import { useI18n } from "../i18n/I18nProvider";
-import type { TranslationKey } from "../i18n/catalog";
+import type { Language, TranslationKey } from "../i18n/catalog";
 import { BrandMark } from "./BrandMark";
 
 interface SidebarProps {
@@ -54,7 +54,8 @@ interface SidebarProps {
 
 interface NavItem {
   id: Page;
-  labelKey: TranslationKey;
+  labelKey?: TranslationKey;
+  label?: Record<Language, string>;
   icon: React.ElementType;
   moduleKey?: string;
   permission?: Permission;
@@ -68,11 +69,10 @@ interface NavGroup {
   items: NavItem[];
 }
 
-const HOME_ITEM: NavItem = { id: "dashboard", labelKey: "nav.dashboard", icon: Home };
 const FOLLOW_UP_ROLES = ["admin", "manager", "sales", "customer_service", "technician", "shipping"];
 const PAGE_SESSION_KEY = "business-tech-erp.current-page";
 const PAGE_IDS = new Set<Page>([
-  "dashboard", "products", "inventory", "customers", "new-customer", "follow-ups", "invoices",
+  "dashboard", "executive-dashboard", "products", "inventory", "customers", "new-customer", "follow-ups", "invoices",
   "sales-returns", "quotes", "credit-invoices", "new-invoice", "new-purchase-invoice", "repairs",
   "expenses", "suppliers", "orders", "deliveries", "shipments", "branches", "employees", "crm",
   "reports", "settings", "audit-logs", "accounts-home", "treasury", "supplier-payments",
@@ -82,6 +82,13 @@ const PAGE_IDS = new Set<Page>([
 const isPage = (value: string | null): value is Page => value !== null && PAGE_IDS.has(value as Page);
 
 const NAV_GROUPS: NavGroup[] = [
+  {
+    key: "dashboard", labelKey: "nav.dashboard", icon: Home,
+    items: [
+      { id: "dashboard", label: { ar: "لوحة التشغيل", en: "Operational Dashboard" }, icon: Home, permission: "view_operational_dashboard" },
+      { id: "executive-dashboard", label: { ar: "اللوحة التنفيذية", en: "Executive Dashboard" }, icon: BarChart3, permission: "view_executive_dashboard" },
+    ],
+  },
   {
     key: "sales", labelKey: "nav.sales", icon: ShoppingBag,
     items: [
@@ -146,7 +153,7 @@ export function Sidebar({ currentPage, onNavigate, onClose, permissions, userNam
   const [openGroup, setOpenGroup] = useState<string | null>(null);
   const restoreAttemptedRef = useRef(false);
   const followUpSyncRunningRef = useRef(false);
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const canViewOrders = permissions.includes("view_orders");
   const canViewFollowUps = permissions.includes("view_follow_ups");
   const pendingOrders = useQuery(api.orderLifecycle.pendingNotifications, canViewOrders ? {} : "skip") ?? [];
@@ -224,10 +231,6 @@ export function Sidebar({ currentPage, onNavigate, onClose, permissions, userNam
         </div>
 
         <nav aria-label={t("nav.main")} className="erp-nav-groups">
-          <button type="button" data-testid="nav-dashboard" onClick={() => navigateTo(HOME_ITEM.id)} aria-current={currentPage === HOME_ITEM.id ? "page" : undefined} className={`erp-nav-home-button ${currentPage === HOME_ITEM.id ? "active" : ""}`}>
-            <Home className="h-4 w-4" /><span>{t(HOME_ITEM.labelKey)}</span>
-          </button>
-
           {groups.map(group => {
             const hasActive = group.items.some(item => item.id === currentPage);
             const isOpen = openGroup === group.key;
@@ -242,8 +245,9 @@ export function Sidebar({ currentPage, onNavigate, onClose, permissions, userNam
                   const Icon = item.icon;
                   const isActive = item.id === currentPage;
                   const badgeCount = notificationCounts?.[item.id] ?? derivedNotificationCounts[item.id] ?? 0;
+                  const itemLabel = item.label ? item.label[language] : t(item.labelKey!);
                   return <button key={item.id} type="button" data-testid={`nav-${item.id}`} onClick={() => navigateTo(item.id)} aria-current={isActive ? "page" : undefined} className={`erp-nav-item ${isActive ? "active" : ""}`}>
-                    <Icon className="h-4 w-4 shrink-0" /><span className="truncate">{t(item.labelKey)}</span>
+                    <Icon className="h-4 w-4 shrink-0" /><span className="truncate">{itemLabel}</span>
                     {badgeCount > 0 && <span data-testid={`nav-badge-${item.id}`} className="mr-auto grid min-h-5 min-w-5 place-items-center rounded-full bg-rose-600 px-1.5 text-[10px] font-black text-white" aria-label={`${badgeCount} تنبيه`}>{badgeCount > 99 ? "99+" : badgeCount}</span>}
                   </button>;
                 })}</div>}
@@ -253,13 +257,13 @@ export function Sidebar({ currentPage, onNavigate, onClose, permissions, userNam
         </nav>
 
         <div className="erp-user-panel">
-          <div className="mb-2 flex items-center gap-2 lg:mb-0">
-            <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-xs font-black text-white" style={{ background: `linear-gradient(135deg, ${brand.primaryColor}, ${brand.secondaryColor})` }} data-user-content>
+          <div className="mb-2 flex min-w-0 items-center gap-2.5 lg:mb-0">
+            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-full text-sm font-black text-white" style={{ background: `linear-gradient(135deg, ${brand.primaryColor}, ${brand.secondaryColor})` }} data-user-content>
               {userName.trim().charAt(0) || "م"}
             </div>
-            <div className="min-w-0">
-              <p className="max-w-28 truncate text-xs font-black text-slate-800" data-user-content>{userName}</p>
-              <p data-testid="current-user-role" data-user-role={role} className="mt-0.5 max-w-28 truncate text-[10px] text-slate-500">{ROLE_LABELS[role] ?? role}</p>
+            <div className="min-w-0 flex-1">
+              <p className="max-w-48 truncate text-sm font-black text-slate-800 xl:max-w-56" title={userName} data-user-content>{userName}</p>
+              <p data-testid="current-user-role" data-user-role={role} className="mt-0.5 max-w-48 truncate text-[11px] font-medium text-slate-500 xl:max-w-56">{ROLE_LABELS[role] ?? role}</p>
             </div>
           </div>
           <SignOutButton />
