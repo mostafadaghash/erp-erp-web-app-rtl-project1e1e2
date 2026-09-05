@@ -6,6 +6,7 @@ const app = readFileSync("src/components/ERPApp.tsx", "utf8");
 const sidebar = readFileSync("src/components/Sidebar.tsx", "utf8");
 const operational = readFileSync("src/components/OperationalDashboard.tsx", "utf8");
 const executive = readFileSync("src/components/Dashboard.tsx", "utf8");
+const executiveBackend = readFileSync("convex/executiveDashboard.ts", "utf8");
 const topbar = readFileSync("src/topbar-polish.css", "utf8");
 const main = readFileSync("src/main.tsx", "utf8");
 
@@ -27,11 +28,11 @@ test("DBS-03 operational dashboard contains no executive financial summary", () 
   assert.match(operational, /view_operational_dashboard/);
   assert.match(operational, /operationStatusDashboard\.orderCounts/);
   assert.match(operational, /operationStatusDashboard\.repairCounts/);
-  assert.doesNotMatch(operational, /reporting\.overview|netProfit|liquidAccounts|supplierPayables|customerReceivables/);
+  assert.doesNotMatch(operational, /executiveDashboard\.overview|netProfit|liquidAccounts|supplierPayables|customerReceivables/);
 });
 
 test("DBS-04 executive dashboard can render without report-center permission", () => {
-  assert.match(executive, /api\.reporting\.overview, canViewExecutiveDashboard/);
+  assert.match(executive, /api\.executiveDashboard\.overview, canViewExecutiveDashboard/);
   assert.doesNotMatch(executive, /canViewExecutiveDashboard && canViewReports && reportArgs/);
   assert.match(executive, /disabled=\{!canViewReports \|\| card\.protected\}/);
 });
@@ -39,10 +40,12 @@ test("DBS-04 executive dashboard can render without report-center permission", (
 test("DBS-05 executive cards also honor their underlying data permissions", () => {
   for (const permission of ["view_invoices", "view_shipments", "view_expenses", "view_finance", "view_customer_ledger", "view_supplier_ledger", "view_profits", "view_products"]) {
     assert.match(executive, new RegExp(`permissions\\.includes\\("${permission}"\\)`));
+    assert.match(executiveBackend, new RegExp(`hasPermission\\(user, "${permission}"\\)`));
   }
   assert.match(executive, /protected: !canViewFinance/);
   assert.match(executive, /protected: !canViewCustomerLedger/);
   assert.match(executive, /protected: !canViewSupplierLedger/);
+  assert.match(executiveBackend, /requirePermission\(ctx, "view_executive_dashboard"\)/);
 });
 
 test("DBS-06 desktop top bar is enlarged and user identity has reserved space", () => {
