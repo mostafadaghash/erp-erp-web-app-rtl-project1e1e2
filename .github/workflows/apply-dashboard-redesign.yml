@@ -23,23 +23,57 @@ jobs:
         run: |
           cat .github/dashboard-redesign/part0* | base64 -d | xz -d > /tmp/apply_dashboard_redesign.py
           python3 -m py_compile /tmp/apply_dashboard_redesign.py
-      - name: Patch current repair UI anchors
+      - name: Patch current source anchors and lifecycle cleanup
         shell: bash
         run: |
           python3 - <<'PY'
           from pathlib import Path
           p = Path('/tmp/apply_dashboard_redesign.py')
           s = p.read_text(encoding='utf-8')
+
           old = "pattern = r'(  useEffect\\(\\(\\) => \\{\\n    if \\(createRequestToken && canCreate\\) setShowForm\\(true\\);\\n  \\}, \\[createRequestToken, canCreate\\]\\);\\n)'"
           new = "pattern = r'(  useEffect\\(\\(\\) => \\{\\n    if \\(createRequestToken && canCreate\\) openNewRepair\\(\\);\\n  \\}, \\[createRequestToken, canCreate\\]\\);\\n)'"
           if old not in s:
               raise SystemExit('old RepairsPage effect pattern not found in transformer')
           s = s.replace(old, new, 1)
+
           marker = "write('src/components/RepairsPage.tsx', repair_ui)"
-          injection = '''repair_ui = repair_ui.replace(\n    '    { key: "pending", label: "قيد الإنتظار", value: repairCounts?.pending ?? 0, icon: Clock },',\n    '    { key: "pending", label: "قيد الإنتظار", value: repairCounts?.pending ?? 0, icon: Clock },\\n    { key: "technician_received", label: "تم الاستلام من الفني", value: repairCounts?.received_by_technician ?? 0, icon: CheckCircle },',\n    1,\n)\nrepair_ui = repair_ui.replace('shipping_rejected', 'technician_rejected').replace('مرفوض من شركة الشحن', 'مرفوض من الفني').replace('rejected_by_shipping', 'rejected_by_technician')\n'''
+          repair_injection = '''repair_ui = repair_ui.replace(\n    '    { key: "pending", label: "قيد الإنتظار", value: repairCounts?.pending ?? 0, icon: Clock },',\n    '    { key: "pending", label: "قيد الإنتظار", value: repairCounts?.pending ?? 0, icon: Clock },\\n    { key: "technician_received", label: "تم الاستلام من الفني", value: repairCounts?.received_by_technician ?? 0, icon: CheckCircle },',\n    1,\n)\nrepair_ui = repair_ui.replace('shipping_rejected', 'technician_rejected').replace('مرفوض من شركة الشحن', 'مرفوض من الفني').replace('rejected_by_shipping', 'rejected_by_technician')\n'''
           if marker not in s:
               raise SystemExit('RepairsPage write marker not found in transformer')
-          s = s.replace(marker, injection + marker, 1)
+          s = s.replace(marker, repair_injection + marker, 1)
+
+          assert_marker = "# Assert production source no longer contains the invalid shipping-company repair state."
+          semantic_cleanup = r'''
+# Remove the obsolete shipping-company decision from every repair production contract.
+for base in ['shared', 'convex', 'src']:
+    for path in (ROOT / base).rglob('*'):
+        if path.is_file() and path.suffix in {'.ts', '.tsx'}:
+            text = path.read_text(encoding='utf-8')
+            updated = text.replace('rejected_by_shipping', 'rejected_by_technician').replace('shipping_rejected', 'technician_rejected').replace('مرفوض من شركة الشحن', 'مرفوض من الفني')
+            if updated != text:
+                path.write_text(updated, encoding='utf-8')
+
+follow_path = ROOT / 'shared/customerFollowUpRules.ts'
+follow = follow_path.read_text(encoding='utf-8')
+follow = follow.replace('export type RepairRejectionParty = "customer" | "shipping";', 'export type RepairRejectionParty = "customer" | "technician";')
+follow = follow.replace('if (/(شحن|شركة الشحن|shipping|carrier)/i.test(normalized)) return "shipping";', 'if (/(فني|الفني|technician)/i.test(normalized)) return "technician";')
+follow = follow.replace('return party === "shipping" ? "مرفوض من الفني" : "مرفوض من العميل";', 'return party === "technician" ? "مرفوض من الفني" : "مرفوض من العميل";')
+follow = follow.replace('  "قيد الإنتظار",\n  "جاري الصيانة",', '  "قيد الإنتظار",\n  "تم الاستلام من الفني",\n  "جاري الصيانة",')
+follow = follow.replace('  if (status === "received") return "قيد الإنتظار";\n  if (status === "under_inspection" || status === "in_progress")', '  if (status === "received") return "قيد الإنتظار";\n  if (status === "received_by_technician") return "تم الاستلام من الفني";\n  if (status === "under_inspection" || status === "in_progress")')
+follow_path.write_text(follow, encoding='utf-8')
+
+ops_path = ROOT / 'convex/operationFollowUps.ts'
+ops = ops_path.read_text(encoding='utf-8')
+ops = ops.replace('const OPEN_REPAIR_STATUSES = ["received", "under_inspection", "awaiting_approval", "in_progress", "ready", "rejected_by_technician"] as const;', 'const OPEN_REPAIR_STATUSES = ["received", "received_by_technician", "under_inspection", "awaiting_approval", "in_progress", "ready"] as const;')
+ops = ops.replace('const REPAIR_TERMINAL = new Set(["delivered", "cancelled"]);', 'const REPAIR_TERMINAL = new Set(["delivered", "cancelled", "rejected_by_technician"]);')
+ops_path.write_text(ops, encoding='utf-8')
+
+'''
+          if assert_marker not in s:
+              raise SystemExit('production assertion marker not found in transformer')
+          s = s.replace(assert_marker, semantic_cleanup + assert_marker, 1)
+
           p.write_text(s, encoding='utf-8')
           PY
           python3 -m py_compile /tmp/apply_dashboard_redesign.py
@@ -55,6 +89,8 @@ jobs:
         run: npm run typecheck
       - name: Dashboard contracts
         run: node --test --test-concurrency=1 --experimental-strip-types tests/dashboardCommercialSecurity.test.ts tests/dashboardOperationalLifecycle.test.ts tests/dashboardHeaderResponsiveCommercial.test.ts
+      - name: Unit and integration tests
+        run: npm test
       - name: Security
         run: npm run security:check
       - name: Production build
