@@ -48,8 +48,9 @@ test("accounting reports cannot regress to client-side list aggregation", () => 
   assert.match(reports, /api\.reporting\.overview/);
 });
 
-test("dashboard remains a compact reporting summary", () => {
-  assert.match(home, /api\.reporting\.overview/);
+test("executive dashboard remains a compact isolated summary", () => {
+  assert.match(home, /api\.executiveDashboard\.overview/);
+  assert.doesNotMatch(home, /api\.reporting\.overview/);
   assert.equal((home.match(/key: "/g) ?? []).length, 8);
   assert.match(home, /erp-dashboard-card-grid/);
   assert.doesNotMatch(home, /أحدث فواتير المبيعات|<table/);
@@ -64,7 +65,7 @@ test("profit inventory and report access remain permission aware", () => {
   assert.match(home, /canViewReports = permissions\.includes\("view_reports"\)/);
 });
 
-test("reporting UI and home launcher remain read-only and typed", () => {
+test("reporting UI and executive dashboard remain read-only and typed", () => {
   for (const source of [reports, home]) {
     assert.doesNotMatch(source, /useMutation|as any|@ts-ignore/);
   }
