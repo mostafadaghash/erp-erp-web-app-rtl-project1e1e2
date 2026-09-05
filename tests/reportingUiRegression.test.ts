@@ -153,16 +153,16 @@ test("RUI-20 reports have explicit loading invalid-range and unauthorized states
   assert.match(reports, /لا تملك صلاحية عرض التقارير/);
 });
 
-test("RUI-21 dashboard loads only protected reporting and low-stock summaries", () => {
+test("RUI-21 executive dashboard loads its summary through its own permission", () => {
   assert.match(home, /api\.reporting\.overview/);
   assert.match(home, /permissions\.includes\("view_executive_dashboard"\)/);
-  assert.match(home, /canViewExecutiveDashboard && canViewReports/);
-  assert.match(home, /canViewExecutiveData && reportArgs/);
-  assert.match(home, /api\.products\.list, canViewProducts \? \{ lowStock: true \} : "skip"/);
+  assert.match(home, /api\.reporting\.overview, canViewExecutiveDashboard/);
+  assert.match(home, /api\.products\.list, canViewExecutiveDashboard && canViewProducts/);
+  assert.doesNotMatch(home, /canViewExecutiveDashboard && canViewReports && reportArgs/);
   assert.doesNotMatch(home, /api\.(?:invoices|expenses|customers|repairs)\.(?:list|stats|getStats)/);
 });
 
-test("RUI-22 dashboard exposes exactly the eight approved management indicators", () => {
+test("RUI-22 executive dashboard exposes exactly the eight approved management indicators", () => {
   for (const label of ["إجمالي المبيعات", "إجمالي المشتريات", "صافي الربح", "إجمالي المصروفات", "أرصدة الخزائن", "مديونيات العملاء", "مستحقات الموردين", "قيمة المخزون"]) {
     assert.match(home, new RegExp(label));
   }
@@ -170,38 +170,43 @@ test("RUI-22 dashboard exposes exactly the eight approved management indicators"
   assert.match(home, /erp-dashboard-card-grid/);
 });
 
-test("RUI-23 dashboard exposes period branch comparison and refresh controls", () => {
+test("RUI-23 executive dashboard exposes period branch comparison and refresh controls", () => {
   assert.match(home, /aria-label="اختيار الفترة"/);
   assert.match(home, /aria-label="اختيار الفرع"/);
   assert.match(home, /مقارنة بالفترة السابقة/);
   assert.match(home, /تحديث البيانات/);
 });
 
-test("RUI-24 dashboard keeps executive reporting profit and inventory permissions", () => {
+test("RUI-24 executive dashboard keeps drill-down profit and inventory permissions independent", () => {
   assert.match(home, /permissions\.includes\("view_executive_dashboard"\)/);
   assert.match(home, /permissions\.includes\("view_reports"\)/);
   assert.match(home, /permissions\.includes\("view_profits"\)/);
   assert.match(home, /permissions\.includes\("view_products"\)/);
+  assert.match(home, /disabled=\{!canViewReports\}/);
+  assert.match(home, /التقرير التفصيلي غير متاح حسب الصلاحية/);
   assert.match(home, /لا تملك صلاحية عرض لوحة التحكم التنفيذية/);
 });
 
-test("RUI-25 each dashboard indicator opens its detailed report", () => {
+test("RUI-25 each executive indicator opens its detailed report only with report permission", () => {
   assert.match(home, /onOpenReport: \(report: ReportKind\) => void/);
-  assert.match(home, /onClick=\{\(\) => onOpenReport\(card\.report\)\}/);
-  assert.match(home, /فتح التقرير/);
+  assert.match(home, /if \(canViewReports\) onOpenReport\(card\.report\)/);
+  assert.match(home, /فتح التقرير التفصيلي/);
 });
 
-test("RUI-26 dashboard uses full clickable cards and the approved title", () => {
+test("RUI-26 executive dashboard uses full cards and an explicit executive title", () => {
   assert.match(home, /data-testid=\{`dashboard-card-\$\{card\.key\}`\}/);
   assert.match(home, /<button/);
-  assert.match(home, /لوحة التحكم/);
+  assert.match(home, /اللوحة التنفيذية/);
   assert.doesNotMatch(home, /erp-home-quick-grid|erp-home-doc-grid/);
 });
 
-test("RUI-27 reporting backend protects branch and sales-detail queries", () => {
+test("RUI-27 backend separates executive summary access from detailed report access", () => {
   assert.match(backend, /export const availableBranches = query/);
   assert.match(backend, /export const salesDetails = query/);
-  assert.equal((backend.match(/requirePermission\(ctx, "view_reports"\)/g) ?? []).length >= 3, true);
+  assert.match(backend, /async function requireReportingOrExecutive/);
+  assert.match(backend, /hasPermission\(user, "view_executive_dashboard"\)/);
+  assert.equal((backend.match(/requireReportingOrExecutive\(ctx\)/g) ?? []).length >= 2, true);
+  assert.match(backend, /export const salesDetails[\s\S]*requirePermission\(ctx, "view_reports"\)/);
   assert.match(backend, /requireModulePermission\(ctx, "view_invoices", "invoices"\)/);
   assert.match(backend, /paginationOptsValidator/);
   assert.match(backend, /\.paginate\(args\.paginationOpts\)/);
@@ -217,12 +222,12 @@ test("RUI-28 branch options expose a minimal DTO and no financial balances", () 
   assert.doesNotMatch(branchQuery, /balance|inventoryValue|currentBalance/);
 });
 
-test("RUI-29 reporting and home UIs perform no direct financial write", () => {
+test("RUI-29 reporting and executive UIs perform no direct financial write", () => {
   assert.doesNotMatch(reports, /useMutation|ctx\.db|api\.[\w.]+\.(?:create|update|remove|reverse)/);
   assert.doesNotMatch(home, /useMutation|ctx\.db/);
 });
 
-test("RUI-30 reporting and home UIs contain no unsafe TypeScript escape", () => {
+test("RUI-30 reporting and executive UIs contain no unsafe TypeScript escape", () => {
   assert.doesNotMatch(reports, /as any|@ts-ignore/);
   assert.doesNotMatch(home, /as any|@ts-ignore/);
 });
