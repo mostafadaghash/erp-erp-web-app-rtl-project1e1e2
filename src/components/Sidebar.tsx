@@ -30,7 +30,7 @@ import { api } from "../../convex/_generated/api";
 import type { Permission } from "../../convex/lib/permissions";
 import { SignOutButton } from "../SignOutButton";
 import { useI18n } from "../i18n/I18nProvider";
-import type { TranslationKey } from "../i18n/catalog";
+import type { Language, TranslationKey } from "../i18n/catalog";
 import { BrandMark } from "./BrandMark";
 
 interface SidebarProps {
@@ -54,7 +54,8 @@ interface SidebarProps {
 
 interface NavItem {
   id: Page;
-  labelKey: TranslationKey;
+  labelKey?: TranslationKey;
+  label?: Record<Language, string>;
   icon: React.ElementType;
   moduleKey?: string;
   permission?: Permission;
@@ -84,8 +85,8 @@ const NAV_GROUPS: NavGroup[] = [
   {
     key: "dashboard", labelKey: "nav.dashboard", icon: Home,
     items: [
-      { id: "dashboard", labelKey: "nav.operationalDashboard", icon: Home, permission: "view_operational_dashboard" },
-      { id: "executive-dashboard", labelKey: "nav.executiveDashboard", icon: BarChart3, permission: "view_executive_dashboard" },
+      { id: "dashboard", label: { ar: "لوحة التشغيل", en: "Operational Dashboard" }, icon: Home, permission: "view_operational_dashboard" },
+      { id: "executive-dashboard", label: { ar: "اللوحة التنفيذية", en: "Executive Dashboard" }, icon: BarChart3, permission: "view_executive_dashboard" },
     ],
   },
   {
@@ -152,7 +153,7 @@ export function Sidebar({ currentPage, onNavigate, onClose, permissions, userNam
   const [openGroup, setOpenGroup] = useState<string | null>(null);
   const restoreAttemptedRef = useRef(false);
   const followUpSyncRunningRef = useRef(false);
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const canViewOrders = permissions.includes("view_orders");
   const canViewFollowUps = permissions.includes("view_follow_ups");
   const pendingOrders = useQuery(api.orderLifecycle.pendingNotifications, canViewOrders ? {} : "skip") ?? [];
@@ -244,8 +245,9 @@ export function Sidebar({ currentPage, onNavigate, onClose, permissions, userNam
                   const Icon = item.icon;
                   const isActive = item.id === currentPage;
                   const badgeCount = notificationCounts?.[item.id] ?? derivedNotificationCounts[item.id] ?? 0;
+                  const itemLabel = item.label ? item.label[language] : t(item.labelKey!);
                   return <button key={item.id} type="button" data-testid={`nav-${item.id}`} onClick={() => navigateTo(item.id)} aria-current={isActive ? "page" : undefined} className={`erp-nav-item ${isActive ? "active" : ""}`}>
-                    <Icon className="h-4 w-4 shrink-0" /><span className="truncate">{t(item.labelKey)}</span>
+                    <Icon className="h-4 w-4 shrink-0" /><span className="truncate">{itemLabel}</span>
                     {badgeCount > 0 && <span data-testid={`nav-badge-${item.id}`} className="mr-auto grid min-h-5 min-w-5 place-items-center rounded-full bg-rose-600 px-1.5 text-[10px] font-black text-white" aria-label={`${badgeCount} تنبيه`}>{badgeCount > 99 ? "99+" : badgeCount}</span>}
                   </button>;
                 })}</div>}
