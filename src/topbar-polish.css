@@ -1,20 +1,31 @@
 /* Final desktop navigation sizing. Loaded last so it can safely refine the navigation skin. */
 @media (min-width: 1024px) {
   .erp-navigation-inner {
-    min-height: 70px;
-    gap: 8px;
-    padding: 9px 16px 8px;
+    min-height: 80px;
+    gap: 9px;
+    padding: 11px 17px 9px;
   }
 
   .erp-nav-brand {
     flex: 0 0 auto;
-    padding-left: 14px;
+    gap: 11px;
+    padding-left: 15px;
+  }
+
+  .erp-nav-brand p:first-of-type {
+    font-size: 16px !important;
+    line-height: 1.2;
+  }
+
+  .erp-nav-brand p:last-of-type {
+    font-size: 11px !important;
+    line-height: 1.2;
   }
 
   .erp-nav-groups {
     min-width: 0;
     flex: 1 1 auto;
-    gap: 0;
+    gap: 1px;
   }
 
   .erp-nav-section {
@@ -23,31 +34,44 @@
   }
 
   .erp-nav-group-button {
-    min-height: 44px;
-    gap: 5px;
-    padding-inline: 8px;
-    font-size: 12px;
+    min-height: 48px;
+    gap: 6px;
+    padding-inline: 9px;
+    font-size: 13px;
+    line-height: 1.15;
   }
 
   .erp-nav-group-button > span {
-    gap: 5px;
+    gap: 6px;
+  }
+
+  .erp-nav-group-button svg {
+    width: 16px;
+    height: 16px;
   }
 
   .erp-nav-dropdown {
-    top: calc(100% + 11px);
+    top: calc(100% + 12px);
   }
 
   .erp-user-panel {
     min-width: 0;
     flex: 0 0 auto;
-    gap: 10px;
-    padding-right: 12px;
+    gap: 11px;
+    padding-right: 13px;
   }
 
   .erp-user-panel > div:first-child {
-    width: 200px;
-    min-width: 200px;
-    flex: 0 0 200px;
+    width: 215px;
+    min-width: 215px;
+    flex: 0 0 215px;
+    gap: 11px;
+  }
+
+  .erp-user-panel > div:first-child > div:first-child {
+    width: 44px;
+    height: 44px;
+    font-size: 15px;
   }
 
   .erp-user-panel > div:first-child > div:last-child {
@@ -65,46 +89,115 @@
     text-overflow: ellipsis !important;
     white-space: nowrap !important;
     unicode-bidi: plaintext;
-    font-size: 14px;
+    font-size: 16px !important;
+    line-height: 1.2;
+  }
+
+  .erp-user-panel [data-testid="current-user-role"] {
+    margin-top: 3px;
+    font-size: 12px !important;
     line-height: 1.2;
   }
 
   .erp-user-panel > button {
     width: auto !important;
-    min-width: 116px;
-    min-height: 42px;
+    min-width: 120px;
+    min-height: 44px;
     flex: 0 0 auto;
-    padding-inline: 13px !important;
+    padding-inline: 14px !important;
+    font-size: 13px !important;
     white-space: nowrap;
+  }
+
+  /* Secondary workspace/context bar: make the page title and controls easier to scan. */
+  .erp-contextbar {
+    min-height: 68px;
+    gap: 14px;
+    padding-top: 8px;
+    padding-bottom: 8px;
+  }
+
+  .erp-contextbar > div:first-child p {
+    font-size: 12px !important;
+    line-height: 1.15;
+  }
+
+  .erp-contextbar > div:first-child h1 {
+    font-size: 20px !important;
+    line-height: 1.2;
+  }
+
+  .erp-contextbar .form-input {
+    min-height: 46px;
+    padding-top: 10px;
+    padding-bottom: 10px;
+    font-size: 14px;
+  }
+
+  .erp-contextbar select[data-testid="working-branch-select"] {
+    min-height: 46px;
+    padding-inline: 14px;
+    font-size: 13px;
+  }
+
+  .erp-contextbar [data-testid="header-operational-notifications"],
+  .erp-contextbar > div:last-child > button {
+    min-width: 46px;
+    min-height: 46px;
+    padding: 11px;
+  }
+
+  .erp-contextbar > div:last-child > span {
+    min-height: 44px;
+    padding-inline: 12px;
+    font-size: 13px;
+  }
+
+  .erp-contextbar .btn-primary {
+    min-height: 46px;
+    padding-inline: 16px;
+    font-size: 14px;
   }
 }
 
 @media (min-width: 1280px) {
   .erp-navigation-inner {
-    gap: 9px;
+    gap: 10px;
   }
 
-  .erp-user-panel > div:first-child {
-    width: 215px;
-    min-width: 215px;
-    flex-basis: 215px;
-  }
-
-  .erp-nav-group-button {
-    padding-inline: 9px;
-    font-size: 12.5px;
-  }
-}
-
-@media (min-width: 1536px) {
   .erp-user-panel > div:first-child {
     width: 230px;
     min-width: 230px;
     flex-basis: 230px;
   }
 
+  .erp-user-panel > div:first-child > div:last-child > p:first-child {
+    font-size: 16.5px !important;
+  }
+
+  .erp-user-panel [data-testid="current-user-role"] {
+    font-size: 12.5px !important;
+  }
+
   .erp-nav-group-button {
     padding-inline: 10px;
-    font-size: 13px;
+    font-size: 14px;
+  }
+}
+
+@media (min-width: 1536px) {
+  .erp-user-panel > div:first-child {
+    width: 245px;
+    min-width: 245px;
+    flex-basis: 245px;
+  }
+
+  .erp-user-panel > div:first-child > div:last-child > p:first-child {
+    font-size: 17px !important;
+  }
+
+  .erp-nav-group-button {
+    padding-inline: 11px;
+    font-size: 14.5px;
   }
 }
