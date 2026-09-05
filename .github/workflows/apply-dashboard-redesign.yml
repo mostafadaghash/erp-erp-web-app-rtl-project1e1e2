@@ -50,7 +50,6 @@ jobs:
           s = s.replace(marker, repair_injection + marker, 1)
           assert_marker = "# Assert production source no longer contains the invalid shipping-company repair state."
           semantic_cleanup = textwrap.dedent(r'''
-          # Remove the obsolete shipping-company decision from every repair production contract.
           for base in ['shared', 'convex', 'src']:
               for path in (ROOT / base).rglob('*'):
                   if path.is_file() and path.suffix in {'.ts', '.tsx'}:
@@ -88,9 +87,106 @@ jobs:
       - name: Apply redesign
         shell: bash
         run: python3 /tmp/apply_dashboard_redesign.py
+      - name: Finalize repair lifecycle contracts
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          rules_path = Path('shared/businessRules.ts')
+          rules = rules_path.read_text(encoding='utf-8')
+          start = rules.index('export const REPAIR_STATUSES = [')
+          comment_start = rules.rfind('/**', 0, start)
+          end = rules.index('\n\nexport const DELIVERY_STATUSES', start)
+          repair_section = '''/**
+           * دورة الصيانة التجارية الموحدة.
+           * لا توجد لشركة الشحن أي حالة قرار داخل الصيانة.
+           * يجب تسجيل استلام الفني قبل بدء الفحص أو الصيانة.
+           */
+          export const REPAIR_STATUSES = [
+            "received",
+            "received_by_technician",
+            "under_inspection",
+            "awaiting_approval",
+            "in_progress",
+            "ready",
+            "delivered",
+            "cancelled",
+            "rejected_by_technician",
+          ] as const;
+          export type RepairStatus = (typeof REPAIR_STATUSES)[number];
+          export type RepairLifecycleStatus =
+            | "pending"
+            | "technician_received"
+            | "in_progress"
+            | "new_issue"
+            | "repaired"
+            | "delivered_to_customer"
+            | "rejected_by_customer"
+            | "rejected_by_technician";
+
+          export const REPAIR_STATUS_LABELS: Readonly<Record<RepairLifecycleStatus, string>> = {
+            pending: "قيد الإنتظار",
+            technician_received: "تم الاستلام من الفني",
+            in_progress: "جاري الصيانة",
+            new_issue: "ظهور مشكلة جديدة",
+            repaired: "تم الإصلاح",
+            delivered_to_customer: "تم التسليم للعميل",
+            rejected_by_customer: "مرفوض من العميل",
+            rejected_by_technician: "مرفوض من الفني",
+          };
+
+          export function isRepairStatus(value: string): value is RepairStatus {
+            return (REPAIR_STATUSES as readonly string[]).includes(value);
+          }
+
+          export function normalizeRepairStatus(value: string): RepairLifecycleStatus | null {
+            if (value === "received") return "pending";
+            if (value === "received_by_technician") return "technician_received";
+            if (value === "under_inspection" || value === "in_progress") return "in_progress";
+            if (value === "awaiting_approval") return "new_issue";
+            if (value === "ready") return "repaired";
+            if (value === "delivered") return "delivered_to_customer";
+            if (value === "cancelled") return "rejected_by_customer";
+            if (value === "rejected_by_technician") return "rejected_by_technician";
+            return null;
+          }
+
+          export function repairStatusLabel(value: string): string {
+            const normalized = normalizeRepairStatus(value);
+            return normalized ? REPAIR_STATUS_LABELS[normalized] : value;
+          }
+
+          export const REPAIR_TRANSITIONS: Readonly<Record<RepairStatus, readonly RepairStatus[]>> = {
+            received: ["received_by_technician", "cancelled"],
+            received_by_technician: ["under_inspection", "cancelled", "rejected_by_technician"],
+            under_inspection: ["awaiting_approval", "in_progress", "cancelled", "rejected_by_technician"],
+            awaiting_approval: ["in_progress", "cancelled", "rejected_by_technician"],
+            in_progress: ["ready", "awaiting_approval", "cancelled", "rejected_by_technician"],
+            ready: ["delivered", "in_progress", "cancelled", "rejected_by_technician"],
+            rejected_by_technician: [],
+            delivered: [],
+            cancelled: [],
+          };
+          '''
+          rules = rules[:comment_start] + repair_section + rules[end:]
+          rules_path.write_text(rules, encoding='utf-8')
+
+          repairs_path = Path('convex/repairs.ts')
+          repairs = repairs_path.read_text(encoding='utf-8')
+          repairs = repairs.replace('["received", "under_inspection", "awaiting_approval", "in_progress", "rejected_by_technician"].includes(repair.status)', '["received", "received_by_technician", "under_inspection", "awaiting_approval", "in_progress"].includes(repair.status)')
+          repairs = repairs.replace('لا يمكن تعديل تفاصيل الصيانة بعد التسليم أو رفض العميل', 'لا يمكن تعديل تفاصيل الصيانة بعد انتهاء أو رفض أمر الصيانة')
+          repairs = repairs.replace('لا يمكن التحصيل لأمر مرفوض من العميل أو مسلم', 'لا يمكن التحصيل لأمر صيانة مرفوض أو مُسلَّم')
+          repairs_path.write_text(repairs, encoding='utf-8')
+
+          test_path = Path('tests/dashboardOperationalLifecycle.test.ts')
+          test_path.write_text('''import test from "node:test";\nimport assert from "node:assert/strict";\nimport { readFileSync } from "node:fs";\nimport { canTransition, REPAIR_TRANSITIONS, normalizeRepairStatus, repairStatusLabel } from "../shared/businessRules.ts";\n\nconst repairsSource = readFileSync(new URL("../convex/repairs.ts", import.meta.url), "utf8");\nconst followUpRulesSource = readFileSync(new URL("../shared/customerFollowUpRules.ts", import.meta.url), "utf8");\n\ntest("repair lifecycle requires technician receipt and has technician rejection only", () => {\n  assert.equal(canTransition(REPAIR_TRANSITIONS, "received", "received_by_technician"), true);\n  assert.equal(canTransition(REPAIR_TRANSITIONS, "received", "under_inspection"), false);\n  assert.equal(canTransition(REPAIR_TRANSITIONS, "received", "in_progress"), false);\n  assert.equal(canTransition(REPAIR_TRANSITIONS, "received_by_technician", "under_inspection"), true);\n  assert.equal(normalizeRepairStatus("received_by_technician"), "technician_received");\n  assert.equal(repairStatusLabel("received_by_technician"), "تم الاستلام من الفني");\n  assert.equal(repairStatusLabel("rejected_by_technician"), "مرفوض من الفني");\n  assert.doesNotMatch(repairsSource, /rejected_by_shipping/);\n  assert.doesNotMatch(repairsSource, /مرفوض من شركة الشحن/);\n  assert.doesNotMatch(followUpRulesSource, /rejected_by_shipping|شركة الشحن/);\n});\n\ntest("technician rejection uses the protected accounting reversal path", () => {\n  assert.match(repairsSource, /isRejection = args\.status === "cancelled" \|\| args\.status === "rejected_by_technician"/);\n  assert.match(repairsSource, /يجب استرداد عربون الصيانة بالكامل قبل الرفض/);\n  assert.match(repairsSource, /repairPartReversal/);\n  assert.match(repairsSource, /type: "repair_cancel"/);\n  assert.match(repairsSource, /reverseRepairRevenueJournal/);\n  assert.match(repairsSource, /rejected_by_technician: \[\]/);\n});\n\ntest("operational dashboard is backend permission-aware and exposes stable drilldowns", () => {\n  const source = readFileSync(new URL("../convex/dashboardOperations.ts", import.meta.url), "utf8");\n  assert.match(source, /requirePermission/);\n  assert.match(source, /view_orders/);\n  assert.match(source, /view_repairs/);\n  assert.match(source, /view_deliveries/);\n  assert.match(source, /drilldown/);\n});\n\ntest("order dashboard business buckets retain internal workflow states", () => {\n  const source = readFileSync(new URL("../convex/dashboardOperations.ts", import.meta.url), "utf8");\n  assert.match(source, /pending/);\n  assert.match(source, /preparing/);\n  assert.match(source, /ready/);\n  assert.match(source, /handed_to_shipping/);\n});\n''', encoding='utf-8')
+          PY
       - name: Remove transient payload
         shell: bash
-        run: rm -rf .github/dashboard-redesign
+        run: |
+          rm -rf .github/dashboard-redesign
+          rm -f .github/workflows/apply-dashboard-redesign.yml
       - name: Install dependencies
         run: npm ci
       - name: TypeScript
