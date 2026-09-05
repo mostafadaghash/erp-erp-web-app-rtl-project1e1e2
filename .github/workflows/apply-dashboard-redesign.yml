@@ -68,6 +68,11 @@ jobs:
           follow = follow.replace('  if (status === "received") return "قيد الإنتظار";\\n  if (status === "under_inspection" || status === "in_progress")', '  if (status === "received") return "قيد الإنتظار";\\n  if (status === "received_by_technician") return "تم الاستلام من الفني";\\n  if (status === "under_inspection" || status === "in_progress")')
           follow_path.write_text(follow, encoding='utf-8')
 
+          customer_followups_path = ROOT / 'convex/customerFollowUps.ts'
+          customer_followups = customer_followups_path.read_text(encoding='utf-8')
+          customer_followups = customer_followups.replace('const rejectionPartyValidator = v.union(v.literal("customer"), v.literal("shipping"));', 'const rejectionPartyValidator = v.union(v.literal("customer"), v.literal("technician"));')
+          customer_followups_path.write_text(customer_followups, encoding='utf-8')
+
           ops_path = ROOT / 'convex/operationFollowUps.ts'
           ops = ops_path.read_text(encoding='utf-8')
           ops = ops.replace('const OPEN_REPAIR_STATUSES = ["received", "under_inspection", "awaiting_approval", "in_progress", "ready", "rejected_by_technician"] as const;', 'const OPEN_REPAIR_STATUSES = ["received", "received_by_technician", "under_inspection", "awaiting_approval", "in_progress", "ready"] as const;')
