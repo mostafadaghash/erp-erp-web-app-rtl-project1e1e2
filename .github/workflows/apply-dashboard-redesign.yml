@@ -27,6 +27,13 @@ jobs:
         run: python3 .github/dashboard-redesign/finalize.py /tmp/apply_dashboard_redesign.py
       - name: Align contract tests with production sources
         run: python3 .github/dashboard-redesign/patch-contract-tests.py
+      - name: Diagnose permission acceptance contract
+        shell: bash
+        run: |
+          echo '--- permissionContract test ---'
+          if [ -f tests/permissionContract.test.ts ]; then sed -n '1,280p' tests/permissionContract.test.ts; else echo 'missing permissionContract.test.ts'; fi
+          echo '--- roleAcceptance contract ---'
+          if [ -f tests/roleAcceptanceContract.json ]; then cat tests/roleAcceptanceContract.json; else echo 'missing roleAcceptanceContract.json'; fi
       - name: Remove transient tooling
         shell: bash
         run: |
