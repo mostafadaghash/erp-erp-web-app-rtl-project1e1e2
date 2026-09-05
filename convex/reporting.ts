@@ -5,6 +5,7 @@ import { ConvexError, v } from "convex/values";
 import { paginationOptsValidator } from "convex/server";
 import {
   hasPermission,
+  requireAuth,
   requireModulePermission,
   requirePermission,
   type AuthUser,
@@ -61,10 +62,21 @@ function normalizedRange(from: string, to: string): ReportingRange {
   }
 }
 
+async function requireReportingOrExecutive(ctx: QueryCtx): Promise<AuthUser> {
+  const user = await requireAuth(ctx);
+  if (
+    !hasPermission(user, "view_reports") &&
+    !hasPermission(user, "view_executive_dashboard")
+  ) {
+    throw new ConvexError("ليس لديك صلاحية عرض التقارير أو لوحة التحكم التنفيذية");
+  }
+  return user;
+}
+
 export const availableBranches = query({
   args: {},
   handler: async (ctx) => {
-    const user = await requirePermission(ctx, "view_reports");
+    const user = await requireReportingOrExecutive(ctx);
     const central = user.role === "admin" || user.role === "accountant";
     if (central) {
       return (await ctx.db.query("branches").collect())
@@ -577,7 +589,7 @@ export const overview = query({
     to: v.string(),
   },
   handler: async (ctx, args) => {
-    const user = await requirePermission(ctx, "view_reports");
+    const user = await requireReportingOrExecutive(ctx);
     const range = normalizedRange(args.from, args.to);
     const branchIds = await resolveReportBranches(ctx, user, args.branchId);
     const branches = await Promise.all(
