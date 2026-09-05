@@ -14,6 +14,10 @@ const backend = readFileSync(
   new URL("../convex/reporting.ts", import.meta.url),
   "utf8",
 );
+const executiveBackend = readFileSync(
+  new URL("../convex/executiveDashboard.ts", import.meta.url),
+  "utf8",
+);
 
 test("RUI-01 report queries are protected by view_reports and skip", () => {
   assert.match(reports, /usePermission\("view_reports"\)/);
@@ -41,9 +45,7 @@ test("RUI-04 non-central reports show the pinned branch without a selector", () 
 });
 
 test("RUI-05 report presets use explicit operation-date ranges", () => {
-  for (const marker of ['"today"', '"week"', '"month"', '"year"', '"custom"']) {
-    assert.match(reports, new RegExp(marker));
-  }
+  for (const marker of ['"today"', '"week"', '"month"', '"year"', '"custom"']) assert.match(reports, new RegExp(marker));
   assert.match(reports, /startOfPeriod/);
   assert.match(reports, /هذا الشهر/);
 });
@@ -61,10 +63,7 @@ test("RUI-07 reports never use creation time as an accounting date", () => {
 });
 
 test("RUI-08 reports do not download operational lists to calculate totals", () => {
-  assert.doesNotMatch(
-    reports,
-    /api\.(?:invoices|expenses|products|customers|repairs)\.(?:list|stats|getStats)/,
-  );
+  assert.doesNotMatch(reports, /api\.(?:invoices|expenses|products|customers|repairs)\.(?:list|stats|getStats)/);
   assert.equal((reports.match(/api\.reporting\.overview/g) ?? []).length, 1);
   assert.equal((reports.match(/api\.reporting\.salesDetails/g) ?? []).length, 1);
 });
@@ -77,9 +76,7 @@ test("RUI-09 sales report consumes detailed invoice rows from the backend", () =
 });
 
 test("RUI-10 detailed sales table exposes financial and document columns", () => {
-  for (const label of ["رقم الفاتورة", "الفرع", "العميل", "الأصناف", "المرتجع", "الصافي", "المحصل", "المتبقي", "الدفع", "الحالة"]) {
-    assert.match(reports, new RegExp(label));
-  }
+  for (const label of ["رقم الفاتورة", "الفرع", "العميل", "الأصناف", "المرتجع", "الصافي", "المحصل", "المتبقي", "الدفع", "الحالة"]) assert.match(reports, new RegExp(label));
   assert.match(reports, /data-testid="sales-detail-invoices"/);
 });
 
@@ -91,17 +88,13 @@ test("RUI-11 clicking an invoice expands its actual item lines", () => {
 });
 
 test("RUI-12 detailed report supports invoice customer product payment and status filters", () => {
-  for (const marker of ["customerFilter", "productFilter", "paymentFilter", "statusFilter"]) {
-    assert.match(reports, new RegExp(marker));
-  }
+  for (const marker of ["customerFilter", "productFilter", "paymentFilter", "statusFilter"]) assert.match(reports, new RegExp(marker));
   assert.match(reports, /رقم الفاتورة أو العميل أو الصنف/);
 });
 
 test("RUI-13 sales report can group by invoices items customers and days", () => {
   assert.match(reports, /type SalesView = "invoices" \| "items" \| "customers" \| "days"/);
-  for (const label of ["الفواتير", "الأصناف", "العملاء", "الأيام"]) {
-    assert.match(reports, new RegExp(label));
-  }
+  for (const label of ["الفواتير", "الأصناف", "العملاء", "الأيام"]) assert.match(reports, new RegExp(label));
   assert.match(reports, /invoice\.customerId \?\?/);
 });
 
@@ -153,19 +146,17 @@ test("RUI-20 reports have explicit loading invalid-range and unauthorized states
   assert.match(reports, /لا تملك صلاحية عرض التقارير/);
 });
 
-test("RUI-21 executive dashboard loads its summary through its own permission", () => {
-  assert.match(home, /api\.reporting\.overview/);
+test("RUI-21 executive dashboard loads only its dedicated summary backend", () => {
+  assert.match(home, /api\.executiveDashboard\.overview/);
+  assert.match(home, /api\.executiveDashboard\.availableBranches/);
   assert.match(home, /permissions\.includes\("view_executive_dashboard"\)/);
-  assert.match(home, /api\.reporting\.overview, canViewExecutiveDashboard/);
+  assert.match(home, /api\.executiveDashboard\.overview, canViewExecutiveDashboard/);
   assert.match(home, /api\.products\.list, canViewExecutiveDashboard && canViewProducts/);
-  assert.doesNotMatch(home, /canViewExecutiveDashboard && canViewReports && reportArgs/);
-  assert.doesNotMatch(home, /api\.(?:invoices|expenses|customers|repairs)\.(?:list|stats|getStats)/);
+  assert.doesNotMatch(home, /api\.reporting\.overview/);
 });
 
 test("RUI-22 executive dashboard exposes exactly the eight approved management indicators", () => {
-  for (const label of ["إجمالي المبيعات", "إجمالي المشتريات", "صافي الربح", "إجمالي المصروفات", "أرصدة الخزائن", "مديونيات العملاء", "مستحقات الموردين", "قيمة المخزون"]) {
-    assert.match(home, new RegExp(label));
-  }
+  for (const label of ["إجمالي المبيعات", "إجمالي المشتريات", "صافي الربح", "إجمالي المصروفات", "أرصدة الخزائن", "مديونيات العملاء", "مستحقات الموردين", "قيمة المخزون"]) assert.match(home, new RegExp(label));
   assert.equal((home.match(/key: "/g) ?? []).length, 8);
   assert.match(home, /erp-dashboard-card-grid/);
 });
@@ -199,26 +190,27 @@ test("RUI-26 executive dashboard uses full cards and an explicit executive title
   assert.doesNotMatch(home, /erp-home-quick-grid|erp-home-doc-grid/);
 });
 
-test("RUI-27 backend separates executive summary access from detailed report access", () => {
+test("RUI-27 report center remains view_reports-only while executive backend is separately authorized", () => {
   assert.match(backend, /export const availableBranches = query/);
   assert.match(backend, /export const salesDetails = query/);
-  assert.match(backend, /async function requireReportingOrExecutive/);
-  assert.match(backend, /hasPermission\(user, "view_executive_dashboard"\)/);
-  assert.equal((backend.match(/requireReportingOrExecutive\(ctx\)/g) ?? []).length >= 2, true);
-  assert.match(backend, /export const salesDetails[\s\S]*requirePermission\(ctx, "view_reports"\)/);
+  assert.match(backend, /requirePermission\(ctx, "view_reports"\)/);
+  assert.doesNotMatch(backend, /view_executive_dashboard/);
+  assert.match(executiveBackend, /export const availableBranches = query/);
+  assert.match(executiveBackend, /export const overview = query/);
+  assert.match(executiveBackend, /requirePermission\(ctx, "view_executive_dashboard"\)/);
   assert.match(backend, /requireModulePermission\(ctx, "view_invoices", "invoices"\)/);
   assert.match(backend, /paginationOptsValidator/);
   assert.match(backend, /\.paginate\(args\.paginationOpts\)/);
-  assert.match(backend, /user\.role === "admin" \|\| user\.role === "accountant"/);
 });
 
-test("RUI-28 branch options expose a minimal DTO and no financial balances", () => {
-  assert.match(backend, /\{ _id: branch\._id, name: branch\.name \}/);
-  const branchQuery = backend.slice(
-    backend.indexOf("export const availableBranches"),
-    backend.indexOf("async function resolveReportBranches"),
-  );
-  assert.doesNotMatch(branchQuery, /balance|inventoryValue|currentBalance/);
+test("RUI-28 executive backend returns null instead of sensitive values without underlying permissions", () => {
+  assert.match(executiveBackend, /sales: canViewSales \? \{ invoiceCount: invoices\.length, netSales \} : null/);
+  assert.match(executiveBackend, /purchases: canViewPurchases \? \{ receiptCount: receipts\.length, landedPurchases \} : null/);
+  assert.match(executiveBackend, /expenses: canViewExpenses \? \{ totalExpenses \} : null/);
+  assert.match(executiveBackend, /liquidAccounts: canViewFinance[\s\S]*: null/);
+  assert.match(executiveBackend, /customerReceivables: canViewCustomerLedger[\s\S]*: null/);
+  assert.match(executiveBackend, /supplierPayables: canViewSupplierLedger[\s\S]*: null/);
+  assert.match(executiveBackend, /inventoryValue: canViewProducts && canViewProfits[\s\S]*: null/);
 });
 
 test("RUI-29 reporting and executive UIs perform no direct financial write", () => {
