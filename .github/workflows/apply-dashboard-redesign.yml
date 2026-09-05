@@ -25,6 +25,8 @@ jobs:
           python3 -m py_compile /tmp/apply_dashboard_redesign.py
       - name: Apply and finalize redesign
         run: python3 .github/dashboard-redesign/finalize.py /tmp/apply_dashboard_redesign.py
+      - name: Align contract tests with production sources
+        run: python3 .github/dashboard-redesign/patch-contract-tests.py
       - name: Remove transient tooling
         shell: bash
         run: |
@@ -34,7 +36,7 @@ jobs:
         run: npm ci
       - name: TypeScript
         run: npm run typecheck
-      - name: Dashboard contracts
+      - name: Dashboard and lifecycle contracts
         run: node --test --test-concurrency=1 --experimental-strip-types tests/dashboardCommercialSecurity.test.ts tests/dashboardOperationalLifecycle.test.ts tests/dashboardHeaderResponsiveCommercial.test.ts
       - name: Unit and integration tests
         run: npm test
