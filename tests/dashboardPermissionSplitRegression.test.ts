@@ -48,10 +48,20 @@ test("DBS-05 executive cards also honor their underlying data permissions", () =
   assert.match(executiveBackend, /requirePermission\(ctx, "view_executive_dashboard"\)/);
 });
 
-test("DBS-06 desktop top bar is enlarged and user identity has reserved space", () => {
+test("DBS-06 desktop top bar preserves user identity and logout without horizontal clipping", () => {
   assert.match(main, /import "\.\/topbar-polish\.css"/);
-  assert.match(topbar, /\.erp-navigation-inner\s*\{[\s\S]*min-height: 68px/);
-  assert.match(topbar, /\.erp-user-panel\s*\{[\s\S]*min-width: 260px/);
-  assert.match(sidebar, /max-w-48 truncate text-sm font-black/);
+  assert.match(topbar, /\.erp-navigation-inner\s*\{[\s\S]*min-height: 70px/);
+  assert.doesNotMatch(topbar, /\.erp-navigation-inner\s*\{[^}]*overflow:\s*hidden/);
+  assert.match(topbar, /\.erp-user-panel\s*\{[\s\S]*flex: 0 0 auto/);
+  assert.match(topbar, /\.erp-user-panel > div:first-child\s*\{[\s\S]*width: 200px/);
+  assert.match(topbar, /p:first-child\s*\{[\s\S]*text-overflow: ellipsis !important[\s\S]*white-space: nowrap !important/);
+  assert.match(topbar, /\.erp-user-panel > button\s*\{[\s\S]*width: auto !important[\s\S]*min-width: 116px/);
   assert.match(sidebar, /title=\{userName\}/);
+});
+
+test("DBS-07 operational cards auto-fit instead of leaving a broken second row on wide screens", () => {
+  assert.match(operational, /grid-cols-\[repeat\(auto-fit,minmax\(230px,1fr\)\)\]/);
+  assert.match(operational, /فتح التفاصيل/);
+  assert.match(operational, /min-h-\[158px\]/);
+  assert.doesNotMatch(operational, /xl:grid-cols-4/);
 });
