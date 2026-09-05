@@ -17,6 +17,7 @@ import { CustomerFollowUpsPage } from "./CustomerFollowUpsPage";
 import { CustomerLedgerPage } from "./CustomerLedgerPage";
 import { CustomersPage } from "./CustomersPage";
 import { Dashboard } from "./Dashboard";
+import { OperationalDashboard } from "./OperationalDashboard";
 import { DataExportPage } from "./DataExportPage";
 import { DeliveriesPage } from "./DeliveriesPage";
 import { EmployeesPage } from "./EmployeesPage";
@@ -66,7 +67,7 @@ import {
 } from "../workspace/workspaceModel";
 
 export type Page =
-  | "dashboard" | "products" | "inventory" | "customers" | "new-customer" | "follow-ups" | "invoices" | "sales-returns" | "quotes" | "credit-invoices"
+  | "dashboard" | "executive-dashboard" | "products" | "inventory" | "customers" | "new-customer" | "follow-ups" | "invoices" | "sales-returns" | "quotes" | "credit-invoices"
   | "new-invoice" | "new-purchase-invoice" | "repairs" | "expenses" | "suppliers" | "orders"
   | "deliveries" | "shipments" | "branches" | "employees" | "crm"
   | "reports" | "settings" | "audit-logs" | "accounts-home" | "treasury"
@@ -80,6 +81,8 @@ const WORKSPACE_STORAGE_PREFIX = "business-tech-erp.workspace.v1";
 const LEGACY_PAGE_SESSION_KEY = "business-tech-erp.current-page";
 
 const PAGE_PERMISSIONS: Partial<Record<Page, Permission>> = {
+  dashboard: "view_operational_dashboard",
+  "executive-dashboard": "view_executive_dashboard",
   products: "view_products",
   inventory: "view_products",
   customers: "view_customers",
@@ -150,7 +153,8 @@ const PAGE_MODULES: Partial<Record<Page, string>> = {
 };
 
 const PAGE_META: Record<Page, { group: string; title: string }> = {
-  dashboard: { group: "لوحة التحكم", title: "لوحة التحكم" },
+  dashboard: { group: "لوحة التحكم", title: "لوحة التشغيل" },
+  "executive-dashboard": { group: "لوحة التحكم", title: "اللوحة التنفيذية" },
   products: { group: "المخزون", title: "الأصناف والمخزون" },
   inventory: { group: "المخزون", title: "إدارة المخزون" },
   customers: { group: "العملاء", title: "قائمة العملاء" },
@@ -717,7 +721,8 @@ export function ERPApp() {
             </div>
           </div>
         )}
-        {tabAuthorized && tab.page === "dashboard" && <Dashboard onOpenReport={openReport} permissions={permissions} />}
+        {tabAuthorized && tab.page === "dashboard" && <OperationalDashboard onNavigate={navigate} permissions={permissions} />}
+        {tabAuthorized && tab.page === "executive-dashboard" && <Dashboard onOpenReport={openReport} permissions={permissions} />}
         {tabAuthorized && tab.page === "accounts-home" && <AccountsHubPage onNavigate={navigate} permissions={permissions} />}
         {tabAuthorized && tab.page === "products" && <ProductsPage createRequestToken={createToken} />}
         {tabAuthorized && tab.page === "inventory" && <InventoryWorkspacePage createRequestToken={createToken} />}
