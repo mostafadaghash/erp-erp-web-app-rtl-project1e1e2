@@ -4,8 +4,11 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-$secretPath = Join-Path (Get-Location) ".local-e2e-admin.local"
+$projectRoot = (Get-Location).Path
+$secretPath = Join-Path $projectRoot ".local-e2e-admin.local"
 $frontendUrl = "http://localhost:5173/"
+$viteStdoutLog = Join-Path $projectRoot ".local-vite-suite.stdout.local"
+$viteStderrLog = Join-Path $projectRoot ".local-vite-suite.stderr.local"
 
 function Test-LocalFrontend {
   try {
@@ -17,28 +20,61 @@ function Test-LocalFrontend {
   }
 }
 
+function Get-ViteStartupDiagnostics {
+  $lines = @()
+  foreach ($logPath in @($viteStdoutLog, $viteStderrLog)) {
+    if (Test-Path $logPath) {
+      $tail = @(Get-Content $logPath -Tail 40 -ErrorAction SilentlyContinue)
+      if ($tail.Count -gt 0) {
+        $lines += "--- $([System.IO.Path]::GetFileName($logPath)) ---"
+        $lines += $tail
+      }
+    }
+  }
+  return ($lines -join [Environment]::NewLine)
+}
+
 function Start-LocalFrontendForSuite {
   if (Test-LocalFrontend) {
     Write-Host "Local frontend already available at $frontendUrl" -ForegroundColor Green
     return $null
   }
 
-  $viteCommand = Join-Path (Get-Location) "node_modules\.bin\vite.cmd"
-  if (-not (Test-Path $viteCommand)) {
+  $viteEntry = Join-Path $projectRoot "node_modules\vite\bin\vite.js"
+  if (-not (Test-Path $viteEntry)) {
     throw "Local Vite executable is missing. Run npm ci before the local suite."
   }
 
+  $nodeCommand = (Get-Command node.exe -ErrorAction SilentlyContinue).Source
+  if (-not $nodeCommand) {
+    $nodeCommand = (Get-Command node -ErrorAction SilentlyContinue).Source
+  }
+  if (-not $nodeCommand) {
+    throw "Node.js executable is missing from PATH."
+  }
+
+  Remove-Item $viteStdoutLog, $viteStderrLog -Force -ErrorAction SilentlyContinue
+
   Write-Host "Starting Local Server frontend for the test suite..." -ForegroundColor Cyan
+  # Launch Node directly instead of the Windows vite.cmd shim. This keeps the
+  # tracked PID tied to the actual Vite process and avoids cmd.exe wrapper
+  # behavior that can leave the suite waiting on a server that never started.
   $process = Start-Process `
-    -FilePath $viteCommand `
-    -ArgumentList @("--mode", "local-server", "--host", "127.0.0.1", "--port", "5173", "--strictPort") `
-    -WorkingDirectory (Get-Location).Path `
+    -FilePath $nodeCommand `
+    -ArgumentList @("node_modules/vite/bin/vite.js", "--mode", "local-server", "--host", "localhost", "--port", "5173", "--strictPort") `
+    -WorkingDirectory $projectRoot `
+    -RedirectStandardOutput $viteStdoutLog `
+    -RedirectStandardError $viteStderrLog `
     -PassThru `
     -WindowStyle Hidden
 
   $deadline = (Get-Date).AddSeconds(30)
   while ((Get-Date) -lt $deadline) {
     if ($process.HasExited) {
+      $diagnostics = Get-ViteStartupDiagnostics
+      if ($diagnostics) {
+        throw "Local frontend process exited before becoming ready.`n$diagnostics"
+      }
       throw "Local frontend process exited before becoming ready."
     }
     if (Test-LocalFrontend) {
@@ -53,6 +89,11 @@ function Start-LocalFrontendForSuite {
   }
   catch {
     # Best-effort cleanup before surfacing the readiness failure.
+  }
+
+  $diagnostics = Get-ViteStartupDiagnostics
+  if ($diagnostics) {
+    throw "Local frontend did not become ready at $frontendUrl within 30 seconds.`n$diagnostics"
   }
   throw "Local frontend did not become ready at $frontendUrl within 30 seconds."
 }
