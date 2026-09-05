@@ -12,6 +12,7 @@ import {
 const employeesSource = readFileSync("src/components/EmployeesPage.tsx", "utf8");
 const executiveDashboardSource = readFileSync("src/components/Dashboard.tsx", "utf8");
 const operationalDashboardSource = readFileSync("src/components/OperationalDashboard.tsx", "utf8");
+const executiveBackendSource = readFileSync("convex/executiveDashboard.ts", "utf8");
 const appSource = readFileSync("src/components/ERPApp.tsx", "utf8");
 const sidebarSource = readFileSync("src/components/Sidebar.tsx", "utf8");
 
@@ -94,8 +95,9 @@ test("PERM-AR05 executive dashboard permission keeps approved role defaults", ()
   }
 
   assert.match(executiveDashboardSource, /permissions\.includes\("view_executive_dashboard"\)/);
-  assert.match(executiveDashboardSource, /api\.reporting\.overview, canViewExecutiveDashboard/);
+  assert.match(executiveDashboardSource, /api\.executiveDashboard\.overview, canViewExecutiveDashboard/);
   assert.match(executiveDashboardSource, /disabled=\{!canViewReports \|\| card\.protected\}/);
+  assert.match(executiveBackendSource, /requirePermission\(ctx, "view_executive_dashboard"\)/);
 });
 
 test("PERM-AR06 operational dashboard is an independent default for every role", () => {
@@ -107,7 +109,7 @@ test("PERM-AR06 operational dashboard is an independent default for every role",
   }
 
   assert.match(operationalDashboardSource, /permissions\.includes\("view_operational_dashboard"\)/);
-  assert.doesNotMatch(operationalDashboardSource, /api\.reporting\.overview|view_profits|currentBalances|netProfit/);
+  assert.doesNotMatch(operationalDashboardSource, /api\.executiveDashboard\.overview|view_profits|currentBalances|netProfit/);
 });
 
 test("PERM-AR07 workspace and navigation expose the two dashboards through separate permissions", () => {
