@@ -99,16 +99,19 @@ test("DBS-09 live refresh is an actual button backed by fresh query arguments", 
   assert.doesNotMatch(operational, /حسب الصلاحيات/);
 });
 
-test("DBS-10 notification center clears unread immediately and cannot resurrect it on tab return", () => {
+test("DBS-10 every bell click acknowledges the current snapshot and legacy stock bell is never visible", () => {
   assert.match(globalSearch, /NOTIFICATION_SEEN_STORAGE_PREFIX/);
   assert.match(globalSearch, /normalizeSeenNotificationKeys/);
   assert.match(globalSearch, /writeSeenNotificationKeys/);
   assert.match(globalSearch, /previousBelongsToCurrentUser/);
-  assert.match(globalSearch, /visibilitychange/);
   assert.match(globalSearch, /header-notification-unread-count/);
-  assert.match(globalSearch, /if \(nextOpen\) markCurrentNotificationsRead\(\)/);
+  assert.match(globalSearch, /onClick=\{\(\) => \{[\s\S]*markCurrentNotificationsRead\(\);[\s\S]*setNotificationsOpen\(\(open\) => !open\)/);
+  assert.match(globalSearch, /\.\.\.snapshot/);
   assert.match(globalSearch, /\.\.\.\(previousBelongsToCurrentUser \? previous : \[\]\),[\s\S]*\.\.\.stored/);
-  assert.doesNotMatch(globalSearch, /notificationSignature intentionally retriggers/);
+  assert.doesNotMatch(globalSearch, /if \(nextOpen\) markCurrentNotificationsRead\(\)/);
+  const hideLegacyBellIndex = topbar.indexOf('.erp-contextbar > div:last-child > button[title$="تنبيه مخزون"]');
+  const desktopMediaIndex = topbar.indexOf('@media (min-width: 1024px)');
+  assert.ok(hideLegacyBellIndex >= 0 && hideLegacyBellIndex < desktopMediaIndex, "legacy stock bell must be hidden globally before desktop media rules");
   assert.match(topbar, /button\[title\$="تنبيه مخزون"\][\s\S]*display: none !important/);
 });
 
