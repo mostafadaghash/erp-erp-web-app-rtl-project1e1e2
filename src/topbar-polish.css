@@ -43,6 +43,7 @@
 
   .erp-nav-group-button > span {
     gap: 6px;
+    font-size: 18px !important;
   }
 
   .erp-nav-group-button svg {
