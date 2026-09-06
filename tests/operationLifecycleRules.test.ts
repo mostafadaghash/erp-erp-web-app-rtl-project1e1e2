@@ -40,24 +40,26 @@ test("sales order lifecycle contains every agreed operational status", () => {
   assert.equal(normalizeOrderStatus("delivered"), "received");
 });
 
-test("repair lifecycle normalizes raw workflow into the seven agreed customer-facing statuses", () => {
+test("repair lifecycle normalizes raw workflow into the eight agreed operational statuses", () => {
   assert.deepEqual(REPAIR_STATUS_LABELS, {
     pending: "قيد الإنتظار",
+    technician_received: "تم الإستلام من الفني",
     in_progress: "جاري الصيانة",
     new_issue: "ظهور مشكلة جديدة",
     repaired: "تم الإصلاح",
     delivered_to_customer: "تم التسليم للعميل",
     rejected_by_customer: "مرفوض من العميل",
-    rejected_by_shipping: "مرفوض من شركة الشحن",
+    rejected_by_technician: "مرفوض من الفني",
   });
   assert.equal(normalizeRepairStatus("received"), "pending");
-  assert.equal(normalizeRepairStatus("under_inspection"), "in_progress");
+  assert.equal(normalizeRepairStatus("under_inspection"), "technician_received");
   assert.equal(normalizeRepairStatus("in_progress"), "in_progress");
   assert.equal(normalizeRepairStatus("awaiting_approval"), "new_issue");
   assert.equal(normalizeRepairStatus("ready"), "repaired");
   assert.equal(normalizeRepairStatus("delivered"), "delivered_to_customer");
   assert.equal(normalizeRepairStatus("cancelled"), "rejected_by_customer");
-  assert.equal(normalizeRepairStatus("rejected_by_shipping"), "rejected_by_shipping");
-  assert.equal(canTransition(REPAIR_TRANSITIONS, "ready", "rejected_by_shipping"), true);
-  assert.equal(canTransition(REPAIR_TRANSITIONS, "rejected_by_shipping", "ready"), true);
+  assert.equal(normalizeRepairStatus("rejected_by_shipping"), "rejected_by_technician");
+  assert.equal(canTransition(REPAIR_TRANSITIONS, "under_inspection", "rejected_by_shipping"), true);
+  assert.equal(canTransition(REPAIR_TRANSITIONS, "rejected_by_shipping", "under_inspection"), true);
+  assert.equal(canTransition(REPAIR_TRANSITIONS, "ready", "rejected_by_shipping"), false);
 });
