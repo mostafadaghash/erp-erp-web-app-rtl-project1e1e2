@@ -99,25 +99,31 @@ test("DBS-09 live refresh is an actual button backed by fresh query arguments", 
   assert.doesNotMatch(operational, /حسب الصلاحيات/);
 });
 
-test("DBS-10 notification center is single and read state survives browser tab changes", () => {
+test("DBS-10 notification center clears unread immediately and cannot resurrect it on tab return", () => {
   assert.match(globalSearch, /NOTIFICATION_SEEN_STORAGE_PREFIX/);
-  assert.match(globalSearch, /window\.localStorage\.setItem/);
-  assert.match(globalSearch, /new Set\(\[\.\.\.previous, \.\.\.notificationKeys\]\)/);
+  assert.match(globalSearch, /normalizeSeenNotificationKeys/);
+  assert.match(globalSearch, /writeSeenNotificationKeys/);
+  assert.match(globalSearch, /previousBelongsToCurrentUser/);
   assert.match(globalSearch, /visibilitychange/);
-  assert.match(globalSearch, /readSeenNotificationKeys/);
   assert.match(globalSearch, /header-notification-unread-count/);
-  assert.match(globalSearch, /markCurrentNotificationsRead/);
+  assert.match(globalSearch, /if \(nextOpen\) markCurrentNotificationsRead\(\)/);
+  assert.match(globalSearch, /\.\.\.\(previousBelongsToCurrentUser \? previous : \[\]\),[\s\S]*\.\.\.stored/);
+  assert.doesNotMatch(globalSearch, /notificationSignature intentionally retriggers/);
   assert.match(topbar, /button\[title\$="تنبيه مخزون"\][\s\S]*display: none !important/);
 });
 
-test("DBS-11 internet indicator is backed by real reachability probes", () => {
+test("DBS-11 internet indicator ignores raw browser online events until a real probe succeeds", () => {
   assert.match(main, /import "\.\/lib\/internetConnectivity"/);
   assert.match(internetConnectivity, /PROBE_URLS/);
   assert.match(internetConnectivity, /fetch\(/);
   assert.match(internetConnectivity, /mode: "no-cors"/);
   assert.match(internetConnectivity, /AbortController/);
   assert.match(internetConnectivity, /PROBE_INTERVAL_MS/);
-  assert.match(internetConnectivity, /publishConnectivity\(false\)/);
+  assert.match(internetConnectivity, /publishConnectivity\("offline"\)/);
+  assert.match(internetConnectivity, /publishingSyntheticNativeEvent/);
+  assert.match(internetConnectivity, /dispatchAuthoritativeNativeEvent/);
+  assert.match(internetConnectivity, /event\.stopImmediatePropagation\(\)/);
+  assert.match(internetConnectivity, /handleNativeOnline[\s\S]*publishConnectivity\("checking"\)[\s\S]*checkInternetConnectivity/);
   assert.match(app, /window\.addEventListener\("online", online\)/);
   assert.match(app, /window\.addEventListener\("offline", offline\)/);
 });
