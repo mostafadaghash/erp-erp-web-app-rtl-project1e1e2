@@ -1,4 +1,10 @@
 /* Final desktop navigation sizing. Loaded last so it can safely refine the navigation skin. */
+
+/* The unified notification center owns stock alerts on every viewport. */
+.erp-contextbar > div:last-child > button[title$="تنبيه مخزون"] {
+  display: none !important;
+}
+
 @media (min-width: 1024px) {
   .erp-navigation-inner {
     min-height: 80px;
@@ -146,11 +152,6 @@
     min-width: 46px;
     min-height: 46px;
     padding: 11px;
-  }
-
-  /* The unified notification center inside GlobalSearch owns stock alerts too. */
-  .erp-contextbar > div:last-child > button[title$="تنبيه مخزون"] {
-    display: none !important;
   }
 
   .erp-contextbar > div:last-child > span {
