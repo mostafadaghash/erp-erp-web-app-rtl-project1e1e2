@@ -2,8 +2,6 @@ import { useEffect, useState } from "react";
 import { useQuery } from "convex/react";
 import {
   ArrowLeft,
-  Boxes,
-  CalendarClock,
   ClipboardList,
   PackageCheck,
   RefreshCw,
@@ -24,70 +22,73 @@ interface OperationalDashboardProps {
   onNavigate: (page: Page) => void;
 }
 
-type OperationalCard = {
-  key: string;
-  title: string;
-  value: number;
-  note: string;
-  page: Page;
-  icon: React.ElementType;
-  iconClass: string;
-};
-
 type StatusMeta<T extends string> = {
   key: T;
+  surfaceClass: string;
   iconClass: string;
+  valueClass: string;
 };
 
 const ORDER_STATUS_META: readonly StatusMeta<CanonicalOrderStatus>[] = [
-  { key: "pending", iconClass: "bg-amber-50 text-amber-700" },
-  { key: "confirmed", iconClass: "bg-indigo-50 text-indigo-700" },
-  { key: "preparing", iconClass: "bg-blue-50 text-blue-700" },
-  { key: "ready", iconClass: "bg-cyan-50 text-cyan-700" },
-  { key: "handed_to_shipping", iconClass: "bg-violet-50 text-violet-700" },
-  { key: "delivered_to_customer", iconClass: "bg-emerald-50 text-emerald-700" },
-  { key: "received", iconClass: "bg-teal-50 text-teal-700" },
-  { key: "cancelled", iconClass: "bg-rose-50 text-rose-700" },
+  { key: "pending", surfaceClass: "border-amber-200 bg-amber-50/65", iconClass: "bg-amber-100 text-amber-700", valueClass: "text-amber-950" },
+  { key: "confirmed", surfaceClass: "border-indigo-200 bg-indigo-50/65", iconClass: "bg-indigo-100 text-indigo-700", valueClass: "text-indigo-950" },
+  { key: "preparing", surfaceClass: "border-blue-200 bg-blue-50/65", iconClass: "bg-blue-100 text-blue-700", valueClass: "text-blue-950" },
+  { key: "ready", surfaceClass: "border-cyan-200 bg-cyan-50/65", iconClass: "bg-cyan-100 text-cyan-700", valueClass: "text-cyan-950" },
+  { key: "handed_to_shipping", surfaceClass: "border-violet-200 bg-violet-50/65", iconClass: "bg-violet-100 text-violet-700", valueClass: "text-violet-950" },
+  { key: "delivered_to_customer", surfaceClass: "border-emerald-200 bg-emerald-50/65", iconClass: "bg-emerald-100 text-emerald-700", valueClass: "text-emerald-950" },
+  { key: "received", surfaceClass: "border-teal-200 bg-teal-50/65", iconClass: "bg-teal-100 text-teal-700", valueClass: "text-teal-950" },
+  { key: "cancelled", surfaceClass: "border-rose-200 bg-rose-50/65", iconClass: "bg-rose-100 text-rose-700", valueClass: "text-rose-950" },
 ];
 
 const REPAIR_STATUS_META: readonly StatusMeta<RepairLifecycleStatus>[] = [
-  { key: "pending", iconClass: "bg-amber-50 text-amber-700" },
-  { key: "in_progress", iconClass: "bg-blue-50 text-blue-700" },
-  { key: "new_issue", iconClass: "bg-orange-50 text-orange-700" },
-  { key: "repaired", iconClass: "bg-emerald-50 text-emerald-700" },
-  { key: "delivered_to_customer", iconClass: "bg-teal-50 text-teal-700" },
-  { key: "rejected_by_customer", iconClass: "bg-rose-50 text-rose-700" },
-  { key: "rejected_by_shipping", iconClass: "bg-slate-100 text-slate-700" },
+  { key: "pending", surfaceClass: "border-amber-200 bg-amber-50/65", iconClass: "bg-amber-100 text-amber-700", valueClass: "text-amber-950" },
+  { key: "technician_received", surfaceClass: "border-sky-200 bg-sky-50/65", iconClass: "bg-sky-100 text-sky-700", valueClass: "text-sky-950" },
+  { key: "in_progress", surfaceClass: "border-blue-200 bg-blue-50/65", iconClass: "bg-blue-100 text-blue-700", valueClass: "text-blue-950" },
+  { key: "new_issue", surfaceClass: "border-orange-200 bg-orange-50/65", iconClass: "bg-orange-100 text-orange-700", valueClass: "text-orange-950" },
+  { key: "repaired", surfaceClass: "border-emerald-200 bg-emerald-50/65", iconClass: "bg-emerald-100 text-emerald-700", valueClass: "text-emerald-950" },
+  { key: "delivered_to_customer", surfaceClass: "border-teal-200 bg-teal-50/65", iconClass: "bg-teal-100 text-teal-700", valueClass: "text-teal-950" },
+  { key: "rejected_by_customer", surfaceClass: "border-rose-200 bg-rose-50/65", iconClass: "bg-rose-100 text-rose-700", valueClass: "text-rose-950" },
+  { key: "rejected_by_technician", surfaceClass: "border-slate-300 bg-slate-100/80", iconClass: "bg-slate-200 text-slate-700", valueClass: "text-slate-950" },
 ];
 
 function StatusCard({
   testId,
   title,
   value,
-  note,
   page,
   icon: Icon,
+  surfaceClass,
   iconClass,
+  valueClass,
   onNavigate,
-}: OperationalCard & { testId: string; onNavigate: (page: Page) => void }) {
+}: {
+  testId: string;
+  title: string;
+  value: number;
+  page: Page;
+  icon: React.ElementType;
+  surfaceClass: string;
+  iconClass: string;
+  valueClass: string;
+  onNavigate: (page: Page) => void;
+}) {
   return (
     <button
       type="button"
       data-testid={testId}
       onClick={() => onNavigate(page)}
-      className="group flex min-h-[142px] min-w-0 flex-col rounded-2xl border border-slate-200 bg-white p-4 text-right shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-200 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/40"
+      className={`group flex min-h-[132px] min-w-0 flex-col rounded-2xl border p-4 text-right shadow-sm transition hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/40 ${surfaceClass}`}
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="truncate text-xs font-black text-slate-500">{title}</p>
-          <p className="mt-1.5 text-[32px] font-black leading-none text-slate-900">{value}</p>
+          <p className="text-sm font-black leading-5 text-slate-700">{title}</p>
+          <p className={`mt-2 text-[34px] font-black leading-none ${valueClass}`}>{value}</p>
         </div>
-        <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${iconClass}`}>
+        <span className={`grid h-11 w-11 shrink-0 place-items-center rounded-xl ${iconClass}`}>
           <Icon className="h-5 w-5" />
         </span>
       </div>
-      <p className="mt-3 min-h-8 text-xs font-medium leading-5 text-slate-500">{note}</p>
-      <div className="mt-auto flex items-center justify-between border-t border-slate-100 pt-2.5 text-[11px] font-black text-emerald-700">
+      <div className="mt-auto flex items-center justify-between border-t border-slate-900/5 pt-3 text-[11px] font-black text-slate-600 transition group-hover:text-emerald-700">
         <span>فتح التفاصيل</span>
         <ArrowLeft className="h-3.5 w-3.5 transition-transform group-hover:-translate-x-0.5" />
       </div>
@@ -101,8 +102,6 @@ export function OperationalDashboard({ permissions, onNavigate }: OperationalDas
   const canViewOperationalDashboard = permissions.includes("view_operational_dashboard");
   const canViewOrders = permissions.includes("view_orders");
   const canViewRepairs = permissions.includes("view_repairs");
-  const canViewFollowUps = permissions.includes("view_follow_ups");
-  const canViewProducts = permissions.includes("view_products");
 
   const orderCounts = useQuery(
     api.operationStatusDashboard.orderCounts,
@@ -112,20 +111,10 @@ export function OperationalDashboard({ permissions, onNavigate }: OperationalDas
     api.operationStatusDashboard.repairCounts,
     canViewOperationalDashboard && canViewRepairs ? { refreshToken } : "skip",
   );
-  const pendingFollowUps = useQuery(
-    api.customerFollowUps.list,
-    canViewOperationalDashboard && canViewFollowUps ? { status: "pending", limit: 100 } : "skip",
-  );
-  const lowStockProducts = useQuery(
-    api.products.list,
-    canViewOperationalDashboard && canViewProducts ? { lowStock: true } : "skip",
-  );
 
   const waitingForData =
     (canViewOrders && orderCounts === undefined) ||
-    (canViewRepairs && repairCounts === undefined) ||
-    (canViewFollowUps && pendingFollowUps === undefined) ||
-    (canViewProducts && lowStockProducts === undefined);
+    (canViewRepairs && repairCounts === undefined);
 
   useEffect(() => {
     if (refreshing && !waitingForData) setRefreshing(false);
@@ -133,30 +122,6 @@ export function OperationalDashboard({ permissions, onNavigate }: OperationalDas
 
   if (!canViewOperationalDashboard) {
     return <div className="erp-empty-state m-6">لا تملك صلاحية عرض لوحة التحكم التشغيلية.</div>;
-  }
-
-  const otherCards: OperationalCard[] = [];
-  if (canViewFollowUps && pendingFollowUps) {
-    otherCards.push({
-      key: "follow-ups",
-      title: "متابعات مطلوبة",
-      value: pendingFollowUps.length,
-      note: "متابعات العملاء التي تحتاج إجراء",
-      page: "follow-ups",
-      icon: CalendarClock,
-      iconClass: "bg-amber-50 text-amber-700",
-    });
-  }
-  if (canViewProducts && lowStockProducts) {
-    otherCards.push({
-      key: "low-stock",
-      title: "تنبيهات المخزون",
-      value: lowStockProducts.length,
-      note: "أصناف وصلت أو اقتربت من حد إعادة الطلب",
-      page: "inventory",
-      icon: Boxes,
-      iconClass: "bg-violet-50 text-violet-700",
-    });
   }
 
   const requestRefresh = () => {
@@ -174,7 +139,7 @@ export function OperationalDashboard({ permissions, onNavigate }: OperationalDas
           <div className="min-w-0">
             <p className="text-[11px] font-black text-emerald-700">لوحة التحكم</p>
             <h1 className="text-xl font-black leading-tight text-slate-900">لوحة التشغيل</h1>
-            <p className="mt-0.5 truncate text-xs text-slate-500">ملخص العمل اليومي حسب صلاحيات المستخدم والفرع المسموح به.</p>
+            <p className="mt-0.5 truncate text-xs text-slate-500">حالات طلبات البيع وأوامر الصيانة حسب صلاحيات المستخدم والفرع المسموح به.</p>
           </div>
         </div>
         <button
@@ -182,39 +147,40 @@ export function OperationalDashboard({ permissions, onNavigate }: OperationalDas
           data-testid="operational-dashboard-refresh"
           onClick={requestRefresh}
           disabled={refreshing}
-          className="hidden shrink-0 items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3.5 py-2 text-[11px] font-black text-slate-700 transition hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-700 disabled:cursor-wait disabled:opacity-60 md:flex"
+          className="hidden shrink-0 items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-xs font-black text-emerald-800 transition hover:bg-emerald-100 disabled:cursor-wait disabled:opacity-60 md:flex"
           title="البيانات تتحدث تلقائيًا، ويمكنك طلب إعادة تحميل فورية"
         >
-          <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`} />
+          <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
           {refreshing ? "جاري التحديث..." : "تحديث لحظي"}
         </button>
       </section>
 
       {canViewOrders && (
-        <section className="mb-5" aria-labelledby="operational-orders-heading">
-          <div className="mb-2.5 flex items-center justify-between px-1">
+        <section className="mb-5 rounded-2xl border border-emerald-100 bg-emerald-50/20 p-3.5 lg:p-4" aria-labelledby="operational-orders-heading">
+          <div className="mb-3 flex items-center justify-between px-1">
             <div>
-              <h2 id="operational-orders-heading" className="text-base font-black text-slate-900">طلبات البيع</h2>
-              <p className="mt-0.5 text-[11px] font-medium text-slate-500">جميع حالات دورة طلب البيع</p>
+              <h2 id="operational-orders-heading" className="text-lg font-black text-slate-900">طلبات البيع</h2>
+              <p className="mt-0.5 text-xs font-medium text-slate-500">جميع حالات دورة طلب البيع بالترتيب التشغيلي</p>
             </div>
-            {orderCounts && <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-black text-emerald-700">الإجمالي {orderCounts.total}</span>}
+            {orderCounts && <span className="rounded-full bg-emerald-100 px-3 py-1.5 text-xs font-black text-emerald-800">الإجمالي {orderCounts.total}</span>}
           </div>
           {orderCounts === undefined ? (
-            <div className="grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-3" aria-label="جارٍ تحميل حالات طلبات البيع">
-              {Array.from({ length: 8 }, (_, index) => <div key={index} className="h-[142px] animate-pulse rounded-2xl bg-slate-100" />)}
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="جارٍ تحميل حالات طلبات البيع">
+              {Array.from({ length: 8 }, (_, index) => <div key={index} className="h-[132px] animate-pulse rounded-2xl bg-slate-100" />)}
             </div>
           ) : (
-            <div className="grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-3" data-testid="operational-orders-status-grid">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4" data-testid="operational-orders-status-grid">
               {ORDER_STATUS_META.map((status) => (
                 <StatusCard
                   key={status.key}
                   testId={`operational-order-status-${status.key}`}
                   title={ORDER_STATUS_LABELS[status.key]}
                   value={orderCounts[status.key]}
-                  note="عدد طلبات البيع في هذه الحالة"
                   page="orders"
                   icon={ClipboardList}
+                  surfaceClass={status.surfaceClass}
                   iconClass={status.iconClass}
+                  valueClass={status.valueClass}
                   onNavigate={onNavigate}
                 />
               ))}
@@ -224,30 +190,31 @@ export function OperationalDashboard({ permissions, onNavigate }: OperationalDas
       )}
 
       {canViewRepairs && (
-        <section className="mb-5" aria-labelledby="operational-repairs-heading">
-          <div className="mb-2.5 flex items-center justify-between px-1">
+        <section className="rounded-2xl border border-sky-100 bg-sky-50/20 p-3.5 lg:p-4" aria-labelledby="operational-repairs-heading">
+          <div className="mb-3 flex items-center justify-between px-1">
             <div>
-              <h2 id="operational-repairs-heading" className="text-base font-black text-slate-900">أوامر الصيانة</h2>
-              <p className="mt-0.5 text-[11px] font-medium text-slate-500">جميع حالات دورة أمر الصيانة</p>
+              <h2 id="operational-repairs-heading" className="text-lg font-black text-slate-900">أوامر الصيانة</h2>
+              <p className="mt-0.5 text-xs font-medium text-slate-500">جميع حالات دورة أمر الصيانة بالترتيب التشغيلي</p>
             </div>
-            {repairCounts && <span className="rounded-full bg-sky-50 px-3 py-1 text-xs font-black text-sky-700">الإجمالي {repairCounts.total}</span>}
+            {repairCounts && <span className="rounded-full bg-sky-100 px-3 py-1.5 text-xs font-black text-sky-800">الإجمالي {repairCounts.total}</span>}
           </div>
           {repairCounts === undefined ? (
-            <div className="grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-3" aria-label="جارٍ تحميل حالات أوامر الصيانة">
-              {Array.from({ length: 7 }, (_, index) => <div key={index} className="h-[142px] animate-pulse rounded-2xl bg-slate-100" />)}
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="جارٍ تحميل حالات أوامر الصيانة">
+              {Array.from({ length: 8 }, (_, index) => <div key={index} className="h-[132px] animate-pulse rounded-2xl bg-slate-100" />)}
             </div>
           ) : (
-            <div className="grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-3" data-testid="operational-repairs-status-grid">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4" data-testid="operational-repairs-status-grid">
               {REPAIR_STATUS_META.map((status) => (
                 <StatusCard
                   key={status.key}
                   testId={`operational-repair-status-${status.key}`}
                   title={REPAIR_STATUS_LABELS[status.key]}
                   value={repairCounts[status.key]}
-                  note="عدد أوامر الصيانة في هذه الحالة"
                   page="repairs"
                   icon={Wrench}
+                  surfaceClass={status.surfaceClass}
                   iconClass={status.iconClass}
+                  valueClass={status.valueClass}
                   onNavigate={onNavigate}
                 />
               ))}
@@ -256,27 +223,8 @@ export function OperationalDashboard({ permissions, onNavigate }: OperationalDas
         </section>
       )}
 
-      {otherCards.length > 0 && (
-        <section aria-labelledby="operational-alerts-heading">
-          <div className="mb-2.5 px-1">
-            <h2 id="operational-alerts-heading" className="text-base font-black text-slate-900">المتابعات والتنبيهات</h2>
-            <p className="mt-0.5 text-[11px] font-medium text-slate-500">مؤشرات تشغيلية إضافية حسب صلاحيات المستخدم</p>
-          </div>
-          <div className="grid grid-cols-[repeat(auto-fit,minmax(230px,1fr))] gap-3">
-            {otherCards.map((card) => (
-              <StatusCard
-                key={card.key}
-                {...card}
-                testId={`operational-card-${card.key}`}
-                onNavigate={onNavigate}
-              />
-            ))}
-          </div>
-        </section>
-      )}
-
-      {!canViewOrders && !canViewRepairs && otherCards.length === 0 && !waitingForData && (
-        <div className="erp-empty-state">لا توجد مؤشرات تشغيلية إضافية متاحة ضمن صلاحيات هذا المستخدم.</div>
+      {!canViewOrders && !canViewRepairs && !waitingForData && (
+        <div className="erp-empty-state">لا توجد أقسام تشغيلية متاحة ضمن صلاحيات هذا المستخدم.</div>
       )}
     </div>
   );
