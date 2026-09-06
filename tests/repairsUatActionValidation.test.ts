@@ -35,7 +35,7 @@ test("RAV-02 create validation covers parts stock duplicates and deposit account
 test("RAV-03 transition validation mirrors technician diagnosis payment cancellation and warranty guards", () => {
   assert.match(page, /const transitionValidationReason = \(\(\) => \{/);
   for (const message of [
-    "عيّن فنيًا قبل بدء الإصلاح",
+    "عيّن فنيًا قبل استلام الجهاز أو بدء الإصلاح",
     "أدخل التشخيص النهائي قبل اعتماد الجاهزية",
     "استرد العربون بالكامل قبل إلغاء الصيانة",
     "حصّل المبلغ المتبقي قبل تسليم الجهاز",
@@ -76,7 +76,7 @@ test("RAV-07 edit validates an optional expected date before update", () => {
 
 test("RAV-08 backend remains authoritative for all operational guards", () => {
   for (const message of [
-    "يجب تعيين فني قبل بدء الإصلاح",
+    "يجب تعيين فني قبل استلام الجهاز أو بدء الإصلاح",
     "التشخيص مطلوب قبل اعتماد الصيانة جاهزة",
     "يجب استرداد عربون الصيانة بالكامل قبل الإلغاء",
     "لا يمكن تسليم صيانة عليها مبلغ متبقٍ",
