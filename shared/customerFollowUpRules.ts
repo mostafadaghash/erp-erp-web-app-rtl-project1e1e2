@@ -60,14 +60,19 @@ export const SALES_ORDER_SOURCE_STATUS_LABELS = [
 
 export const REPAIR_SOURCE_STATUS_LABELS = [
   "قيد الإنتظار",
+  "تم الإستلام من الفني",
   "جاري الصيانة",
   "ظهور مشكلة جديدة",
   "تم الإصلاح",
   "تم التسليم للعميل",
   "مرفوض من العميل",
-  "مرفوض من شركة الشحن",
+  "مرفوض من الفني",
 ] as const;
 
+/**
+ * `shipping` قيمة داخلية تاريخية فقط؛ في سياق الصيانة تمثل رفض الفني
+ * حفاظًا على توافق البيانات السابقة دون إظهار مسمى شركة الشحن للمستخدم.
+ */
 export type RepairRejectionParty = "customer" | "shipping";
 
 export function mapOrderSourceStatus(status: string, hasShippedDelivery = false): string | undefined {
@@ -94,7 +99,7 @@ export function mapDeliverySourceStatus(status: string): string | undefined {
 function inferRepairRejectionParty(reason?: string): RepairRejectionParty | undefined {
   const normalized = reason?.trim().toLowerCase();
   if (!normalized) return undefined;
-  if (/(شحن|شركة الشحن|shipping|carrier)/i.test(normalized)) return "shipping";
+  if (/(فني|الفني|technician|شحن|شركة الشحن|shipping|carrier)/i.test(normalized)) return "shipping";
   if (/(عميل|العميل|customer|client)/i.test(normalized)) return "customer";
   return undefined;
 }
@@ -105,14 +110,15 @@ export function mapRepairSourceStatus(
   rejectionParty?: RepairRejectionParty,
 ): string | undefined {
   if (status === "received") return "قيد الإنتظار";
-  if (status === "under_inspection" || status === "in_progress") return "جاري الصيانة";
+  if (status === "under_inspection") return "تم الإستلام من الفني";
+  if (status === "in_progress") return "جاري الصيانة";
   if (status === "awaiting_approval") return "ظهور مشكلة جديدة";
   if (status === "ready") return "تم الإصلاح";
   if (status === "delivered") return "تم التسليم للعميل";
-  if (status === "rejected_by_shipping") return "مرفوض من شركة الشحن";
+  if (status === "rejected_by_shipping") return "مرفوض من الفني";
   if (status === "cancelled") {
     const party = rejectionParty ?? inferRepairRejectionParty(cancellationReason) ?? "customer";
-    return party === "shipping" ? "مرفوض من شركة الشحن" : "مرفوض من العميل";
+    return party === "shipping" ? "مرفوض من الفني" : "مرفوض من العميل";
   }
   return undefined;
 }
