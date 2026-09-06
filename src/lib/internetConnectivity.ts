@@ -10,6 +10,16 @@ export type InternetConnectivityState = "checking" | "online" | "offline";
 
 let currentState: InternetConnectivityState = "checking";
 let probeInFlight = false;
+let publishingSyntheticNativeEvent = false;
+
+function dispatchAuthoritativeNativeEvent(state: "online" | "offline") {
+  publishingSyntheticNativeEvent = true;
+  try {
+    window.dispatchEvent(new Event(state));
+  } finally {
+    publishingSyntheticNativeEvent = false;
+  }
+}
 
 function publishConnectivity(nextState: InternetConnectivityState) {
   if (currentState === nextState) return;
@@ -17,6 +27,9 @@ function publishConnectivity(nextState: InternetConnectivityState) {
   window.dispatchEvent(new CustomEvent<InternetConnectivityState>(CONNECTIVITY_EVENT, {
     detail: nextState,
   }));
+  if (nextState === "online" || nextState === "offline") {
+    dispatchAuthoritativeNativeEvent(nextState);
+  }
 }
 
 export function getInternetConnectivityState(): InternetConnectivityState {
@@ -70,8 +83,14 @@ export async function checkInternetConnectivity(): Promise<void> {
 }
 
 if (typeof window !== "undefined") {
-  const handleNativeOffline = () => publishConnectivity("offline");
-  const handleNativeOnline = () => {
+  const handleNativeOffline = (event: Event) => {
+    if (publishingSyntheticNativeEvent) return;
+    event.stopImmediatePropagation();
+    publishConnectivity("offline");
+  };
+  const handleNativeOnline = (event: Event) => {
+    if (publishingSyntheticNativeEvent) return;
+    event.stopImmediatePropagation();
     publishConnectivity("checking");
     void checkInternetConnectivity();
   };
@@ -80,6 +99,8 @@ if (typeof window !== "undefined") {
     if (document.visibilityState === "visible") void checkInternetConnectivity();
   };
 
+  // Registered before React mounts, so raw browser connectivity events cannot
+  // overwrite the verified reachability state used by ERPApp.
   window.addEventListener("offline", handleNativeOffline);
   window.addEventListener("online", handleNativeOnline);
   window.addEventListener("focus", handleFocus);
