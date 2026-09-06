@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "convex/react";
 import { Bell, Boxes, CalendarClock, ClipboardList, Search, Truck, Users } from "lucide-react";
 import { api } from "../../convex/_generated/api";
@@ -6,6 +6,8 @@ import type { Id } from "../../convex/_generated/dataModel";
 import { usePermission } from "../lib/access";
 import type { WorkspaceRecordTarget } from "../workspace/WorkspaceRecordPage";
 import type { Page } from "./ERPApp";
+
+const NOTIFICATION_SEEN_STORAGE_PREFIX = "business-tech-erp.notifications.seen.v1";
 
 export function GlobalSearch({
   onNavigate,
@@ -17,6 +19,7 @@ export function GlobalSearch({
   const [value, setValue] = useState("");
   const [focused, setFocused] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [seenNotificationKeys, setSeenNotificationKeys] = useState<string[]>([]);
   const me = useQuery(api.employees.me);
   const canProducts = usePermission("view_products");
   const canCustomers = usePermission("view_customers");
@@ -29,8 +32,50 @@ export function GlobalSearch({
   const suppliers = useQuery(api.suppliers.list, canSuppliers && value.trim().length >= 2 ? {} : "skip") ?? [];
   const pendingOrders = useQuery(api.orderLifecycle.pendingNotifications, canOrders ? {} : "skip") ?? [];
   const pendingFollowUps = useQuery(api.customerFollowUps.list, canFollowUps ? { status: "pending", limit: 20 } : "skip") ?? [];
+  const lowStockProducts = useQuery(api.products.list, canProducts ? { lowStock: true } : "skip") ?? [];
   const normalized = value.trim().toLocaleLowerCase("ar-EG");
-  const notificationCount = pendingOrders.length + pendingFollowUps.length;
+
+  const notificationKeys = useMemo(() => [
+    ...pendingOrders.map(row => `order:${String(row.id)}:${row.createdAt}`),
+    ...pendingFollowUps.map(row => `follow-up:${String(row._id)}:${row.updatedAt}:${row.status}:${row.followUpDate}`),
+    ...lowStockProducts.map(row => `stock:${String(row._id)}:${row.stock}:${row.minStock}`),
+  ], [pendingOrders, pendingFollowUps, lowStockProducts]);
+  const notificationSignature = notificationKeys.join("|");
+  const seenNotificationSet = useMemo(() => new Set(seenNotificationKeys), [seenNotificationKeys]);
+  const unreadCount = notificationKeys.filter(key => !seenNotificationSet.has(key)).length;
+  const currentNotificationCount = notificationKeys.length;
+
+  useEffect(() => {
+    if (!me?.id) {
+      setSeenNotificationKeys([]);
+      return;
+    }
+    try {
+      const raw = window.localStorage.getItem(`${NOTIFICATION_SEEN_STORAGE_PREFIX}:${String(me.id)}`);
+      const parsed = raw ? JSON.parse(raw) : [];
+      setSeenNotificationKeys(Array.isArray(parsed) ? parsed.filter((key): key is string => typeof key === "string") : []);
+    } catch {
+      setSeenNotificationKeys([]);
+    }
+  }, [me?.id]);
+
+  const markCurrentNotificationsRead = () => {
+    const keys = [...notificationKeys];
+    setSeenNotificationKeys(keys);
+    if (!me?.id) return;
+    try {
+      window.localStorage.setItem(`${NOTIFICATION_SEEN_STORAGE_PREFIX}:${String(me.id)}`, JSON.stringify(keys));
+    } catch {
+      // Read state is best-effort when browser storage is unavailable.
+    }
+  };
+
+  useEffect(() => {
+    if (notificationsOpen) markCurrentNotificationsRead();
+    // notificationSignature intentionally retriggers while the notification center is open.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [notificationsOpen, notificationSignature]);
+
   const results = useMemo(() => [
     ...products.slice(0, 4).map(row => ({
       key: String(row._id),
@@ -110,26 +155,34 @@ export function GlobalSearch({
         )}
       </div>
 
-      {(canOrders || canFollowUps) && (
+      {(canOrders || canFollowUps || canProducts) && (
         <div className="relative shrink-0">
           <button
             type="button"
             data-testid="header-operational-notifications"
             className="relative rounded-xl border border-slate-200 bg-white p-2.5 text-slate-600 transition hover:bg-slate-50"
-            onClick={() => { setNotificationsOpen(open => !open); setFocused(false); }}
+            onClick={() => {
+              const nextOpen = !notificationsOpen;
+              setNotificationsOpen(nextOpen);
+              setFocused(false);
+              if (nextOpen) markCurrentNotificationsRead();
+            }}
             aria-expanded={notificationsOpen}
-            title="تنبيهات الطلبات والمتابعات"
+            title={unreadCount > 0 ? `${unreadCount} إشعار جديد` : "الإشعارات"}
           >
             <Bell className="h-4 w-4" />
-            {notificationCount > 0 && (
-              <span className="absolute -left-1 -top-1 grid h-5 min-w-5 place-items-center rounded-full bg-rose-600 px-1 text-[10px] font-black text-white">
-                {notificationCount > 99 ? "99+" : notificationCount}
+            {unreadCount > 0 && (
+              <span data-testid="header-notification-unread-count" className="absolute -left-1 -top-1 grid h-5 min-w-5 place-items-center rounded-full bg-rose-600 px-1 text-[10px] font-black text-white">
+                {unreadCount > 99 ? "99+" : unreadCount}
               </span>
             )}
           </button>
           {notificationsOpen && (
             <div data-testid="header-operational-notifications-menu" className="absolute left-0 top-[calc(100%+8px)] z-50 w-80 overflow-hidden rounded-2xl border border-slate-200 bg-white p-2 shadow-2xl">
-              <div className="px-2 pb-2 pt-1 text-xs font-black text-slate-500">تنبيهات التشغيل</div>
+              <div className="flex items-center justify-between px-2 pb-2 pt-1">
+                <span className="text-xs font-black text-slate-500">الإشعارات</span>
+                <span className="text-[10px] font-bold text-slate-400">تمت قراءة الظاهر</span>
+              </div>
               {canOrders && (
                 <button
                   type="button"
@@ -154,7 +207,19 @@ export function GlobalSearch({
                   {pendingFollowUps.length > 0 && <span className="badge badge-success">{pendingFollowUps.length}</span>}
                 </button>
               )}
-              {notificationCount === 0 && <p className="px-3 py-4 text-center text-sm text-slate-400">لا توجد تنبيهات تشغيلية مفتوحة.</p>}
+              {canProducts && (
+                <button
+                  type="button"
+                  className="flex w-full items-center gap-3 rounded-xl p-3 text-right hover:bg-violet-50"
+                  onMouseDown={event => event.preventDefault()}
+                  onClick={() => { onNavigate("inventory"); setNotificationsOpen(false); }}
+                >
+                  <span className="grid h-9 w-9 place-items-center rounded-xl bg-violet-50 text-violet-700"><Boxes className="h-4 w-4" /></span>
+                  <span className="min-w-0 flex-1"><strong className="block text-sm text-slate-800">تنبيهات المخزون</strong><small className="text-slate-500">{lowStockProducts.length} صنف عند أو تحت حد إعادة الطلب</small></span>
+                  {lowStockProducts.length > 0 && <span className="badge badge-warning">{lowStockProducts.length}</span>}
+                </button>
+              )}
+              {currentNotificationCount === 0 && <p className="px-3 py-4 text-center text-sm text-slate-400">لا توجد إشعارات حالية.</p>}
             </div>
           )}
         </div>
