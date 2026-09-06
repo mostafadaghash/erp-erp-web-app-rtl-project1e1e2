@@ -24,19 +24,21 @@ test("shipping workflow synchronizes the linked sales order lifecycle", async ()
   assert.match(deliveries, /applyOrderStatsChange/);
 });
 
-test("repair UI exposes the seven agreed commercial statuses including carrier rejection", async () => {
+test("repair UI exposes the eight agreed commercial statuses including technician receipt and rejection", async () => {
   const repairs = await readFile("src/components/RepairsPage.tsx", "utf8");
   for (const label of [
     "قيد الإنتظار",
+    "تم الإستلام من الفني",
     "جاري الصيانة",
     "ظهور مشكلة جديدة",
     "تم الإصلاح",
     "تم التسليم للعميل",
     "مرفوض من العميل",
-    "مرفوض من شركة الشحن",
+    "مرفوض من الفني",
   ]) {
     assert.match(repairs, new RegExp(label));
   }
+  assert.doesNotMatch(repairs, /مرفوض من شركة الشحن/);
   assert.match(repairs, /rejected_by_shipping/);
   assert.match(repairs, /repairs-summary-strip/);
 });

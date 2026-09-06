@@ -41,31 +41,31 @@ const isMoney = (value: number) =>
 
 const statusConfig: Record<RepairStatus, { label: string; badge: string; icon: LucideIcon }> = {
   received: { label: "قيد الإنتظار", badge: "badge-info", icon: Clock },
-  under_inspection: { label: "جاري الصيانة", badge: "badge-warning", icon: Wrench },
-  awaiting_approval: { label: "ظهور مشكلة جديدة", badge: "badge-danger", icon: AlertCircle },
+  under_inspection: { label: "تم الإستلام من الفني", badge: "badge-info", icon: CheckCircle },
   in_progress: { label: "جاري الصيانة", badge: "badge-warning", icon: Wrench },
+  awaiting_approval: { label: "ظهور مشكلة جديدة", badge: "badge-danger", icon: AlertCircle },
   ready: { label: "تم الإصلاح", badge: "badge-success", icon: CheckCircle },
   delivered: { label: "تم التسليم للعميل", badge: "badge-purple", icon: CheckCircle },
   cancelled: { label: "مرفوض من العميل", badge: "badge-danger", icon: AlertCircle },
-  rejected_by_shipping: { label: "مرفوض من شركة الشحن", badge: "badge-danger", icon: AlertCircle },
+  rejected_by_shipping: { label: "مرفوض من الفني", badge: "badge-danger", icon: AlertCircle },
 };
 
-type RepairFilter = "" | "received" | "repairing" | "awaiting_approval" | "ready" | "delivered" | "cancelled" | "rejected_by_shipping";
+type RepairFilter = "" | "received" | "under_inspection" | "in_progress" | "awaiting_approval" | "ready" | "delivered" | "cancelled" | "rejected_by_shipping";
 
 const repairFilterOptions: Array<{ value: RepairFilter; label: string }> = [
   { value: "", label: "الكل" },
   { value: "received", label: "قيد الإنتظار" },
-  { value: "repairing", label: "جاري الصيانة" },
+  { value: "under_inspection", label: "تم الإستلام من الفني" },
+  { value: "in_progress", label: "جاري الصيانة" },
   { value: "awaiting_approval", label: "ظهور مشكلة جديدة" },
   { value: "ready", label: "تم الإصلاح" },
   { value: "delivered", label: "تم التسليم للعميل" },
   { value: "cancelled", label: "مرفوض من العميل" },
-  { value: "rejected_by_shipping", label: "مرفوض من شركة الشحن" },
+  { value: "rejected_by_shipping", label: "مرفوض من الفني" },
 ];
 
 function matchesRepairFilter(status: RepairStatus, filter: RepairFilter) {
   if (!filter) return true;
-  if (filter === "repairing") return status === "under_inspection" || status === "in_progress";
   return status === filter;
 }
 
@@ -264,13 +264,13 @@ export function RepairsPage({ createRequestToken }: { createRequestToken?: numbe
   const transitionValidationReason = (() => {
     if (!transitionTarget || !transitionNext) return null;
     if (!isIsoDate(transitionForm.date)) return "اختر تاريخ عملية صالحًا";
-    if (transitionNext === "in_progress" && !transitionTarget.technicianName) return "عيّن فنيًا قبل بدء الإصلاح";
+    if ((transitionNext === "under_inspection" || transitionNext === "in_progress") && !transitionTarget.technicianName) return "عيّن فنيًا قبل استلام الجهاز أو بدء الإصلاح";
     if (transitionNext === "ready" && !transitionForm.diagnosis.trim()) return "أدخل التشخيص النهائي قبل اعتماد الجاهزية";
     if (transitionNext === "cancelled") {
       if (transitionTarget.deposit > 0) return "استرد العربون بالكامل قبل إلغاء الصيانة";
       if (!transitionForm.reason.trim()) return "أدخل سبب الإلغاء";
     }
-    if (transitionNext === "rejected_by_shipping" && !transitionForm.reason.trim()) return "أدخل سبب رفض شركة الشحن";
+    if (transitionNext === "rejected_by_shipping" && !transitionForm.reason.trim()) return "أدخل سبب رفض الفني";
     if (transitionNext === "delivered") {
       if (transitionTarget.remaining > 0) return "حصّل المبلغ المتبقي قبل تسليم الجهاز";
       const warrantyDays = Number(transitionForm.warrantyDays || 0);
@@ -329,12 +329,13 @@ export function RepairsPage({ createRequestToken }: { createRequestToken?: numbe
     if (!repairCounts) return value ? repairs.filter((r) => matchesRepairFilter(r.status, value)).length : repairs.length;
     if (!value) return repairCounts.total;
     if (value === "received") return repairCounts.pending;
-    if (value === "repairing") return repairCounts.in_progress;
+    if (value === "under_inspection") return repairCounts.technician_received;
+    if (value === "in_progress") return repairCounts.in_progress;
     if (value === "awaiting_approval") return repairCounts.new_issue;
     if (value === "ready") return repairCounts.repaired;
     if (value === "delivered") return repairCounts.delivered_to_customer;
     if (value === "cancelled") return repairCounts.rejected_by_customer;
-    return repairCounts.rejected_by_shipping;
+    return repairCounts.rejected_by_technician;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -601,12 +602,13 @@ export function RepairsPage({ createRequestToken }: { createRequestToken?: numbe
 
   const summaryItems = [
     { key: "pending", label: "قيد الإنتظار", value: repairCounts?.pending ?? 0, icon: Clock },
+    { key: "technician_received", label: "تم الإستلام من الفني", value: repairCounts?.technician_received ?? 0, icon: CheckCircle },
     { key: "in_progress", label: "جاري الصيانة", value: repairCounts?.in_progress ?? 0, icon: Wrench },
     { key: "new_issue", label: "ظهور مشكلة جديدة", value: repairCounts?.new_issue ?? 0, icon: AlertCircle },
     { key: "repaired", label: "تم الإصلاح", value: repairCounts?.repaired ?? 0, icon: CheckCircle },
     { key: "delivered", label: "تم التسليم للعميل", value: repairCounts?.delivered_to_customer ?? 0, icon: CheckCircle },
     { key: "customer_rejected", label: "مرفوض من العميل", value: repairCounts?.rejected_by_customer ?? 0, icon: AlertCircle },
-    { key: "shipping_rejected", label: "مرفوض من شركة الشحن", value: repairCounts?.rejected_by_shipping ?? 0, icon: AlertCircle },
+    { key: "technician_rejected", label: "مرفوض من الفني", value: repairCounts?.rejected_by_technician ?? 0, icon: AlertCircle },
   ];
 
   return (
@@ -615,7 +617,7 @@ export function RepairsPage({ createRequestToken }: { createRequestToken?: numbe
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <h1 className="flex items-center gap-2 text-2xl font-black text-slate-900"><Wrench className="h-6 w-6 text-indigo-600" /> أوامر الصيانة</h1>
-            <p className="mt-1 text-sm text-slate-500">دورة موحّدة من قيد الإنتظار حتى الإصلاح والتسليم أو الرفض، وتنعكس تلقائيًا على المتابعة والتقارير.</p>
+            <p className="mt-1 text-sm text-slate-500">دورة موحّدة من قيد الإنتظار حتى الإصلاح والتسليم أو الرفض، وتنعكس تلقائيًا على لوحة التشغيل والمتابعة والتقارير.</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             {canViewBranches && branches.length > 0 && (
@@ -630,7 +632,7 @@ export function RepairsPage({ createRequestToken }: { createRequestToken?: numbe
       </section>
 
       {!requiresBranchSelection && (
-        <section className="grid grid-cols-2 gap-2 md:grid-cols-4 xl:grid-cols-7" data-testid="repairs-summary-strip">
+        <section className="grid grid-cols-2 gap-2 md:grid-cols-4 xl:grid-cols-4" data-testid="repairs-summary-strip">
           {summaryItems.map((item) => {
             const Icon = item.icon;
             return <div key={item.key} className="flex min-h-20 items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5 shadow-sm"><div><p className="text-xl font-black text-slate-900">{item.value}</p><p className="mt-1 text-[11px] font-bold text-slate-500">{item.label}</p></div><div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-slate-50"><Icon className="h-4 w-4 text-indigo-600" /></div></div>;
@@ -758,7 +760,7 @@ export function RepairsPage({ createRequestToken }: { createRequestToken?: numbe
                 </section>
               </div>
               {detailTarget.status === "ready" && canEdit && <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900"><strong>تم الإصلاح فنيًا.</strong> يمكن تعديل القطع وأجرة الصيانة قبل التسليم.</div>}
-              {detailTarget.status === "rejected_by_shipping" && <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-900"><strong>مرفوض من شركة الشحن.</strong> راجع سبب الرفض في سجل الحالات، ثم أعده إلى «تم الإصلاح» عند جاهزيته لإعادة الشحن أو التسليم.</div>}
+              {detailTarget.status === "rejected_by_shipping" && <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-900"><strong>مرفوض من الفني.</strong> راجع سبب الرفض في سجل الحالات، ويمكن إعادة إسناد الجهاز لفني أو إعادته إلى مسار الصيانة.</div>}
               {detailTarget.trackingToken && (
                 <div className="mt-4 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-indigo-100 bg-indigo-50 p-3">
                   <div><p className="text-xs text-indigo-500">رمز التتبع</p><p className="font-mono text-xs font-black text-indigo-800">{detailTarget.trackingToken}</p></div>
@@ -771,7 +773,7 @@ export function RepairsPage({ createRequestToken }: { createRequestToken?: numbe
               )}
               <div className="mt-5 flex flex-wrap gap-2 border-t border-slate-200 pt-4">
                 {canEdit && !["delivered", "cancelled", "rejected_by_shipping"].includes(detailTarget.status) && <button className="btn-primary" data-testid="repair-work-edit-detail" onClick={() => setWorkTarget(detailTarget)}><Pencil className="h-4 w-4" /> تعديل العمل والقطع</button>}
-                {canEdit && ["received", "in_progress"].includes(detailTarget.status) && <button className="btn-secondary" onClick={() => openEdit(detailTarget)}>بيانات وفني</button>}
+                {canEdit && ["received", "under_inspection", "in_progress"].includes(detailTarget.status) && <button className="btn-secondary" onClick={() => openEdit(detailTarget)}>بيانات وفني</button>}
                 {canCollect && detailTarget.remaining > 0 && detailTarget.status !== "delivered" && detailTarget.status !== "cancelled" && <button className="btn-secondary" onClick={() => openCollection(detailTarget)}>تحصيل دفعة</button>}
                 {canRefund && detailTarget.deposit > 0 && <button className="btn-secondary" onClick={() => openRefund(detailTarget)}>استرداد مبلغ</button>}
                 <button className="btn-secondary" onClick={() => setHistoryTarget(detailTarget)}>السجل</button>
@@ -827,7 +829,7 @@ export function RepairsPage({ createRequestToken }: { createRequestToken?: numbe
               {(transitionNext === "ready" || transitionNext === "in_progress") && <label className="block"><span className="form-label">التشخيص {transitionNext === "ready" ? "*" : ""}</span><textarea rows={3} className="form-input" value={transitionForm.diagnosis} onChange={(event) => setTransitionForm({ ...transitionForm, diagnosis: event.target.value })} /></label>}
               {transitionNext === "ready" && <label className="block"><span className="form-label">اختبار الجودة</span><textarea rows={2} className="form-input" value={transitionForm.qualityCheckNotes} onChange={(event) => setTransitionForm({ ...transitionForm, qualityCheckNotes: event.target.value })} /></label>}
               {transitionNext === "delivered" && <label className="block"><span className="form-label">مدة الضمان بالأيام</span><input type="number" min="0" max="365" step="1" className="form-input" value={transitionForm.warrantyDays} onChange={(event) => setTransitionForm({ ...transitionForm, warrantyDays: event.target.value })} /></label>}
-              {(transitionNext === "cancelled" || transitionNext === "rejected_by_shipping") && <label className="block"><span className="form-label">{transitionNext === "cancelled" ? "سبب رفض العميل" : "سبب رفض شركة الشحن"} *</span><textarea rows={3} className="form-input" value={transitionForm.reason} onChange={(event) => setTransitionForm({ ...transitionForm, reason: event.target.value })} /></label>}
+              {(transitionNext === "cancelled" || transitionNext === "rejected_by_shipping") && <label className="block"><span className="form-label">{transitionNext === "cancelled" ? "سبب رفض العميل" : "سبب رفض الفني"} *</span><textarea rows={3} className="form-input" value={transitionForm.reason} onChange={(event) => setTransitionForm({ ...transitionForm, reason: event.target.value })} /></label>}
               {transitionValidationReason && <p role="alert" className="rounded-lg bg-amber-50 p-3 text-sm font-medium text-amber-800">{transitionValidationReason}</p>}
               <div className="flex gap-3"><button className="btn-primary flex-1" disabled={updatingId !== null || Boolean(transitionValidationReason)}>{updatingId ? "جارٍ الحفظ..." : "تأكيد الانتقال"}</button><button type="button" className="btn-secondary" disabled={updatingId !== null} onClick={() => { setTransitionTarget(null); setTransitionNext(null); }}>تراجع</button></div>
             </form>

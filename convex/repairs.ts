@@ -826,7 +826,7 @@ async function transitionRepair(
     throw new ConvexError("تم رفض الصيانة من العميل سابقًا بطلب مختلف");
   }
   if (repair.status === "rejected_by_shipping" && args.status === "rejected_by_shipping") {
-    throw new ConvexError("تم تسجيل رفض شركة الشحن سابقًا بطلب مختلف");
+    throw new ConvexError("تم تسجيل رفض الفني سابقًا بطلب مختلف");
   }
   if (!canTransition(REPAIR_TRANSITIONS, repair.status, args.status)) {
     throw new ConvexError(
@@ -836,8 +836,8 @@ async function transitionRepair(
   const nextDiagnosis = diagnosis ?? repair.diagnosis;
   const nextQualityCheckNotes =
     qualityCheckNotes ?? repair.qualityCheckNotes;
-  if (args.status === "in_progress" && !repair.technicianName) {
-    throw new ConvexError("يجب تعيين فني قبل بدء الإصلاح");
+  if ((args.status === "under_inspection" || args.status === "in_progress") && !repair.technicianName) {
+    throw new ConvexError("يجب تعيين فني قبل استلام الجهاز أو بدء الإصلاح");
   }
   if (args.status === "ready" && !nextDiagnosis) {
     throw new ConvexError("التشخيص مطلوب قبل اعتماد الصيانة جاهزة");
@@ -846,7 +846,7 @@ async function transitionRepair(
     throw new ConvexError("سبب الإلغاء مطلوب");
   }
   if (args.status === "rejected_by_shipping" && !reason) {
-    throw new ConvexError("سبب رفض شركة الشحن مطلوب");
+    throw new ConvexError("سبب رفض الفني مطلوب");
   }
   if (args.status === "cancelled" && repair.deposit > 0) {
     throw new ConvexError("يجب استرداد عربون الصيانة بالكامل قبل الإلغاء");
@@ -961,7 +961,7 @@ async function transitionRepair(
     diagnosisSnapshot: nextDiagnosis,
     technicianNameSnapshot: repair.technicianName,
     qualityCheckNotesSnapshot: nextQualityCheckNotes,
-    reason: args.status === "rejected_by_shipping" ? `شركة الشحن: ${reason}` : reason,
+    reason: args.status === "rejected_by_shipping" ? `الفني: ${reason}` : reason,
     idempotencyKey,
     requestFingerprint,
     changedAt: Date.now(),
@@ -1045,6 +1045,7 @@ export const getStats = query({
     const user = await requireModulePermission(ctx, "view_repairs", "repairs");
     const all = await ctx.db.query("repairs").collect();
     const repairs = filterByBranch(all, user);
+    const rejectedByTechnician = repairs.filter(r => r.status === "rejected_by_shipping").length;
     return {
       total: repairs.length,
       received: repairs.filter(r => r.status === "received").length,
@@ -1054,7 +1055,8 @@ export const getStats = query({
       ready: repairs.filter(r => r.status === "ready").length,
       delivered: repairs.filter(r => r.status === "delivered").length,
       cancelled: repairs.filter(r => r.status === "cancelled").length,
-      rejectedByShipping: repairs.filter(r => r.status === "rejected_by_shipping").length,
+      rejectedByTechnician,
+      rejectedByShipping: rejectedByTechnician,
     };
   },
 });

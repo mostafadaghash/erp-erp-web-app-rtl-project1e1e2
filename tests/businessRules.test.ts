@@ -41,10 +41,11 @@ test("repair and delivery state machines enforce terminal states", () => {
 
 test("repair transitions expose only approved next states", () => {
   assert.deepEqual(REPAIR_TRANSITIONS.received, ["under_inspection", "cancelled"]);
-  assert.deepEqual(REPAIR_TRANSITIONS.under_inspection, ["awaiting_approval", "in_progress", "cancelled"]);
-  assert.deepEqual(REPAIR_TRANSITIONS.awaiting_approval, ["in_progress", "cancelled"]);
-  assert.deepEqual(REPAIR_TRANSITIONS.in_progress, ["ready", "awaiting_approval", "cancelled"]);
-  assert.deepEqual(REPAIR_TRANSITIONS.ready, ["delivered", "in_progress", "cancelled", "rejected_by_shipping"]);
+  assert.deepEqual(REPAIR_TRANSITIONS.under_inspection, ["in_progress", "awaiting_approval", "cancelled", "rejected_by_shipping"]);
+  assert.deepEqual(REPAIR_TRANSITIONS.awaiting_approval, ["in_progress", "cancelled", "rejected_by_shipping"]);
+  assert.deepEqual(REPAIR_TRANSITIONS.in_progress, ["ready", "awaiting_approval", "cancelled", "rejected_by_shipping"]);
+  assert.deepEqual(REPAIR_TRANSITIONS.ready, ["delivered", "in_progress", "cancelled"]);
+  assert.deepEqual(REPAIR_TRANSITIONS.rejected_by_shipping, ["under_inspection", "in_progress", "cancelled"]);
   assert.deepEqual(REPAIR_TRANSITIONS.delivered, []);
   assert.deepEqual(REPAIR_TRANSITIONS.cancelled, []);
   assert.equal(isRepairStatus("ready"), true);

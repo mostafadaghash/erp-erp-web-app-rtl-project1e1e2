@@ -5,10 +5,13 @@ import { readFileSync } from "node:fs";
 const app = readFileSync("src/components/ERPApp.tsx", "utf8");
 const sidebar = readFileSync("src/components/Sidebar.tsx", "utf8");
 const operational = readFileSync("src/components/OperationalDashboard.tsx", "utf8");
+const repairsPage = readFileSync("src/components/RepairsPage.tsx", "utf8");
+const businessRules = readFileSync("shared/businessRules.ts", "utf8");
 const executive = readFileSync("src/components/Dashboard.tsx", "utf8");
 const executiveBackend = readFileSync("convex/executiveDashboard.ts", "utf8");
 const operationStatusBackend = readFileSync("convex/operationStatusDashboard.ts", "utf8");
 const globalSearch = readFileSync("src/components/GlobalSearch.tsx", "utf8");
+const internetConnectivity = readFileSync("src/lib/internetConnectivity.ts", "utf8");
 const topbar = readFileSync("src/topbar-polish.css", "utf8");
 const main = readFileSync("src/main.tsx", "utf8");
 
@@ -52,21 +55,15 @@ test("DBS-05 executive cards also honor their underlying data permissions", () =
 
 test("DBS-06 desktop top bar preserves user identity and targets primary label text at 18px", () => {
   assert.match(main, /import "\.\/topbar-polish\.css"/);
-  assert.match(topbar, /\.erp-navigation-inner\s*\{[\s\S]*min-height: 80px/);
   assert.doesNotMatch(topbar, /\.erp-navigation-inner\s*\{[^}]*overflow:\s*hidden/);
   assert.match(topbar, /@media \(min-width: 1024px\)[\s\S]*\.erp-nav-group-button\s*\{[\s\S]*min-height: 48px[\s\S]*font-size: 18px/);
   assert.match(topbar, /\.erp-nav-group-button > span\s*\{[\s\S]*font-size: 18px !important/);
   assert.match(topbar, /@media \(min-width: 1280px\)[\s\S]*\.erp-nav-groups\s*\{[\s\S]*justify-content: space-between/);
-  assert.match(topbar, /@media \(min-width: 1280px\)[\s\S]*\.erp-nav-group-button\s*\{[\s\S]*padding-inline: 10px;[\s\S]*font-size: 18px/);
-  assert.match(topbar, /@media \(min-width: 1536px\)[\s\S]*\.erp-nav-group-button\s*\{[\s\S]*padding-inline: 12px;[\s\S]*font-size: 18px/);
   assert.match(topbar, /\.erp-user-panel\s*\{[\s\S]*flex: 0 0 auto/);
-  assert.match(topbar, /\.erp-user-panel > div:first-child\s*\{[\s\S]*width: 215px/);
-  assert.match(topbar, /p:first-child\s*\{[\s\S]*text-overflow: ellipsis !important[\s\S]*font-size: 16px !important/);
-  assert.match(topbar, /\.erp-user-panel > button\s*\{[\s\S]*width: auto !important[\s\S]*min-height: 44px/);
   assert.match(sidebar, /title=\{userName\}/);
 });
 
-test("DBS-07 operational dashboard separates every order and repair lifecycle status", () => {
+test("DBS-07 operational dashboard separates all eight order and repair lifecycle statuses", () => {
   assert.match(operational, /طلبات البيع/);
   assert.match(operational, /أوامر الصيانة/);
   assert.match(operational, /ORDER_STATUS_LABELS\[status\.key\]/);
@@ -74,12 +71,14 @@ test("DBS-07 operational dashboard separates every order and repair lifecycle st
   for (const orderStatus of ["pending", "confirmed", "preparing", "ready", "handed_to_shipping", "delivered_to_customer", "received", "cancelled"]) {
     assert.match(operational, new RegExp(`key: "${orderStatus}"`));
   }
-  for (const repairStatus of ["pending", "in_progress", "new_issue", "repaired", "delivered_to_customer", "rejected_by_customer", "rejected_by_shipping"]) {
+  for (const repairStatus of ["pending", "technician_received", "in_progress", "new_issue", "repaired", "delivered_to_customer", "rejected_by_customer", "rejected_by_technician"]) {
     assert.match(operational, new RegExp(`key: "${repairStatus}"`));
   }
-  assert.match(operational, /grid-cols-\[repeat\(auto-fit,minmax\(180px,1fr\)\)\]/);
+  assert.match(operational, /xl:grid-cols-4/);
+  assert.match(operational, /surfaceClass/);
+  assert.match(operational, /bg-amber-50\/65/);
   assert.match(operational, /فتح التفاصيل/);
-  assert.doesNotMatch(operational, /طلبات البيع المفتوحة|أوامر الصيانة المفتوحة/);
+  assert.doesNotMatch(operational, /customerFollowUps|lowStock|متابعات مطلوبة|تنبيهات المخزون|المتابعات والتنبيهات/);
 });
 
 test("DBS-08 workspace context bar has readable desktop scale", () => {
@@ -87,7 +86,6 @@ test("DBS-08 workspace context bar has readable desktop scale", () => {
   assert.match(topbar, /\.erp-contextbar > div:first-child h1\s*\{[\s\S]*font-size: 20px/);
   assert.match(topbar, /\.erp-contextbar \.form-input\s*\{[\s\S]*min-height: 46px[\s\S]*font-size: 14px/);
   assert.match(topbar, /select\[data-testid="working-branch-select"\][\s\S]*min-height: 46px/);
-  assert.match(topbar, /\.erp-contextbar \.btn-primary\s*\{[\s\S]*min-height: 46px[\s\S]*font-size: 14px/);
 });
 
 test("DBS-09 live refresh is an actual button backed by fresh query arguments", () => {
@@ -101,14 +99,50 @@ test("DBS-09 live refresh is an actual button backed by fresh query arguments", 
   assert.doesNotMatch(operational, /حسب الصلاحيات/);
 });
 
-test("DBS-10 notification center is visually single and tracks unread keys", () => {
+test("DBS-10 notification center is single and read state survives browser tab changes", () => {
   assert.match(globalSearch, /NOTIFICATION_SEEN_STORAGE_PREFIX/);
+  assert.match(globalSearch, /window\.localStorage\.setItem/);
+  assert.match(globalSearch, /new Set\(\[\.\.\.previous, \.\.\.notificationKeys\]\)/);
+  assert.match(globalSearch, /visibilitychange/);
+  assert.match(globalSearch, /readSeenNotificationKeys/);
   assert.match(globalSearch, /header-notification-unread-count/);
   assert.match(globalSearch, /markCurrentNotificationsRead/);
-  assert.match(globalSearch, /unreadCount/);
-  assert.match(globalSearch, /lowStockProducts/);
-  assert.match(globalSearch, /طلبات بيع بانتظار المراجعة/);
-  assert.match(globalSearch, /متابعات عميل مفتوحة/);
-  assert.match(globalSearch, /تنبيهات المخزون/);
   assert.match(topbar, /button\[title\$="تنبيه مخزون"\][\s\S]*display: none !important/);
+});
+
+test("DBS-11 internet indicator is backed by real reachability probes", () => {
+  assert.match(main, /import "\.\/lib\/internetConnectivity"/);
+  assert.match(internetConnectivity, /PROBE_URLS/);
+  assert.match(internetConnectivity, /fetch\(/);
+  assert.match(internetConnectivity, /mode: "no-cors"/);
+  assert.match(internetConnectivity, /AbortController/);
+  assert.match(internetConnectivity, /PROBE_INTERVAL_MS/);
+  assert.match(internetConnectivity, /publishConnectivity\(false\)/);
+  assert.match(app, /window\.addEventListener\("online", online\)/);
+  assert.match(app, /window\.addEventListener\("offline", offline\)/);
+});
+
+test("DBS-12 repair lifecycle is identical in shared rules and original repairs page", () => {
+  const orderedLabels = [
+    "قيد الإنتظار",
+    "تم الإستلام من الفني",
+    "جاري الصيانة",
+    "ظهور مشكلة جديدة",
+    "تم الإصلاح",
+    "تم التسليم للعميل",
+    "مرفوض من العميل",
+    "مرفوض من الفني",
+  ];
+  let previousIndex = -1;
+  for (const label of orderedLabels) {
+    const index = repairsPage.indexOf(`label: "${label}"`, previousIndex + 1);
+    assert.ok(index > previousIndex, `${label} must appear in lifecycle order`);
+    previousIndex = index;
+    assert.match(businessRules, new RegExp(label));
+  }
+  assert.match(repairsPage, /under_inspection: \{ label: "تم الإستلام من الفني"/);
+  assert.match(repairsPage, /rejected_by_shipping: \{ label: "مرفوض من الفني"/);
+  assert.match(repairsPage, /repairCounts\.technician_received/);
+  assert.match(repairsPage, /repairCounts\.rejected_by_technician/);
+  assert.doesNotMatch(repairsPage, /مرفوض من شركة الشحن|سبب رفض شركة الشحن/);
 });

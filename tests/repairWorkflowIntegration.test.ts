@@ -278,21 +278,15 @@ test("RWF-06 details lock after the repair reaches ready", async () => {
   assert.deepEqual(await e.raw.run(async (ctx) => ctx.db.get(id)), before);
 });
 
-test("RWF-07 starting repair requires an assigned technician and rolls back", async () => {
+test("RWF-07 technician receipt requires an assigned technician and rolls back", async () => {
   const e = await fixture();
   const id = await createRepair(e, "rwf-07");
-  await e.admin.mutation(api.repairs.transitionStatus, {
-    id,
-    status: "under_inspection",
-    date: "2026-01-11",
-    requestId: "rwf-07-inspection",
-  });
   await assert.rejects(
     () => e.admin.mutation(api.repairs.transitionStatus, {
       id,
-      status: "in_progress",
-      date: "2026-01-12",
-      requestId: "rwf-07-start",
+      status: "under_inspection",
+      date: "2026-01-11",
+      requestId: "rwf-07-inspection",
     }),
     /تعيين فني/,
   );
@@ -300,8 +294,8 @@ test("RWF-07 starting repair requires an assigned technician and rolls back", as
     repair: await ctx.db.get(id),
     history: await ctx.db.query("repairStatusHistory").collect(),
   }));
-  assert.equal(state.repair?.status, "under_inspection");
-  assert.equal(state.history.length, 2);
+  assert.equal(state.repair?.status, "received");
+  assert.equal(state.history.length, 1);
 });
 
 test("RWF-08 starting repair posts one immutable status-history entry", async () => {
