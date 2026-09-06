@@ -48,11 +48,12 @@ test("DBS-05 executive cards also honor their underlying data permissions", () =
   assert.match(executiveBackend, /requirePermission\(ctx, "view_executive_dashboard"\)/);
 });
 
-test("DBS-06 desktop top bar preserves user identity and keeps primary navigation at 18px", () => {
+test("DBS-06 desktop top bar preserves user identity and targets primary label text at 18px", () => {
   assert.match(main, /import "\.\/topbar-polish\.css"/);
   assert.match(topbar, /\.erp-navigation-inner\s*\{[\s\S]*min-height: 80px/);
   assert.doesNotMatch(topbar, /\.erp-navigation-inner\s*\{[^}]*overflow:\s*hidden/);
   assert.match(topbar, /@media \(min-width: 1024px\)[\s\S]*\.erp-nav-group-button\s*\{[\s\S]*min-height: 48px[\s\S]*font-size: 18px/);
+  assert.match(topbar, /\.erp-nav-group-button > span\s*\{[\s\S]*font-size: 18px !important/);
   assert.match(topbar, /@media \(min-width: 1280px\)[\s\S]*\.erp-nav-groups\s*\{[\s\S]*justify-content: space-between/);
   assert.match(topbar, /@media \(min-width: 1280px\)[\s\S]*\.erp-nav-group-button\s*\{[\s\S]*padding-inline: 10px;[\s\S]*font-size: 18px/);
   assert.match(topbar, /@media \(min-width: 1536px\)[\s\S]*\.erp-nav-group-button\s*\{[\s\S]*padding-inline: 12px;[\s\S]*font-size: 18px/);
