@@ -218,9 +218,8 @@ export function GlobalSearch({
             data-testid="header-operational-notifications"
             className="relative rounded-xl border border-slate-200 bg-white p-2.5 text-slate-600 transition hover:bg-slate-50"
             onClick={() => {
-              const nextOpen = !notificationsOpen;
-              if (nextOpen) markCurrentNotificationsRead();
-              setNotificationsOpen(nextOpen);
+              markCurrentNotificationsRead();
+              setNotificationsOpen((open) => !open);
               setFocused(false);
             }}
             aria-expanded={notificationsOpen}
