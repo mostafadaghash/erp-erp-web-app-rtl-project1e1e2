@@ -54,6 +54,7 @@ test("DBS-06 desktop top bar preserves user identity and expands the primary nav
   assert.doesNotMatch(topbar, /\.erp-navigation-inner\s*\{[^}]*overflow:\s*hidden/);
   assert.match(topbar, /\.erp-nav-group-button\s*\{[\s\S]*min-height: 48px[\s\S]*font-size: 13px/);
   assert.match(topbar, /@media \(min-width: 1280px\)[\s\S]*\.erp-nav-groups\s*\{[\s\S]*justify-content: space-between/);
+  assert.match(topbar, /@media \(min-width: 1280px\)[\s\S]*\.erp-nav-group-button\s*\{[\s\S]*padding-inline: 10px;[\s\S]*font-size: 18px/);
   assert.match(topbar, /@media \(min-width: 1536px\)[\s\S]*\.erp-nav-group-button\s*\{[\s\S]*padding-inline: 12px;[\s\S]*font-size: 18px/);
   assert.match(topbar, /\.erp-user-panel\s*\{[\s\S]*flex: 0 0 auto/);
   assert.match(topbar, /\.erp-user-panel > div:first-child\s*\{[\s\S]*width: 215px/);
