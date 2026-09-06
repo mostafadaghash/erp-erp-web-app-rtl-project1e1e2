@@ -7,7 +7,20 @@ import { usePermission } from "../lib/access";
 import type { WorkspaceRecordTarget } from "../workspace/WorkspaceRecordPage";
 import type { Page } from "./ERPApp";
 
-const NOTIFICATION_SEEN_STORAGE_PREFIX = "business-tech-erp.notifications.seen.v1";
+const NOTIFICATION_SEEN_STORAGE_PREFIX = "business-tech-erp.notifications.seen.v2";
+const MAX_SEEN_NOTIFICATION_KEYS = 600;
+
+function readSeenNotificationKeys(storageKey: string): string[] {
+  try {
+    const raw = window.localStorage.getItem(storageKey);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed)
+      ? parsed.filter((key): key is string => typeof key === "string").slice(-MAX_SEEN_NOTIFICATION_KEYS)
+      : [];
+  } catch {
+    return [];
+  }
+}
 
 export function GlobalSearch({
   onNavigate,
@@ -20,6 +33,7 @@ export function GlobalSearch({
   const [focused, setFocused] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [seenNotificationKeys, setSeenNotificationKeys] = useState<string[]>([]);
+  const [seenStateUserId, setSeenStateUserId] = useState<string | null>(null);
   const me = useQuery(api.employees.me);
   const canProducts = usePermission("view_products");
   const canCustomers = usePermission("view_customers");
@@ -34,6 +48,8 @@ export function GlobalSearch({
   const pendingFollowUps = useQuery(api.customerFollowUps.list, canFollowUps ? { status: "pending", limit: 20 } : "skip") ?? [];
   const lowStockProducts = useQuery(api.products.list, canProducts ? { lowStock: true } : "skip") ?? [];
   const normalized = value.trim().toLocaleLowerCase("ar-EG");
+  const userId = me?.id ? String(me.id) : null;
+  const seenStorageKey = userId ? `${NOTIFICATION_SEEN_STORAGE_PREFIX}:${userId}` : null;
 
   const notificationKeys = useMemo(() => [
     ...pendingOrders.map(row => `order:${String(row.id)}:${row.createdAt}`),
@@ -42,39 +58,57 @@ export function GlobalSearch({
   ], [pendingOrders, pendingFollowUps, lowStockProducts]);
   const notificationSignature = notificationKeys.join("|");
   const seenNotificationSet = useMemo(() => new Set(seenNotificationKeys), [seenNotificationKeys]);
-  const unreadCount = notificationKeys.filter(key => !seenNotificationSet.has(key)).length;
+  const seenStateReady = Boolean(userId && seenStateUserId === userId);
+  const unreadCount = seenStateReady
+    ? notificationKeys.filter(key => !seenNotificationSet.has(key)).length
+    : 0;
   const currentNotificationCount = notificationKeys.length;
 
   useEffect(() => {
-    if (!me?.id) {
+    if (!userId || !seenStorageKey) {
       setSeenNotificationKeys([]);
+      setSeenStateUserId(null);
       return;
     }
-    try {
-      const raw = window.localStorage.getItem(`${NOTIFICATION_SEEN_STORAGE_PREFIX}:${String(me.id)}`);
-      const parsed = raw ? JSON.parse(raw) : [];
-      setSeenNotificationKeys(Array.isArray(parsed) ? parsed.filter((key): key is string => typeof key === "string") : []);
-    } catch {
-      setSeenNotificationKeys([]);
-    }
-  }, [me?.id]);
+    const syncReadState = () => {
+      setSeenNotificationKeys(readSeenNotificationKeys(seenStorageKey));
+      setSeenStateUserId(userId);
+    };
+    syncReadState();
+
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key === seenStorageKey) syncReadState();
+    };
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") syncReadState();
+    };
+    window.addEventListener("storage", handleStorage);
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => {
+      window.removeEventListener("storage", handleStorage);
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
+  }, [seenStorageKey, userId]);
 
   const markCurrentNotificationsRead = () => {
-    const keys = [...notificationKeys];
-    setSeenNotificationKeys(keys);
-    if (!me?.id) return;
-    try {
-      window.localStorage.setItem(`${NOTIFICATION_SEEN_STORAGE_PREFIX}:${String(me.id)}`, JSON.stringify(keys));
-    } catch {
-      // Read state is best-effort when browser storage is unavailable.
-    }
+    if (!userId || !seenStorageKey) return;
+    setSeenNotificationKeys((previous) => {
+      const merged = [...new Set([...previous, ...notificationKeys])].slice(-MAX_SEEN_NOTIFICATION_KEYS);
+      try {
+        window.localStorage.setItem(seenStorageKey, JSON.stringify(merged));
+      } catch {
+        // Read state remains valid for the current session when storage is unavailable.
+      }
+      return merged;
+    });
+    setSeenStateUserId(userId);
   };
 
   useEffect(() => {
-    if (notificationsOpen) markCurrentNotificationsRead();
+    if (notificationsOpen && seenStateReady) markCurrentNotificationsRead();
     // notificationSignature intentionally retriggers while the notification center is open.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [notificationsOpen, notificationSignature]);
+  }, [notificationsOpen, notificationSignature, seenStateReady]);
 
   const results = useMemo(() => [
     ...products.slice(0, 4).map(row => ({
@@ -165,7 +199,7 @@ export function GlobalSearch({
               const nextOpen = !notificationsOpen;
               setNotificationsOpen(nextOpen);
               setFocused(false);
-              if (nextOpen) markCurrentNotificationsRead();
+              if (nextOpen && seenStateReady) markCurrentNotificationsRead();
             }}
             aria-expanded={notificationsOpen}
             title={unreadCount > 0 ? `${unreadCount} إشعار جديد` : "الإشعارات"}
