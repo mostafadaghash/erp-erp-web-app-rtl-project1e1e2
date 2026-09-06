@@ -31,12 +31,13 @@ const emptyOrderCounts = (): Record<CanonicalOrderStatus, number> => ({
 
 const emptyRepairCounts = (): Record<RepairLifecycleStatus, number> => ({
   pending: 0,
+  technician_received: 0,
   in_progress: 0,
   new_issue: 0,
   repaired: 0,
   delivered_to_customer: 0,
   rejected_by_customer: 0,
-  rejected_by_shipping: 0,
+  rejected_by_technician: 0,
 });
 
 async function loadOrders(
