@@ -48,16 +48,16 @@ test("DBS-05 executive cards also honor their underlying data permissions", () =
   assert.match(executiveBackend, /requirePermission\(ctx, "view_executive_dashboard"\)/);
 });
 
-test("DBS-06 desktop top bar preserves user identity and logout without horizontal clipping", () => {
+test("DBS-06 desktop top bar preserves user identity and expands the primary navigation", () => {
   assert.match(main, /import "\.\/topbar-polish\.css"/);
   assert.match(topbar, /\.erp-navigation-inner\s*\{[\s\S]*min-height: 80px/);
   assert.doesNotMatch(topbar, /\.erp-navigation-inner\s*\{[^}]*overflow:\s*hidden/);
   assert.match(topbar, /\.erp-nav-group-button\s*\{[\s\S]*min-height: 48px[\s\S]*font-size: 13px/);
-  assert.match(topbar, /@media \(min-width: 1536px\)[\s\S]*\.erp-nav-group-button\s*\{[\s\S]*font-size: 14\.5px/);
+  assert.match(topbar, /@media \(min-width: 1280px\)[\s\S]*\.erp-nav-groups\s*\{[\s\S]*justify-content: space-between/);
+  assert.match(topbar, /@media \(min-width: 1536px\)[\s\S]*\.erp-nav-group-button\s*\{[\s\S]*font-size: 16px/);
   assert.match(topbar, /\.erp-user-panel\s*\{[\s\S]*flex: 0 0 auto/);
   assert.match(topbar, /\.erp-user-panel > div:first-child\s*\{[\s\S]*width: 215px/);
   assert.match(topbar, /p:first-child\s*\{[\s\S]*text-overflow: ellipsis !important[\s\S]*font-size: 16px !important/);
-  assert.match(topbar, /@media \(min-width: 1536px\)[\s\S]*p:first-child\s*\{[\s\S]*font-size: 17px !important/);
   assert.match(topbar, /\.erp-user-panel > button\s*\{[\s\S]*width: auto !important[\s\S]*min-height: 44px/);
   assert.match(sidebar, /title=\{userName\}/);
 });
