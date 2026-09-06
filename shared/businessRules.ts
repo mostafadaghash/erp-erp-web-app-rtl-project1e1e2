@@ -104,9 +104,9 @@ export const SHIPMENT_TRANSITIONS: Readonly<Record<ShipmentStatus, readonly Ship
 };
 
 /**
- * الحالات الخام للصيانة تحتفظ بالقيم التاريخية، بينما الواجهة وبقية النظام
- * يعرضان دورة العمل التجارية المتفق عليها. `rejected_by_shipping` حالة تشغيلية
- * جديدة لأنها تختلف عن رفض العميل ولا تعكس قيد الصيانة ماليًا.
+ * دورة الصيانة التشغيلية الموحدة.
+ * الاسم الخام `rejected_by_shipping` باقٍ فقط للتوافق مع البيانات السابقة،
+ * لكنه يمثل تشغيليًا «مرفوض من الفني» في كل واجهات النظام.
  */
 export const REPAIR_STATUSES = [
   "received",
@@ -121,21 +121,23 @@ export const REPAIR_STATUSES = [
 export type RepairStatus = (typeof REPAIR_STATUSES)[number];
 export type RepairLifecycleStatus =
   | "pending"
+  | "technician_received"
   | "in_progress"
   | "new_issue"
   | "repaired"
   | "delivered_to_customer"
   | "rejected_by_customer"
-  | "rejected_by_shipping";
+  | "rejected_by_technician";
 
 export const REPAIR_STATUS_LABELS: Readonly<Record<RepairLifecycleStatus, string>> = {
   pending: "قيد الإنتظار",
+  technician_received: "تم الإستلام من الفني",
   in_progress: "جاري الصيانة",
   new_issue: "ظهور مشكلة جديدة",
   repaired: "تم الإصلاح",
   delivered_to_customer: "تم التسليم للعميل",
   rejected_by_customer: "مرفوض من العميل",
-  rejected_by_shipping: "مرفوض من شركة الشحن",
+  rejected_by_technician: "مرفوض من الفني",
 };
 
 export function isRepairStatus(value: string): value is RepairStatus {
@@ -144,12 +146,13 @@ export function isRepairStatus(value: string): value is RepairStatus {
 
 export function normalizeRepairStatus(value: string): RepairLifecycleStatus | null {
   if (value === "received") return "pending";
-  if (value === "under_inspection" || value === "in_progress") return "in_progress";
+  if (value === "under_inspection") return "technician_received";
+  if (value === "in_progress") return "in_progress";
   if (value === "awaiting_approval") return "new_issue";
   if (value === "ready") return "repaired";
   if (value === "delivered") return "delivered_to_customer";
   if (value === "cancelled") return "rejected_by_customer";
-  if (value === "rejected_by_shipping") return "rejected_by_shipping";
+  if (value === "rejected_by_shipping") return "rejected_by_technician";
   return null;
 }
 
@@ -160,11 +163,11 @@ export function repairStatusLabel(value: string): string {
 
 export const REPAIR_TRANSITIONS: Readonly<Record<RepairStatus, readonly RepairStatus[]>> = {
   received: ["under_inspection", "cancelled"],
-  under_inspection: ["awaiting_approval", "in_progress", "cancelled"],
-  awaiting_approval: ["in_progress", "cancelled"],
-  in_progress: ["ready", "awaiting_approval", "cancelled"],
-  ready: ["delivered", "in_progress", "cancelled", "rejected_by_shipping"],
-  rejected_by_shipping: ["ready", "cancelled"],
+  under_inspection: ["in_progress", "awaiting_approval", "cancelled", "rejected_by_shipping"],
+  awaiting_approval: ["in_progress", "cancelled", "rejected_by_shipping"],
+  in_progress: ["ready", "awaiting_approval", "cancelled", "rejected_by_shipping"],
+  ready: ["delivered", "in_progress", "cancelled"],
+  rejected_by_shipping: ["under_inspection", "in_progress", "cancelled"],
   delivered: [],
   cancelled: [],
 };
