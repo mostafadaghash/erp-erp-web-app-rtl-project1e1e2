@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "convex/react";
 import { Bell, Boxes, CalendarClock, ClipboardList, Search, Truck, Users } from "lucide-react";
 import { api } from "../../convex/_generated/api";
@@ -7,18 +7,29 @@ import { usePermission } from "../lib/access";
 import type { WorkspaceRecordTarget } from "../workspace/WorkspaceRecordPage";
 import type { Page } from "./ERPApp";
 
-const NOTIFICATION_SEEN_STORAGE_PREFIX = "business-tech-erp.notifications.seen.v2";
+const NOTIFICATION_SEEN_STORAGE_PREFIX = "business-tech-erp.notifications.seen.v3";
 const MAX_SEEN_NOTIFICATION_KEYS = 600;
+
+function normalizeSeenNotificationKeys(keys: readonly string[]): string[] {
+  return [...new Set(keys.filter((key): key is string => typeof key === "string"))]
+    .slice(-MAX_SEEN_NOTIFICATION_KEYS);
+}
 
 function readSeenNotificationKeys(storageKey: string): string[] {
   try {
     const raw = window.localStorage.getItem(storageKey);
     const parsed = raw ? JSON.parse(raw) : [];
-    return Array.isArray(parsed)
-      ? parsed.filter((key): key is string => typeof key === "string").slice(-MAX_SEEN_NOTIFICATION_KEYS)
-      : [];
+    return Array.isArray(parsed) ? normalizeSeenNotificationKeys(parsed) : [];
   } catch {
     return [];
+  }
+}
+
+function writeSeenNotificationKeys(storageKey: string, keys: readonly string[]) {
+  try {
+    window.localStorage.setItem(storageKey, JSON.stringify(normalizeSeenNotificationKeys(keys)));
+  } catch {
+    // The in-memory state still keeps the acknowledgement for this session.
   }
 }
 
@@ -34,6 +45,7 @@ export function GlobalSearch({
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [seenNotificationKeys, setSeenNotificationKeys] = useState<string[]>([]);
   const [seenStateUserId, setSeenStateUserId] = useState<string | null>(null);
+  const seenUserIdRef = useRef<string | null>(null);
   const me = useQuery(api.employees.me);
   const canProducts = usePermission("view_products");
   const canCustomers = usePermission("view_customers");
@@ -56,7 +68,6 @@ export function GlobalSearch({
     ...pendingFollowUps.map(row => `follow-up:${String(row._id)}:${row.updatedAt}:${row.status}:${row.followUpDate}`),
     ...lowStockProducts.map(row => `stock:${String(row._id)}:${row.stock}:${row.minStock}`),
   ], [pendingOrders, pendingFollowUps, lowStockProducts]);
-  const notificationSignature = notificationKeys.join("|");
   const seenNotificationSet = useMemo(() => new Set(seenNotificationKeys), [seenNotificationKeys]);
   const seenStateReady = Boolean(userId && seenStateUserId === userId);
   const unreadCount = seenStateReady
@@ -66,14 +77,28 @@ export function GlobalSearch({
 
   useEffect(() => {
     if (!userId || !seenStorageKey) {
+      seenUserIdRef.current = null;
       setSeenNotificationKeys([]);
       setSeenStateUserId(null);
       return;
     }
+
     const syncReadState = () => {
-      setSeenNotificationKeys(readSeenNotificationKeys(seenStorageKey));
+      const stored = readSeenNotificationKeys(seenStorageKey);
+      setSeenNotificationKeys((previous) => {
+        const previousBelongsToCurrentUser =
+          seenUserIdRef.current === null || seenUserIdRef.current === userId;
+        const merged = normalizeSeenNotificationKeys([
+          ...(previousBelongsToCurrentUser ? previous : []),
+          ...stored,
+        ]);
+        writeSeenNotificationKeys(seenStorageKey, merged);
+        return merged;
+      });
+      seenUserIdRef.current = userId;
       setSeenStateUserId(userId);
     };
+
     syncReadState();
 
     const handleStorage = (event: StorageEvent) => {
@@ -91,24 +116,21 @@ export function GlobalSearch({
   }, [seenStorageKey, userId]);
 
   const markCurrentNotificationsRead = () => {
-    if (!userId || !seenStorageKey) return;
+    const snapshot = [...notificationKeys];
     setSeenNotificationKeys((previous) => {
-      const merged = [...new Set([...previous, ...notificationKeys])].slice(-MAX_SEEN_NOTIFICATION_KEYS);
-      try {
-        window.localStorage.setItem(seenStorageKey, JSON.stringify(merged));
-      } catch {
-        // Read state remains valid for the current session when storage is unavailable.
-      }
+      const sameUser = !userId || seenUserIdRef.current === null || seenUserIdRef.current === userId;
+      const merged = normalizeSeenNotificationKeys([
+        ...(sameUser ? previous : []),
+        ...snapshot,
+      ]);
+      if (seenStorageKey) writeSeenNotificationKeys(seenStorageKey, merged);
       return merged;
     });
-    setSeenStateUserId(userId);
+    if (userId) {
+      seenUserIdRef.current = userId;
+      setSeenStateUserId(userId);
+    }
   };
-
-  useEffect(() => {
-    if (notificationsOpen && seenStateReady) markCurrentNotificationsRead();
-    // notificationSignature intentionally retriggers while the notification center is open.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [notificationsOpen, notificationSignature, seenStateReady]);
 
   const results = useMemo(() => [
     ...products.slice(0, 4).map(row => ({
@@ -197,9 +219,9 @@ export function GlobalSearch({
             className="relative rounded-xl border border-slate-200 bg-white p-2.5 text-slate-600 transition hover:bg-slate-50"
             onClick={() => {
               const nextOpen = !notificationsOpen;
+              if (nextOpen) markCurrentNotificationsRead();
               setNotificationsOpen(nextOpen);
               setFocused(false);
-              if (nextOpen && seenStateReady) markCurrentNotificationsRead();
             }}
             aria-expanded={notificationsOpen}
             title={unreadCount > 0 ? `${unreadCount} إشعار جديد` : "الإشعارات"}

@@ -1,17 +1,53 @@
-const PROBE_INTERVAL_MS = 6000;
-const PROBE_TIMEOUT_MS = 3500;
+const PROBE_INTERVAL_MS = 5000;
+const PROBE_TIMEOUT_MS = 2500;
+const CONNECTIVITY_EVENT = "business-tech-erp:internet-connectivity";
 const PROBE_URLS = [
   "https://www.gstatic.com/generate_204",
   "https://1.1.1.1/cdn-cgi/trace",
 ] as const;
 
-let lastReportedState: boolean | null = null;
-let probeInFlight = false;
+export type InternetConnectivityState = "checking" | "online" | "offline";
 
-function publishConnectivity(online: boolean) {
-  if (lastReportedState === online) return;
-  lastReportedState = online;
-  window.dispatchEvent(new Event(online ? "online" : "offline"));
+let currentState: InternetConnectivityState = "checking";
+let probeInFlight = false;
+let publishingSyntheticNativeEvent = false;
+
+function dispatchAuthoritativeNativeEvent(state: "online" | "offline") {
+  publishingSyntheticNativeEvent = true;
+  try {
+    window.dispatchEvent(new Event(state));
+  } finally {
+    publishingSyntheticNativeEvent = false;
+  }
+}
+
+function publishConnectivity(nextState: InternetConnectivityState) {
+  if (currentState === nextState) return;
+  currentState = nextState;
+  window.dispatchEvent(new CustomEvent<InternetConnectivityState>(CONNECTIVITY_EVENT, {
+    detail: nextState,
+  }));
+  if (nextState === "online" || nextState === "offline") {
+    dispatchAuthoritativeNativeEvent(nextState);
+  }
+}
+
+export function getInternetConnectivityState(): InternetConnectivityState {
+  return currentState;
+}
+
+export function subscribeInternetConnectivity(
+  listener: (state: InternetConnectivityState) => void,
+): () => void {
+  const handleConnectivity = (event: Event) => {
+    const detail = (event as CustomEvent<InternetConnectivityState>).detail;
+    if (detail === "checking" || detail === "online" || detail === "offline") {
+      listener(detail);
+    }
+  };
+  window.addEventListener(CONNECTIVITY_EVENT, handleConnectivity);
+  listener(currentState);
+  return () => window.removeEventListener(CONNECTIVITY_EVENT, handleConnectivity);
 }
 
 async function probeUrl(url: string): Promise<void> {
@@ -30,25 +66,46 @@ async function probeUrl(url: string): Promise<void> {
   }
 }
 
-async function checkInternetConnectivity() {
+export async function checkInternetConnectivity(): Promise<void> {
   if (probeInFlight) return;
+  if (!navigator.onLine) {
+    publishConnectivity("offline");
+    return;
+  }
+
   probeInFlight = true;
   try {
-    if (!navigator.onLine) {
-      publishConnectivity(false);
-      return;
-    }
     const results = await Promise.allSettled(PROBE_URLS.map((url) => probeUrl(url)));
-    publishConnectivity(results.some((result) => result.status === "fulfilled"));
+    publishConnectivity(results.some((result) => result.status === "fulfilled") ? "online" : "offline");
   } finally {
     probeInFlight = false;
   }
 }
 
 if (typeof window !== "undefined") {
+  const handleNativeOffline = (event: Event) => {
+    if (publishingSyntheticNativeEvent) return;
+    event.stopImmediatePropagation();
+    publishConnectivity("offline");
+  };
+  const handleNativeOnline = (event: Event) => {
+    if (publishingSyntheticNativeEvent) return;
+    event.stopImmediatePropagation();
+    publishConnectivity("checking");
+    void checkInternetConnectivity();
+  };
+  const handleFocus = () => void checkInternetConnectivity();
+  const handleVisibility = () => {
+    if (document.visibilityState === "visible") void checkInternetConnectivity();
+  };
+
+  // Registered before React mounts, so raw browser connectivity events cannot
+  // overwrite the verified reachability state used by ERPApp.
+  window.addEventListener("offline", handleNativeOffline);
+  window.addEventListener("online", handleNativeOnline);
+  window.addEventListener("focus", handleFocus);
+  document.addEventListener("visibilitychange", handleVisibility);
+
   void checkInternetConnectivity();
   window.setInterval(() => void checkInternetConnectivity(), PROBE_INTERVAL_MS);
-  document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "visible") void checkInternetConnectivity();
-  });
 }
