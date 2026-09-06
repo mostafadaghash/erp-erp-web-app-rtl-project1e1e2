@@ -7,6 +7,8 @@ const sidebar = readFileSync("src/components/Sidebar.tsx", "utf8");
 const operational = readFileSync("src/components/OperationalDashboard.tsx", "utf8");
 const executive = readFileSync("src/components/Dashboard.tsx", "utf8");
 const executiveBackend = readFileSync("convex/executiveDashboard.ts", "utf8");
+const operationStatusBackend = readFileSync("convex/operationStatusDashboard.ts", "utf8");
+const globalSearch = readFileSync("src/components/GlobalSearch.tsx", "utf8");
 const topbar = readFileSync("src/topbar-polish.css", "utf8");
 const main = readFileSync("src/main.tsx", "utf8");
 
@@ -64,11 +66,20 @@ test("DBS-06 desktop top bar preserves user identity and targets primary label t
   assert.match(sidebar, /title=\{userName\}/);
 });
 
-test("DBS-07 operational cards auto-fit instead of leaving a broken second row on wide screens", () => {
-  assert.match(operational, /grid-cols-\[repeat\(auto-fit,minmax\(230px,1fr\)\)\]/);
+test("DBS-07 operational dashboard separates every order and repair lifecycle status", () => {
+  assert.match(operational, /طلبات البيع/);
+  assert.match(operational, /أوامر الصيانة/);
+  assert.match(operational, /ORDER_STATUS_LABELS\[status\.key\]/);
+  assert.match(operational, /REPAIR_STATUS_LABELS\[status\.key\]/);
+  for (const orderStatus of ["pending", "confirmed", "preparing", "ready", "handed_to_shipping", "delivered_to_customer", "received", "cancelled"]) {
+    assert.match(operational, new RegExp(`key: "${orderStatus}"`));
+  }
+  for (const repairStatus of ["pending", "in_progress", "new_issue", "repaired", "delivered_to_customer", "rejected_by_customer", "rejected_by_shipping"]) {
+    assert.match(operational, new RegExp(`key: "${repairStatus}"`));
+  }
+  assert.match(operational, /grid-cols-\[repeat\(auto-fit,minmax\(180px,1fr\)\)\]/);
   assert.match(operational, /فتح التفاصيل/);
-  assert.match(operational, /min-h-\[158px\]/);
-  assert.doesNotMatch(operational, /xl:grid-cols-4/);
+  assert.doesNotMatch(operational, /طلبات البيع المفتوحة|أوامر الصيانة المفتوحة/);
 });
 
 test("DBS-08 workspace context bar has readable desktop scale", () => {
@@ -77,4 +88,27 @@ test("DBS-08 workspace context bar has readable desktop scale", () => {
   assert.match(topbar, /\.erp-contextbar \.form-input\s*\{[\s\S]*min-height: 46px[\s\S]*font-size: 14px/);
   assert.match(topbar, /select\[data-testid="working-branch-select"\][\s\S]*min-height: 46px/);
   assert.match(topbar, /\.erp-contextbar \.btn-primary\s*\{[\s\S]*min-height: 46px[\s\S]*font-size: 14px/);
+});
+
+test("DBS-09 live refresh is an actual button backed by fresh query arguments", () => {
+  assert.match(operational, /data-testid="operational-dashboard-refresh"/);
+  assert.match(operational, /onClick=\{requestRefresh\}/);
+  assert.match(operational, /setRefreshToken\(Date\.now\(\)\)/);
+  assert.match(operational, /orderCounts,[\s\S]*\{ refreshToken \}/);
+  assert.match(operational, /repairCounts,[\s\S]*\{ refreshToken \}/);
+  assert.match(operationStatusBackend, /orderCounts = query\([\s\S]*refreshToken: v\.optional\(v\.number\(\)\)/);
+  assert.match(operationStatusBackend, /repairCounts = query\([\s\S]*refreshToken: v\.optional\(v\.number\(\)\)/);
+  assert.doesNotMatch(operational, /حسب الصلاحيات/);
+});
+
+test("DBS-10 notification center is visually single and tracks unread keys", () => {
+  assert.match(globalSearch, /NOTIFICATION_SEEN_STORAGE_PREFIX/);
+  assert.match(globalSearch, /header-notification-unread-count/);
+  assert.match(globalSearch, /markCurrentNotificationsRead/);
+  assert.match(globalSearch, /unreadCount/);
+  assert.match(globalSearch, /lowStockProducts/);
+  assert.match(globalSearch, /طلبات بيع بانتظار المراجعة/);
+  assert.match(globalSearch, /متابعات عميل مفتوحة/);
+  assert.match(globalSearch, /تنبيهات المخزون/);
+  assert.match(topbar, /button\[title\$="تنبيه مخزون"\][\s\S]*display: none !important/);
 });

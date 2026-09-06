@@ -148,6 +148,11 @@
     padding: 11px;
   }
 
+  /* The unified notification center inside GlobalSearch owns stock alerts too. */
+  .erp-contextbar > div:last-child > button[title$="تنبيه مخزون"] {
+    display: none !important;
+  }
+
   .erp-contextbar > div:last-child > span {
     min-height: 44px;
     padding-inline: 12px;

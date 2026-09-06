@@ -111,7 +111,10 @@ function accessibleBranch(user: AuthUser, requested?: Id<"branches">) {
 }
 
 export const orderCounts = query({
-  args: { branchId: v.optional(v.id("branches")) },
+  args: {
+    branchId: v.optional(v.id("branches")),
+    refreshToken: v.optional(v.number()),
+  },
   handler: async (ctx, args) => {
     const user = await requireModulePermission(ctx, "view_orders", "orders");
     const branchId = accessibleBranch(user, args.branchId);
@@ -121,7 +124,10 @@ export const orderCounts = query({
 });
 
 export const repairCounts = query({
-  args: { branchId: v.optional(v.id("branches")) },
+  args: {
+    branchId: v.optional(v.id("branches")),
+    refreshToken: v.optional(v.number()),
+  },
   handler: async (ctx, args) => {
     const user = await requireModulePermission(ctx, "view_repairs", "repairs");
     const branchId = accessibleBranch(user, args.branchId);
