@@ -66,6 +66,100 @@ jobs:
         if: always()
         run: npm run release:preflight
 
+  backend-verify:
+    name: backend-verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: erp_backend_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d erp_backend_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - name: Runtime version guard
+        run: |
+          test "$(node --version)" = "v24.21.0"
+          test "$(npm --version)" = "11.19.0"
+      - run: npm ci --ignore-scripts
+      - name: Dependency audit
+        run: npm audit --audit-level=low
+      - name: Backend secret and security scan
+        run: node scripts/backend-security-check.mjs
+      - name: Backend typecheck
+        run: npm run backend:typecheck
+      - name: Backend unit tests
+        run: npm run backend:test
+      - name: Transaction helper unit tests
+        run: node --import tsx --test server/tests/transaction-helper.test.ts
+      - name: PostgreSQL transaction integration tests
+        env:
+          ERP_TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/erp_backend_ci
+        run: node --import tsx --test server/tests/transaction-helper.integration.test.ts
+      - name: Backend build
+        run: npm run backend:build
+      - name: PostgreSQL health/readiness and graceful shutdown smoke
+        shell: bash
+        env:
+          NODE_ENV: test
+          ERP_LOG_LEVEL: info
+          ERP_BACKEND_HOST: 127.0.0.1
+          ERP_BACKEND_PORT: '8787'
+          ERP_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/erp_backend_ci
+          ERP_SHUTDOWN_TIMEOUT_MS: '5000'
+        run: |
+          set -euo pipefail
+          node dist-server/main.js >backend-ci.log 2>&1 &
+          pid=$!
+
+          cleanup() {
+            if kill -0 "$pid" 2>/dev/null; then
+              kill -TERM "$pid" || true
+              wait "$pid" || true
+            fi
+          }
+          trap cleanup EXIT
+
+          started=0
+          for _ in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8787/health >health.json; then
+              started=1
+              break
+            fi
+            sleep 1
+          done
+          test "$started" = "1"
+
+          curl -fsS http://127.0.0.1:8787/ready >ready.json
+          node -e "const fs=require('fs'); const h=JSON.parse(fs.readFileSync('health.json')); if(h.status!=='ok'||!h.requestId) process.exit(1); const r=JSON.parse(fs.readFileSync('ready.json')); if(r.status!=='ready'||r.checks?.database!=='up'||!r.requestId) process.exit(1)"
+
+          kill -TERM "$pid"
+          wait "$pid"
+          trap - EXIT
+
+          grep -q 'backend shutdown completed' backend-ci.log
+      - name: Upload backend smoke log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-ci-log
+          path: backend-ci.log
+          if-no-files-found: warn
+          retention-days: 1
+
   browser-contract:
     name: browser-contract
     runs-on: ubuntu-latest
@@ -88,15 +182,17 @@ jobs:
 
   release-gate:
     name: release-gate
-    needs: [verify, browser-contract]
+    needs: [verify, backend-verify, browser-contract]
     if: ${{ always() }}
     runs-on: ubuntu-latest
     steps:
-      - name: Require successful verification and browser contract
+      - name: Require successful legacy, backend, and browser verification
         env:
           VERIFY_RESULT: ${{ needs.verify.result }}
+          BACKEND_VERIFY_RESULT: ${{ needs.backend-verify.result }}
           BROWSER_CONTRACT_RESULT: ${{ needs.browser-contract.result }}
         run: |
           test "$VERIFY_RESULT" = "success"
+          test "$BACKEND_VERIFY_RESULT" = "success"
           test "$BROWSER_CONTRACT_RESULT" = "success"
           echo "CI release gate passed."
