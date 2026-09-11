@@ -6,6 +6,7 @@
 **Source branch:** `agent/local-server-edition`  
 **Frozen source SHA:** `b6db4010953a3ecf96c8e8244c1fc5b5b8562516`  
 **Target branch:** `agent/postgres-v1.7-core`  
+**Validation PR:** `#183`  
 **Architecture source of truth:** `Business-Tech-ERP-Architecture-Baseline-v1.7-Final.docx`  
 **Execution source of truth:** `Business-Tech-ERP-Master-Implementation-Plan-v1.0.md`
 
@@ -25,11 +26,20 @@ No Business Schema DDL, new business backend, module cutover, main merge, or Con
 - No production deployment or production data change was performed.
 - GitHub remote state is deterministic: the branch started from the exact frozen commit. A developer-machine working tree is not used as the source of this freeze.
 
-## 3. Baseline CI evidence on the frozen SHA
+## 3. Baseline and Phase 01 CI evidence
 
-GitHub Actions run `33982265835` completed successfully for the frozen SHA.
+Baseline GitHub Actions run `33982265835` completed successfully for the frozen source SHA.
 
-Successful gates recorded on that exact SHA:
+During Phase 01 validation, npm later reported a new high-severity advisory:
+
+- package: `js-yaml`
+- advisory: `GHSA-2883-xcg3-v3hh`
+- vulnerable range: `>=4.0.0 <4.3.2`
+- dependency chain: project → `eslint 9.37.0` → `js-yaml ^4.1.0` → locked `js-yaml 4.3.1`
+
+The root cause was resolved with the minimum compatible dependency-tree change: `package-lock.json` now resolves `js-yaml` to patched version `4.3.2`. No `--force`, audit suppression, broad dependency upgrade, or direct `js-yaml` application dependency was introduced.
+
+Validation commit `35463a7df5173302c4fa42b30c406407c312abaa` passed GitHub Actions run `34607422133` with all of the following successful on the same SHA:
 
 - Dependency audit
 - TypeScript typecheck
@@ -41,7 +51,7 @@ Successful gates recorded on that exact SHA:
 - Browser contract / Playwright discovery
 - Release gate
 
-This establishes the regression baseline before PostgreSQL Core changes.
+The final Phase 01 documentation commit must also pass the same CI gate before closure becomes effective.
 
 ## 4. Current runtime and dependency snapshot
 
@@ -158,7 +168,7 @@ Confirmed execution boundaries:
 - No destructive migration was created.
 - No dual-write path was introduced.
 
-## 11. Phase 01 gate status before closing commit
+## 11. Phase 01 gate status
 
 - [x] Target branch created from exact frozen SHA.
 - [x] Frozen source commit verified.
@@ -169,12 +179,14 @@ Confirmed execution boundaries:
 - [x] Target tree sequencing documented.
 - [x] No Production changes.
 - [x] Freeze report committed.
-- [ ] PR CI successful on the Phase 01 closing commit.
+- [x] Security advisory root cause identified and patched with minimum compatible lockfile change.
+- [x] PR CI successful on validation commit `35463a7df5173302c4fa42b30c406407c312abaa`.
+- [ ] CI successful on this final Phase 01 documentation commit.
 
-Phase 01 must remain `IN_PROGRESS` until the last check is completed.
+**Closure rule:** Phase 01 becomes `CLOSED` automatically when CI succeeds on this exact documentation commit. Until then it remains `VERIFYING`.
 
 ## 12. Next action
 
-Open a PR against `agent/local-server-edition` for validation only and require CI success on the Phase 01 closing commit.
+After the final documentation commit CI is green, update the official Master Implementation Plan with Phase 01 `CLOSED`, the final SHA, PR `#183`, test results, rollback note, and set the execution pointer to **PHASE 02 — Toolchain & Backend Scaffold**.
 
-No Phase 02 implementation begins before that gate is green.
+Do not create PostgreSQL Business DDL or start module cutover as part of Phase 01.
