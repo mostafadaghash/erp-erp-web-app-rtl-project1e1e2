@@ -11,9 +11,10 @@ const CORE_TABLES = ["companies","company_phones","company_settings","branches",
 const COUNTERPARTY_TABLES = ["counterparties","counterparty_roles","customer_profiles","supplier_profiles","customer_ledger_entries","supplier_ledger_entries"];
 const PRODUCT_TABLES = ["product_categories","products","product_variants","units","product_units","variant_barcodes","attributes","attribute_values","product_attributes","variant_attribute_values","price_lists","price_list_items","reorder_levels"];
 const INVENTORY_TABLES = ["serial_numbers","batches","inventory_movements","inventory_movement_lines","inventory_line_serials","inventory_line_batches","inventory_stock_positions","variant_warehouse_cost_projection","batch_stock_positions","stock_reservations","stock_transfers","stock_transfer_lines","stocktake_sessions","stocktake_lines","stocktake_line_serials","stocktake_line_batches","inventory_adjustments","inventory_adjustment_lines","inventory_adjustment_line_serials","inventory_adjustment_line_batches"];
-const TARGET_TABLES = ["product_categories","products","product_variants","units","product_units","variant_barcodes","attributes","attribute_values","product_attributes","variant_attribute_values","price_lists","price_list_items","reorder_levels"];
+const SALES_TABLES = ["sales_quotes","sales_quote_lines","sales_orders","sales_order_lines","sales_order_status_history","sales_order_shipping_details","sales_order_deliveries","sales_order_delivery_lines","sales_invoices","sales_invoice_lines","sales_returns","sales_return_lines"];
+const TARGET_TABLES = PRODUCT_TABLES;
 const EXPECTED_COLUMNS = {"product_categories":[["id","uuid",true],["name","text",true],["parent_id","uuid",false],["is_active","boolean",true]],"products":[["id","uuid",true],["name","text",true],["category_id","uuid",true],["product_type","text",true],["base_unit_id","uuid",true],["tracking_serial","boolean",true],["tracking_batch","boolean",true],["tracking_expiry","boolean",true],["is_active","boolean",true],["created_at","timestamp with time zone",true],["updated_at","timestamp with time zone",true]],"product_variants":[["id","uuid",true],["product_id","uuid",true],["name","text",true],["sku","text",false],["is_default","boolean",true],["combination_signature","text",true],["minimum_selling_price","numeric(18,4)",false],["is_active","boolean",true],["created_at","timestamp with time zone",true],["updated_at","timestamp with time zone",true]],"units":[["id","uuid",true],["name","text",true],["symbol","text",true],["allows_fraction","boolean",true],["is_active","boolean",true]],"product_units":[["id","uuid",true],["product_id","uuid",true],["unit_id","uuid",true],["conversion_to_base","numeric(18,6)",true],["is_sellable","boolean",true],["is_purchasable","boolean",true]],"variant_barcodes":[["id","uuid",true],["variant_id","uuid",true],["product_unit_id","uuid",true],["barcode","text",true],["is_primary","boolean",true]],"attributes":[["id","uuid",true],["name","text",true],["attribute_type","text",true],["usage_type","text",true],["is_active","boolean",true]],"attribute_values":[["id","uuid",true],["attribute_id","uuid",true],["value","text",true],["sort_order","integer",true]],"product_attributes":[["product_id","uuid",true],["attribute_id","uuid",true]],"variant_attribute_values":[["variant_id","uuid",true],["attribute_value_id","uuid",true]],"price_lists":[["id","uuid",true],["name","text",true],["is_active","boolean",true],["created_at","timestamp with time zone",true],["updated_at","timestamp with time zone",true]],"price_list_items":[["price_list_id","uuid",true],["variant_id","uuid",true],["product_unit_id","uuid",true],["price","numeric(18,4)",true],["updated_at","timestamp with time zone",true]],"reorder_levels":[["variant_id","uuid",true],["warehouse_id","uuid",true],["minimum_quantity","numeric(18,6)",true]]};
-const MIGRATIONS = ["0001","0002","0003","0004","0005"];
+const MIGRATIONS = ["0001","0002","0003","0004","0005","0006"];
 
 async function withClient(fn) {
   const client = new Client({ connectionString: databaseUrl });
@@ -23,6 +24,8 @@ async function withClient(fn) {
 
 async function cleanup() {
   await withClient(async (client) => {
+    await client.query("DROP VIEW IF EXISTS public.sales_returnable_quantities_v");
+    for (const table of [...SALES_TABLES].reverse()) await client.query(`DROP TABLE IF EXISTS public.${table}`);
     for (const table of [...INVENTORY_TABLES].reverse()) await client.query(`DROP TABLE IF EXISTS public.${table}`);
     for (const table of [...PRODUCT_TABLES].reverse()) await client.query(`DROP TABLE IF EXISTS public.${table}`);
     for (const table of [...COUNTERPARTY_TABLES].reverse()) await client.query(`DROP TABLE IF EXISTS public.${table}`);
@@ -91,11 +94,11 @@ test("03.C Product Catalog schema remains canonical after later schema migration
       assert.equal(baseUnitAlias.rows[0].has_is_base, false);
       assert.equal(baseUnitAlias.rows[0].has_base_unit_id, true);
 
-      const futureDomain = await client.query("SELECT to_regclass('public.sales_quotes') IS NULL AS absent");
-      assert.equal(futureDomain.rows[0].absent, true, "03.E Sales must not start during 03.D");
+      const futureDomain = await client.query("SELECT to_regclass('public.purchase_invoices') IS NULL AS absent");
+      assert.equal(futureDomain.rows[0].absent, true, "03.F Purchasing must not start during 03.E");
 
       const history = await client.query("SELECT version, name, checksum FROM schema_migrations ORDER BY version");
-      assert.equal(history.rowCount, 5);
+      assert.equal(history.rowCount, 6);
       const target = history.rows.find((row) => row.version === "0004");
       assert.equal(target?.name, "product_catalog");
       assert.match(target?.checksum ?? "", /^[0-9a-f]{64}$/);
