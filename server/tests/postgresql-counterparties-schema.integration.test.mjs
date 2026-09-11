@@ -38,6 +38,22 @@ const COUNTERPARTY_TABLES = [
   "supplier_ledger_entries",
 ];
 
+const PRODUCT_TABLES = [
+  "product_categories",
+  "products",
+  "product_variants",
+  "units",
+  "product_units",
+  "variant_barcodes",
+  "attributes",
+  "attribute_values",
+  "product_attributes",
+  "variant_attribute_values",
+  "price_lists",
+  "price_list_items",
+  "reorder_levels",
+];
+
 const EXPECTED_COLUMNS = {
   counterparties: [
     ["id", "uuid", true],
@@ -101,6 +117,9 @@ async function withClient(fn) {
 
 async function cleanup() {
   await withClient(async (client) => {
+    for (const table of [...PRODUCT_TABLES].reverse()) {
+      await client.query(`DROP TABLE IF EXISTS public.${table}`);
+    }
     for (const table of [...COUNTERPARTY_TABLES].reverse()) {
       await client.query(`DROP TABLE IF EXISTS public.${table}`);
     }
@@ -112,13 +131,13 @@ async function cleanup() {
   });
 }
 
-test("03.B creates only the canonical Counterparties schema shape", async (t) => {
+test("03.B Counterparties schema remains canonical after later schema migrations", async (t) => {
   if (!databaseUrl) return t.skip("ERP_TEST_DATABASE_URL is not configured");
 
   await cleanup();
   try {
     const first = await runMigrations({ databaseUrl });
-    assert.deepEqual(first.applied, ["0001", "0002", "0003"]);
+    assert.deepEqual(first.applied, ["0001", "0002", "0003", "0004"]);
     assert.deepEqual(first.skipped, []);
 
     await withClient(async (client) => {
@@ -188,14 +207,14 @@ test("03.B creates only the canonical Counterparties schema shape", async (t) =>
       assert.equal(indexes.rows[0].count, 0, "03.07 indexes must remain deferred");
 
       const futureDomain = await client.query(
-        "SELECT to_regclass('public.product_categories') IS NULL AS absent",
+        "SELECT to_regclass('public.serial_numbers') IS NULL AS absent",
       );
-      assert.equal(futureDomain.rows[0].absent, true, "03.C must not start during 03.B");
+      assert.equal(futureDomain.rows[0].absent, true, "03.D must not start during 03.C");
 
       const history = await client.query(
         "SELECT version, name, checksum FROM schema_migrations ORDER BY version",
       );
-      assert.equal(history.rowCount, 3);
+      assert.equal(history.rowCount, 4);
       assert.equal(history.rows[2].version, "0003");
       assert.equal(history.rows[2].name, "counterparties");
       assert.match(history.rows[2].checksum, /^[0-9a-f]{64}$/);
@@ -203,11 +222,11 @@ test("03.B creates only the canonical Counterparties schema shape", async (t) =>
 
     const second = await runMigrations({ databaseUrl });
     assert.deepEqual(second.applied, []);
-    assert.deepEqual(second.skipped, ["0001", "0002", "0003"]);
+    assert.deepEqual(second.skipped, ["0001", "0002", "0003", "0004"]);
 
     const verification = await runMigrations({ databaseUrl, verifyOnly: true });
     assert.deepEqual(verification.applied, []);
-    assert.deepEqual(verification.skipped, ["0001", "0002", "0003"]);
+    assert.deepEqual(verification.skipped, ["0001", "0002", "0003", "0004"]);
   } finally {
     await cleanup();
   }
