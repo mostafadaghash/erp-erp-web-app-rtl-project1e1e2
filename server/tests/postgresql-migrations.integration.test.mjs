@@ -20,7 +20,7 @@ const SALES_TABLES = [
   "sales_order_delivery_lines", "sales_invoices", "sales_invoice_lines", "sales_returns",
   "sales_return_lines",
 ];
-
+const PURCHASING_TABLES = ["purchase_invoices","purchase_invoice_lines","purchase_returns","purchase_return_lines","tax_codes"];
 const BUSINESS_TABLES = [
   "companies", "company_phones", "company_settings", "branches", "branch_settings",
   "warehouses", "users", "auth_sessions", "roles", "permissions", "role_permissions",
@@ -37,8 +37,7 @@ const BUSINESS_TABLES = [
   "stock_transfers", "stock_transfer_lines", "stocktake_sessions", "stocktake_lines",
   "stocktake_line_serials", "stocktake_line_batches", "inventory_adjustments",
   "inventory_adjustment_lines", "inventory_adjustment_line_serials",
-  "inventory_adjustment_line_batches",
-  ...SALES_TABLES,
+  "inventory_adjustment_line_batches", ...SALES_TABLES, ...PURCHASING_TABLES,
 ];
 
 const MIGRATIONS = [
@@ -48,6 +47,7 @@ const MIGRATIONS = [
   { version: "0004", name: "product_catalog", transactional: true },
   { version: "0005", name: "inventory", transactional: true },
   { version: "0006", name: "sales", transactional: true },
+  { version: "0007", name: "purchasing_tax", transactional: true },
 ];
 
 async function withClient(fn) {
@@ -58,11 +58,10 @@ async function withClient(fn) {
 
 async function cleanup() {
   await withClient(async (client) => {
+    await client.query("DROP VIEW IF EXISTS public.purchase_returnable_quantities_v");
     await client.query("DROP VIEW IF EXISTS public.sales_returnable_quantities_v");
     await client.query("DROP TABLE IF EXISTS public.migration_transaction_probe");
-    for (const table of [...BUSINESS_TABLES].reverse()) {
-      await client.query(`DROP TABLE IF EXISTS public.${table}`);
-    }
+    for (const table of [...BUSINESS_TABLES].reverse()) await client.query(`DROP TABLE IF EXISTS public.${table}`);
     await client.query("DROP TABLE IF EXISTS public.schema_migrations");
     await client.query("DROP EXTENSION IF EXISTS pg_trgm");
   });
@@ -71,10 +70,7 @@ async function cleanup() {
 test("migration definitions have deterministic versioned pairs", async () => {
   const definitions = await loadMigrationDefinitions(DEFAULT_MIGRATIONS_DIR);
   assert.equal(definitions.length, MIGRATIONS.length);
-  assert.deepEqual(
-    definitions.map(({ version, name, transactional }) => ({ version, name, transactional })),
-    MIGRATIONS,
-  );
+  assert.deepEqual(definitions.map(({ version, name, transactional }) => ({ version, name, transactional })), MIGRATIONS);
   for (const definition of definitions) assert.match(definition.checksum, /^[0-9a-f]{64}$/);
 });
 
@@ -86,42 +82,24 @@ test("fresh apply, idempotent rerun, verification, and checksum drift protection
     const first = await runMigrations({ databaseUrl });
     assert.deepEqual(first.applied, versions);
     assert.deepEqual(first.skipped, []);
-
     await withClient(async (client) => {
-      const history = await client.query(
-        "SELECT version, name, checksum FROM schema_migrations ORDER BY version",
-      );
+      const history = await client.query("SELECT version, name, checksum FROM schema_migrations ORDER BY version");
       assert.equal(history.rowCount, MIGRATIONS.length);
-      assert.deepEqual(
-        history.rows.map((row) => [row.version, row.name]),
-        MIGRATIONS.map(({ version, name }) => [version, name]),
-      );
+      assert.deepEqual(history.rows.map((row) => [row.version, row.name]), MIGRATIONS.map(({ version, name }) => [version, name]));
       for (const row of history.rows) assert.match(row.checksum, /^[0-9a-f]{64}$/);
-
-      const extension = await client.query(
-        "SELECT count(*)::int AS count FROM pg_extension WHERE extname = 'pg_trgm'",
-      );
+      const extension = await client.query("SELECT count(*)::int AS count FROM pg_extension WHERE extname = 'pg_trgm'");
       assert.equal(extension.rows[0].count, 1);
     });
-
     const second = await runMigrations({ databaseUrl });
     assert.deepEqual(second.applied, []);
     assert.deepEqual(second.skipped, versions);
-
     const verification = await runMigrations({ databaseUrl, verifyOnly: true });
     assert.deepEqual(verification.applied, []);
     assert.deepEqual(verification.skipped, versions);
-
     await withClient(async (client) => {
-      await client.query(
-        "UPDATE schema_migrations SET checksum = $1 WHERE version = '0006'",
-        ["0".repeat(64)],
-      );
+      await client.query("UPDATE schema_migrations SET checksum = $1 WHERE version = '0007'", ["0".repeat(64)]);
     });
-    await assert.rejects(
-      () => runMigrations({ databaseUrl, verifyOnly: true }),
-      /checksum drift detected/,
-    );
+    await assert.rejects(() => runMigrations({ databaseUrl, verifyOnly: true }), /checksum drift detected/);
   } finally {
     await cleanup();
   }
@@ -129,41 +107,24 @@ test("fresh apply, idempotent rerun, verification, and checksum drift protection
 
 test("failed transactional migration rolls back DDL and does not record success", async (t) => {
   if (!databaseUrl) return t.skip("ERP_TEST_DATABASE_URL is not configured");
-
   const dir = await mkdtemp(join(tmpdir(), "erp-migration-failure-"));
   const meta = {
     version: "0001",
     name: "transaction_rollback_probe",
     transactional: true,
     preconditionSql: "SELECT true AS ok;",
-    verificationSql:
-      "SELECT to_regclass('public.migration_transaction_probe') IS NOT NULL AS ok;",
+    verificationSql: "SELECT to_regclass('public.migration_transaction_probe') IS NOT NULL AS ok;",
     recovery: "Transactional failure must roll back automatically.",
   };
-  await writeFile(
-    join(dir, "0001_transaction_rollback_probe.meta.json"),
-    `${JSON.stringify(meta, null, 2)}\n`,
-  );
-  await writeFile(
-    join(dir, "0001_transaction_rollback_probe.sql"),
-    "CREATE TABLE migration_transaction_probe (id integer);\nSELECT 1 / 0;\n",
-  );
-
+  await writeFile(join(dir, "0001_transaction_rollback_probe.meta.json"), `${JSON.stringify(meta, null, 2)}\n`);
+  await writeFile(join(dir, "0001_transaction_rollback_probe.sql"), "CREATE TABLE migration_transaction_probe (id integer);\nSELECT 1 / 0;\n");
   await cleanup();
   try {
-    await assert.rejects(
-      () => runMigrations({ databaseUrl, migrationsDir: dir }),
-      /division by zero/,
-    );
+    await assert.rejects(() => runMigrations({ databaseUrl, migrationsDir: dir }), /division by zero/);
     await withClient(async (client) => {
-      const probe = await client.query(
-        "SELECT to_regclass('public.migration_transaction_probe') IS NULL AS rolled_back",
-      );
+      const probe = await client.query("SELECT to_regclass('public.migration_transaction_probe') IS NULL AS rolled_back");
       assert.equal(probe.rows[0].rolled_back, true);
-
-      const history = await client.query(
-        "SELECT count(*)::int AS count FROM schema_migrations",
-      );
+      const history = await client.query("SELECT count(*)::int AS count FROM schema_migrations");
       assert.equal(history.rows[0].count, 0);
     });
   } finally {
