@@ -1,0 +1,8 @@
+{
+  "version": "0001",
+  "name": "postgresql_extensions",
+  "transactional": true,
+  "preconditionSql": "SELECT EXISTS (SELECT 1 FROM pg_available_extensions WHERE name = 'pg_trgm') AS ok;",
+  "verificationSql": "SELECT EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'pg_trgm') AS ok;",
+  "recovery": "If application fails, the transaction rolls back automatically. After successful application, do not edit or drop the extension ad hoc; any required correction must be a new reviewed forward migration after checking dependent approved objects."
+}
