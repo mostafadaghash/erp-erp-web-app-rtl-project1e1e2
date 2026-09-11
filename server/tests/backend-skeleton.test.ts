@@ -42,7 +42,9 @@ test('configuration is validated before the backend becomes ready', async () => 
     databaseFactory: () => createFakeDatabase(),
   })
 
-  await assert.rejects(app.ready())
+  await assert.rejects(async () => {
+    await app.ready()
+  })
   await app.close().catch(() => undefined)
 })
 
