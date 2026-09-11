@@ -14,6 +14,13 @@ import {
 const { Client } = pg;
 const databaseUrl = process.env.ERP_TEST_DATABASE_URL;
 
+const SALES_TABLES = [
+  "sales_quotes", "sales_quote_lines", "sales_orders", "sales_order_lines",
+  "sales_order_status_history", "sales_order_shipping_details", "sales_order_deliveries",
+  "sales_order_delivery_lines", "sales_invoices", "sales_invoice_lines", "sales_returns",
+  "sales_return_lines",
+];
+
 const BUSINESS_TABLES = [
   "companies", "company_phones", "company_settings", "branches", "branch_settings",
   "warehouses", "users", "auth_sessions", "roles", "permissions", "role_permissions",
@@ -31,6 +38,7 @@ const BUSINESS_TABLES = [
   "stocktake_line_serials", "stocktake_line_batches", "inventory_adjustments",
   "inventory_adjustment_lines", "inventory_adjustment_line_serials",
   "inventory_adjustment_line_batches",
+  ...SALES_TABLES,
 ];
 
 const MIGRATIONS = [
@@ -39,6 +47,7 @@ const MIGRATIONS = [
   { version: "0003", name: "counterparties", transactional: true },
   { version: "0004", name: "product_catalog", transactional: true },
   { version: "0005", name: "inventory", transactional: true },
+  { version: "0006", name: "sales", transactional: true },
 ];
 
 async function withClient(fn) {
@@ -49,6 +58,7 @@ async function withClient(fn) {
 
 async function cleanup() {
   await withClient(async (client) => {
+    await client.query("DROP VIEW IF EXISTS public.sales_returnable_quantities_v");
     await client.query("DROP TABLE IF EXISTS public.migration_transaction_probe");
     for (const table of [...BUSINESS_TABLES].reverse()) {
       await client.query(`DROP TABLE IF EXISTS public.${table}`);
@@ -104,7 +114,7 @@ test("fresh apply, idempotent rerun, verification, and checksum drift protection
 
     await withClient(async (client) => {
       await client.query(
-        "UPDATE schema_migrations SET checksum = $1 WHERE version = '0005'",
+        "UPDATE schema_migrations SET checksum = $1 WHERE version = '0006'",
         ["0".repeat(64)],
       );
     });
