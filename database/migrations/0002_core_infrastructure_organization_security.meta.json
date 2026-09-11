@@ -1,0 +1,8 @@
+{
+  "version": "0002",
+  "name": "core_infrastructure_organization_security",
+  "transactional": true,
+  "preconditionSql": "SELECT NOT EXISTS (SELECT 1 FROM (VALUES ('companies'), ('company_phones'), ('company_settings'), ('branches'), ('branch_settings'), ('warehouses'), ('users'), ('auth_sessions'), ('roles'), ('permissions'), ('role_permissions'), ('user_permission_overrides'), ('user_branch_access'), ('document_sequences'), ('idempotency_keys'), ('posting_batches'), ('audit_logs'), ('outbox_events'), ('document_tombstones')) AS expected(relation_name) WHERE to_regclass('public.' || relation_name) IS NOT NULL) AS ok;",
+  "verificationSql": "SELECT (SELECT count(*) FROM (VALUES ('companies'), ('company_phones'), ('company_settings'), ('branches'), ('branch_settings'), ('warehouses'), ('users'), ('auth_sessions'), ('roles'), ('permissions'), ('role_permissions'), ('user_permission_overrides'), ('user_branch_access'), ('document_sequences'), ('idempotency_keys'), ('posting_batches'), ('audit_logs'), ('outbox_events'), ('document_tombstones')) AS expected(relation_name) WHERE to_regclass('public.' || relation_name) IS NOT NULL) = 19 AS ok;",
+  "recovery": "This migration is transactional. Any failure rolls back all 03.A relation creation and the migration-history insert. After successful application, do not edit or drop these relations ad hoc; corrections must be new reviewed forward migrations. Primary/foreign/unique/check/generated/deferred constraints remain intentionally deferred to 03.06, and indexes remain intentionally deferred to 03.07."
+}

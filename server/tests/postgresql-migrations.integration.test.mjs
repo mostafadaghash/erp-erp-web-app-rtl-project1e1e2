@@ -14,6 +14,28 @@ import {
 const { Client } = pg;
 const databaseUrl = process.env.ERP_TEST_DATABASE_URL;
 
+const CORE_TABLES = [
+  "companies",
+  "company_phones",
+  "company_settings",
+  "branches",
+  "branch_settings",
+  "warehouses",
+  "users",
+  "auth_sessions",
+  "roles",
+  "permissions",
+  "role_permissions",
+  "user_permission_overrides",
+  "user_branch_access",
+  "document_sequences",
+  "idempotency_keys",
+  "posting_batches",
+  "audit_logs",
+  "outbox_events",
+  "document_tombstones",
+];
+
 async function withClient(fn) {
   const client = new Client({ connectionString: databaseUrl });
   await client.connect();
@@ -27,6 +49,9 @@ async function withClient(fn) {
 async function cleanup() {
   await withClient(async (client) => {
     await client.query("DROP TABLE IF EXISTS public.migration_transaction_probe");
+    for (const table of [...CORE_TABLES].reverse()) {
+      await client.query(`DROP TABLE IF EXISTS public.${table}`);
+    }
     await client.query("DROP TABLE IF EXISTS public.schema_migrations");
     await client.query("DROP EXTENSION IF EXISTS pg_trgm");
   });
@@ -34,11 +59,17 @@ async function cleanup() {
 
 test("migration definitions have deterministic versioned pairs", async () => {
   const definitions = await loadMigrationDefinitions(DEFAULT_MIGRATIONS_DIR);
-  assert.equal(definitions.length, 1);
-  assert.equal(definitions[0].version, "0001");
-  assert.equal(definitions[0].name, "postgresql_extensions");
-  assert.equal(definitions[0].transactional, true);
-  assert.match(definitions[0].checksum, /^[0-9a-f]{64}$/);
+  assert.equal(definitions.length, 2);
+  assert.deepEqual(
+    definitions.map(({ version, name, transactional }) => ({ version, name, transactional })),
+    [
+      { version: "0001", name: "postgresql_extensions", transactional: true },
+      { version: "0002", name: "core_infrastructure_organization_security", transactional: true },
+    ],
+  );
+  for (const definition of definitions) {
+    assert.match(definition.checksum, /^[0-9a-f]{64}$/);
+  }
 });
 
 test("fresh apply, idempotent rerun, verification, and checksum drift protection work on PostgreSQL 17", async (t) => {
@@ -47,17 +78,21 @@ test("fresh apply, idempotent rerun, verification, and checksum drift protection
   await cleanup();
   try {
     const first = await runMigrations({ databaseUrl });
-    assert.deepEqual(first.applied, ["0001"]);
+    assert.deepEqual(first.applied, ["0001", "0002"]);
     assert.deepEqual(first.skipped, []);
 
     await withClient(async (client) => {
       const history = await client.query(
         "SELECT version, name, checksum FROM schema_migrations ORDER BY version",
       );
-      assert.equal(history.rowCount, 1);
+      assert.equal(history.rowCount, 2);
       assert.equal(history.rows[0].version, "0001");
       assert.equal(history.rows[0].name, "postgresql_extensions");
-      assert.match(history.rows[0].checksum, /^[0-9a-f]{64}$/);
+      assert.equal(history.rows[1].version, "0002");
+      assert.equal(history.rows[1].name, "core_infrastructure_organization_security");
+      for (const row of history.rows) {
+        assert.match(row.checksum, /^[0-9a-f]{64}$/);
+      }
 
       const extension = await client.query(
         "SELECT count(*)::int AS count FROM pg_extension WHERE extname = 'pg_trgm'",
@@ -67,15 +102,15 @@ test("fresh apply, idempotent rerun, verification, and checksum drift protection
 
     const second = await runMigrations({ databaseUrl });
     assert.deepEqual(second.applied, []);
-    assert.deepEqual(second.skipped, ["0001"]);
+    assert.deepEqual(second.skipped, ["0001", "0002"]);
 
     const verification = await runMigrations({ databaseUrl, verifyOnly: true });
     assert.deepEqual(verification.applied, []);
-    assert.deepEqual(verification.skipped, ["0001"]);
+    assert.deepEqual(verification.skipped, ["0001", "0002"]);
 
     await withClient(async (client) => {
       await client.query(
-        "UPDATE schema_migrations SET checksum = $1 WHERE version = '0001'",
+        "UPDATE schema_migrations SET checksum = $1 WHERE version = '0002'",
         ["0".repeat(64)],
       );
     });
