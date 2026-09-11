@@ -3,7 +3,10 @@ import { randomUUID } from 'node:crypto'
 import fastifyEnv from '@fastify/env'
 import Fastify, { type FastifyBaseLogger, type FastifyInstance } from 'fastify'
 
-import { handleRequestError } from './api/errors/error-handler.js'
+import {
+  handleNotFoundRequest,
+  handleRequestError,
+} from './api/errors/error-handler.js'
 import { registerOperationalRoutes } from './api/routes/health.js'
 import { appConfigSchema, type AppConfig } from './infrastructure/config/config.js'
 import {
@@ -33,6 +36,7 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
   })
 
   app.setErrorHandler(handleRequestError)
+  app.setNotFoundHandler(handleNotFoundRequest)
 
   app.register(fastifyEnv, {
     confKey: 'config',
