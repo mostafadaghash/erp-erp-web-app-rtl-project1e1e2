@@ -21,6 +21,9 @@ const BUSINESS_TABLES = [
   "posting_batches", "audit_logs", "outbox_events", "document_tombstones",
   "counterparties", "counterparty_roles", "customer_profiles", "supplier_profiles",
   "customer_ledger_entries", "supplier_ledger_entries",
+  "product_categories", "products", "product_variants", "units", "product_units",
+  "variant_barcodes", "attributes", "attribute_values", "product_attributes",
+  "variant_attribute_values", "price_lists", "price_list_items", "reorder_levels",
 ];
 
 async function withClient(fn) {
@@ -42,13 +45,14 @@ async function cleanup() {
 
 test("migration definitions have deterministic versioned pairs", async () => {
   const definitions = await loadMigrationDefinitions(DEFAULT_MIGRATIONS_DIR);
-  assert.equal(definitions.length, 3);
+  assert.equal(definitions.length, 4);
   assert.deepEqual(
     definitions.map(({ version, name, transactional }) => ({ version, name, transactional })),
     [
       { version: "0001", name: "postgresql_extensions", transactional: true },
       { version: "0002", name: "core_infrastructure_organization_security", transactional: true },
       { version: "0003", name: "counterparties", transactional: true },
+      { version: "0004", name: "product_catalog", transactional: true },
     ],
   );
   for (const definition of definitions) assert.match(definition.checksum, /^[0-9a-f]{64}$/);
@@ -59,16 +63,17 @@ test("fresh apply, idempotent rerun, verification, and checksum drift protection
   await cleanup();
   try {
     const first = await runMigrations({ databaseUrl });
-    assert.deepEqual(first.applied, ["0001", "0002", "0003"]);
+    assert.deepEqual(first.applied, ["0001", "0002", "0003", "0004"]);
     assert.deepEqual(first.skipped, []);
 
     await withClient(async (client) => {
       const history = await client.query("SELECT version, name, checksum FROM schema_migrations ORDER BY version");
-      assert.equal(history.rowCount, 3);
+      assert.equal(history.rowCount, 4);
       assert.deepEqual(history.rows.map((r) => [r.version, r.name]), [
         ["0001", "postgresql_extensions"],
         ["0002", "core_infrastructure_organization_security"],
         ["0003", "counterparties"],
+        ["0004", "product_catalog"],
       ]);
       for (const row of history.rows) assert.match(row.checksum, /^[0-9a-f]{64}$/);
       const extension = await client.query("SELECT count(*)::int AS count FROM pg_extension WHERE extname = 'pg_trgm'");
@@ -77,14 +82,14 @@ test("fresh apply, idempotent rerun, verification, and checksum drift protection
 
     const second = await runMigrations({ databaseUrl });
     assert.deepEqual(second.applied, []);
-    assert.deepEqual(second.skipped, ["0001", "0002", "0003"]);
+    assert.deepEqual(second.skipped, ["0001", "0002", "0003", "0004"]);
 
     const verification = await runMigrations({ databaseUrl, verifyOnly: true });
     assert.deepEqual(verification.applied, []);
-    assert.deepEqual(verification.skipped, ["0001", "0002", "0003"]);
+    assert.deepEqual(verification.skipped, ["0001", "0002", "0003", "0004"]);
 
     await withClient(async (client) => {
-      await client.query("UPDATE schema_migrations SET checksum = $1 WHERE version = '0003'", ["0".repeat(64)]);
+      await client.query("UPDATE schema_migrations SET checksum = $1 WHERE version = '0004'", ["0".repeat(64)]);
     });
     await assert.rejects(() => runMigrations({ databaseUrl, verifyOnly: true }), /checksum drift detected/);
   } finally { await cleanup(); }
