@@ -19,6 +19,12 @@ const COUNTERPARTY_TABLES = [
   "customer_ledger_entries", "supplier_ledger_entries",
 ];
 
+const PRODUCT_TABLES = [
+  "product_categories", "products", "product_variants", "units", "product_units",
+  "variant_barcodes", "attributes", "attribute_values", "product_attributes",
+  "variant_attribute_values", "price_lists", "price_list_items", "reorder_levels",
+];
+
 const EXPECTED_COLUMNS = {
   companies: [["id","uuid",true],["name","text",true],["short_name","text",false],["legal_name","text",false],["commercial_registration","text",false],["tax_number","text",false],["address","text",false],["logo_path","text",false],["base_currency_code","text",true],["default_language","text",true],["timezone","text",true],["is_active","boolean",true],["created_at","timestamp with time zone",true],["updated_at","timestamp with time zone",true]],
   company_phones: [["id","uuid",true],["company_id","uuid",true],["phone","text",true],["sort_order","integer",true]],
@@ -49,6 +55,7 @@ async function withClient(fn) {
 
 async function cleanup() {
   await withClient(async (client) => {
+    for (const table of [...PRODUCT_TABLES].reverse()) await client.query(`DROP TABLE IF EXISTS public.${table}`);
     for (const table of [...COUNTERPARTY_TABLES].reverse()) await client.query(`DROP TABLE IF EXISTS public.${table}`);
     for (const table of [...CORE_TABLES].reverse()) await client.query(`DROP TABLE IF EXISTS public.${table}`);
     await client.query("DROP TABLE IF EXISTS public.schema_migrations");
@@ -61,7 +68,7 @@ test("03.A core schema remains canonical after later schema migrations", async (
   await cleanup();
   try {
     const first = await runMigrations({ databaseUrl });
-    assert.deepEqual(first.applied, ["0001", "0002", "0003"]);
+    assert.deepEqual(first.applied, ["0001", "0002", "0003", "0004"]);
 
     await withClient(async (client) => {
       const tables = await client.query(
@@ -102,7 +109,7 @@ test("03.A core schema remains canonical after later schema migrations", async (
       assert.equal(indexes.rows[0].count, 0, "03.07 indexes must remain deferred");
 
       const history = await client.query("SELECT version, name, checksum FROM schema_migrations ORDER BY version");
-      assert.equal(history.rowCount, 3);
+      assert.equal(history.rowCount, 4);
       assert.equal(history.rows[1].version, "0002");
       assert.equal(history.rows[1].name, "core_infrastructure_organization_security");
       assert.match(history.rows[1].checksum, /^[0-9a-f]{64}$/);
@@ -110,8 +117,8 @@ test("03.A core schema remains canonical after later schema migrations", async (
 
     const second = await runMigrations({ databaseUrl });
     assert.deepEqual(second.applied, []);
-    assert.deepEqual(second.skipped, ["0001", "0002", "0003"]);
+    assert.deepEqual(second.skipped, ["0001", "0002", "0003", "0004"]);
     const verification = await runMigrations({ databaseUrl, verifyOnly: true });
-    assert.deepEqual(verification.skipped, ["0001", "0002", "0003"]);
+    assert.deepEqual(verification.skipped, ["0001", "0002", "0003", "0004"]);
   } finally { await cleanup(); }
 });
