@@ -37,8 +37,14 @@ jobs:
         run: npm audit --audit-level=low
       - name: Backend typecheck
         run: npm run backend:typecheck
-      - name: Backend unit tests
+      - name: Backend skeleton unit tests
         run: npm run backend:test
+      - name: Transaction helper unit tests
+        run: node --import tsx --test server/tests/transaction-helper.test.ts
+      - name: PostgreSQL transaction integration tests
+        env:
+          ERP_TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/erp_skeleton
+        run: node --import tsx --test server/tests/transaction-helper.integration.test.ts
       - name: Backend build
         run: npm run backend:build
       - name: Real PostgreSQL health/readiness and graceful shutdown smoke
