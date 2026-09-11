@@ -21,8 +21,12 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version-file: .nvmrc
           cache: npm
+      - name: Runtime version guard
+        run: |
+          test "$(node --version)" = "v24.21.0"
+          test "$(npm --version)" = "11.19.0"
       - run: npm ci --ignore-scripts
       - name: Dependency audit
         run: npm audit --audit-level=low
@@ -70,8 +74,12 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version-file: .nvmrc
           cache: npm
+      - name: Runtime version guard
+        run: |
+          test "$(node --version)" = "v24.21.0"
+          test "$(npm --version)" = "11.19.0"
       - run: npm ci --ignore-scripts
       - name: Install pinned Playwright runner without changing lockfile
         run: npm install --no-save --package-lock=false @playwright/test@1.62.1
