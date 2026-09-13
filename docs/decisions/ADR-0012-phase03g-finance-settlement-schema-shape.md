@@ -32,7 +32,7 @@ No Accounting tables, Finance services, posting rules, constraints, indexes, mod
 - `financial_movements` is the Historical Source of Truth for treasury effects.
 - `treasury_balance_positions` is a Synchronous Rebuildable Operational Projection + Lock Row.
 - Applying `advance_applications` must not create a new cash movement later because the cash entered through the original Receipt.
-- A PENDING cheque has no treasury effect; only CLEARING/CLEARED service behavior later creates the settlement `financial_movement`.
+- A PENDING cheque has no treasury effect; only transition to `CLEARED` later creates the settlement `financial_movement`.
 - Installment schedules are due-date structures, not parallel financial ledgers. Paid/status projections are rebuildable from Financial Allocations.
 
 ## Deferred work
