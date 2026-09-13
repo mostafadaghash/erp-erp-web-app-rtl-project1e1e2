@@ -1,0 +1,8 @@
+{
+  "version": "0008",
+  "name": "finance_settlement",
+  "transactional": true,
+  "preconditionSql": "SELECT to_regclass('public.purchase_invoices') IS NOT NULL AND to_regclass('public.purchase_returnable_quantities_v') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM (VALUES ('treasuries'), ('receipts'), ('disbursements'), ('finance_categories'), ('treasury_transfers'), ('financial_movements'), ('treasury_balance_positions'), ('financial_allocations'), ('customer_advances'), ('advance_applications'), ('cheques'), ('installment_plans'), ('installments')) AS expected(relation_name) WHERE to_regclass('public.' || relation_name) IS NOT NULL) AS ok;",
+  "verificationSql": "SELECT (SELECT count(*) FROM (VALUES ('treasuries'), ('receipts'), ('disbursements'), ('finance_categories'), ('treasury_transfers'), ('financial_movements'), ('treasury_balance_positions'), ('financial_allocations'), ('customer_advances'), ('advance_applications'), ('cheques'), ('installment_plans'), ('installments')) AS expected(relation_name) WHERE to_regclass('public.' || relation_name) IS NOT NULL) = 13 AS ok;",
+  "recovery": "This migration is transactional. Any failure rolls back all 03.G Finance/Settlement relation creation plus the migration-history insert. After successful application, corrections must be new reviewed forward migrations. PK/FK/composite-context/UNIQUE/CHECK constraints remain intentionally deferred to 03.06; all project-owned indexes remain intentionally deferred to 03.07; Finance posting/locking/allocation/cheque/installment behavior remains deferred to later service phases."
+}
