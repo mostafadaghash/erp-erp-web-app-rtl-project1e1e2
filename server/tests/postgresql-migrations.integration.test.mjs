@@ -21,6 +21,7 @@ const SALES_TABLES = [
   "sales_return_lines",
 ];
 const PURCHASING_TABLES = ["purchase_invoices","purchase_invoice_lines","purchase_returns","purchase_return_lines","tax_codes"];
+const FINANCE_TABLES = ["treasuries","receipts","disbursements","finance_categories","treasury_transfers","financial_movements","treasury_balance_positions","financial_allocations","customer_advances","advance_applications","cheques","installment_plans","installments"];
 const BUSINESS_TABLES = [
   "companies", "company_phones", "company_settings", "branches", "branch_settings",
   "warehouses", "users", "auth_sessions", "roles", "permissions", "role_permissions",
@@ -37,7 +38,7 @@ const BUSINESS_TABLES = [
   "stock_transfers", "stock_transfer_lines", "stocktake_sessions", "stocktake_lines",
   "stocktake_line_serials", "stocktake_line_batches", "inventory_adjustments",
   "inventory_adjustment_lines", "inventory_adjustment_line_serials",
-  "inventory_adjustment_line_batches", ...SALES_TABLES, ...PURCHASING_TABLES,
+  "inventory_adjustment_line_batches", ...SALES_TABLES, ...PURCHASING_TABLES, ...FINANCE_TABLES,
 ];
 
 const MIGRATIONS = [
@@ -48,6 +49,7 @@ const MIGRATIONS = [
   { version: "0005", name: "inventory", transactional: true },
   { version: "0006", name: "sales", transactional: true },
   { version: "0007", name: "purchasing_tax", transactional: true },
+  { version: "0008", name: "finance_settlement", transactional: true },
 ];
 
 async function withClient(fn) {
@@ -97,7 +99,7 @@ test("fresh apply, idempotent rerun, verification, and checksum drift protection
     assert.deepEqual(verification.applied, []);
     assert.deepEqual(verification.skipped, versions);
     await withClient(async (client) => {
-      await client.query("UPDATE schema_migrations SET checksum = $1 WHERE version = '0007'", ["0".repeat(64)]);
+      await client.query("UPDATE schema_migrations SET checksum = $1 WHERE version = '0008'", ["0".repeat(64)]);
     });
     await assert.rejects(() => runMigrations({ databaseUrl, verifyOnly: true }), /checksum drift detected/);
   } finally {
