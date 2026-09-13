@@ -1,0 +1,8 @@
+{
+  "version": "0010",
+  "name": "repairs_followup_notifications",
+  "transactional": true,
+  "preconditionSql": "SELECT to_regclass('public.gl_accounts') IS NOT NULL AND to_regclass('public.repair_orders') IS NULL AS ok;",
+  "verificationSql": "SELECT (SELECT count(*) = 12 FROM pg_catalog.pg_class c JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname = 'public' AND c.relkind = 'r' AND c.relname IN ('repair_orders','repair_status_history','repair_assignments','repair_issue_reports','repair_customer_decisions','repair_tracking_tokens','customer_followups','followup_actions','followup_status_history','message_templates','notifications','notification_recipients')) AND to_regclass('public.print_templates') IS NULL AS ok;",
+  "recovery": "Transactional failure rolls the migration back. After a successful production apply, recovery is forward-only: preserve historical repair/follow-up/notification data and issue a corrective migration rather than dropping or rewriting history."
+}
