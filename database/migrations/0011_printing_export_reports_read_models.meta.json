@@ -1,0 +1,8 @@
+{
+  "version": "0011",
+  "name": "printing_export_reports_read_models",
+  "transactional": true,
+  "preconditionSql": "SELECT to_regclass('public.repair_orders') IS NOT NULL AND to_regclass('public.print_templates') IS NULL AS ok;",
+  "verificationSql": "SELECT (SELECT count(*) = 7 FROM pg_catalog.pg_class c JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname = 'public' AND c.relkind = 'r' AND c.relname IN ('print_templates','branch_print_defaults','reporting_daily_branch_metrics','reporting_inventory_balances','reporting_counterparty_balances','reporting_treasury_balances','reporting_followup_metrics')) AND to_regclass('public.templates_print') IS NULL AS ok;",
+  "recovery": "Transactional failure rolls the migration back. After a successful production apply, recovery is forward-only: preserve reporting/template configuration data and issue a corrective migration rather than dropping or rewriting committed schema history."
+}
