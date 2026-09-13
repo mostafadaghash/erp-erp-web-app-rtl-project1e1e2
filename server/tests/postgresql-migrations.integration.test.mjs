@@ -10,6 +10,7 @@ import {
   loadMigrationDefinitions,
   runMigrations,
 } from "../../scripts/database/migrations.mjs";
+import { cleanupReportingTables } from "./postgresql-schema-test-support.mjs";
 
 const { Client } = pg;
 const databaseUrl = process.env.ERP_TEST_DATABASE_URL;
@@ -55,6 +56,7 @@ const MIGRATIONS = [
   { version: "0008", name: "finance_settlement", transactional: true },
   { version: "0009", name: "accounting", transactional: true },
   { version: "0010", name: "repairs_followup_notifications", transactional: true },
+  { version: "0011", name: "printing_export_reports_read_models", transactional: true },
 ];
 
 async function withClient(fn) {
@@ -64,6 +66,7 @@ async function withClient(fn) {
 }
 
 async function cleanup() {
+  await cleanupReportingTables(databaseUrl);
   await withClient(async (client) => {
     await client.query("DROP VIEW IF EXISTS public.purchase_returnable_quantities_v");
     await client.query("DROP VIEW IF EXISTS public.sales_returnable_quantities_v");
@@ -105,7 +108,7 @@ test("fresh apply, idempotent rerun, verification, and checksum drift protection
     assert.deepEqual(verification.applied, []);
     assert.deepEqual(verification.skipped, versions);
     await withClient(async (client) => {
-      await client.query("UPDATE schema_migrations SET checksum = $1 WHERE version = '0010'", ["0".repeat(64)]);
+      await client.query("UPDATE schema_migrations SET checksum = $1 WHERE version = '0011'", ["0".repeat(64)]);
     });
     await assert.rejects(() => runMigrations({ databaseUrl, verifyOnly: true }), /checksum drift detected/);
   } finally {
