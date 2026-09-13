@@ -12,7 +12,8 @@ const COUNTERPARTY_TABLES = ["counterparties","counterparty_roles","customer_pro
 const PRODUCT_TABLES = ["product_categories","products","product_variants","units","product_units","variant_barcodes","attributes","attribute_values","product_attributes","variant_attribute_values","price_lists","price_list_items","reorder_levels"];
 const INVENTORY_TABLES = ["serial_numbers","batches","inventory_movements","inventory_movement_lines","inventory_line_serials","inventory_line_batches","inventory_stock_positions","variant_warehouse_cost_projection","batch_stock_positions","stock_reservations","stock_transfers","stock_transfer_lines","stocktake_sessions","stocktake_lines","stocktake_line_serials","stocktake_line_batches","inventory_adjustments","inventory_adjustment_lines","inventory_adjustment_line_serials","inventory_adjustment_line_batches"];
 const SALES_TABLES = ["sales_quotes","sales_quote_lines","sales_orders","sales_order_lines","sales_order_status_history","sales_order_shipping_details","sales_order_deliveries","sales_order_delivery_lines","sales_invoices","sales_invoice_lines","sales_returns","sales_return_lines"];
-const MIGRATIONS = ["0001","0002","0003","0004","0005","0006","0007"];
+const FINANCE_TABLES = ["treasuries","receipts","disbursements","finance_categories","treasury_transfers","financial_movements","treasury_balance_positions","financial_allocations","customer_advances","advance_applications","cheques","installment_plans","installments"];
+const MIGRATIONS = ["0001","0002","0003","0004","0005","0006","0007","0008"];
 
 const EXPECTED_COLUMNS = {
   serial_numbers: [["id","uuid",true],["variant_id","uuid",true],["serial_number","text",true],["current_warehouse_id","uuid",false],["status","text",true],["created_at","timestamp with time zone",true]],
@@ -45,6 +46,7 @@ async function withClient(fn) {
 
 async function cleanup() {
   await withClient(async (client) => {
+    for (const table of [...FINANCE_TABLES].reverse()) await client.query(`DROP TABLE IF EXISTS public.${table}`);
     await client.query("DROP VIEW IF EXISTS public.purchase_returnable_quantities_v");
     await client.query("DROP VIEW IF EXISTS public.sales_returnable_quantities_v");
     await client.query("DROP TABLE IF EXISTS public.purchase_return_lines, public.purchase_returns, public.purchase_invoice_lines, public.purchase_invoices, public.tax_codes");
@@ -121,11 +123,11 @@ test("03.D Inventory schema remains canonical after later schema migrations", as
          WHERE n.nspname='public' AND c.relname = ANY($1::text[])`, [INVENTORY_TABLES]);
       assert.equal(indexes.rows[0].count, 0, "03.07 indexes must remain deferred");
 
-      const futureDomain = await client.query("SELECT to_regclass('public.treasuries') IS NULL AS absent");
-      assert.equal(futureDomain.rows[0].absent, true, "03.G Finance must not start during 03.F");
+      const futureDomain = await client.query("SELECT to_regclass('public.gl_accounts') IS NULL AS absent");
+      assert.equal(futureDomain.rows[0].absent, true, "03.H Accounting must not start during 03.G");
 
       const history = await client.query("SELECT version,name,checksum FROM schema_migrations ORDER BY version");
-      assert.equal(history.rowCount, 7);
+      assert.equal(history.rowCount, 8);
       const target = history.rows.find((row) => row.version === "0005");
       assert.equal(target?.name, "inventory");
       assert.match(target?.checksum ?? "", /^[0-9a-f]{64}$/);
