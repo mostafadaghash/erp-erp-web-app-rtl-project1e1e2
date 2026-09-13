@@ -13,7 +13,8 @@ const PRODUCT_TABLES = ["product_categories","products","product_variants","unit
 const INVENTORY_TABLES = ["serial_numbers","batches","inventory_movements","inventory_movement_lines","inventory_line_serials","inventory_line_batches","inventory_stock_positions","variant_warehouse_cost_projection","batch_stock_positions","stock_reservations","stock_transfers","stock_transfer_lines","stocktake_sessions","stocktake_lines","stocktake_line_serials","stocktake_line_batches","inventory_adjustments","inventory_adjustment_lines","inventory_adjustment_line_serials","inventory_adjustment_line_batches"];
 const SALES_TABLES = ["sales_quotes","sales_quote_lines","sales_orders","sales_order_lines","sales_order_status_history","sales_order_shipping_details","sales_order_deliveries","sales_order_delivery_lines","sales_invoices","sales_invoice_lines","sales_returns","sales_return_lines"];
 const PURCHASING_TABLES = ["purchase_invoices","purchase_invoice_lines","purchase_returns","purchase_return_lines","tax_codes"];
-const MIGRATIONS = ["0001","0002","0003","0004","0005","0006","0007"];
+const FINANCE_TABLES = ["treasuries","receipts","disbursements","finance_categories","treasury_transfers","financial_movements","treasury_balance_positions","financial_allocations","customer_advances","advance_applications","cheques","installment_plans","installments"];
+const MIGRATIONS = ["0001","0002","0003","0004","0005","0006","0007","0008"];
 
 const EXPECTED_COLUMNS = {
   purchase_invoices: [["id","uuid",true],["branch_id","uuid",true],["document_number","bigint",true],["document_date","date",true],["document_version","integer",true],["counterparty_id","uuid",false],["warehouse_id","uuid",true],["subtotal","numeric(18,4)",true],["discount_total","numeric(18,4)",true],["additional_cost","numeric(18,4)",true],["tax_total","numeric(18,4)",true],["grand_total","numeric(18,4)",true],["paid_total","numeric(18,4)",true],["due_total","numeric(18,4)",true],["payment_status","text",true],["notes","text",false],["posted_at","timestamp with time zone",true],["created_by","uuid",true],["deleted_at","timestamp with time zone",false],["deleted_by","uuid",false],["delete_reason","text",false]],
@@ -31,6 +32,7 @@ async function withClient(fn) {
 
 async function cleanup() {
   await withClient(async (client) => {
+    for (const table of [...FINANCE_TABLES].reverse()) await client.query(`DROP TABLE IF EXISTS public.${table}`);
     await client.query("DROP VIEW IF EXISTS public.purchase_returnable_quantities_v");
     await client.query("DROP VIEW IF EXISTS public.sales_returnable_quantities_v");
     for (const table of [...PURCHASING_TABLES].reverse()) await client.query(`DROP TABLE IF EXISTS public.${table}`);
@@ -44,7 +46,7 @@ async function cleanup() {
   });
 }
 
-test("03.F creates the canonical Purchasing/Tax schema and returnable helper view", async (t) => {
+test("03.F Purchasing/Tax schema remains canonical after later schema migrations", async (t) => {
   if (!databaseUrl) return t.skip("ERP_TEST_DATABASE_URL is not configured");
   await cleanup();
   try {
@@ -53,7 +55,7 @@ test("03.F creates the canonical Purchasing/Tax schema and returnable helper vie
     assert.deepEqual(first.skipped, []);
 
     await withClient(async (client) => {
-      const expectedTables = [...CORE_TABLES,...COUNTERPARTY_TABLES,...PRODUCT_TABLES,...INVENTORY_TABLES,...SALES_TABLES,...PURCHASING_TABLES].sort();
+      const expectedTables = [...CORE_TABLES,...COUNTERPARTY_TABLES,...PRODUCT_TABLES,...INVENTORY_TABLES,...SALES_TABLES,...PURCHASING_TABLES,...FINANCE_TABLES].sort();
       const allTables = await client.query(
         `SELECT tablename FROM pg_catalog.pg_tables
          WHERE schemaname='public' AND tablename <> 'schema_migrations' ORDER BY tablename`,
@@ -111,8 +113,8 @@ test("03.F creates the canonical Purchasing/Tax schema and returnable helper vie
          WHERE n.nspname='public' AND c.relname = ANY($1::text[])`, [PURCHASING_TABLES]);
       assert.equal(indexes.rows[0].count, 0, "03.07 indexes must remain deferred");
 
-      const futureDomain = await client.query("SELECT to_regclass('public.treasuries') IS NULL AS absent");
-      assert.equal(futureDomain.rows[0].absent, true, "03.G Finance must remain absent");
+      const futureDomain = await client.query("SELECT to_regclass('public.gl_accounts') IS NULL AS absent");
+      assert.equal(futureDomain.rows[0].absent, true, "03.H Accounting must remain absent");
 
       const ids = {
         line: "00000000-0000-4000-8000-000000000201",
@@ -161,10 +163,10 @@ test("03.F creates the canonical Purchasing/Tax schema and returnable helper vie
       });
 
       const history = await client.query("SELECT version,name,checksum FROM schema_migrations ORDER BY version");
-      assert.equal(history.rowCount, 7);
-      assert.equal(history.rows[6].version, "0007");
-      assert.equal(history.rows[6].name, "purchasing_tax");
-      assert.match(history.rows[6].checksum, /^[0-9a-f]{64}$/);
+      assert.equal(history.rowCount, 8);
+      const target = history.rows.find((row) => row.version === "0007");
+      assert.equal(target?.name, "purchasing_tax");
+      assert.match(target?.checksum ?? "", /^[0-9a-f]{64}$/);
     });
 
     const second = await runMigrations({ databaseUrl });
