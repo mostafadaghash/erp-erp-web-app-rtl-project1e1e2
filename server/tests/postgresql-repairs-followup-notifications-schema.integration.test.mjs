@@ -17,7 +17,7 @@ const PURCHASING_TABLES = ["purchase_invoices","purchase_invoice_lines","purchas
 const FINANCE_TABLES = ["treasuries","receipts","disbursements","finance_categories","treasury_transfers","financial_movements","treasury_balance_positions","financial_allocations","customer_advances","advance_applications","cheques","installment_plans","installments"];
 const ACCOUNTING_TABLES = ["gl_accounts","journal_entries","journal_lines"];
 const REPAIR_TABLES = ["repair_orders","repair_status_history","repair_assignments","repair_issue_reports","repair_customer_decisions","repair_tracking_tokens","customer_followups","followup_actions","followup_status_history","message_templates","notifications","notification_recipients"];
-const MIGRATIONS = ["0001","0002","0003","0004","0005","0006","0007","0008","0009","0010","0011"];
+const MIGRATIONS = ["0001","0002","0003","0004","0005","0006","0007","0008","0009","0010","0011","0012"];
 
 const EXPECTED_COLUMNS = {
   repair_orders: [["id","uuid",true],["branch_id","uuid",true],["document_number","bigint",true],["counterparty_id","uuid",true],["device_description","text",true],["device_serial","text",false],["reported_problem","text",true],["status","text",true],["current_technician_id","uuid",false],["received_at","timestamp with time zone",true],["completed_at","timestamp with time zone",false],["delivered_at","timestamp with time zone",false],["version","integer",true],["customer_notes","text",false],["internal_notes","text",false],["created_by","uuid",true],["created_at","timestamp with time zone",true],["updated_at","timestamp with time zone",true]],
@@ -150,10 +150,10 @@ test("03.I Repairs / Follow-Up / Notifications remains canonical through 03.J", 
       assert.equal(persisted.rows[0].unseen_unread, true);
 
       const history = await client.query("SELECT version,name,checksum FROM schema_migrations ORDER BY version");
-      assert.equal(history.rowCount, 11);
-      assert.equal(history.rows[9].version, "0010");
-      assert.equal(history.rows[9].name, "repairs_followup_notifications");
-      assert.match(history.rows[9].checksum, /^[0-9a-f]{64}$/);
+      assert.equal(history.rowCount, MIGRATIONS.length);
+      const target = history.rows.find((row) => row.version === "0010");
+      assert.equal(target?.name, "repairs_followup_notifications");
+      assert.match(target?.checksum ?? "", /^[0-9a-f]{64}$/);
     });
 
     const second = await runMigrations({ databaseUrl });
