@@ -39,6 +39,7 @@ export const MIGRATIONS = [
   "0009",
   "0010",
   "0011",
+  "0012",
 ];
 
 export async function withClient(databaseUrl, fn) {
@@ -51,8 +52,21 @@ export async function withClient(databaseUrl, fn) {
   }
 }
 
+async function cleanupCoreConstraintLayer(client) {
+  // Old schema-regression tests drop Core tables one-by-one in historical creation order.
+  // Remove only the 0012 backward dependencies/triggers first so cleanup remains deterministic.
+  await client.query("DROP FUNCTION IF EXISTS public.fn_branch_settings_default_warehouse_valid_at_commit() CASCADE");
+  await client.query("DROP FUNCTION IF EXISTS public.fn_warehouses_preserve_default_reference_at_commit() CASCADE");
+  await client.query("DROP FUNCTION IF EXISTS public.fn_users_default_branch_access_at_commit() CASCADE");
+  await client.query("DROP FUNCTION IF EXISTS public.fn_user_branch_access_preserves_default_at_commit() CASCADE");
+  await client.query("ALTER TABLE IF EXISTS public.company_settings DROP CONSTRAINT IF EXISTS fk_company_settings__updated_by");
+  await client.query("ALTER TABLE IF EXISTS public.branch_settings DROP CONSTRAINT IF EXISTS fk_branch_settings__default_warehouse");
+  await client.query("ALTER TABLE IF EXISTS public.users DROP CONSTRAINT IF EXISTS fk_users__role");
+}
+
 export async function cleanupReportingTables(databaseUrl) {
   await withClient(databaseUrl, async (client) => {
+    await cleanupCoreConstraintLayer(client);
     for (const table of [...REPORTING_TABLES].reverse()) {
       await client.query(`DROP TABLE IF EXISTS public.${table}`);
     }
@@ -61,6 +75,7 @@ export async function cleanupReportingTables(databaseUrl) {
 
 export async function cleanupDatabase(databaseUrl) {
   await withClient(databaseUrl, async (client) => {
+    await cleanupCoreConstraintLayer(client);
     for (const table of [...REPORTING_TABLES].reverse()) await client.query(`DROP TABLE IF EXISTS public.${table}`);
     for (const table of [...REPAIR_TABLES].reverse()) await client.query(`DROP TABLE IF EXISTS public.${table}`);
     await client.query("DROP TABLE IF EXISTS public.journal_lines, public.journal_entries, public.gl_accounts");
