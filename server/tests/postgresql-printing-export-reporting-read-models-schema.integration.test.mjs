@@ -156,10 +156,10 @@ test("03.J creates canonical Printing / Export / Reports Read Models schema", as
       assert.equal(persisted.rows[0].created_count, "9007199254740993");
 
       const history = await client.query("SELECT version,name,checksum FROM schema_migrations ORDER BY version");
-      assert.equal(history.rowCount, 11);
-      assert.equal(history.rows[10].version, "0011");
-      assert.equal(history.rows[10].name, "printing_export_reports_read_models");
-      assert.match(history.rows[10].checksum, /^[0-9a-f]{64}$/);
+      assert.equal(history.rowCount, MIGRATIONS.length);
+      const target = history.rows.find((row) => row.version === "0011");
+      assert.equal(target?.name, "printing_export_reports_read_models");
+      assert.match(target?.checksum ?? "", /^[0-9a-f]{64}$/);
     });
 
     const second = await runMigrations({ databaseUrl });
