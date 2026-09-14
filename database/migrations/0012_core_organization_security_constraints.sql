@@ -173,7 +173,7 @@ BEGIN
       ERRCODE = '23514',
       CONSTRAINT = 'ct_branch_settings__default_warehouse_valid_at_commit',
       MESSAGE = format(
-        'default warehouse %s must be active and belong to branch %s',
+        'ct_branch_settings__default_warehouse_valid_at_commit: default warehouse %s must be active and belong to branch %s',
         NEW.default_warehouse_id,
         NEW.branch_id
       );
@@ -204,7 +204,7 @@ BEGIN
       ERRCODE = '23514',
       CONSTRAINT = 'ct_warehouses__preserve_default_reference_at_commit',
       MESSAGE = format(
-        'warehouse %s cannot be inactive or move branches while it is a branch default',
+        'ct_warehouses__preserve_default_reference_at_commit: warehouse %s cannot be inactive or move branches while it is a branch default',
         NEW.id
       );
   END IF;
@@ -237,7 +237,7 @@ BEGIN
       ERRCODE = '23514',
       CONSTRAINT = 'ct_users__default_branch_access_at_commit',
       MESSAGE = format(
-        'selected-scope user %s must have access to default branch %s',
+        'ct_users__default_branch_access_at_commit: selected-scope user %s must have access to default branch %s',
         NEW.id,
         NEW.default_branch_id
       );
@@ -278,7 +278,7 @@ BEGIN
       ERRCODE = '23514',
       CONSTRAINT = 'ct_user_branch_access__preserves_default_at_commit',
       MESSAGE = format(
-        'cannot remove default-branch access for selected-scope user %s',
+        'ct_user_branch_access__preserves_default_at_commit: cannot remove default-branch access for selected-scope user %s',
         OLD.user_id
       );
   END IF;
