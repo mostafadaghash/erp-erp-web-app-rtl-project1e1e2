@@ -141,6 +141,10 @@ jobs:
         env:
           ERP_TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/erp_backend_ci
         run: node --test server/tests/postgresql-product-catalog-schema.integration.test.mjs
+      - name: PostgreSQL product catalog constraint integration tests
+        env:
+          ERP_TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/erp_backend_ci
+        run: node --test server/tests/postgresql-product-catalog-constraints.integration.test.mjs
       - name: PostgreSQL inventory schema integration tests
         env:
           ERP_TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/erp_backend_ci
@@ -184,7 +188,6 @@ jobs:
           set -euo pipefail
           node dist-server/main.js >backend-ci.log 2>&1 &
           pid=$!
-
           cleanup() {
             if kill -0 "$pid" 2>/dev/null; then
               kill -TERM "$pid" || true
@@ -192,7 +195,6 @@ jobs:
             fi
           }
           trap cleanup EXIT
-
           started=0
           for _ in $(seq 1 30); do
             if curl -fsS http://127.0.0.1:8787/health >health.json; then
@@ -202,14 +204,11 @@ jobs:
             sleep 1
           done
           test "$started" = "1"
-
           curl -fsS http://127.0.0.1:8787/ready >ready.json
           node -e "const fs=require('fs'); const h=JSON.parse(fs.readFileSync('health.json')); if(h.status!=='ok'||!h.requestId) process.exit(1); const r=JSON.parse(fs.readFileSync('ready.json')); if(r.status!=='ready'||r.checks?.database!=='up'||!r.requestId) process.exit(1)"
-
           kill -TERM "$pid"
           wait "$pid"
           trap - EXIT
-
           grep -q 'backend shutdown completed' backend-ci.log
       - name: Upload backend smoke log
         if: always()
