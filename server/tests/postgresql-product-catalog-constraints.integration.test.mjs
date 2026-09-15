@@ -80,7 +80,7 @@ test("03.06 Product Catalog constraints enforce canonical integrity on PostgreSQ
       await client.query(`INSERT INTO branches (id,company_id,name,code,is_active,created_at,updated_at) VALUES ($1,$2,'Main','MAIN',true,now(),now())`,[ids.branch,ids.company]);
       await client.query(`INSERT INTO warehouses (id,branch_id,name,code,is_active,created_at,updated_at) VALUES ($1,$2,'Main WH','WH1',true,now(),now())`,[ids.warehouse,ids.branch]);
       await client.query(`INSERT INTO roles (id,role_key,display_name_key,is_system) VALUES ($1,'ADMIN','roles.admin',true)`,[ids.role]);
-      await client.query(`INSERT INTO users (id,name,username,email,password_hash,role_id,default_branch_id,branch_scope_mode,preferred_language,is_active,created_at,updated_at) VALUES ($1,'Admin','admin',NULL,'hash',$2,$3,'SELECTED','ar-EG',true,now(),now())`,[ids.user,ids.role,ids.branch]);
+      await client.query(`INSERT INTO users (id,name,username,email,password_hash,role_id,default_branch_id,branch_scope_mode,preferred_language,is_active,created_at,updated_at) VALUES ($1,'Admin','admin',NULL,'hash',$2,$3,'ALL','ar-EG',true,now(),now())`,[ids.user,ids.role,ids.branch]);
       await client.query(`INSERT INTO user_branch_access (user_id,branch_id) VALUES ($1,$2)`,[ids.user,ids.branch]);
       await client.query(`INSERT INTO branch_settings (branch_id,default_warehouse_id,settings_json,updated_at) VALUES ($1,$2,'{}'::jsonb,now())`,[ids.branch,ids.warehouse]);
       await client.query(`INSERT INTO counterparties (id,name,is_active,created_at,updated_at) VALUES ($1,'Customer',true,now(),now())`,[ids.counterparty]);
