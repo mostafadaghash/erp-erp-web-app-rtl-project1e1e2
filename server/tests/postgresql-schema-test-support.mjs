@@ -40,6 +40,7 @@ export const MIGRATIONS = [
   "0010",
   "0011",
   "0012",
+  "0013",
 ];
 
 export async function withClient(databaseUrl, fn) {
