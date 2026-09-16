@@ -86,6 +86,8 @@ async function cleanupSalesConstraintLayer(client) {
   await client.query("DROP FUNCTION IF EXISTS public.fn_stock_reservations_sales_context_at_commit() CASCADE");
   await client.query("DROP FUNCTION IF EXISTS public.fn_sales_orders_preserve_reservation_context_at_commit() CASCADE");
   await client.query("DROP FUNCTION IF EXISTS public.fn_sales_order_lines_preserve_reservation_context_at_commit() CASCADE");
+  await client.query("ALTER TABLE IF EXISTS public.stock_reservations DROP CONSTRAINT IF EXISTS fk_stock_reservations__sales_order_line");
+  await client.query("ALTER TABLE IF EXISTS public.stock_reservations DROP CONSTRAINT IF EXISTS fk_stock_reservations__sales_order");
 }
 
 export async function cleanupReportingTables(databaseUrl) {
