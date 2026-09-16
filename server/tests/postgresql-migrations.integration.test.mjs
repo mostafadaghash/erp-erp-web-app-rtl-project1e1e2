@@ -22,7 +22,12 @@ const SALES_TABLES = [
   "sales_return_lines",
 ];
 const PURCHASING_TABLES = ["purchase_invoices","purchase_invoice_lines","purchase_returns","purchase_return_lines","tax_codes"];
-const FINANCE_TABLES = ["treasuries","receipts","disbursements","finance_categories","treasury_transfers","financial_movements","treasury_balance_positions","financial_allocations","customer_advances","advance_applications","cheques","installment_plans","installments"];
+// Parent-to-child declaration order so reverse cleanup drops dependents before referenced Finance masters.
+const FINANCE_TABLES = [
+  "treasuries","finance_categories","receipts","disbursements","treasury_transfers",
+  "financial_movements","treasury_balance_positions","financial_allocations","customer_advances",
+  "advance_applications","cheques","installment_plans","installments",
+];
 const ACCOUNTING_TABLES = ["gl_accounts","journal_entries","journal_lines"];
 const REPAIR_TABLES = ["repair_orders","repair_status_history","repair_assignments","repair_issue_reports","repair_customer_decisions","repair_tracking_tokens","customer_followups","followup_actions","followup_status_history","message_templates","notifications","notification_recipients"];
 const BUSINESS_TABLES = [
@@ -63,6 +68,7 @@ const MIGRATIONS = [
   { version: "0015", name: "inventory_constraints", transactional: true },
   { version: "0016", name: "sales_constraints", transactional: true },
   { version: "0017", name: "purchasing_tax_constraints", transactional: true },
+  { version: "0018", name: "finance_settlement_constraints", transactional: true },
 ];
 
 async function withClient(fn) {
@@ -114,7 +120,7 @@ test("fresh apply, idempotent rerun, verification, and checksum drift protection
     assert.deepEqual(verification.applied, []);
     assert.deepEqual(verification.skipped, versions);
     await withClient(async (client) => {
-      await client.query("UPDATE schema_migrations SET checksum = $1 WHERE version = '0017'", ["0".repeat(64)]);
+      await client.query("UPDATE schema_migrations SET checksum = $1 WHERE version = '0018'", ["0".repeat(64)]);
     });
     await assert.rejects(() => runMigrations({ databaseUrl, verifyOnly: true }), /checksum drift detected/);
   } finally {
