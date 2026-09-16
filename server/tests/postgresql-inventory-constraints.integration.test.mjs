@@ -40,6 +40,10 @@ async function seedFixture(client) {
     variant: "30000000-0000-4000-8000-000000000012",
     postingBatch: "30000000-0000-4000-8000-000000000013",
     source: "30000000-0000-4000-8000-000000000014",
+    counterparty: "30000000-0000-4000-8000-000000000015",
+    priceList: "30000000-0000-4000-8000-000000000016",
+    salesOrder: "30000000-0000-4000-8000-000000000017",
+    salesOrderLine: "30000000-0000-4000-8000-000000000018",
   };
 
   await client.query(`INSERT INTO companies (id,name,base_currency_code,default_language,timezone,is_active,created_at,updated_at)
@@ -51,6 +55,11 @@ async function seedFixture(client) {
   await client.query(`INSERT INTO roles (id,role_key,display_name_key,is_system) VALUES ($1,'INVENTORY_ADMIN','roles.inventoryAdmin',true)`, [ids.role]);
   await client.query(`INSERT INTO users (id,name,username,email,password_hash,role_id,default_branch_id,branch_scope_mode,preferred_language,is_active,created_at,updated_at)
     VALUES ($1,'Inventory User','inventory-user',NULL,'hash',$2,$3,'ALL','ar-EG',true,now(),now())`, [ids.user, ids.role, ids.branch1]);
+  await client.query(`INSERT INTO counterparties (id,name,phone,normalized_phone,address,notes,is_active,created_at,updated_at)
+    VALUES ($1,'Inventory Reservation Customer',NULL,NULL,NULL,NULL,true,now(),now())`, [ids.counterparty]);
+  await client.query(`INSERT INTO counterparty_roles (counterparty_id,role) VALUES ($1,'CUSTOMER')`, [ids.counterparty]);
+  await client.query(`INSERT INTO price_lists (id,name,is_active,created_at,updated_at)
+    VALUES ($1,'Inventory Reservation Retail',true,now(),now())`, [ids.priceList]);
   await client.query(`INSERT INTO product_categories (id,name,parent_id,is_active) VALUES ($1,'Inventory',NULL,true)`, [ids.category]);
   await client.query(`INSERT INTO units (id,name,symbol,allows_fraction,is_active) VALUES ($1,'Inventory Piece','pc',false,true)`, [ids.unit]);
 
@@ -62,6 +71,15 @@ async function seedFixture(client) {
   await client.query(`INSERT INTO product_variants (id,product_id,name,sku,is_default,combination_signature,minimum_selling_price,is_active,created_at,updated_at)
     VALUES ($1,$2,'Default','INV-001',true,'DEFAULT',0.0000,true,now(),now())`, [ids.variant, ids.product]);
   await client.query("COMMIT");
+
+  await client.query(`INSERT INTO sales_orders
+    (id,branch_id,document_number,counterparty_id,warehouse_id,price_list_id,status,delivery_method,sales_user_id,customer_service_user_id,customer_notes,internal_notes,source_quote_id,version,created_at,updated_at)
+    VALUES ($1,$2,1,$3,$4,$5,'PENDING','PICKUP',$6,$6,NULL,NULL,NULL,0,now(),now())`,
+    [ids.salesOrder, ids.branch1, ids.counterparty, ids.warehouse1, ids.priceList, ids.user]);
+  await client.query(`INSERT INTO sales_order_lines
+    (id,sales_order_id,variant_id,product_unit_id,ordered_quantity,unit_price,discount_amount,tax_code_id,line_total)
+    VALUES ($1,$2,$3,$4,5.000000,100.0000,0.0000,NULL,500.0000)`,
+    [ids.salesOrderLine, ids.salesOrder, ids.variant, ids.productUnit]);
 
   await client.query(`INSERT INTO posting_batches
     (id,branch_id,source_type,source_id,operation_type,document_version,reverses_posting_batch_id,posted_at,created_by)
@@ -143,18 +161,18 @@ test("03.06 Inventory constraints enforce canonical integrity on PostgreSQL 17",
       await expectConstraint(client.query(`INSERT INTO stock_reservations
         (id,sales_order_id,sales_order_line_id,warehouse_id,variant_id,quantity,status,created_at,released_at)
         VALUES ('30000000-0000-4000-8000-000000000030',$1,$2,$3,$4,1,'INVALID',now(),NULL)`,
-        [ids.source, ids.postingBatch, ids.warehouse1, ids.variant]), "23514", "ck_stock_reservations__status");
+        [ids.salesOrder, ids.salesOrderLine, ids.warehouse1, ids.variant]), "23514", "ck_stock_reservations__status");
       await expectConstraint(client.query(`INSERT INTO stock_reservations
         (id,sales_order_id,sales_order_line_id,warehouse_id,variant_id,quantity,status,created_at,released_at)
         VALUES ('30000000-0000-4000-8000-000000000031',$1,$2,$3,$4,0,'ACTIVE',now(),NULL)`,
-        [ids.source, ids.postingBatch, ids.warehouse1, ids.variant]), "23514", "ck_stock_reservations__quantity_positive");
+        [ids.salesOrder, ids.salesOrderLine, ids.warehouse1, ids.variant]), "23514", "ck_stock_reservations__quantity_positive");
 
       await client.query(`INSERT INTO stock_reservations
         (id,sales_order_id,sales_order_line_id,warehouse_id,variant_id,quantity,status,created_at,released_at)
         VALUES ('30000000-0000-4000-8000-000000000032',$1,$2,$3,$4,1,'ACTIVE',now(),NULL),
                ('30000000-0000-4000-8000-000000000033',$1,$2,$3,$4,1,'PARTIALLY_CONSUMED',now(),NULL)`,
-        [ids.source, ids.postingBatch, ids.warehouse1, ids.variant]);
-      const duplicateActive = await client.query(`SELECT count(*)::int AS count FROM stock_reservations WHERE sales_order_line_id=$1 AND warehouse_id=$2 AND variant_id=$3 AND status IN ('ACTIVE','PARTIALLY_CONSUMED')`, [ids.postingBatch, ids.warehouse1, ids.variant]);
+        [ids.salesOrder, ids.salesOrderLine, ids.warehouse1, ids.variant]);
+      const duplicateActive = await client.query(`SELECT count(*)::int AS count FROM stock_reservations WHERE sales_order_line_id=$1 AND warehouse_id=$2 AND variant_id=$3 AND status IN ('ACTIVE','PARTIALLY_CONSUMED')`, [ids.salesOrderLine, ids.warehouse1, ids.variant]);
       assert.equal(duplicateActive.rows[0].count, 2, "active-reservation partial uniqueness remains intentionally deferred to 03.07");
 
       await expectConstraint(client.query(`INSERT INTO stock_transfers
@@ -216,10 +234,12 @@ test("03.06 Inventory constraints enforce canonical integrity on PostgreSQL 17",
 
       const history = await client.query("SELECT version,name,checksum FROM schema_migrations ORDER BY version");
       assert.equal(history.rowCount, MIGRATIONS.length);
+      const inventorySlice = history.rows.find((row) => row.version === "0015");
+      assert.equal(inventorySlice?.name, "inventory_constraints");
+      assert.match(inventorySlice?.checksum ?? "", /^[0-9a-f]{64}$/);
       const latest = history.rows.at(-1);
-      assert.equal(latest.version, "0015");
-      assert.equal(latest.name, "inventory_constraints");
-      assert.match(latest.checksum, /^[0-9a-f]{64}$/);
+      assert.equal(latest.version, "0016");
+      assert.equal(latest.name, "sales_constraints");
     });
 
     const second = await runMigrations({ databaseUrl });
