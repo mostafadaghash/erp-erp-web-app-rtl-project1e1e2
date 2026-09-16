@@ -317,9 +317,12 @@ test("03.06 Purchasing / Tax constraints enforce canonical integrity on PostgreS
 
       const history = await client.query("SELECT version,name,checksum FROM schema_migrations ORDER BY version");
       assert.equal(history.rowCount, MIGRATIONS.length);
+      const purchasingSlice = history.rows.find((row) => row.version === "0017");
+      assert.equal(purchasingSlice?.name, "purchasing_tax_constraints");
+      assert.match(purchasingSlice?.checksum ?? "", /^[0-9a-f]{64}$/);
       const latest = history.rows.at(-1);
-      assert.equal(latest.version, "0017");
-      assert.equal(latest.name, "purchasing_tax_constraints");
+      assert.equal(latest.version, "0018");
+      assert.equal(latest.name, "finance_settlement_constraints");
       assert.match(latest.checksum, /^[0-9a-f]{64}$/);
     });
 
