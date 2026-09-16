@@ -43,6 +43,7 @@ export const MIGRATIONS = [
   "0013",
   "0014",
   "0015",
+  "0016",
 ];
 
 export async function withClient(databaseUrl, fn) {
@@ -75,10 +76,23 @@ async function cleanupProductConstraintLayer(client) {
   await client.query("ALTER TABLE IF EXISTS public.customer_profiles DROP CONSTRAINT IF EXISTS fk_customer_profiles__default_price_list");
 }
 
+async function cleanupSalesConstraintLayer(client) {
+  await client.query("DROP FUNCTION IF EXISTS public.fn_sales_line_product_unit_match_at_commit() CASCADE");
+  await client.query("DROP FUNCTION IF EXISTS public.fn_sales_delivery_line_source_match_at_commit() CASCADE");
+  await client.query("DROP FUNCTION IF EXISTS public.fn_sales_delivery_hierarchy_preserve_at_commit() CASCADE");
+  await client.query("DROP FUNCTION IF EXISTS public.fn_sales_invoice_source_match_at_commit() CASCADE");
+  await client.query("DROP FUNCTION IF EXISTS public.fn_sales_return_source_match_at_commit() CASCADE");
+  await client.query("DROP FUNCTION IF EXISTS public.fn_sales_return_source_preserve_at_commit() CASCADE");
+  await client.query("DROP FUNCTION IF EXISTS public.fn_stock_reservations_sales_context_at_commit() CASCADE");
+  await client.query("DROP FUNCTION IF EXISTS public.fn_sales_orders_preserve_reservation_context_at_commit() CASCADE");
+  await client.query("DROP FUNCTION IF EXISTS public.fn_sales_order_lines_preserve_reservation_context_at_commit() CASCADE");
+}
+
 export async function cleanupReportingTables(databaseUrl) {
   await withClient(databaseUrl, async (client) => {
     await cleanupCoreConstraintLayer(client);
     await cleanupProductConstraintLayer(client);
+    await cleanupSalesConstraintLayer(client);
     for (const table of [...REPORTING_TABLES].reverse()) {
       await client.query(`DROP TABLE IF EXISTS public.${table}`);
     }
@@ -89,6 +103,7 @@ export async function cleanupDatabase(databaseUrl) {
   await withClient(databaseUrl, async (client) => {
     await cleanupCoreConstraintLayer(client);
     await cleanupProductConstraintLayer(client);
+    await cleanupSalesConstraintLayer(client);
     for (const table of [...REPORTING_TABLES].reverse()) await client.query(`DROP TABLE IF EXISTS public.${table}`);
     for (const table of [...REPAIR_TABLES].reverse()) await client.query(`DROP TABLE IF EXISTS public.${table}`);
     await client.query("DROP TABLE IF EXISTS public.journal_lines, public.journal_entries, public.gl_accounts");
