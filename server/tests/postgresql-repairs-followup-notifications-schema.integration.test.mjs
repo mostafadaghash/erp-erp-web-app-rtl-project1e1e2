@@ -14,10 +14,10 @@ const PRODUCT_TABLES = ["product_categories","products","product_variants","unit
 const INVENTORY_TABLES = ["serial_numbers","batches","inventory_movements","inventory_movement_lines","inventory_line_serials","inventory_line_batches","inventory_stock_positions","variant_warehouse_cost_projection","batch_stock_positions","stock_reservations","stock_transfers","stock_transfer_lines","stocktake_sessions","stocktake_lines","stocktake_line_serials","stocktake_line_batches","inventory_adjustments","inventory_adjustment_lines","inventory_adjustment_line_serials","inventory_adjustment_line_batches"];
 const SALES_TABLES = ["sales_quotes","sales_quote_lines","sales_orders","sales_order_lines","sales_order_status_history","sales_order_shipping_details","sales_order_deliveries","sales_order_delivery_lines","sales_invoices","sales_invoice_lines","sales_returns","sales_return_lines"];
 const PURCHASING_TABLES = ["purchase_invoices","purchase_invoice_lines","purchase_returns","purchase_return_lines","tax_codes"];
-const FINANCE_TABLES = ["treasuries","receipts","disbursements","finance_categories","treasury_transfers","financial_movements","treasury_balance_positions","financial_allocations","customer_advances","advance_applications","cheques","installment_plans","installments"];
+const FINANCE_TABLES = ["treasuries","finance_categories","receipts","disbursements","treasury_transfers","financial_movements","treasury_balance_positions","financial_allocations","customer_advances","advance_applications","cheques","installment_plans","installments"];
 const ACCOUNTING_TABLES = ["gl_accounts","journal_entries","journal_lines"];
 const REPAIR_TABLES = ["repair_orders","repair_status_history","repair_assignments","repair_issue_reports","repair_customer_decisions","repair_tracking_tokens","customer_followups","followup_actions","followup_status_history","message_templates","notifications","notification_recipients"];
-const MIGRATIONS = ["0001","0002","0003","0004","0005","0006","0007","0008","0009","0010","0011","0012","0013","0014","0015","0016","0017"];
+const MIGRATIONS = ["0001","0002","0003","0004","0005","0006","0007","0008","0009","0010","0011","0012","0013","0014","0015","0016","0017","0018"];
 
 const EXPECTED_COLUMNS = {
   repair_orders: [["id","uuid",true],["branch_id","uuid",true],["document_number","bigint",true],["counterparty_id","uuid",true],["device_description","text",true],["device_serial","text",false],["reported_problem","text",true],["status","text",true],["current_technician_id","uuid",false],["received_at","timestamp with time zone",true],["completed_at","timestamp with time zone",false],["delivered_at","timestamp with time zone",false],["version","integer",true],["customer_notes","text",false],["internal_notes","text",false],["created_by","uuid",true],["created_at","timestamp with time zone",true],["updated_at","timestamp with time zone",true]],
@@ -154,6 +154,7 @@ test("03.I Repairs / Follow-Up / Notifications remains canonical through 03.J", 
       const target = history.rows.find((row) => row.version === "0010");
       assert.equal(target?.name, "repairs_followup_notifications");
       assert.match(target?.checksum ?? "", /^[0-9a-f]{64}$/);
+      assert.equal(history.rows.at(-1)?.version, "0018");
     });
 
     const second = await runMigrations({ databaseUrl });
