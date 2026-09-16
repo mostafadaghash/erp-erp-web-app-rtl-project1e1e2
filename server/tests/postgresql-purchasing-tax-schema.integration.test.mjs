@@ -1,14 +1,175 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import pg from "pg";
+
 import { runMigrations } from "../../scripts/database/migrations.mjs";
-import { cleanupReportingTables } from "./postgresql-schema-test-support.mjs";
-const { Client }=pg;const databaseUrl=process.env.ERP_TEST_DATABASE_URL;
-const TARGET=["purchase_invoices","purchase_invoice_lines","purchase_returns","purchase_return_lines","tax_codes"];
-const REPAIR=["repair_orders","repair_status_history","repair_assignments","repair_issue_reports","repair_customer_decisions","repair_tracking_tokens","customer_followups","followup_actions","followup_status_history","message_templates","notifications","notification_recipients"];
-const ALL=["companies","company_phones","company_settings","branches","branch_settings","warehouses","users","auth_sessions","roles","permissions","role_permissions","user_permission_overrides","user_branch_access","document_sequences","idempotency_keys","posting_batches","audit_logs","outbox_events","document_tombstones","counterparties","counterparty_roles","customer_profiles","supplier_profiles","customer_ledger_entries","supplier_ledger_entries","product_categories","products","product_variants","units","product_units","variant_barcodes","attributes","attribute_values","product_attributes","variant_attribute_values","price_lists","price_list_items","reorder_levels","serial_numbers","batches","inventory_movements","inventory_movement_lines","inventory_line_serials","inventory_line_batches","inventory_stock_positions","variant_warehouse_cost_projection","batch_stock_positions","stock_reservations","stock_transfers","stock_transfer_lines","stocktake_sessions","stocktake_lines","stocktake_line_serials","stocktake_line_batches","inventory_adjustments","inventory_adjustment_lines","inventory_adjustment_line_serials","inventory_adjustment_line_batches","sales_quotes","sales_quote_lines","sales_orders","sales_order_lines","sales_order_status_history","sales_order_shipping_details","sales_order_deliveries","sales_order_delivery_lines","sales_invoices","sales_invoice_lines","sales_returns","sales_return_lines",...TARGET,"treasuries","receipts","disbursements","finance_categories","treasury_transfers","financial_movements","treasury_balance_positions","financial_allocations","customer_advances","advance_applications","cheques","installment_plans","installments","gl_accounts","journal_entries","journal_lines",...REPAIR];
-const MIGRATIONS=["0001","0002","0003","0004","0005","0006","0007","0008","0009","0010","0011","0012","0013","0014","0015","0016"];
-const EXPECTED={purchase_invoices:[["id","uuid",true],["branch_id","uuid",true],["document_number","bigint",true],["document_date","date",true],["document_version","integer",true],["counterparty_id","uuid",false],["warehouse_id","uuid",true],["subtotal","numeric(18,4)",true],["discount_total","numeric(18,4)",true],["additional_cost","numeric(18,4)",true],["tax_total","numeric(18,4)",true],["grand_total","numeric(18,4)",true],["paid_total","numeric(18,4)",true],["due_total","numeric(18,4)",true],["payment_status","text",true],["notes","text",false],["posted_at","timestamp with time zone",true],["created_by","uuid",true],["deleted_at","timestamp with time zone",false],["deleted_by","uuid",false],["delete_reason","text",false]],purchase_invoice_lines:[["id","uuid",true],["purchase_invoice_id","uuid",true],["variant_id","uuid",true],["product_unit_id","uuid",true],["quantity","numeric(18,6)",true],["purchase_unit_price","numeric(18,4)",true],["discount_amount","numeric(18,4)",true],["net_before_tax","numeric(18,4)",true],["landed_cost_allocation","numeric(18,4)",true],["landed_unit_cost","numeric(18,4)",false],["tax_code_id","uuid",false],["tax_amount","numeric(18,4)",true],["line_total","numeric(18,4)",true]],purchase_returns:[["id","uuid",true],["branch_id","uuid",true],["document_number","bigint",true],["document_date","date",true],["document_version","integer",true],["counterparty_id","uuid",false],["warehouse_id","uuid",true],["source_purchase_invoice_id","uuid",false],["total","numeric(18,4)",true],["posted_at","timestamp with time zone",true],["created_by","uuid",true],["deleted_at","timestamp with time zone",false],["deleted_by","uuid",false],["delete_reason","text",false]],purchase_return_lines:[["id","uuid",true],["purchase_return_id","uuid",true],["source_purchase_invoice_line_id","uuid",false],["variant_id","uuid",true],["quantity","numeric(18,6)",true],["commercial_unit_value_snapshot","numeric(18,4)",true],["inventory_unit_cost_snapshot","numeric(18,4)",false],["cost_variance","numeric(18,4)",false],["tax_amount","numeric(18,4)",true],["line_total","numeric(18,4)",true]],tax_codes:[["id","uuid",true],["name","text",true],["code","text",true],["rate","numeric(18,4)",true],["tax_type","text",true],["is_purchase_recoverable","boolean",true],["is_active","boolean",true]]};
-async function withClient(fn){const c=new Client({connectionString:databaseUrl});await c.connect();try{return await fn(c);}finally{await c.end();}}
-async function cleanup(){await cleanupReportingTables(databaseUrl);await withClient(async c=>{await c.query("DROP VIEW IF EXISTS public.purchase_returnable_quantities_v");await c.query("DROP VIEW IF EXISTS public.sales_returnable_quantities_v");for(const t of [...ALL].reverse())await c.query(`DROP TABLE IF EXISTS public.${t}`);await c.query("DROP FUNCTION IF EXISTS public.fn_journal_entries_balanced_at_commit()");await c.query("DROP TABLE IF EXISTS public.schema_migrations");await c.query("DROP EXTENSION IF EXISTS pg_trgm");});}
-test("03.F Purchasing/Tax remains canonical through 03.J",async t=>{if(!databaseUrl)return t.skip("ERP_TEST_DATABASE_URL is not configured");await cleanup();try{const first=await runMigrations({databaseUrl});assert.deepEqual(first.applied,MIGRATIONS);await withClient(async c=>{const cols=await c.query(`SELECT c.relname table_name,a.attname column_name,pg_catalog.format_type(a.atttypid,a.atttypmod) data_type,a.attnotnull not_null FROM pg_catalog.pg_class c JOIN pg_catalog.pg_namespace n ON n.oid=c.relnamespace JOIN pg_catalog.pg_attribute a ON a.attrelid=c.oid WHERE n.nspname='public' AND c.relkind='r' AND c.relname=ANY($1::text[]) AND a.attnum>0 AND NOT a.attisdropped ORDER BY c.relname,a.attnum`,[TARGET]);const actual=Object.fromEntries(TARGET.map(x=>[x,[]]));for(const r of cols.rows)actual[r.table_name].push([r.column_name,r.data_type,r.not_null]);assert.deepEqual(actual,EXPECTED);const view=await c.query(`SELECT c.relkind FROM pg_catalog.pg_class c JOIN pg_catalog.pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND c.relname='purchase_returnable_quantities_v'`);assert.equal(view.rows[0].relkind,'v');const viewCols=await c.query(`SELECT a.attname column_name,pg_catalog.format_type(a.atttypid,a.atttypmod) data_type FROM pg_catalog.pg_class c JOIN pg_catalog.pg_namespace n ON n.oid=c.relnamespace JOIN pg_catalog.pg_attribute a ON a.attrelid=c.oid WHERE n.nspname='public' AND c.relname='purchase_returnable_quantities_v' AND a.attnum>0 AND NOT a.attisdropped ORDER BY a.attnum`);assert.deepEqual(viewCols.rows.map(r=>[r.column_name,r.data_type]),[["source_purchase_invoice_line_id","uuid"],["purchased_quantity","numeric(18,6)"],["posted_returned_quantity","numeric(18,6)"],["returnable_quantity","numeric(18,6)"]]);const constraints=await c.query(`SELECT count(*)::int count FROM pg_catalog.pg_constraint con JOIN pg_catalog.pg_class c ON c.oid=con.conrelid JOIN pg_catalog.pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND c.relname=ANY($1::text[])`,[TARGET]);assert.equal(constraints.rows[0].count,0);const indexes=await c.query(`SELECT count(*)::int count FROM pg_catalog.pg_index i JOIN pg_catalog.pg_class c ON c.oid=i.indrelid JOIN pg_catalog.pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND c.relname=ANY($1::text[])`,[TARGET]);assert.equal(indexes.rows[0].count,0);const ids={line:"00000000-0000-4000-8000-000000000201",invoice:"00000000-0000-4000-8000-000000000202",variant:"00000000-0000-4000-8000-000000000203",unit:"00000000-0000-4000-8000-000000000204",active:"00000000-0000-4000-8000-000000000205",deleted:"00000000-0000-4000-8000-000000000206",branch:"00000000-0000-4000-8000-000000000207",warehouse:"00000000-0000-4000-8000-000000000208",user:"00000000-0000-4000-8000-000000000209"};await c.query(`INSERT INTO purchase_invoice_lines (id,purchase_invoice_id,variant_id,product_unit_id,quantity,purchase_unit_price,discount_amount,net_before_tax,landed_cost_allocation,landed_unit_cost,tax_amount,line_total) VALUES ($1,$2,$3,$4,8.000000,50.0000,0.0000,400.0000,0.0000,50.0000,0.0000,400.0000)`,[ids.line,ids.invoice,ids.variant,ids.unit]);await c.query(`INSERT INTO purchase_returns (id,branch_id,document_number,document_date,document_version,counterparty_id,warehouse_id,source_purchase_invoice_id,total,posted_at,created_by) VALUES ($1,$2,1,CURRENT_DATE,1,NULL,$3,$4,150.0000,now(),$5),($6,$2,2,CURRENT_DATE,1,NULL,$3,$4,50.0000,now(),$5)`,[ids.active,ids.branch,ids.warehouse,ids.invoice,ids.user,ids.deleted]);await c.query("UPDATE purchase_returns SET deleted_at=now(),deleted_by=$1,delete_reason='reversed test return' WHERE id=$2",[ids.user,ids.deleted]);await c.query(`INSERT INTO purchase_return_lines (id,purchase_return_id,source_purchase_invoice_line_id,variant_id,quantity,commercial_unit_value_snapshot,inventory_unit_cost_snapshot,cost_variance,tax_amount,line_total) VALUES ('00000000-0000-4000-8000-000000000210',$1,$2,$3,3.000000,50.0000,48.0000,6.0000,0.0000,150.0000),('00000000-0000-4000-8000-000000000211',$4,$2,$3,1.000000,50.0000,48.0000,2.0000,0.0000,50.0000)`,[ids.active,ids.line,ids.variant,ids.deleted]);const ret=await c.query("SELECT purchased_quantity,posted_returned_quantity,returnable_quantity FROM purchase_returnable_quantities_v WHERE source_purchase_invoice_line_id=$1",[ids.line]);assert.deepEqual(ret.rows[0],{purchased_quantity:"8.000000",posted_returned_quantity:"3.000000",returnable_quantity:"5.000000"});const later=await c.query("SELECT to_regclass('public.print_templates') IS NOT NULL present");assert.equal(later.rows[0].present,true);const h=await c.query("SELECT version,name,checksum FROM schema_migrations ORDER BY version");assert.equal(h.rowCount,MIGRATIONS.length);const row=h.rows.find(r=>r.version==='0007');assert.equal(row?.name,'purchasing_tax');assert.match(row?.checksum??'',/^[0-9a-f]{64}$/);});const second=await runMigrations({databaseUrl});assert.deepEqual(second.applied,[]);assert.deepEqual(second.skipped,MIGRATIONS);const verify=await runMigrations({databaseUrl,verifyOnly:true});assert.deepEqual(verify.applied,[]);assert.deepEqual(verify.skipped,MIGRATIONS);}finally{await cleanup();}});
+import { cleanupDatabase, MIGRATIONS } from "./postgresql-schema-test-support.mjs";
+
+const { Client } = pg;
+const databaseUrl = process.env.ERP_TEST_DATABASE_URL;
+const TARGET = ["purchase_invoices","purchase_invoice_lines","purchase_returns","purchase_return_lines","tax_codes"];
+
+const EXPECTED = {
+  purchase_invoices: [["id","uuid",true],["branch_id","uuid",true],["document_number","bigint",true],["document_date","date",true],["document_version","integer",true],["counterparty_id","uuid",false],["warehouse_id","uuid",true],["subtotal","numeric(18,4)",true],["discount_total","numeric(18,4)",true],["additional_cost","numeric(18,4)",true],["tax_total","numeric(18,4)",true],["grand_total","numeric(18,4)",true],["paid_total","numeric(18,4)",true],["due_total","numeric(18,4)",true],["payment_status","text",true],["notes","text",false],["posted_at","timestamp with time zone",true],["created_by","uuid",true],["deleted_at","timestamp with time zone",false],["deleted_by","uuid",false],["delete_reason","text",false]],
+  purchase_invoice_lines: [["id","uuid",true],["purchase_invoice_id","uuid",true],["variant_id","uuid",true],["product_unit_id","uuid",true],["quantity","numeric(18,6)",true],["purchase_unit_price","numeric(18,4)",true],["discount_amount","numeric(18,4)",true],["net_before_tax","numeric(18,4)",true],["landed_cost_allocation","numeric(18,4)",true],["landed_unit_cost","numeric(18,4)",false],["tax_code_id","uuid",false],["tax_amount","numeric(18,4)",true],["line_total","numeric(18,4)",true]],
+  purchase_returns: [["id","uuid",true],["branch_id","uuid",true],["document_number","bigint",true],["document_date","date",true],["document_version","integer",true],["counterparty_id","uuid",false],["warehouse_id","uuid",true],["source_purchase_invoice_id","uuid",false],["total","numeric(18,4)",true],["posted_at","timestamp with time zone",true],["created_by","uuid",true],["deleted_at","timestamp with time zone",false],["deleted_by","uuid",false],["delete_reason","text",false]],
+  purchase_return_lines: [["id","uuid",true],["purchase_return_id","uuid",true],["source_purchase_invoice_line_id","uuid",false],["variant_id","uuid",true],["quantity","numeric(18,6)",true],["commercial_unit_value_snapshot","numeric(18,4)",true],["inventory_unit_cost_snapshot","numeric(18,4)",false],["cost_variance","numeric(18,4)",false],["tax_amount","numeric(18,4)",true],["line_total","numeric(18,4)",true]],
+  tax_codes: [["id","uuid",true],["name","text",true],["code","text",true],["rate","numeric(18,4)",true],["tax_type","text",true],["is_purchase_recoverable","boolean",true],["is_active","boolean",true]],
+};
+
+async function withClient(fn) {
+  const client = new Client({ connectionString: databaseUrl });
+  await client.connect();
+  try { return await fn(client); } finally { await client.end(); }
+}
+
+async function seedViewFixture(client) {
+  const ids = {
+    company: "51000000-0000-4000-8000-000000000001",
+    branch: "51000000-0000-4000-8000-000000000002",
+    warehouse: "51000000-0000-4000-8000-000000000003",
+    role: "51000000-0000-4000-8000-000000000004",
+    user: "51000000-0000-4000-8000-000000000005",
+    counterparty: "51000000-0000-4000-8000-000000000006",
+    category: "51000000-0000-4000-8000-000000000007",
+    unit: "51000000-0000-4000-8000-000000000008",
+    product: "51000000-0000-4000-8000-000000000009",
+    productUnit: "51000000-0000-4000-8000-000000000010",
+    variant: "51000000-0000-4000-8000-000000000011",
+    invoice: "51000000-0000-4000-8000-000000000012",
+    line: "51000000-0000-4000-8000-000000000013",
+    activeReturn: "51000000-0000-4000-8000-000000000014",
+    deletedReturn: "51000000-0000-4000-8000-000000000015",
+  };
+
+  await client.query(`INSERT INTO companies (id,name,base_currency_code,default_language,timezone,is_active,created_at,updated_at)
+    VALUES ($1,'Purchasing Schema Co','EGP','ar-EG','Africa/Cairo',true,now(),now())`, [ids.company]);
+  await client.query(`INSERT INTO branches (id,company_id,name,code,is_active,created_at,updated_at)
+    VALUES ($1,$2,'Main','MAIN',true,now(),now())`, [ids.branch, ids.company]);
+  await client.query(`INSERT INTO warehouses (id,branch_id,name,code,is_active,created_at,updated_at)
+    VALUES ($1,$2,'Main WH','MAIN-WH',true,now(),now())`, [ids.warehouse, ids.branch]);
+  await client.query(`INSERT INTO roles (id,role_key,display_name_key,is_system)
+    VALUES ($1,'PURCH_SCHEMA','roles.purchSchema',true)`, [ids.role]);
+  await client.query(`INSERT INTO users
+    (id,name,username,email,password_hash,role_id,default_branch_id,branch_scope_mode,preferred_language,is_active,created_at,updated_at)
+    VALUES ($1,'Purchasing Schema User','purch-schema',NULL,'hash',$2,$3,'ALL','ar-EG',true,now(),now())`,
+    [ids.user, ids.role, ids.branch]);
+  await client.query(`INSERT INTO counterparties
+    (id,name,phone,normalized_phone,address,notes,is_active,created_at,updated_at)
+    VALUES ($1,'Schema Supplier',NULL,NULL,NULL,NULL,true,now(),now())`, [ids.counterparty]);
+  await client.query(`INSERT INTO counterparty_roles (counterparty_id,role) VALUES ($1,'SUPPLIER')`, [ids.counterparty]);
+  await client.query(`INSERT INTO product_categories (id,name,parent_id,is_active) VALUES ($1,'Schema Purchase',NULL,true)`, [ids.category]);
+  await client.query(`INSERT INTO units (id,name,symbol,allows_fraction,is_active) VALUES ($1,'Schema Piece','spc',false,true)`, [ids.unit]);
+
+  await client.query("BEGIN");
+  await client.query(`INSERT INTO products
+    (id,name,category_id,product_type,base_unit_id,tracking_serial,tracking_batch,tracking_expiry,is_active,created_at,updated_at)
+    VALUES ($1,'Schema Product',$2,'STOCK',$3,false,false,false,true,now(),now())`, [ids.product, ids.category, ids.productUnit]);
+  await client.query(`INSERT INTO product_units (id,product_id,unit_id,conversion_to_base,is_sellable,is_purchasable)
+    VALUES ($1,$2,$3,1.000000,true,true)`, [ids.productUnit, ids.product, ids.unit]);
+  await client.query(`INSERT INTO product_variants
+    (id,product_id,name,sku,is_default,combination_signature,minimum_selling_price,is_active,created_at,updated_at)
+    VALUES ($1,$2,'Default','PUR-SCHEMA',true,'DEFAULT-SCHEMA',0.0000,true,now(),now())`, [ids.variant, ids.product]);
+  await client.query("COMMIT");
+
+  await client.query(`INSERT INTO purchase_invoices
+    (id,branch_id,document_number,document_date,document_version,counterparty_id,warehouse_id,subtotal,discount_total,additional_cost,tax_total,grand_total,paid_total,due_total,payment_status,notes,posted_at,created_by,deleted_at,deleted_by,delete_reason)
+    VALUES ($1,$2,1,CURRENT_DATE,1,$3,$4,400.0000,0.0000,0.0000,0.0000,400.0000,400.0000,0.0000,'POSTED',NULL,now(),$5,NULL,NULL,NULL)`,
+    [ids.invoice, ids.branch, ids.counterparty, ids.warehouse, ids.user]);
+  await client.query(`INSERT INTO purchase_invoice_lines
+    (id,purchase_invoice_id,variant_id,product_unit_id,quantity,purchase_unit_price,discount_amount,net_before_tax,landed_cost_allocation,landed_unit_cost,tax_code_id,tax_amount,line_total)
+    VALUES ($1,$2,$3,$4,8.000000,50.0000,0.0000,400.0000,0.0000,50.0000,NULL,0.0000,400.0000)`,
+    [ids.line, ids.invoice, ids.variant, ids.productUnit]);
+  await client.query(`INSERT INTO purchase_returns
+    (id,branch_id,document_number,document_date,document_version,counterparty_id,warehouse_id,source_purchase_invoice_id,total,posted_at,created_by,deleted_at,deleted_by,delete_reason)
+    VALUES ($1,$3,1,CURRENT_DATE,1,$4,$5,$6,150.0000,now(),$7,NULL,NULL,NULL),
+           ($2,$3,2,CURRENT_DATE,1,$4,$5,$6,50.0000,now(),$7,now(),$7,'reversed test return')`,
+    [ids.activeReturn, ids.deletedReturn, ids.branch, ids.counterparty, ids.warehouse, ids.invoice, ids.user]);
+  await client.query(`INSERT INTO purchase_return_lines
+    (id,purchase_return_id,source_purchase_invoice_line_id,variant_id,quantity,commercial_unit_value_snapshot,inventory_unit_cost_snapshot,cost_variance,tax_amount,line_total)
+    VALUES ('51000000-0000-4000-8000-000000000016',$1,$2,$3,3.000000,50.0000,48.0000,6.0000,0.0000,150.0000),
+           ('51000000-0000-4000-8000-000000000017',$4,$2,$3,1.000000,50.0000,48.0000,2.0000,0.0000,50.0000)`,
+    [ids.activeReturn, ids.line, ids.variant, ids.deletedReturn]);
+
+  return ids;
+}
+
+test("03.F Purchasing/Tax remains canonical after its 03.06 constraint slice", async (t) => {
+  if (!databaseUrl) return t.skip("ERP_TEST_DATABASE_URL is not configured");
+  await cleanupDatabase(databaseUrl);
+  try {
+    const first = await runMigrations({ databaseUrl });
+    assert.deepEqual(first.applied, MIGRATIONS);
+    assert.deepEqual(first.skipped, []);
+
+    await withClient(async (client) => {
+      const cols = await client.query(`SELECT c.relname table_name,a.attname column_name,
+        pg_catalog.format_type(a.atttypid,a.atttypmod) data_type,a.attnotnull not_null
+        FROM pg_catalog.pg_class c
+        JOIN pg_catalog.pg_namespace n ON n.oid=c.relnamespace
+        JOIN pg_catalog.pg_attribute a ON a.attrelid=c.oid
+        WHERE n.nspname='public' AND c.relkind='r' AND c.relname=ANY($1::text[])
+          AND a.attnum>0 AND NOT a.attisdropped ORDER BY c.relname,a.attnum`, [TARGET]);
+      const actual = Object.fromEntries(TARGET.map((table) => [table, []]));
+      for (const row of cols.rows) actual[row.table_name].push([row.column_name,row.data_type,row.not_null]);
+      assert.deepEqual(actual, EXPECTED);
+
+      const viewCols = await client.query(`SELECT a.attname column_name,pg_catalog.format_type(a.atttypid,a.atttypmod) data_type
+        FROM pg_catalog.pg_class c
+        JOIN pg_catalog.pg_namespace n ON n.oid=c.relnamespace
+        JOIN pg_catalog.pg_attribute a ON a.attrelid=c.oid
+        WHERE n.nspname='public' AND c.relname='purchase_returnable_quantities_v'
+          AND a.attnum>0 AND NOT a.attisdropped ORDER BY a.attnum`);
+      assert.deepEqual(viewCols.rows.map((row) => [row.column_name,row.data_type]), [
+        ["source_purchase_invoice_line_id","uuid"],
+        ["purchased_quantity","numeric(18,6)"],
+        ["posted_returned_quantity","numeric(18,6)"],
+        ["returnable_quantity","numeric(18,6)"],
+      ]);
+
+      const requiredConstraints = await client.query(`SELECT conname FROM pg_catalog.pg_constraint
+        WHERE conname = ANY($1::text[]) ORDER BY conname`, [[
+          "pk_tax_codes","uq_tax_codes__code","pk_purchase_invoices","uq_purchase_invoices__branch_document",
+          "pk_purchase_invoice_lines","pk_purchase_returns","uq_purchase_returns__branch_document","pk_purchase_return_lines",
+          "fk_purchase_invoices__warehouse_branch","fk_purchase_returns__warehouse_branch",
+          "fk_purchase_invoice_lines__tax_code","ck_purchase_invoices__due_requires_counterparty",
+        ]]);
+      assert.equal(requiredConstraints.rowCount, 12);
+
+      const independentIndexes = await client.query(`SELECT idx.relname AS index_name
+        FROM pg_catalog.pg_index i
+        JOIN pg_catalog.pg_class tbl ON tbl.oid=i.indrelid
+        JOIN pg_catalog.pg_namespace n ON n.oid=tbl.relnamespace
+        JOIN pg_catalog.pg_class idx ON idx.oid=i.indexrelid
+        LEFT JOIN pg_catalog.pg_constraint con ON con.conindid=i.indexrelid
+        WHERE n.nspname='public' AND tbl.relname=ANY($1::text[]) AND con.oid IS NULL
+        ORDER BY idx.relname`, [TARGET]);
+      assert.deepEqual(independentIndexes.rows, [], "03.07 Purchasing/Tax indexes remain deferred");
+
+      const ids = await seedViewFixture(client);
+      const returnable = await client.query(`SELECT purchased_quantity,posted_returned_quantity,returnable_quantity
+        FROM purchase_returnable_quantities_v WHERE source_purchase_invoice_line_id=$1`, [ids.line]);
+      assert.deepEqual(returnable.rows[0], {
+        purchased_quantity: "8.000000", posted_returned_quantity: "3.000000", returnable_quantity: "5.000000",
+      });
+
+      const history = await client.query("SELECT version,name,checksum FROM schema_migrations ORDER BY version");
+      assert.equal(history.rowCount, MIGRATIONS.length);
+      const original = history.rows.find((row) => row.version === "0007");
+      assert.equal(original?.name, "purchasing_tax");
+      const latest = history.rows.at(-1);
+      assert.equal(latest.version, "0017");
+      assert.equal(latest.name, "purchasing_tax_constraints");
+      assert.match(latest.checksum, /^[0-9a-f]{64}$/);
+    });
+
+    const second = await runMigrations({ databaseUrl });
+    assert.deepEqual(second.applied, []);
+    assert.deepEqual(second.skipped, MIGRATIONS);
+    const verification = await runMigrations({ databaseUrl, verifyOnly: true });
+    assert.deepEqual(verification.applied, []);
+    assert.deepEqual(verification.skipped, MIGRATIONS);
+  } finally {
+    await cleanupDatabase(databaseUrl);
+  }
+});
