@@ -210,10 +210,16 @@ test("03.06 Sales constraints enforce canonical integrity on PostgreSQL 17", asy
 
       const taxFks = await client.query(`
         SELECT conname FROM pg_catalog.pg_constraint
-        WHERE conrelid = ANY($1::regclass[]) AND conname LIKE '%tax_code%'`, [[
+        WHERE conrelid = ANY($1::regclass[]) AND conname LIKE '%tax_code%'
+        ORDER BY conname`, [[
           "public.sales_quote_lines","public.sales_order_lines","public.sales_invoice_lines","public.sales_return_lines",
         ]]);
-      assert.deepEqual(taxFks.rows, [], "Sales tax_code FKs must wait for the Purchasing/Tax target-key slice");
+      assert.deepEqual(taxFks.rows.map((row) => row.conname), [
+        "fk_sales_invoice_lines__tax_code",
+        "fk_sales_order_lines__tax_code",
+        "fk_sales_quote_lines__tax_code",
+        "fk_sales_return_lines__tax_code",
+      ]);
 
       const ids = await seedFixture(client);
       const quote1 = "40000000-0000-4000-8000-000000000020";
