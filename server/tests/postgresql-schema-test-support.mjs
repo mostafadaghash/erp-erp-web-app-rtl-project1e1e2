@@ -95,6 +95,7 @@ async function cleanupPurchasingConstraintLayer(client) {
   await client.query("DROP FUNCTION IF EXISTS public.fn_purchase_invoice_line_product_unit_match_at_commit() CASCADE");
   await client.query("DROP FUNCTION IF EXISTS public.fn_purchase_return_source_match_at_commit() CASCADE");
   await client.query("DROP FUNCTION IF EXISTS public.fn_purchase_return_source_preserve_at_commit() CASCADE");
+  await client.query("ALTER TABLE IF EXISTS public.purchase_invoice_lines DROP CONSTRAINT IF EXISTS fk_purchase_invoice_lines__tax_code");
   await client.query("ALTER TABLE IF EXISTS public.sales_quote_lines DROP CONSTRAINT IF EXISTS fk_sales_quote_lines__tax_code");
   await client.query("ALTER TABLE IF EXISTS public.sales_order_lines DROP CONSTRAINT IF EXISTS fk_sales_order_lines__tax_code");
   await client.query("ALTER TABLE IF EXISTS public.sales_invoice_lines DROP CONSTRAINT IF EXISTS fk_sales_invoice_lines__tax_code");
