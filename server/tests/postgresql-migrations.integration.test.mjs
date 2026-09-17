@@ -22,7 +22,6 @@ const SALES_TABLES = [
   "sales_return_lines",
 ];
 const PURCHASING_TABLES = ["purchase_invoices","purchase_invoice_lines","purchase_returns","purchase_return_lines","tax_codes"];
-// Parent-to-child declaration order so reverse cleanup drops dependents before referenced Finance masters.
 const FINANCE_TABLES = [
   "treasuries","finance_categories","receipts","disbursements","treasury_transfers",
   "financial_movements","treasury_balance_positions","financial_allocations","customer_advances",
@@ -71,6 +70,7 @@ const MIGRATIONS = [
   { version: "0018", name: "finance_settlement_constraints", transactional: true },
   { version: "0019", name: "accounting_constraints", transactional: true },
   { version: "0020", name: "repairs_followup_notifications_constraints", transactional: true },
+  { version: "0021", name: "printing_export_reporting_read_models_constraints", transactional: true },
 ];
 
 async function withClient(fn) {
@@ -122,7 +122,7 @@ test("fresh apply, idempotent rerun, verification, and checksum drift protection
     assert.deepEqual(verification.applied, []);
     assert.deepEqual(verification.skipped, versions);
     await withClient(async (client) => {
-      await client.query("UPDATE schema_migrations SET checksum = $1 WHERE version = '0020'", ["0".repeat(64)]);
+      await client.query("UPDATE schema_migrations SET checksum = $1 WHERE version = '0021'", ["0".repeat(64)]);
     });
     await assert.rejects(() => runMigrations({ databaseUrl, verifyOnly: true }), /checksum drift detected/);
   } finally {
