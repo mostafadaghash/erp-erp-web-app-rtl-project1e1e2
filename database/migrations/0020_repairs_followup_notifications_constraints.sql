@@ -1,8 +1,7 @@
 -- Phase 03.06 Repairs / Follow-Up / Notifications constraints only.
--- Independent query/search/performance and partial indexes remain deferred to Phase 03.07.
--- In particular, active RepairAssignment uniqueness, automatic Follow-Up source-event dedupe,
--- Notification outbox-event/type dedupe, unseen-recipient indexes and operational dashboard indexes
--- remain owned by the closed Index Catalog in 03.07.
+-- Integrity unique indexes explicitly closed by Baseline v1.7 belong to 03.06 even though
+-- PostgreSQL implements partial uniqueness with indexes. Non-integrity query/performance indexes
+-- remain deferred to Phase 03.07.
 
 -- Canonical identities and ordinary uniqueness.
 ALTER TABLE public.repair_orders
@@ -31,10 +30,9 @@ ALTER TABLE public.customer_followups
 ALTER TABLE public.followup_actions
   ADD CONSTRAINT pk_followup_actions PRIMARY KEY (id);
 
--- The approved physical shape has no standalone id column for Follow-Up status history.
--- Use its natural append-only grain without altering migration 0010's column shape.
+-- Migration 0010 physically includes a UUID id column; preserve that canonical identity.
 ALTER TABLE public.followup_status_history
-  ADD CONSTRAINT pk_followup_status_history PRIMARY KEY (followup_id, changed_at);
+  ADD CONSTRAINT pk_followup_status_history PRIMARY KEY (id);
 
 ALTER TABLE public.message_templates
   ADD CONSTRAINT pk_message_templates PRIMARY KEY (id);
@@ -157,5 +155,19 @@ ALTER TABLE public.repair_customer_decisions
 ALTER TABLE public.customer_followups
   ADD CONSTRAINT ck_customer_followups__source_type CHECK (source_type IN ('SALES_ORDER', 'REPAIR_ORDER', 'MANUAL'));
 
+-- Approved 03.06 integrity partial uniqueness from Baseline §28.7 / Gap Analysis §8.
+CREATE UNIQUE INDEX uq_repair_assignments__active
+  ON public.repair_assignments (repair_order_id)
+  WHERE ended_at IS NULL;
+
+CREATE UNIQUE INDEX uq_customer_followups__source_event
+  ON public.customer_followups (source_event_id)
+  WHERE source_event_id IS NOT NULL;
+
+CREATE UNIQUE INDEX uq_notifications__outbox_event_type
+  ON public.notifications (outbox_event_id, notification_type)
+  WHERE outbox_event_id IS NOT NULL;
+
 -- No closed CHECK is invented for Follow-Up priority/status/type/action/result, message-template event keys,
 -- notification event/type or template language because Baseline v1.7 does not define closed technical vocabularies for them.
+-- All other Repairs / Follow-Up / Notifications query/performance indexes remain Phase 03.07.
