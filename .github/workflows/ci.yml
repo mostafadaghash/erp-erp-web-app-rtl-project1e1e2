@@ -177,6 +177,10 @@ jobs:
         env:
           ERP_TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/erp_backend_ci
         run: node --test server/tests/postgresql-accounting-schema.integration.test.mjs
+      - name: PostgreSQL accounting constraint integration tests
+        env:
+          ERP_TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/erp_backend_ci
+        run: node --test server/tests/postgresql-accounting-constraints.integration.test.mjs
       - name: PostgreSQL repairs/follow-up/notifications schema integration tests
         env:
           ERP_TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/erp_backend_ci
