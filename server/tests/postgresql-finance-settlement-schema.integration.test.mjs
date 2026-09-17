@@ -36,7 +36,7 @@ async function withClient(fn) {
   try { return await fn(client); } finally { await client.end(); }
 }
 
-test("03.G Finance / Settlement physical shape remains canonical after 03.06 constraints", async (t) => {
+test("03.G Finance / Settlement physical shape remains canonical after later 03.06 constraints", async (t) => {
   if (!databaseUrl) return t.skip("ERP_TEST_DATABASE_URL is not configured");
   await cleanupDatabase(databaseUrl);
   try {
@@ -73,9 +73,12 @@ test("03.G Finance / Settlement physical shape remains canonical after 03.06 con
       const history = await client.query("SELECT version,name,checksum FROM schema_migrations ORDER BY version");
       assert.equal(history.rowCount, MIGRATIONS.length);
       assert.equal(history.rows.find((row) => row.version === "0008")?.name, "finance_settlement");
+      const financeSlice = history.rows.find((row) => row.version === "0018");
+      assert.equal(financeSlice?.name, "finance_settlement_constraints");
+      assert.match(financeSlice?.checksum ?? "", /^[0-9a-f]{64}$/);
       const latest = history.rows.at(-1);
-      assert.equal(latest.version, "0018");
-      assert.equal(latest.name, "finance_settlement_constraints");
+      assert.equal(latest.version, "0019");
+      assert.equal(latest.name, "accounting_constraints");
       assert.match(latest.checksum ?? "", /^[0-9a-f]{64}$/);
     });
 
