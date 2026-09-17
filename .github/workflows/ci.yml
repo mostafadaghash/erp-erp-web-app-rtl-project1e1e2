@@ -193,6 +193,10 @@ jobs:
         env:
           ERP_TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/erp_backend_ci
         run: node --test server/tests/postgresql-printing-export-reporting-read-models-schema.integration.test.mjs
+      - name: PostgreSQL printing/export/reporting read-model constraint integration tests
+        env:
+          ERP_TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/erp_backend_ci
+        run: node --test server/tests/postgresql-printing-export-reporting-read-models-constraints.integration.test.mjs
       - name: Backend build
         run: npm run backend:build
       - name: PostgreSQL health/readiness and graceful shutdown smoke
