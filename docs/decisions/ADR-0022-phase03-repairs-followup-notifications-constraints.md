@@ -1,81 +1,68 @@
-# ADR-0022 — Phase 03.06 Repairs / Follow-Up / Notifications Constraints
+# ADR-0022 — Phase 03.06 Repairs / Follow-Up / Notifications Constraint Boundary
 
-- **Status:** Accepted
-- **Date:** 2026-09-17
-- **Phase:** 03.06 — Constraints
-- **Authority:** `Business-Tech-ERP-Architecture-Baseline-v1.7-Final.docx`
+**Status:** ACCEPTED  
+**Date:** 2026-09-17  
+**Phase:** 03.06 — Constraints  
+**Authority:** `Business-Tech-ERP-Architecture-Baseline-v1.7-Final.docx` §§25.15, 25.16, 26, 28.7 plus `docs/gap-analysis/phase-03-06-constraints-gap-analysis.md`
 
 ## Context
 
-Migration `0010_repairs_followup_notifications` created the approved physical shape for Repairs, Customer Follow-Up and Notifications without the relational constraint layer. Architecture Baseline v1.7 closes the Repairs status vocabulary, repair customer decision vocabulary and Follow-Up source domain, requires historical timeline protection through restrictive relationships, and requires ordinary uniqueness for repair document numbers, one final customer decision per issue report and notification recipient state.
+Migration `0010_repairs_followup_notifications` froze the physical columns for Repairs, Customer Follow-Up and Notifications. Phase 03.06 must add relational integrity without rewriting the historical migration or pulling ordinary query/performance indexes forward from Phase 03.07.
 
-The Baseline also places active RepairAssignment uniqueness, automatic Follow-Up source-event deduplication and Notification outbox-event/type deduplication in the locked §28 Index Catalog as partial unique indexes. The established Phase 03.06 policy from earlier slices is to keep independent/partial/expression Index Catalog DDL in Phase 03.07 rather than pull it forward into an ordinary constraint migration.
+Baseline v1.7 also closes three partial uniqueness rules whose purpose is integrity rather than performance:
 
-The approved physical shape of `followup_status_history` contains no standalone `id` column even though it is historical. Because Phase 03.06 must remain additive and must not rewrite migration `0010`, its natural append-only grain is represented by `(followup_id, changed_at)`.
+1. one active `repair_assignments` row per RepairOrder (`ended_at IS NULL`);
+2. one automatic `customer_followups` row per non-null `source_event_id`;
+3. one `notifications` row per `(outbox_event_id, notification_type)` when `outbox_event_id IS NOT NULL`.
+
+Although PostgreSQL implements these rules using partial unique indexes, the Gap Analysis §8 explicitly classifies such structures as Phase 03.06 integrity requirements. Phase 03.07 owns only the remaining non-integrity query/search/performance indexes.
+
+The physical migration `0010` contains `followup_status_history.id uuid NOT NULL`. That existing identity is preserved; Phase 03.06 does not pretend the column is absent or replace it with an invented natural-key identity.
 
 ## Decision
 
-1. Migration `0020_repairs_followup_notifications_constraints` establishes primary keys for Repair, Follow-Up, template and Notification entity tables.
-2. `followup_status_history` uses composite primary key `(followup_id, changed_at)` without changing its approved column shape.
-3. `notification_recipients` uses composite primary key `(notification_id, user_id)`, satisfying the mandatory recipient uniqueness requirement.
-4. Repair document numbers are unique by `(branch_id, document_number)`.
-5. `repair_customer_decisions(repair_issue_report_id)` is unique, so one Issue Report has at most one final Customer Decision row.
-6. Historical Repair / Follow-Up relationships use `ON DELETE RESTRICT`: repair orders, status history, assignments, issue reports, decisions, tracking tokens, Follow-Up actions/history and their user/counterparty/branch references cannot be destroyed by cascading parent deletion.
-7. `repair_orders.current_technician_id`, assignment technician/user references and all recorded-by/changed-by/assigned-by references point to canonical `users(id)`.
-8. `customer_followups.source_event_id` and `notifications.outbox_event_id` reference `outbox_events(id)` because the Baseline explicitly defines these as the event identity used for automatic task/notification retry handling.
-9. `customer_followups.source_type/source_id` remains intentionally polymorphic across `SALES_ORDER / REPAIR_ORDER / MANUAL`; no fake conventional FK is introduced on `source_id`.
-10. `notifications.source_type/source_id` remains intentionally polymorphic; no fake conventional FK is introduced on `source_id`.
-11. Repair current status and Repair status-history old/new values use the canonical V1 vocabulary: `WAITING`, `HANDED_TO_TECHNICIAN`, `IN_REPAIR`, `NEW_PROBLEM`, `CUSTOMER_APPROVED`, `TECHNICIAN_REJECTED`, `CUSTOMER_REJECTED`, `REPAIRED`, `DELIVERED`.
-12. Customer repair decision is restricted to `APPROVED / REJECTED`.
-13. Follow-Up source type is restricted to `SALES_ORDER / REPAIR_ORDER / MANUAL`.
-14. Repair document number must be positive and Repair version cannot be negative.
-15. No closed CHECK is invented for Follow-Up priority/status/type/action/result, Message Template event key/language, or Notification event/type because Baseline v1.7 does not define closed technical vocabularies for those fields.
+Migration `0020_repairs_followup_notifications_constraints` will:
 
-## Deliberately deferred to Phase 03.07
+- keep `followup_status_history(id)` as its primary key;
+- add canonical PK/FK/UNIQUE/CHECK constraints for the 12 Repairs / Follow-Up / Notifications tables;
+- use `ON DELETE RESTRICT` for historical/business references so repair timelines, assignments, issue reports, decisions, follow-up history and notification recipient state cannot be destroyed by parent deletion;
+- enforce repair document uniqueness by `(branch_id, document_number)`;
+- enforce one final customer decision per `repair_issue_report_id`;
+- enforce the approved Repair status vocabulary:
+  - `WAITING`
+  - `HANDED_TO_TECHNICIAN`
+  - `IN_REPAIR`
+  - `NEW_PROBLEM`
+  - `CUSTOMER_APPROVED`
+  - `TECHNICIAN_REJECTED`
+  - `CUSTOMER_REJECTED`
+  - `REPAIRED`
+  - `DELIVERED`;
+- enforce customer decision `APPROVED | REJECTED`;
+- enforce Follow-Up `source_type = SALES_ORDER | REPAIR_ORDER | MANUAL`;
+- link non-null Follow-Up `source_event_id` and Notification `outbox_event_id` to `outbox_events(id)` with restrictive FKs;
+- retain `customer_followups.source_type/source_id` and `notifications.source_type/source_id` as polymorphic references with no fake conventional FK;
+- create these Phase 03.06 integrity partial unique indexes:
+  - `uq_repair_assignments__active` on `(repair_order_id) WHERE ended_at IS NULL`;
+  - `uq_customer_followups__source_event` on `(source_event_id) WHERE source_event_id IS NOT NULL`;
+  - `uq_notifications__outbox_event_type` on `(outbox_event_id, notification_type) WHERE outbox_event_id IS NOT NULL`.
 
-The following locked Index Catalog items are not pulled into migration `0020`:
+## Deliberate non-decisions
 
-- `PARTIAL UNIQUE (repair_order_id) WHERE ended_at IS NULL` for one active RepairAssignment.
-- `UNIQUE (source_event_id) WHERE source_event_id IS NOT NULL` for automatic Follow-Up deduplication.
-- `UNIQUE (outbox_event_id, notification_type) WHERE outbox_event_id IS NOT NULL` for automatic Notification deduplication.
-- Repair / Follow-Up / Notification query indexes, technician workload partial index, open Follow-Up partial index and unseen-recipient partial index.
+This slice does not invent closed CHECK vocabularies for Follow-Up status, priority, followup type, action/result, message-template language/event keys, or notification event/type because Baseline v1.7 does not close those technical vocabularies.
 
-This deferral does not change their approved V1 requirement; it preserves the official execution order by keeping partial/index DDL inside Phase 03.07.
+This slice does not implement the transaction/service rules that require `NEW_PROBLEM` to create an issue report in the same transaction, or customer approval/rejection to create the associated decision and notifications. Those remain later backend command/transaction responsibilities.
 
-## Deliberately deferred to later backend phases
-
-- Repair Status command transition policy, permission checks and sensitive-transition reasons.
-- Enforcing `NEW_PROBLEM` + Issue Report in one transaction.
-- Enforcing `CUSTOMER_APPROVED / CUSTOMER_REJECTED` + Customer Decision in one transaction.
-- Technician rejection reason policy.
-- Follow-Up action locking/reschedule/assignment effects.
-- Idempotency, Audit/Outbox emission, notifications and Post-Delivery Follow-Up creation.
-- Polymorphic source existence validation for Follow-Ups and Notifications.
+This slice does not add operational dashboard, technician workload, source history, unseen notification, timeline, or other performance indexes from §28.7. Those remain Phase 03.07.
 
 ## Consequences
 
-- Repair and Follow-Up historical rows can no longer reference missing canonical parents/users/branches/counterparties where a direct relationship exists.
-- Invalid Repair statuses, Repair decisions and Follow-Up source types are rejected by PostgreSQL.
-- Duplicate repair document numbers in one Branch and duplicate final decisions for one Issue Report are rejected.
-- Recipient identity is canonical and duplicate recipient rows are rejected.
-- Automatic event references must point to real Outbox events.
-- Partial/index-catalog dedupe rules remain visibly deferred rather than being silently omitted or prematurely implemented.
+- Retries cannot create duplicate automatic Follow-Ups or duplicate notification types for the same Outbox Event.
+- A RepairOrder cannot have two active technician assignments simultaneously.
+- Historical Repair/Follow-Up chains are protected from destructive parent deletion.
+- Physical schema identity remains consistent with migration `0010`.
+- Phase 03.07 can add only the remaining cataloged performance indexes and must not duplicate PK/UNIQUE/integrity index structures already created by `0020`.
 
 ## Verification contract
 
-PostgreSQL 17 behavioral integration tests for this slice must prove:
-
-- canonical PK/FK/UNIQUE/CHECK constraints are installed;
-- Repair document-number duplicates fail inside one Branch;
-- all nine canonical Repair statuses are accepted and invalid statuses are rejected;
-- Repair status-history old/new status checks are enforced;
-- one Issue Report accepts only one Customer Decision and decision is `APPROVED / REJECTED` only;
-- direct Branch/Counterparty/User/Repair/Follow-Up/Outbox foreign-key violations fail;
-- Follow-Up source type accepts `SALES_ORDER / REPAIR_ORDER / MANUAL` and rejects invalid values;
-- no fake source FK exists on polymorphic Follow-Up/Notification `source_id`;
-- recipient duplicates fail;
-- historical parent deletion is restricted;
-- independent/partial Repairs/Follow-Up/Notification indexes remain absent until 03.07;
-- active-assignment, source-event and Notification outbox dedupe partial rules remain structurally deferred to 03.07 rather than silently implemented in 03.06;
-- migration checksum, idempotent rerun and verify-only behavior remain valid;
-- no frontend cutover, dual write, Convex Production change or merge to `main` occurs.
+PostgreSQL 17 behavioral integration must prove the PK/FK/UNIQUE/CHECK catalog, all nine Repair statuses, decision and Follow-Up source domains, one active assignment, source-event retry deduplication, notification outbox/type retry deduplication, recipient uniqueness, historical deletion protection, absence of fake polymorphic source FKs, migration checksum/idempotent rerun/verify-only behavior, and that only the three approved integrity partial indexes exist before 03.07.
