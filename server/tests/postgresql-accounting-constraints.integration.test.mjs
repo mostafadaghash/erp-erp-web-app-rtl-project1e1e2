@@ -240,8 +240,8 @@ test("03.06 Accounting constraints enforce canonical integrity on PostgreSQL 17"
       assert.equal(accountingSlice?.name, "accounting_constraints");
       assert.match(accountingSlice?.checksum ?? "", /^[0-9a-f]{64}$/);
       const latest = history.rows.at(-1);
-      assert.equal(latest?.version, "0020");
-      assert.equal(latest?.name, "repairs_followup_notifications_constraints");
+      assert.equal(latest?.version, "0021");
+      assert.equal(latest?.name, "printing_export_reporting_read_models_constraints");
       assert.match(latest?.checksum ?? "", /^[0-9a-f]{64}$/);
     });
 
