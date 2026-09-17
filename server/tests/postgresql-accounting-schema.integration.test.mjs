@@ -141,7 +141,7 @@ test("03.H Accounting physical shape remains canonical and deferred balance surv
       const accountingSlice = history.rows.find((row) => row.version === "0019");
       assert.equal(accountingSlice?.name, "accounting_constraints");
       assert.match(accountingSlice?.checksum ?? "", /^[0-9a-f]{64}$/);
-      assert.equal(history.rows.at(-1)?.version, "0020");
+      assert.equal(history.rows.at(-1)?.version, "0021");
     });
 
     const second = await runMigrations({ databaseUrl });
