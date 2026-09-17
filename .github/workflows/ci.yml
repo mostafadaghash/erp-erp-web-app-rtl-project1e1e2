@@ -185,6 +185,10 @@ jobs:
         env:
           ERP_TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/erp_backend_ci
         run: node --test server/tests/postgresql-repairs-followup-notifications-schema.integration.test.mjs
+      - name: PostgreSQL repairs/follow-up/notifications constraint integration tests
+        env:
+          ERP_TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/erp_backend_ci
+        run: node --test server/tests/postgresql-repairs-followup-notifications-constraints.integration.test.mjs
       - name: PostgreSQL printing/export/reporting read-model schema integration tests
         env:
           ERP_TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/erp_backend_ci
