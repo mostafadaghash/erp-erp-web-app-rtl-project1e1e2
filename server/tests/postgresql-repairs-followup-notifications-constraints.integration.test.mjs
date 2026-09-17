@@ -122,10 +122,11 @@ test("03.06 Repairs / Follow-Up / Notifications constraints enforce canonical in
 
       const followupHistoryPk = await client.query(`SELECT pg_get_constraintdef(oid) AS definition
         FROM pg_catalog.pg_constraint WHERE conname='pk_followup_status_history'`);
-      assert.match(followupHistoryPk.rows[0].definition, /PRIMARY KEY \(followup_id, changed_at\)/);
+      assert.match(followupHistoryPk.rows[0].definition, /PRIMARY KEY \(id\)/);
 
-      const independentIndexes = await client.query(`
-        SELECT idx.relname AS index_name
+      const integrityIndexes = await client.query(`
+        SELECT idx.relname AS index_name, i.indisunique AS is_unique,
+               pg_get_expr(i.indpred, i.indrelid) AS predicate
         FROM pg_catalog.pg_index i
         JOIN pg_catalog.pg_class tbl ON tbl.oid=i.indrelid
         JOIN pg_catalog.pg_namespace n ON n.oid=tbl.relnamespace
@@ -133,7 +134,16 @@ test("03.06 Repairs / Follow-Up / Notifications constraints enforce canonical in
         LEFT JOIN pg_catalog.pg_constraint con ON con.conindid=i.indexrelid
         WHERE n.nspname='public' AND tbl.relname=ANY($1::text[]) AND con.oid IS NULL
         ORDER BY idx.relname`, [REPAIR_TABLES]);
-      assert.deepEqual(independentIndexes.rows, [], "03.07 partial/query Repairs/Follow-Up/Notifications indexes must remain deferred");
+      assert.equal(integrityIndexes.rowCount, 3);
+      assert.deepEqual(integrityIndexes.rows.map((row) => row.index_name), [
+        "uq_customer_followups__source_event",
+        "uq_notifications__outbox_event_type",
+        "uq_repair_assignments__active",
+      ]);
+      for (const row of integrityIndexes.rows) assert.equal(row.is_unique, true);
+      assert.match(integrityIndexes.rows.find((row) => row.index_name === "uq_repair_assignments__active").predicate, /ended_at IS NULL/);
+      assert.match(integrityIndexes.rows.find((row) => row.index_name === "uq_customer_followups__source_event").predicate, /source_event_id IS NOT NULL/);
+      assert.match(integrityIndexes.rows.find((row) => row.index_name === "uq_notifications__outbox_event_type").predicate, /outbox_event_id IS NOT NULL/);
 
       const fakeSourceFks = await client.query(`SELECT count(*)::int AS count
         FROM pg_catalog.pg_constraint con
@@ -190,14 +200,14 @@ test("03.06 Repairs / Follow-Up / Notifications constraints enforce canonical in
         [ids.user]), "23514", "ck_repair_customer_decisions__decision");
 
       const followup1 = "80000000-0000-4000-8000-000000000030";
-      const followup2 = "80000000-0000-4000-8000-000000000031";
       await client.query(`INSERT INTO customer_followups
         (id,counterparty_id,branch_id,source_type,source_id,source_event_id,followup_type,required_action,priority,assigned_user_id,status,due_at,created_at,completed_at)
-        VALUES ($1,$3,$4,'REPAIR_ORDER',$5,$6,'CUSTOMER_CONTACT','Call customer','URGENT',$7,'OPEN',now(),now(),NULL),
-               ($2,$3,$4,'REPAIR_ORDER',$5,$6,'CUSTOMER_CONTACT','Retry-safe probe','URGENT',$7,'OPEN',now(),now(),NULL)`,
-        [followup1, followup2, ids.counterparty, ids.branch1, ids.repair, ids.outbox1, ids.user]);
-      const duplicateSourceEvent = await client.query(`SELECT count(*)::int AS count FROM customer_followups WHERE source_event_id=$1`, [ids.outbox1]);
-      assert.equal(duplicateSourceEvent.rows[0].count, 2, "source_event partial uniqueness remains intentionally deferred to 03.07");
+        VALUES ($1,$2,$3,'REPAIR_ORDER',$4,$5,'CUSTOMER_CONTACT','Call customer','URGENT',$6,'OPEN',now(),now(),NULL)`,
+        [followup1, ids.counterparty, ids.branch1, ids.repair, ids.outbox1, ids.user]);
+      await expectConstraint(client.query(`INSERT INTO customer_followups
+        (id,counterparty_id,branch_id,source_type,source_id,source_event_id,followup_type,required_action,priority,assigned_user_id,status,due_at,created_at,completed_at)
+        VALUES ('80000000-0000-4000-8000-000000000031',$1,$2,'REPAIR_ORDER',$3,$4,'CUSTOMER_CONTACT','Retry-safe probe','URGENT',$5,'OPEN',now(),now(),NULL)`,
+        [ids.counterparty, ids.branch1, ids.repair, ids.outbox1, ids.user]), "23505", "uq_customer_followups__source_event");
 
       for (const [index, sourceType] of ["SALES_ORDER", "REPAIR_ORDER", "MANUAL"].entries()) {
         await client.query(`INSERT INTO customer_followups
@@ -219,29 +229,43 @@ test("03.06 Repairs / Follow-Up / Notifications constraints enforce canonical in
         (id,followup_id,action_type,result,notes,user_id,created_at)
         VALUES ('80000000-0000-4000-8000-000000000034',$1,'CALL','CONTACTED',NULL,$2,now())`, [followup1, ids.user]);
       await client.query(`INSERT INTO followup_status_history
-        (followup_id,from_status,to_status,changed_by,changed_at)
-        VALUES ($1,'OPEN','LATER',$2,now())`, [followup1, ids.user]);
+        (id,followup_id,from_status,to_status,changed_by,changed_at)
+        VALUES ('80000000-0000-4000-8000-000000000035',$1,'OPEN','LATER',$2,now())`, [followup1, ids.user]);
 
       await client.query(`INSERT INTO repair_assignments
         (id,repair_order_id,technician_id,assigned_at,received_by_technician_at,ended_at,assigned_by)
-        VALUES ('80000000-0000-4000-8000-000000000040',$1,$2,now(),NULL,NULL,$3),
-               ('80000000-0000-4000-8000-000000000041',$1,$2,now(),NULL,NULL,$3)`, [ids.repair, ids.technician, ids.user]);
-      const duplicateActiveAssignment = await client.query(`SELECT count(*)::int AS count FROM repair_assignments WHERE repair_order_id=$1 AND ended_at IS NULL`, [ids.repair]);
-      assert.equal(duplicateActiveAssignment.rows[0].count, 2, "active-assignment partial uniqueness remains intentionally deferred to 03.07");
+        VALUES ('80000000-0000-4000-8000-000000000040',$1,$2,now(),NULL,NULL,$3)`, [ids.repair, ids.technician, ids.user]);
+      await expectConstraint(client.query(`INSERT INTO repair_assignments
+        (id,repair_order_id,technician_id,assigned_at,received_by_technician_at,ended_at,assigned_by)
+        VALUES ('80000000-0000-4000-8000-000000000041',$1,$2,now(),NULL,NULL,$3)`,
+        [ids.repair, ids.technician, ids.user]), "23505", "uq_repair_assignments__active");
+      await client.query(`INSERT INTO repair_assignments
+        (id,repair_order_id,technician_id,assigned_at,received_by_technician_at,ended_at,assigned_by)
+        VALUES ('80000000-0000-4000-8000-000000000042',$1,$2,now()-interval '2 days',NULL,now()-interval '1 day',$3)`,
+        [ids.repair, ids.technician, ids.user]);
 
       const notification1 = "80000000-0000-4000-8000-000000000050";
-      const notification2 = "80000000-0000-4000-8000-000000000051";
       await client.query(`INSERT INTO notifications
         (id,event_type,notification_type,branch_id,source_type,source_id,outbox_event_id,title_key,message_key,message_params_json,created_at)
-        VALUES ($1,'RepairCompleted','REPAIR_READY',$3,'REPAIR_ORDER',$4,$5,'repair.ready.title','repair.ready.message','{}'::jsonb,now()),
-               ($2,'RepairCompleted','REPAIR_READY',$3,'REPAIR_ORDER',$4,$5,'repair.ready.title','repair.ready.message','{}'::jsonb,now())`,
-        [notification1, notification2, ids.branch1, ids.repair, ids.outbox2]);
-      const duplicateNotification = await client.query(`SELECT count(*)::int AS count FROM notifications WHERE outbox_event_id=$1 AND notification_type='REPAIR_READY'`, [ids.outbox2]);
-      assert.equal(duplicateNotification.rows[0].count, 2, "notification outbox/type partial uniqueness remains intentionally deferred to 03.07");
+        VALUES ($1,'RepairCompleted','REPAIR_READY',$2,'REPAIR_ORDER',$3,$4,'repair.ready.title','repair.ready.message','{}'::jsonb,now())`,
+        [notification1, ids.branch1, ids.repair, ids.outbox2]);
+      await expectConstraint(client.query(`INSERT INTO notifications
+        (id,event_type,notification_type,branch_id,source_type,source_id,outbox_event_id,title_key,message_key,message_params_json,created_at)
+        VALUES ('80000000-0000-4000-8000-000000000051','RepairCompleted','REPAIR_READY',$1,'REPAIR_ORDER',$2,$3,'repair.ready.title','repair.ready.message','{}'::jsonb,now())`,
+        [ids.branch1, ids.repair, ids.outbox2]), "23505", "uq_notifications__outbox_event_type");
+      await client.query(`INSERT INTO notifications
+        (id,event_type,notification_type,branch_id,source_type,source_id,outbox_event_id,title_key,message_key,message_params_json,created_at)
+        VALUES ('80000000-0000-4000-8000-000000000052','RepairCompleted','REPAIR_READY_ALT',$1,'REPAIR_ORDER',$2,$3,'x','y','{}'::jsonb,now())`,
+        [ids.branch1, ids.repair, ids.outbox2]);
+      await client.query(`INSERT INTO notifications
+        (id,event_type,notification_type,branch_id,source_type,source_id,outbox_event_id,title_key,message_key,message_params_json,created_at)
+        VALUES ('80000000-0000-4000-8000-000000000053','Manual','REPAIR_READY',$1,'REPAIR_ORDER',$2,NULL,'x','y','{}'::jsonb,now()),
+               ('80000000-0000-4000-8000-000000000054','Manual','REPAIR_READY',$1,'REPAIR_ORDER',$2,NULL,'x','y','{}'::jsonb,now())`,
+        [ids.branch1, ids.repair]);
 
       await expectConstraint(client.query(`INSERT INTO notifications
         (id,event_type,notification_type,branch_id,source_type,source_id,outbox_event_id,title_key,message_key,message_params_json,created_at)
-        VALUES ('80000000-0000-4000-8000-000000000052','RepairCompleted','REPAIR_READY',$1,'REPAIR_ORDER',$2,'ffffffff-ffff-4fff-8fff-ffffffffffff','x','y','{}'::jsonb,now())`,
+        VALUES ('80000000-0000-4000-8000-000000000055','RepairCompleted','REPAIR_READY',$1,'REPAIR_ORDER',$2,'ffffffff-ffff-4fff-8fff-ffffffffffff','x','y','{}'::jsonb,now())`,
         [ids.branch1, ids.repair]), "23503", "fk_notifications__outbox_event");
 
       await client.query(`INSERT INTO notification_recipients (notification_id,user_id,seen_at,read_at)
