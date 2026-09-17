@@ -17,7 +17,7 @@ const EXPECTED_COLUMNS = {
   repair_tracking_tokens: [["id","uuid",true],["repair_order_id","uuid",true],["token_hash","text",true],["expires_at","timestamp with time zone",true],["revoked_at","timestamp with time zone",false],["created_at","timestamp with time zone",true]],
   customer_followups: [["id","uuid",true],["counterparty_id","uuid",true],["branch_id","uuid",true],["source_type","text",true],["source_id","uuid",false],["source_event_id","uuid",false],["followup_type","text",true],["required_action","text",true],["priority","text",true],["assigned_user_id","uuid",true],["status","text",true],["due_at","timestamp with time zone",true],["created_at","timestamp with time zone",true],["completed_at","timestamp with time zone",false]],
   followup_actions: [["id","uuid",true],["followup_id","uuid",true],["action_type","text",true],["result","text",false],["notes","text",false],["user_id","uuid",true],["created_at","timestamp with time zone",true]],
-  followup_status_history: [["followup_id","uuid",true],["from_status","text",false],["to_status","text",true],["changed_by","uuid",true],["changed_at","timestamp with time zone",true]],
+  followup_status_history: [["id","uuid",true],["followup_id","uuid",true],["from_status","text",false],["to_status","text",true],["changed_by","uuid",true],["changed_at","timestamp with time zone",true]],
   message_templates: [["id","uuid",true],["event_key","text",true],["language","text",true],["template_text","text",true],["is_active","boolean",true],["updated_at","timestamp with time zone",true]],
   notifications: [["id","uuid",true],["event_type","text",true],["notification_type","text",true],["branch_id","uuid",true],["source_type","text",true],["source_id","uuid",true],["outbox_event_id","uuid",false],["title_key","text",true],["message_key","text",true],["message_params_json","jsonb",true],["created_at","timestamp with time zone",true]],
   notification_recipients: [["notification_id","uuid",true],["user_id","uuid",true],["seen_at","timestamp with time zone",false],["read_at","timestamp with time zone",false]],
@@ -91,12 +91,16 @@ test("03.I Repairs / Follow-Up / Notifications physical shape remains canonical 
         WHERE conname=ANY($1::text[]) ORDER BY conname`, [requiredConstraints]);
       assert.equal(constraints.rowCount, requiredConstraints.length);
 
-      const independentIndexes = await client.query(`SELECT idx.relname AS index_name
+      const integrityIndexes = await client.query(`SELECT idx.relname AS index_name
         FROM pg_catalog.pg_index i JOIN pg_catalog.pg_class c ON c.oid=i.indrelid
         JOIN pg_catalog.pg_namespace n ON n.oid=c.relnamespace JOIN pg_catalog.pg_class idx ON idx.oid=i.indexrelid
         LEFT JOIN pg_catalog.pg_constraint con ON con.conindid=i.indexrelid
         WHERE n.nspname='public' AND c.relname=ANY($1::text[]) AND con.oid IS NULL ORDER BY idx.relname`, [REPAIR_TABLES]);
-      assert.deepEqual(independentIndexes.rows, [], "03.07 partial/query Repairs/Follow-Up/Notifications indexes remain deferred");
+      assert.deepEqual(integrityIndexes.rows, [
+        { index_name: "uq_customer_followups__source_event" },
+        { index_name: "uq_notifications__outbox_event_type" },
+        { index_name: "uq_repair_assignments__active" },
+      ], "03.06 keeps only approved integrity partial uniques; other query/performance indexes remain deferred to 03.07");
 
       const tokenShape = await client.query(`SELECT
         EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='repair_tracking_tokens' AND column_name='token_hash') AS has_hash,
@@ -113,6 +117,9 @@ test("03.I Repairs / Follow-Up / Notifications physical shape remains canonical 
         (id,counterparty_id,branch_id,source_type,source_id,source_event_id,followup_type,required_action,priority,assigned_user_id,status,due_at,created_at,completed_at)
         VALUES ($1,$2,$3,'MANUAL',NULL,NULL,'CUSTOMER_CONTACT','Call customer','TODAY',$4,'OPEN',now(),now(),NULL)`,
         [followup, ids.counterparty, ids.branch, ids.user]);
+      await client.query(`INSERT INTO followup_status_history
+        (id,followup_id,from_status,to_status,changed_by,changed_at)
+        VALUES ('83000000-0000-4000-8000-000000000012',$1,NULL,'OPEN',$2,now())`, [followup, ids.user]);
       await client.query(`INSERT INTO notifications
         (id,event_type,notification_type,branch_id,source_type,source_id,outbox_event_id,title_key,message_key,message_params_json,created_at)
         VALUES ($1,'RepairCompleted','REPAIR_READY',$2,'REPAIR_ORDER',$3,NULL,'notifications.repairReady.title','notifications.repairReady.message',$4::jsonb,now())`,
