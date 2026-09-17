@@ -69,6 +69,7 @@ const MIGRATIONS = [
   { version: "0016", name: "sales_constraints", transactional: true },
   { version: "0017", name: "purchasing_tax_constraints", transactional: true },
   { version: "0018", name: "finance_settlement_constraints", transactional: true },
+  { version: "0019", name: "accounting_constraints", transactional: true },
 ];
 
 async function withClient(fn) {
@@ -120,7 +121,7 @@ test("fresh apply, idempotent rerun, verification, and checksum drift protection
     assert.deepEqual(verification.applied, []);
     assert.deepEqual(verification.skipped, versions);
     await withClient(async (client) => {
-      await client.query("UPDATE schema_migrations SET checksum = $1 WHERE version = '0018'", ["0".repeat(64)]);
+      await client.query("UPDATE schema_migrations SET checksum = $1 WHERE version = '0019'", ["0".repeat(64)]);
     });
     await assert.rejects(() => runMigrations({ databaseUrl, verifyOnly: true }), /checksum drift detected/);
   } finally {
