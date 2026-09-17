@@ -38,7 +38,7 @@ async function seedFixture(client) {
     treasury2: "60000000-0000-4000-8000-000000000011",
     treasuryRemote: "60000000-0000-4000-8000-000000000012",
     category: "60000000-0000-4000-8000-000000000013",
-    glAccountPlaceholder: "60000000-0000-4000-8000-000000000014",
+    glAccount: "60000000-0000-4000-8000-000000000014",
     salesOrder: "60000000-0000-4000-8000-000000000015",
     salesInvoice: "60000000-0000-4000-8000-000000000016",
     postingBatch1: "60000000-0000-4000-8000-000000000017",
@@ -75,12 +75,14 @@ async function seedFixture(client) {
   await client.query(`INSERT INTO counterparty_roles (counterparty_id,role) VALUES ($1,'CUSTOMER')`, [ids.counterparty]);
   await client.query(`INSERT INTO price_lists (id,name,is_active,created_at,updated_at)
     VALUES ($1,'Finance Retail',true,now(),now())`, [ids.priceList]);
+  await client.query(`INSERT INTO gl_accounts (id,company_id,code,name,account_type,parent_id,is_system,is_active)
+    VALUES ($1,$2,'FIN-INC','Finance Income','INCOME',NULL,true,true)`, [ids.glAccount, ids.company]);
 
   await client.query(`INSERT INTO treasuries (id,branch_id,name,is_active,notes,created_at)
     VALUES ($1,$4,'Cash',true,NULL,now()),($2,$4,'Bank',true,NULL,now()),($3,$5,'Remote Cash',true,NULL,now())`,
     [ids.treasury1, ids.treasury2, ids.treasuryRemote, ids.branch1, ids.branch2]);
   await client.query(`INSERT INTO finance_categories (id,name,category_type,gl_account_id,is_active)
-    VALUES ($1,'Service Income','INCOME',$2,true)`, [ids.category, ids.glAccountPlaceholder]);
+    VALUES ($1,'Service Income','INCOME',$2,true)`, [ids.category, ids.glAccount]);
 
   await client.query(`INSERT INTO sales_orders
     (id,branch_id,document_number,counterparty_id,warehouse_id,price_list_id,status,delivery_method,sales_user_id,customer_service_user_id,customer_notes,internal_notes,source_quote_id,version,created_at,updated_at)
@@ -139,17 +141,13 @@ test("03.06 Finance / Settlement constraints enforce canonical integrity on Post
         "pk_installment_plans","pk_installments","fk_receipts__treasury_branch",
         "fk_disbursements__treasury_branch","fk_treasury_transfers__from_treasury_branch",
         "fk_treasury_transfers__to_treasury_branch","fk_financial_movements__treasury_branch",
-        "fk_cheques__settlement_movement_branch","ck_financial_movements__direction",
-        "ck_finance_categories__category_type","ck_cheques__direction","ck_cheques__status",
-        "ck_installments__status","ck_customer_advances__remaining_projection_range",
+        "fk_cheques__settlement_movement_branch","fk_finance_categories__gl_account",
+        "ck_financial_movements__direction","ck_finance_categories__category_type","ck_cheques__direction",
+        "ck_cheques__status","ck_installments__status","ck_customer_advances__remaining_projection_range",
       ];
       const constraints = await client.query(`SELECT conname,contype FROM pg_catalog.pg_constraint
         WHERE conname = ANY($1::text[]) ORDER BY conname`, [expectedConstraints]);
       assert.equal(constraints.rowCount, expectedConstraints.length);
-
-      const forbiddenAccountingFk = await client.query(`SELECT count(*)::int AS count FROM pg_catalog.pg_constraint
-        WHERE conname='fk_finance_categories__gl_account'`);
-      assert.equal(forbiddenAccountingFk.rows[0].count, 0, "Accounting target FK must remain deferred to the Accounting constraint slice");
 
       const independentIndexes = await client.query(`
         SELECT idx.relname AS index_name
@@ -288,7 +286,7 @@ test("03.06 Finance / Settlement constraints enforce canonical integrity on Post
       const financeConstraints = history.rows.find((row) => row.version === "0018");
       assert.equal(financeConstraints?.name, "finance_settlement_constraints");
       assert.match(financeConstraints?.checksum ?? "", /^[0-9a-f]{64}$/);
-      assert.equal(history.rows.at(-1)?.version, "0018");
+      assert.equal(history.rows.at(-1)?.version, "0019");
     });
 
     const second = await runMigrations({ databaseUrl });
