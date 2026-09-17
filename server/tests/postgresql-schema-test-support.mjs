@@ -46,6 +46,7 @@ export const MIGRATIONS = [
   "0016",
   "0017",
   "0018",
+  "0019",
 ];
 
 export async function withClient(databaseUrl, fn) {
@@ -103,12 +104,17 @@ async function cleanupPurchasingConstraintLayer(client) {
   await client.query("ALTER TABLE IF EXISTS public.sales_return_lines DROP CONSTRAINT IF EXISTS fk_sales_return_lines__tax_code");
 }
 
+async function cleanupAccountingConstraintLayer(client) {
+  await client.query("ALTER TABLE IF EXISTS public.finance_categories DROP CONSTRAINT IF EXISTS fk_finance_categories__gl_account");
+}
+
 export async function cleanupReportingTables(databaseUrl) {
   await withClient(databaseUrl, async (client) => {
     await cleanupCoreConstraintLayer(client);
     await cleanupProductConstraintLayer(client);
     await cleanupSalesConstraintLayer(client);
     await cleanupPurchasingConstraintLayer(client);
+    await cleanupAccountingConstraintLayer(client);
     for (const table of [...REPORTING_TABLES].reverse()) {
       await client.query(`DROP TABLE IF EXISTS public.${table}`);
     }
@@ -121,6 +127,7 @@ export async function cleanupDatabase(databaseUrl) {
     await cleanupProductConstraintLayer(client);
     await cleanupSalesConstraintLayer(client);
     await cleanupPurchasingConstraintLayer(client);
+    await cleanupAccountingConstraintLayer(client);
     for (const table of [...REPORTING_TABLES].reverse()) await client.query(`DROP TABLE IF EXISTS public.${table}`);
     for (const table of [...REPAIR_TABLES].reverse()) await client.query(`DROP TABLE IF EXISTS public.${table}`);
     await client.query("DROP TABLE IF EXISTS public.journal_lines, public.journal_entries, public.gl_accounts");
