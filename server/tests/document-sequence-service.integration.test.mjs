@@ -232,10 +232,10 @@ test(
       );
 
       const persistedParallel = await pool.query(
-        `SELECT document_number::text AS document_number
-           FROM phase04_sequence_probe
-          WHERE branch_id=$1 AND document_type='PARALLEL_INVOICE'
-          ORDER BY document_number`,
+        `SELECT probe.document_number::text AS document_number
+           FROM phase04_sequence_probe AS probe
+          WHERE probe.branch_id=$1 AND probe.document_type='PARALLEL_INVOICE'
+          ORDER BY probe.document_number`,
         [IDS.branch1],
       );
       assert.deepEqual(
