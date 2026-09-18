@@ -2257,7 +2257,24 @@ requestId
 - ADR-0017 يظل ملزمًا لتصحيح Installment open-status predicate.
 - ADR-0020 يظل ملزمًا لسلامة AdvanceApplication history وعدم اختراع uniqueness يزيل إمكانية reversal/re-application history.
 
-**Next substep:** تجميد Exact 03.07 Index Inventory لكل §28، وتصنيف كل entry إلى: already satisfied / create in 03.07 / omitted by ADR / blocked. لا إنشاء Index Migration قبل إغلاق هذا inventory.
+### 03.07.B Exact Index Inventory Freeze
+
+**Status:** `CLOSED`
+
+- تم إنشاء وتجميد `docs/gap-analysis/phase-03-07-index-inventory.md`.
+- تمت مراجعة §28 كاملة مقابل migrations الحالية حتى `0021`.
+- Frozen totals:
+  - `74` = `ALREADY_SATISFIED`.
+  - `155` = `CREATE_IN_03_07`.
+  - `2` = `OMITTED_BY_ADR` (ADR-0024).
+  - `0` = `BLOCKED`.
+  - `231` = إجمالي قرارات/بنود الـCatalog المصنفة.
+- قاعدة No Redundant Prefix Indexes طُبقت أثناء التجميد؛ مثال: لا يتم إنشاء `financial_allocations(financial_source_type, financial_source_id)` لأن الـUNIQUE الحالي `(financial_source_type, financial_source_id, target_type, target_id)` يبدأ بنفس الـprefix ويغطي lookup المعتمد.
+- `counterparties.normalized_phone` هو اسم العمود canonical المستخدم للبحث بالهاتف.
+- ADR-0017 مطبق على Installment open-items predicate باستخدام `UPCOMING / DUE / PARTIAL / OVERDUE`.
+- لا Index Migration تم إنشاؤها في هذه الخطوة.
+
+**Next substep:** إنشاء Forward-only Phase 03.07 Index Migration واحدة من الـ`155` entries المجمدة، مع PostgreSQL 17 index-catalog integration tests وFull CI على نفس SHA النهائي.
 
 ## 03.08 DDL Verification Suite
 
@@ -3827,10 +3844,10 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 **03.06 Final CI:** run `35251535466` (Run `#935`) — `verify`, `backend-verify`, `browser-contract`, and `release-gate` all SUCCESS on the same SHA; PostgreSQL 17 Printing / Export / Reporting Read Models schema and behavioral integration gates both passed.  
 **03.06 Validation PR:** `#208` — CLOSED WITHOUT MERGE; `merged=false`.  
 **Installment Status Decision:** canonical V1 values remain `UPCOMING / DUE / PARTIAL / PAID / OVERDUE`.  
-**03.07 Index Catalog:** `IN_PROGRESS` — Pre-DDL reconciliation `CLOSED` by ADR-0024; no Index Migration has been created yet.  
-**03.07 Resolved Defects:** `receipts.sales_order_id` and `advance_applications.posting_batch_id` in §28.6 are classified as Index Catalog defects because the canonical §25.12 / migration `0008` physical schema contains neither column. No schema column will be added merely to satisfy those index lines; both invalid index entries are omitted under ADR-0024.  
-**Next Action:** build and freeze the **Exact 03.07 Index Inventory** for all §28 entries, classifying every entry as already satisfied / create in 03.07 / omitted by accepted ADR / blocked. **Do not create an Index Migration yet.**  
-**Forbidden Next Actions:** لا إنشاء Index Migration قبل تجميد الـExact Index Inventory، لا بدء 03.08 DDL Verification، لا Business Module cutover، لا dual write، لا `main` merge، ولا Convex Production change.
+**03.07 Index Catalog:** `IN_PROGRESS` — Pre-DDL reconciliation `CLOSED`; Exact Index Inventory `CLOSED/FROZEN`; no Index Migration has been created yet.  
+**03.07 Frozen Inventory:** `docs/gap-analysis/phase-03-07-index-inventory.md` — 231 classified catalog decisions: 74 already satisfied, 155 to create, 2 omitted by ADR-0024, 0 blocked.  
+**Next Action:** create the **single forward-only Phase 03.07 Index Migration** from the 155 frozen `CREATE_IN_03_07` entries, add PostgreSQL 17 exact index-catalog integration tests, then run Full CI on the same final SHA.  
+**Forbidden Next Actions:** لا إضافة Index خارج الـFrozen Inventory، لا بدء 03.08 DDL Verification قبل إغلاق 03.07، لا Business Module cutover، لا dual write، لا `main` merge، ولا Convex Production change.
 
 **Plan update — 2026-09-17 / ACCOUNTING CONSTRAINTS CLOSED:** تم إغلاق ثامن executable slice من 03.06 على SHA `ef03d141958c392032bd8caf16b5f880a193e86e`. Migration `0019`، ADR-0021، Accounting PK/FK/UNIQUE/CHECK layer، Finance Category → GL Account FK، والحفاظ على deferred Journal balance at COMMIT تم التحقق منهم فعليًا على PostgreSQL 17؛ Full CI run `35224498880` أخضر بالكامل وPR `#206` أُغلق بدون Merge. 03.06 ما زالت `IN_PROGRESS` و03.07 لم تبدأ.
 
@@ -3838,6 +3855,8 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 
 ---
 
+
+**Plan update — 2026-09-18 / 03.07 EXACT INDEX INVENTORY FROZEN:** تم تجميد `docs/gap-analysis/phase-03-07-index-inventory.md` بعد مراجعة §28 كاملة مقابل الـschema/migrations الحالية. التصنيف النهائي = 74 already satisfied + 155 create in 03.07 + 2 omitted by ADR-0024 + 0 blocked. لم يتم إنشاء أي Index Migration. Next Action الوحيدة: Forward Index Migration من القائمة المجمدة + PostgreSQL 17 exact catalog tests + Full CI على نفس SHA.
 
 **Plan update — 2026-09-18 / 03.07 PRE-DDL BLOCKERS RESOLVED:** تم اعتماد ADR-0024 وحسم تعارضي §28.6 بدون تعديل الـPhysical Schema: `receipts.sales_order_id` و`advance_applications.posting_batch_id` مصنفان Catalog Defects ولا يتم إنشاء العمودين أو الفهرسين في V1. لم يتم إنشاء أي Index Migration. الـNext Action الوحيدة هي تجميد Exact 03.07 Index Inventory كاملًا قبل أي DDL.
 
