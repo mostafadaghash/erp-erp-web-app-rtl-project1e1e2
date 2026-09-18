@@ -101,7 +101,7 @@ test("03.H Accounting physical shape remains canonical and deferred balance surv
         JOIN pg_catalog.pg_namespace n ON n.oid=c.relnamespace JOIN pg_catalog.pg_class idx ON idx.oid=i.indexrelid
         LEFT JOIN pg_catalog.pg_constraint con ON con.conindid=i.indexrelid
         WHERE n.nspname='public' AND c.relname=ANY($1::text[]) AND con.oid IS NULL ORDER BY idx.relname`, [ACCOUNTING]);
-      assert.deepEqual(independentIndexes.rows, [], "03.07 independent Accounting indexes remain deferred");
+      assert.ok(independentIndexes.rows.length > 0, "03.07 approved Accounting indexes must exist after migration 0022");
 
       const ids = await seedAccountingParents(client);
       const entry = "71000000-0000-4000-8000-000000000020";
@@ -141,7 +141,7 @@ test("03.H Accounting physical shape remains canonical and deferred balance surv
       const accountingSlice = history.rows.find((row) => row.version === "0019");
       assert.equal(accountingSlice?.name, "accounting_constraints");
       assert.match(accountingSlice?.checksum ?? "", /^[0-9a-f]{64}$/);
-      assert.equal(history.rows.at(-1)?.version, "0021");
+      assert.equal(history.rows.at(-1)?.version, "0022");
     });
 
     const second = await runMigrations({ databaseUrl });
