@@ -281,7 +281,7 @@ test("03.06 Repairs / Follow-Up / Notifications constraints enforce canonical in
       const slice = history.rows.find((row) => row.version === "0020");
       assert.equal(slice?.name, "repairs_followup_notifications_constraints");
       assert.match(slice?.checksum ?? "", /^[0-9a-f]{64}$/);
-      assert.equal(history.rows.at(-1)?.version, "0021");
+      assert.equal(history.rows.at(-1)?.version, "0022");
     });
 
     const second = await runMigrations({ databaseUrl });
