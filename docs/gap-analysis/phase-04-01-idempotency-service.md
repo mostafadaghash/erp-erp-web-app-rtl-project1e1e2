@@ -1,6 +1,6 @@
 # Phase 04.01 — Idempotency Service Gap Analysis
 
-**Status:** VERIFYING  
+**Status:** CLOSED  
 **Branch:** `agent/postgres-v1.7-core`  
 **Starting SHA:** `4e0d22b7317af75641e8285725a520b846ef3359`
 
@@ -57,9 +57,24 @@ Architecture Baseline v1.7 and the Master Implementation Plan require:
 - No 04.06 API error mapping.
 - No module cutover, dual write, Convex Production change, or merge to `main`.
 
-## Exit procedure
+## Validation evidence
 
-1. Full CI on the 04.01 implementation SHA.
-2. If green, update the canonical Master Implementation Plan to `04.01 CLOSED`.
-3. Full CI again on the final documentation SHA.
-4. Close the validation-only PR without merge.
+- Implementation SHA: `c39f99f7f16c95b099d157e3c784c6b5453c5eb1`.
+- Full implementation CI: Run `#946` / `35377090817` — SUCCESS.
+- backend unit tests including canonical hash: SUCCESS.
+- PostgreSQL 17 Idempotency Service integration: SUCCESS.
+- Eight parallel same-key callers: exactly one `EXECUTED`, seven `REPLAYED`.
+- rollback/retry proof: claim row and business probe both rolled back, then retry executed successfully.
+- payload mismatch rejection: SUCCESS.
+- known incomplete state return: SUCCESS.
+- bounded expiry cleanup: SUCCESS.
+- `verify`: SUCCESS.
+- `backend-verify`: SUCCESS.
+- `browser-contract`: SUCCESS.
+- `release-gate`: SUCCESS.
+- Validation PR: `#213` — validation-only; do not merge.
+- Final documentation closure SHA must pass Full CI before PR #213 is closed.
+
+## Next action
+
+After final same-SHA closure validation succeeds: `PHASE 04 / 04.02 Document Sequence Service` only.
