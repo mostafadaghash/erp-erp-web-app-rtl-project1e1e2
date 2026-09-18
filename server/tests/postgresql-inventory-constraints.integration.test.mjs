@@ -122,7 +122,7 @@ test("03.06 Inventory constraints enforce canonical integrity on PostgreSQL 17",
         LEFT JOIN pg_catalog.pg_constraint con ON con.conindid=i.indexrelid
         WHERE n.nspname='public' AND tbl.relname=ANY($1::text[]) AND con.oid IS NULL
         ORDER BY idx.relname`, [INVENTORY_TABLES]);
-      assert.deepEqual(independentIndexes.rows, [], "03.07 independent/partial Inventory indexes must remain deferred");
+      assert.ok(independentIndexes.rows.length > 0, "03.07 approved Inventory indexes must exist after migration 0022");
 
       const ids = await seedFixture(client);
 
@@ -169,11 +169,14 @@ test("03.06 Inventory constraints enforce canonical integrity on PostgreSQL 17",
 
       await client.query(`INSERT INTO stock_reservations
         (id,sales_order_id,sales_order_line_id,warehouse_id,variant_id,quantity,status,created_at,released_at)
-        VALUES ('30000000-0000-4000-8000-000000000032',$1,$2,$3,$4,1,'ACTIVE',now(),NULL),
-               ('30000000-0000-4000-8000-000000000033',$1,$2,$3,$4,1,'PARTIALLY_CONSUMED',now(),NULL)`,
+        VALUES ('30000000-0000-4000-8000-000000000032',$1,$2,$3,$4,1,'ACTIVE',now(),NULL)`,
         [ids.salesOrder, ids.salesOrderLine, ids.warehouse1, ids.variant]);
+      await expectConstraint(client.query(`INSERT INTO stock_reservations
+        (id,sales_order_id,sales_order_line_id,warehouse_id,variant_id,quantity,status,created_at,released_at)
+        VALUES ('30000000-0000-4000-8000-000000000033',$1,$2,$3,$4,1,'PARTIALLY_CONSUMED',now(),NULL)`,
+        [ids.salesOrder, ids.salesOrderLine, ids.warehouse1, ids.variant]), "23505", "ux_stock_reservations__sales_order_line_id_warehouse_i_7a546c4c");
       const duplicateActive = await client.query(`SELECT count(*)::int AS count FROM stock_reservations WHERE sales_order_line_id=$1 AND warehouse_id=$2 AND variant_id=$3 AND status IN ('ACTIVE','PARTIALLY_CONSUMED')`, [ids.salesOrderLine, ids.warehouse1, ids.variant]);
-      assert.equal(duplicateActive.rows[0].count, 2, "active-reservation partial uniqueness remains intentionally deferred to 03.07");
+      assert.equal(duplicateActive.rows[0].count, 1, "03.07 partial unique permits only one active logical reservation");
 
       await expectConstraint(client.query(`INSERT INTO stock_transfers
         (id,document_number,issuing_branch_id,from_warehouse_id,to_warehouse_id,status,notes,created_by,posted_at)
