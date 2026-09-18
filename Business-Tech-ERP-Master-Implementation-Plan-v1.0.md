@@ -1,6 +1,6 @@
 # Business Tech ERP — Master Implementation Plan v1.0
 
-**الحالة:** ACTIVE — PHASE 04 NOT_STARTED  
+**الحالة:** ACTIVE — PHASE 04 IN PROGRESS  
 **تاريخ الإصدار:** 2026-09-11  
 **المشروع:** Business Tech ERP — Local Server Edition / PostgreSQL Core  
 **المرجع المعماري الرسمي:** `Business-Tech-ERP-Architecture-Baseline-v1.7-Final.docx`  
@@ -2338,9 +2338,11 @@ New executable gate: `server/tests/postgresql-ddl-verification.integration.test.
 
 # 10. PHASE 04 — Core Infrastructure Services
 
-**Status:** `NOT_STARTED`
+**Status:** `IN_PROGRESS`
 
 ## 04.01 Idempotency Service
+
+**Status:** `VERIFYING`
 
 Implement:
 
@@ -3847,8 +3849,8 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 
 # 32. Current Execution Pointer
 
-**Current Phase:** `PHASE 04 — Core Infrastructure Services`  
-**Status:** `NOT_STARTED`  
+**Current Phase:** `PHASE 04 — Core Infrastructure Services / 04.01 Idempotency Service`  
+**Status:** `IN_PROGRESS`  
 **Integration Branch:** `agent/postgres-v1.7-core`  
 **Phase 01 Final SHA:** `b0d35101bf622264b655bcc574787989fadbcd83`  
 **Phase 01 Validation PR:** `#183` — closed without merge.  
@@ -3881,9 +3883,12 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 **03.08 DDL Verification:** `CLOSED` — reused the already-closed 03.06/03.07 PostgreSQL 17 evidence without duplicating DDL, and added only the missing case-insensitive user identity + no-direct-PostgreSQL-exposure gates.  
 **03.08 Coverage:** `docs/gap-analysis/phase-03-08-ddl-verification.md`.  
 **03.08 Implementation Validation:** Run `#944` / `35372123130` SUCCESS on code SHA `18f9b39a7a113a72dc71bb3f5092027506a6ec28`; `verify`, `backend-verify`, dedicated PostgreSQL 17 DDL gate, `browser-contract`, and `release-gate` all SUCCESS.  
-**03.08 Validation PR:** `#212` — validation-only; close WITHOUT MERGE after final same-SHA documentation validation.  
-**PHASE 03:** `CLOSED` after final same-SHA closure validation.  
-**Next Action:** execute **04.01 Idempotency Service only**.  
+**03.08 Final Verified SHA:** `4e0d22b7317af75641e8285725a520b846ef3359`.  
+**03.08 Final CI:** Run `#945` / `35372431829` — SUCCESS; `verify`, `backend-verify`, PostgreSQL 17 DDL gate, `browser-contract`, and `release-gate` all SUCCESS on the same SHA.  
+**03.08 Validation PR:** `#212` — CLOSED WITHOUT MERGE; `merged=false`.  
+**PHASE 03:** `CLOSED`.  
+**04.01 Idempotency Service:** `VERIFYING` — Gap Analysis at `docs/gap-analysis/phase-04-01-idempotency-service.md`; no schema/index change required.  
+**Next Action:** validate **04.01 Idempotency Service only** with PostgreSQL 17 parallel/rollback/cleanup tests + Full CI.  
 **Forbidden Next Actions:** لا 04.02 قبل إغلاق 04.01، لا Module cutover، لا dual write، لا `main` merge، ولا Convex Production change.
 
 **Plan update — 2026-09-17 / ACCOUNTING CONSTRAINTS CLOSED:** تم إغلاق ثامن executable slice من 03.06 على SHA `ef03d141958c392032bd8caf16b5f880a193e86e`. Migration `0019`، ADR-0021، Accounting PK/FK/UNIQUE/CHECK layer، Finance Category → GL Account FK، والحفاظ على deferred Journal balance at COMMIT تم التحقق منهم فعليًا على PostgreSQL 17؛ Full CI run `35224498880` أخضر بالكامل وPR `#206` أُغلق بدون Merge. 03.06 ما زالت `IN_PROGRESS` و03.07 لم تبدأ.
@@ -3892,6 +3897,8 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 
 ---
 
+
+**Plan update — 2026-09-18 / 04.01 IDEMPOTENCY SERVICE STARTED:** تم عمل Gap Analysis مقابل Architecture Baseline v1.7. جدول `idempotency_keys` و`UNIQUE(key)` وIndex `expires_at` موجودون ومتوافقون، لذلك لا Migration أو Index جديد. التنفيذ يضيف canonical request hashing + transaction-bound claim/replay + mismatch rejection + rollback safety + bounded expiry cleanup، مع PostgreSQL 17 parallel integration gate. 04.02 ممنوع قبل إغلاق 04.01.
 
 **Plan update — 2026-09-18 / 03.08 DDL VERIFICATION CLOSED:** تم تنفيذ 03.08 كـverification-only phase بدون تكرار DDL المقفول. تم إعادة استخدام اختبارات 03.06/03.07 القائمة وإضافة الفجوتين فقط: case-insensitive username/email behavioral proof وno direct PostgreSQL client exposure. Implementation CI Run `#944` / `35372123130` نجح بالكامل على SHA `18f9b39a7a113a72dc71bb3f5092027506a6ec28`. Validation PR `#212` يبقى بدون Merge ويخضع الآن لـFull CI نهائي على documentation closure SHA. Next Action بعد نجاحه: 04.01 Idempotency Service فقط.
 
