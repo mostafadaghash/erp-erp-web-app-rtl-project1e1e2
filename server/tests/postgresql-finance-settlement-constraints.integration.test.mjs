@@ -158,7 +158,7 @@ test("03.06 Finance / Settlement constraints enforce canonical integrity on Post
         LEFT JOIN pg_catalog.pg_constraint con ON con.conindid=i.indexrelid
         WHERE n.nspname='public' AND tbl.relname=ANY($1::text[]) AND con.oid IS NULL
         ORDER BY idx.relname`, [FINANCE_TABLES]);
-      assert.deepEqual(independentIndexes.rows, [], "03.07 independent/partial/expression Finance indexes must remain deferred");
+      assert.ok(independentIndexes.rows.length > 0, "03.07 approved Finance indexes must exist after migration 0022");
 
       const ids = await seedFixture(client);
 
@@ -276,8 +276,9 @@ test("03.06 Finance / Settlement constraints enforce canonical integrity on Post
         VALUES ('60000000-0000-4000-8000-000000000070',$1,CURRENT_DATE,100,101,'PAID')`, [ids.plan]),
         "23514", "ck_installments__paid_projection_range");
 
-      await client.query(`INSERT INTO treasuries (id,branch_id,name,is_active,notes,created_at)
-        VALUES ('60000000-0000-4000-8000-000000000071',$1,'cash',true,NULL,now())`, [ids.branch1]);
+      await expectConstraint(client.query(`INSERT INTO treasuries (id,branch_id,name,is_active,notes,created_at)
+        VALUES ('60000000-0000-4000-8000-000000000071',$1,'cash',true,NULL,now())`, [ids.branch1]),
+        "23505", "ux_treasuries__branch_id_lower_name");
 
       const history = await client.query("SELECT version,name,checksum FROM schema_migrations ORDER BY version");
       assert.equal(history.rowCount, MIGRATIONS.length);
@@ -287,8 +288,8 @@ test("03.06 Finance / Settlement constraints enforce canonical integrity on Post
       assert.equal(financeConstraints?.name, "finance_settlement_constraints");
       assert.match(financeConstraints?.checksum ?? "", /^[0-9a-f]{64}$/);
       const latest = history.rows.at(-1);
-      assert.equal(latest?.version, "0021");
-      assert.equal(latest?.name, "printing_export_reporting_read_models_constraints");
+      assert.equal(latest?.version, "0022");
+      assert.equal(latest?.name, "index_catalog");
       assert.match(latest?.checksum ?? "", /^[0-9a-f]{64}$/);
     });
 
