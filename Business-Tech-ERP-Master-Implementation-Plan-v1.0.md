@@ -2383,6 +2383,8 @@ Implemented and verified:
 
 ## 04.03 Posting Batch Service
 
+**Status:** `VERIFYING`
+
 - POST
 - CORRECTION
 - REVERSAL
@@ -3915,8 +3917,11 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 **04.02 Document Sequence Service:** `CLOSED` — Gap Analysis at `docs/gap-analysis/phase-04-02-document-sequence-service.md`; transaction-bound late allocation via atomic UPSERT/RETURNING, branch/type scope isolation, rollback safety, 32-worker contention safety, and no-reuse-after-deletion proof completed without schema/index changes.  
 **04.02 Implementation SHA:** `eb1c02035bd1dc91e7045e3d6ed08e23b9342acd`.  
 **04.02 Implementation CI:** Run `#949` / `35380340039` — SUCCESS; PostgreSQL 17 32-worker sequence gate and all regressions passed.  
-**04.02 Validation PR:** `#214` — validation-only; close WITHOUT MERGE after final same-SHA documentation validation.  
-**Next Action:** execute **04.03 Posting Batch Service only** after final 04.02 same-SHA closure validation.  
+**04.02 Final Verified SHA:** `20119820d41a24dd9f3bb235e7425ed9303e97a2`.  
+**04.02 Final CI:** Run `#950` / `35380599348` — SUCCESS; `verify`, `backend-verify` including PostgreSQL 17 Document Sequence Service integration, `browser-contract`, and `release-gate` all SUCCESS on the same SHA.  
+**04.02 Validation PR:** `#214` — CLOSED WITHOUT MERGE; `merged=false`.  
+**04.03 Posting Batch Service:** `VERIFYING` — Gap Analysis at `docs/gap-analysis/phase-04-03-posting-batch-service.md`; existing posting batch schema/constraints/index reused unchanged.  
+**Next Action:** validate **04.03 Posting Batch Service only** with PostgreSQL 17 traceability/self-reference/rollback tests + Full CI.  
 **Forbidden Next Actions:** لا 04.04 قبل إغلاق 04.03، لا Module cutover، لا dual write، لا `main` merge، ولا Convex Production change.
 
 **Plan update — 2026-09-17 / ACCOUNTING CONSTRAINTS CLOSED:** تم إغلاق ثامن executable slice من 03.06 على SHA `ef03d141958c392032bd8caf16b5f880a193e86e`. Migration `0019`، ADR-0021، Accounting PK/FK/UNIQUE/CHECK layer، Finance Category → GL Account FK، والحفاظ على deferred Journal balance at COMMIT تم التحقق منهم فعليًا على PostgreSQL 17؛ Full CI run `35224498880` أخضر بالكامل وPR `#206` أُغلق بدون Merge. 03.06 ما زالت `IN_PROGRESS` و03.07 لم تبدأ.
@@ -3925,6 +3930,8 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 
 ---
 
+
+**Plan update — 2026-09-18 / 04.03 POSTING BATCH SERVICE STARTED:** تم عمل Gap Analysis مقابل Architecture Baseline v1.7. جدول `posting_batches` والـoperation CHECK والـSelf-FK والـsource trace index موجودون ومتوافقون، لذلك لا Migration أو Index جديد. التنفيذ يضيف insert-only transaction-bound service مع server-generated `posted_at`، source traceability، lock/validation للـreversal reference، وPostgreSQL 17 rollback proof يثبت أن Posting Batch وآثاره لا يتسربون عند فشل الـTransaction. 04.04 ممنوع قبل إغلاق 04.03.
 
 **Plan update — 2026-09-18 / 04.02 DOCUMENT SEQUENCE SERVICE CLOSED:** تم إغلاق التنفيذ الوظيفي على SHA `eb1c02035bd1dc91e7045e3d6ed08e23b9342acd` بعد Full CI Run `#949` / `35380340039` SUCCESS. الخدمة لا تبدأ Transaction مستقلة؛ تستقبل `PoolClient` من الـBusiness Transaction وتُستدعى late بعد validation/locks، وتستخدم atomic UPSERT/RETURNING على `document_sequences`. اختبار PostgreSQL 17 بـ32 workers أثبت أرقام `1..32` بدون duplicates، rollback لا يترك sequence/business effect، والرقم committed لا يعاد استخدامه بعد tombstone. Run `#948` كان Diagnostic failure في test-only lexicographic ORDER BY بعد cast إلى text؛ الأرقام المولدة كانت صحيحة وفريدة، وتم إصلاح assertion فقط. لا Migration `0023` ولا Index جديد. PR `#214` validation-only ويخضع الآن لـFull CI نهائي على documentation closure SHA قبل إغلاقه بدون Merge. Next Action بعد نجاحه: 04.03 Posting Batch Service فقط.
 
