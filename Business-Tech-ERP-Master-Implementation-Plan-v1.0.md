@@ -1,6 +1,6 @@
 # Business Tech ERP — Master Implementation Plan v1.0
 
-**الحالة:** ACTIVE — PHASE 03 IN PROGRESS  
+**الحالة:** ACTIVE — PHASE 04 NOT_STARTED  
 **تاريخ الإصدار:** 2026-09-11  
 **المشروع:** Business Tech ERP — Local Server Edition / PostgreSQL Core  
 **المرجع المعماري الرسمي:** `Business-Tech-ERP-Architecture-Baseline-v1.7-Final.docx`  
@@ -704,7 +704,7 @@ requestId
 
 # 9. PHASE 03 — PostgreSQL Physical Schema & DDL/Migrations
 
-**Status:** `IN_PROGRESS`
+**Status:** `CLOSED`
 
 **الهدف:** تحويل §25-§28 من v1.7 إلى Physical PostgreSQL Schema نهائية قابلة للتنفيذ.
 
@@ -2296,7 +2296,7 @@ requestId
 
 ## 03.08 DDL Verification Suite
 
-**Status:** `VERIFYING`
+**Status:** `CLOSED`
 
 Verification-only strategy: لا نكرر DDL أو Constraints أو Indexes المقفولة في 03.06/03.07. تم توثيق الـcoverage في `docs/gap-analysis/phase-03-08-ddl-verification.md`، وتظل الاختبارات القائمة هي الدليل التنفيذي للبنود التي تغطيها بالفعل.
 
@@ -2322,14 +2322,17 @@ New executable gate: `server/tests/postgresql-ddl-verification.integration.test.
 
 ### Gate 03
 
-- [ ] clean DB builds from zero.
-- [ ] all migrations apply in order.
-- [ ] schema verification passes.
-- [ ] index catalog matches v1.7.
-- [ ] no extra unexplained index.
-- [ ] no direct PostgreSQL exposure to client network.
+- [x] clean DB builds from zero.
+- [x] all migrations apply in order.
+- [x] schema verification passes.
+- [x] index catalog matches v1.7.
+- [x] no extra unexplained index.
+- [x] no direct PostgreSQL exposure to client network.
 
-**Next substep:** validation-only PR + Full CI on the implementation SHA. بعد نجاحه يتم إغلاق 03.08 في نفس Master Plan وتشغيل Full CI مرة ثانية على الـfinal documentation SHA.
+**03.08 Implementation Validation:** Run `#944` / `35372123130` — SUCCESS على code SHA `18f9b39a7a113a72dc71bb3f5092027506a6ec28`. `verify`, `backend-verify`, PostgreSQL 17 Phase 03.08 DDL verification gate, `browser-contract`, و`release-gate` كلها SUCCESS.  
+**03.08 Validation PR:** `#212` — validation-only؛ يغلق WITHOUT MERGE بعد نجاح Full CI النهائي على documentation closure SHA.  
+**Scope confirmation:** لا migration `0023`، لا Index جديد، لا Business Backend، لا Module Cutover، لا dual write، ولا Convex Production change.  
+**Next Action بعد final same-SHA closure validation:** `PHASE 04 / 04.01 Idempotency Service` فقط.
 
 ---
 
@@ -3844,8 +3847,8 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 
 # 32. Current Execution Pointer
 
-**Current Phase:** `PHASE 03 — PostgreSQL Physical Schema & DDL/Migrations`  
-**Status:** `IN_PROGRESS`  
+**Current Phase:** `PHASE 04 — Core Infrastructure Services`  
+**Status:** `NOT_STARTED`  
 **Integration Branch:** `agent/postgres-v1.7-core`  
 **Phase 01 Final SHA:** `b0d35101bf622264b655bcc574787989fadbcd83`  
 **Phase 01 Validation PR:** `#183` — closed without merge.  
@@ -3874,9 +3877,14 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 **03.07 Index Catalog:** `CLOSED` — Pre-DDL reconciliation, Exact Index Inventory, Forward Migration `0022_index_catalog`, and PostgreSQL 17 exact catalog verification completed.  
 **03.07 Frozen Inventory:** `docs/gap-analysis/phase-03-07-index-inventory.md` — 231 classified decisions: 74 already satisfied, 155 implemented by `0022`, 2 omitted by ADR-0024, 0 blocked.  
 **03.07 Implementation Validation:** Run `#941` / `35303952439` SUCCESS on code SHA `ba7eda5ee52f4b021d0afa36b7ab71653d0adb69`, including exact index-catalog integration, full backend regressions/build/smoke, `verify`, `browser-contract`, and `release-gate`.  
-**03.07 Validation PR:** `#211` — validation-only; close WITHOUT MERGE after final same-SHA documentation validation.  
-**Next Action:** execute **03.08 DDL Verification only**.  
-**Forbidden Next Actions:** لا Business Backend قبل إغلاق 03.08، لا Module cutover، لا dual write، لا `main` merge، ولا Convex Production change.
+**03.07 Validation PR:** `#211` — CLOSED WITHOUT MERGE; `merged=false`.  
+**03.08 DDL Verification:** `CLOSED` — reused the already-closed 03.06/03.07 PostgreSQL 17 evidence without duplicating DDL, and added only the missing case-insensitive user identity + no-direct-PostgreSQL-exposure gates.  
+**03.08 Coverage:** `docs/gap-analysis/phase-03-08-ddl-verification.md`.  
+**03.08 Implementation Validation:** Run `#944` / `35372123130` SUCCESS on code SHA `18f9b39a7a113a72dc71bb3f5092027506a6ec28`; `verify`, `backend-verify`, dedicated PostgreSQL 17 DDL gate, `browser-contract`, and `release-gate` all SUCCESS.  
+**03.08 Validation PR:** `#212` — validation-only; close WITHOUT MERGE after final same-SHA documentation validation.  
+**PHASE 03:** `CLOSED` after final same-SHA closure validation.  
+**Next Action:** execute **04.01 Idempotency Service only**.  
+**Forbidden Next Actions:** لا 04.02 قبل إغلاق 04.01، لا Module cutover، لا dual write، لا `main` merge، ولا Convex Production change.
 
 **Plan update — 2026-09-17 / ACCOUNTING CONSTRAINTS CLOSED:** تم إغلاق ثامن executable slice من 03.06 على SHA `ef03d141958c392032bd8caf16b5f880a193e86e`. Migration `0019`، ADR-0021، Accounting PK/FK/UNIQUE/CHECK layer، Finance Category → GL Account FK، والحفاظ على deferred Journal balance at COMMIT تم التحقق منهم فعليًا على PostgreSQL 17؛ Full CI run `35224498880` أخضر بالكامل وPR `#206` أُغلق بدون Merge. 03.06 ما زالت `IN_PROGRESS` و03.07 لم تبدأ.
 
@@ -3884,6 +3892,8 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 
 ---
 
+
+**Plan update — 2026-09-18 / 03.08 DDL VERIFICATION CLOSED:** تم تنفيذ 03.08 كـverification-only phase بدون تكرار DDL المقفول. تم إعادة استخدام اختبارات 03.06/03.07 القائمة وإضافة الفجوتين فقط: case-insensitive username/email behavioral proof وno direct PostgreSQL client exposure. Implementation CI Run `#944` / `35372123130` نجح بالكامل على SHA `18f9b39a7a113a72dc71bb3f5092027506a6ec28`. Validation PR `#212` يبقى بدون Merge ويخضع الآن لـFull CI نهائي على documentation closure SHA. Next Action بعد نجاحه: 04.01 Idempotency Service فقط.
 
 **Plan update — 2026-09-18 / 03.07 INDEX CATALOG CLOSED:** تم تنفيذ `0022_index_catalog` من الـ155 entry المجمدة بالضبط، وإضافة executable manifest وPostgreSQL 17 exact catalog gate. Run `#941` / `35303952439` نجح بالكامل على code SHA `ba7eda5ee52f4b021d0afa36b7ab71653d0adb69`. تم نقل Next Action إلى `03.08 DDL Verification` فقط. Final documentation SHA يخضع لـFull CI مستقل قبل إغلاق PR #211 بدون Merge.
 

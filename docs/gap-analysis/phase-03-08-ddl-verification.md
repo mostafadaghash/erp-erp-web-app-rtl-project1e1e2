@@ -1,6 +1,6 @@
 # Phase 03.08 — DDL Verification Coverage
 
-**Status:** VERIFYING  
+**Status:** CLOSED  
 **Branch:** `agent/postgres-v1.7-core`  
 **Starting SHA:** `62b3e0b7052ac5b5f2f1eb58209c75eb9095b91f`
 
@@ -51,9 +51,18 @@ Phase 03.08 is a verification phase. It does not create another business-schema 
 - No Convex Production change.
 - No merge to `main`.
 
-## Exit procedure
+## Validation evidence
 
-1. Run the full PR CI with the new 03.08 gate on the implementation SHA.
-2. If all jobs pass, update the canonical Master Implementation Plan in-place to `03.08 CLOSED`.
-3. Run Full CI again on that final documentation SHA.
-4. Close the validation-only PR without merge.
+- Implementation SHA: `18f9b39a7a113a72dc71bb3f5092027506a6ec28`.
+- Full implementation CI: Run `#944` / `35372123130` — SUCCESS.
+- `verify`: SUCCESS.
+- `backend-verify`: SUCCESS.
+- PostgreSQL 17 Phase 03.08 DDL verification gate: SUCCESS.
+- `browser-contract`: SUCCESS.
+- `release-gate`: SUCCESS.
+- Validation PR: `#212` — validation-only; do not merge.
+- Final documentation closure SHA must pass Full CI before PR #212 is closed.
+
+## Next action
+
+After the final same-SHA closure validation succeeds: `PHASE 04 / 04.01 Idempotency Service` only.
