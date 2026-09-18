@@ -206,7 +206,7 @@ test("03.06 Sales constraints enforce canonical integrity on PostgreSQL 17", asy
         LEFT JOIN pg_catalog.pg_constraint con ON con.conindid=i.indexrelid
         WHERE n.nspname='public' AND tbl.relname=ANY($1::text[]) AND con.oid IS NULL
         ORDER BY idx.relname`, [SALES_TABLES]);
-      assert.deepEqual(independentIndexes.rows, [], "03.07 independent/partial Sales indexes must remain deferred");
+      assert.ok(independentIndexes.rows.length > 0, "03.07 approved Sales indexes must exist after migration 0022");
 
       const taxFks = await client.query(`
         SELECT conname FROM pg_catalog.pg_constraint
@@ -308,11 +308,15 @@ test("03.06 Sales constraints enforce canonical integrity on PostgreSQL 17", asy
       }, "ct_sales_invoice_lines__product_unit_match_at_commit");
 
       await insertInvoice(client, {
-        id: invoice2, documentNumber: 2, sourceOrderId: order1, sourceDeliveryId: delivery1,
+        id: invoice2, documentNumber: 2, sourceOrderId: order1, sourceDeliveryId: null,
       }, ids);
       await insertInvoiceLine(client, invoiceLine2, invoice2, ids.variant1, ids.productUnit1);
+      await expectConstraint(insertInvoice(client, {
+        id: "40000000-0000-4000-8000-000000000042", documentNumber: 3,
+        sourceOrderId: order1, sourceDeliveryId: delivery1,
+      }, ids), "23505", "ux_sales_invoices__source_delivery_id__where_source_de_7ebffff9");
       const sameDeliveryInvoices = await client.query(`SELECT count(*)::int AS count FROM sales_invoices WHERE source_delivery_id=$1`, [delivery1]);
-      assert.equal(sameDeliveryInvoices.rows[0].count, 2, "source_delivery partial uniqueness remains intentionally deferred to 03.07");
+      assert.equal(sameDeliveryInvoices.rows[0].count, 1, "03.07 partial unique permits one invoice per source delivery");
 
       await client.query(`INSERT INTO sales_returns
         (id,branch_id,document_number,document_date,document_version,counterparty_id,warehouse_id,source_invoice_id,subtotal,tax_total,grand_total,posted_at,created_by,deleted_at,deleted_by,delete_reason)
