@@ -2235,7 +2235,7 @@ requestId
 
 ## 03.07 Index Catalog
 
-**Status:** `IN_PROGRESS`
+**Status:** `CLOSED`
 
 تطبيق §28 حرفيًا بعد تطبيق التصحيحات المعمارية versioned المعتمدة:
 
@@ -2274,7 +2274,25 @@ requestId
 - ADR-0017 مطبق على Installment open-items predicate باستخدام `UPCOMING / DUE / PARTIAL / OVERDUE`.
 - لا Index Migration تم إنشاؤها في هذه الخطوة.
 
-**Next substep:** إنشاء Forward-only Phase 03.07 Index Migration واحدة من الـ`155` entries المجمدة، مع PostgreSQL 17 index-catalog integration tests وFull CI على نفس SHA النهائي.
+### 03.07.C Forward Index Migration & Exact Catalog Verification
+
+**Status:** `CLOSED`
+
+- تم إنشاء Forward-only migration واحدة: `database/migrations/0022_index_catalog.sql`.
+- تم إنشاء executable manifest: `database/index-catalog/phase-03-07-indexes.json`.
+- الـMigration تنشئ **155 Index بالضبط** من الـFrozen Inventory، بدون أي Index إضافي.
+- أسماء الـIndexes deterministic وفق ADR-0002 باستخدام `ix_` / `ux_` / `gin_`، ومع stable hash عند تجاوز حد PostgreSQL للاسم.
+- ADR-0017 مطبق على open installments predicate: `UPCOMING / DUE / PARTIAL / OVERDUE`.
+- ADR-0024 مطبق: لا `receipts.sales_order_id` index ولا `advance_applications.posting_batch_id` index.
+- PostgreSQL 17 exact catalog test: `server/tests/postgresql-index-catalog.integration.test.mjs`.
+- الاختبار يثبت الاسم، الجدول، access method، uniqueness، key/expression order، DESC direction، non-default opclass مثل `gin_trgm_ops`، predicates، غياب أي independent index غير معتمد، وعدم وجود redundant general B-Tree prefix indexes.
+- Migration framework محدث حتى `0022/index_catalog` مع checksum drift / idempotent rerun / verify-only.
+- الـBehavioral regressions تم تحديثها لإثبات تفعيل قواعد 03.07 فعليًا: case-insensitive User/Treasury uniqueness، SKU partial unique، active reservation uniqueness، وInvoice-per-Delivery uniqueness.
+- Diagnostic runs `#938` و`#939` و`#940` كشفت فقط stale regression / catalog-reader gaps وتم تصحيح الاختبارات بدون تغيير الـ155 Index المعتمدة.
+- Implementation validation Run `#941` / `35303952439` — SUCCESS على code SHA `ba7eda5ee52f4b021d0afa36b7ab71653d0adb69`: `verify`, `backend-verify` بما فيه exact index-catalog gate، `browser-contract`, و`release-gate` جميعها SUCCESS.
+- لا Partitioning، لا Index speculative، لا تعديل على Historical Sources of Truth، ولا Backend/Frontend cutover.
+
+**Next Action:** `03.08 DDL Verification` فقط.
 
 ## 03.08 DDL Verification Suite
 
@@ -3844,10 +3862,12 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 **03.06 Final CI:** run `35251535466` (Run `#935`) — `verify`, `backend-verify`, `browser-contract`, and `release-gate` all SUCCESS on the same SHA; PostgreSQL 17 Printing / Export / Reporting Read Models schema and behavioral integration gates both passed.  
 **03.06 Validation PR:** `#208` — CLOSED WITHOUT MERGE; `merged=false`.  
 **Installment Status Decision:** canonical V1 values remain `UPCOMING / DUE / PARTIAL / PAID / OVERDUE`.  
-**03.07 Index Catalog:** `IN_PROGRESS` — Pre-DDL reconciliation `CLOSED`; Exact Index Inventory `CLOSED/FROZEN`; no Index Migration has been created yet.  
-**03.07 Frozen Inventory:** `docs/gap-analysis/phase-03-07-index-inventory.md` — 231 classified catalog decisions: 74 already satisfied, 155 to create, 2 omitted by ADR-0024, 0 blocked.  
-**Next Action:** create the **single forward-only Phase 03.07 Index Migration** from the 155 frozen `CREATE_IN_03_07` entries, add PostgreSQL 17 exact index-catalog integration tests, then run Full CI on the same final SHA.  
-**Forbidden Next Actions:** لا إضافة Index خارج الـFrozen Inventory، لا بدء 03.08 DDL Verification قبل إغلاق 03.07، لا Business Module cutover، لا dual write، لا `main` merge، ولا Convex Production change.
+**03.07 Index Catalog:** `CLOSED` — Pre-DDL reconciliation, Exact Index Inventory, Forward Migration `0022_index_catalog`, and PostgreSQL 17 exact catalog verification completed.  
+**03.07 Frozen Inventory:** `docs/gap-analysis/phase-03-07-index-inventory.md` — 231 classified decisions: 74 already satisfied, 155 implemented by `0022`, 2 omitted by ADR-0024, 0 blocked.  
+**03.07 Implementation Validation:** Run `#941` / `35303952439` SUCCESS on code SHA `ba7eda5ee52f4b021d0afa36b7ab71653d0adb69`, including exact index-catalog integration, full backend regressions/build/smoke, `verify`, `browser-contract`, and `release-gate`.  
+**03.07 Validation PR:** `#211` — validation-only; close WITHOUT MERGE after final same-SHA documentation validation.  
+**Next Action:** execute **03.08 DDL Verification only**.  
+**Forbidden Next Actions:** لا Business Backend قبل إغلاق 03.08، لا Module cutover، لا dual write، لا `main` merge، ولا Convex Production change.
 
 **Plan update — 2026-09-17 / ACCOUNTING CONSTRAINTS CLOSED:** تم إغلاق ثامن executable slice من 03.06 على SHA `ef03d141958c392032bd8caf16b5f880a193e86e`. Migration `0019`، ADR-0021، Accounting PK/FK/UNIQUE/CHECK layer، Finance Category → GL Account FK، والحفاظ على deferred Journal balance at COMMIT تم التحقق منهم فعليًا على PostgreSQL 17؛ Full CI run `35224498880` أخضر بالكامل وPR `#206` أُغلق بدون Merge. 03.06 ما زالت `IN_PROGRESS` و03.07 لم تبدأ.
 
@@ -3855,6 +3875,8 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 
 ---
 
+
+**Plan update — 2026-09-18 / 03.07 INDEX CATALOG CLOSED:** تم تنفيذ `0022_index_catalog` من الـ155 entry المجمدة بالضبط، وإضافة executable manifest وPostgreSQL 17 exact catalog gate. Run `#941` / `35303952439` نجح بالكامل على code SHA `ba7eda5ee52f4b021d0afa36b7ab71653d0adb69`. تم نقل Next Action إلى `03.08 DDL Verification` فقط. Final documentation SHA يخضع لـFull CI مستقل قبل إغلاق PR #211 بدون Merge.
 
 **Plan update — 2026-09-18 / 03.07 EXACT INDEX INVENTORY FROZEN:** تم تجميد `docs/gap-analysis/phase-03-07-index-inventory.md` بعد مراجعة §28 كاملة مقابل الـschema/migrations الحالية. التصنيف النهائي = 74 already satisfied + 155 create in 03.07 + 2 omitted by ADR-0024 + 0 blocked. لم يتم إنشاء أي Index Migration. Next Action الوحيدة: Forward Index Migration من القائمة المجمدة + PostgreSQL 17 exact catalog tests + Full CI على نفس SHA.
 
