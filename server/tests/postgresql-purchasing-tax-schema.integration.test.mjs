@@ -72,7 +72,7 @@ test("03.F Purchasing/Tax remains canonical after its 03.06 constraint slice", a
       const requiredConstraints = await client.query(`SELECT conname FROM pg_catalog.pg_constraint WHERE conname = ANY($1::text[]) ORDER BY conname`, [["pk_tax_codes","uq_tax_codes__code","pk_purchase_invoices","uq_purchase_invoices__branch_document","pk_purchase_invoice_lines","pk_purchase_returns","uq_purchase_returns__branch_document","pk_purchase_return_lines","fk_purchase_invoices__warehouse_branch","fk_purchase_returns__warehouse_branch","fk_purchase_invoice_lines__tax_code","ck_purchase_invoices__due_requires_counterparty"]]);
       assert.equal(requiredConstraints.rowCount, 12);
       const independentIndexes = await client.query(`SELECT idx.relname AS index_name FROM pg_catalog.pg_index i JOIN pg_catalog.pg_class tbl ON tbl.oid=i.indrelid JOIN pg_catalog.pg_namespace n ON n.oid=tbl.relnamespace JOIN pg_catalog.pg_class idx ON idx.oid=i.indexrelid LEFT JOIN pg_catalog.pg_constraint con ON con.conindid=i.indexrelid WHERE n.nspname='public' AND tbl.relname=ANY($1::text[]) AND con.oid IS NULL ORDER BY idx.relname`, [TARGET]);
-      assert.deepEqual(independentIndexes.rows, [], "03.07 Purchasing/Tax indexes remain deferred");
+      assert.ok(independentIndexes.rows.length > 0, "03.07 approved Purchasing/Tax indexes must exist after migration 0022");
       const ids = await seedViewFixture(client);
       const returnable = await client.query(`SELECT purchased_quantity,posted_returned_quantity,returnable_quantity FROM purchase_returnable_quantities_v WHERE source_purchase_invoice_line_id=$1`, [ids.line]);
       assert.deepEqual(returnable.rows[0], { purchased_quantity: "8.000000", posted_returned_quantity: "3.000000", returnable_quantity: "5.000000" });
@@ -84,8 +84,8 @@ test("03.F Purchasing/Tax remains canonical after its 03.06 constraint slice", a
       assert.equal(purchasingSlice?.name, "purchasing_tax_constraints");
       assert.match(purchasingSlice?.checksum ?? "", /^[0-9a-f]{64}$/);
       const latest = history.rows.at(-1);
-      assert.equal(latest.version, "0021");
-      assert.equal(latest.name, "printing_export_reporting_read_models_constraints");
+      assert.equal(latest.version, "0022");
+      assert.equal(latest.name, "index_catalog");
       assert.match(latest.checksum, /^[0-9a-f]{64}$/);
     });
     const second = await runMigrations({ databaseUrl });
