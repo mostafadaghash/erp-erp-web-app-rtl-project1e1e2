@@ -117,7 +117,7 @@ test("03.E Sales remains canonical through Sales constraint migration", async (t
       const constraints = await client.query(`SELECT count(*)::int count FROM pg_catalog.pg_constraint con JOIN pg_catalog.pg_class c ON c.oid=con.conrelid JOIN pg_catalog.pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND c.relname=ANY($1::text[])`, [TARGET]);
       assert.ok(constraints.rows[0].count > 0, "03.06 Sales constraints must exist after migration 0016");
       const indexes = await client.query(`SELECT count(*)::int count FROM pg_catalog.pg_index i JOIN pg_catalog.pg_class c ON c.oid=i.indrelid JOIN pg_catalog.pg_namespace n ON n.oid=c.relnamespace LEFT JOIN pg_catalog.pg_constraint con ON con.conindid=i.indexrelid WHERE n.nspname='public' AND c.relname=ANY($1::text[]) AND con.oid IS NULL`, [TARGET]);
-      assert.equal(indexes.rows[0].count, 0, "03.07 independent Sales indexes remain deferred");
+      assert.ok(indexes.rows[0].count > 0, "03.07 approved Sales indexes must exist after migration 0022");
 
       const ids = await seedReturnableFixture(client);
       const ret = await client.query("SELECT sold_quantity,posted_returned_quantity,returnable_quantity FROM sales_returnable_quantities_v WHERE source_invoice_line_id=$1", [ids.line]);
