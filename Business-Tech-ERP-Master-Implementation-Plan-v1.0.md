@@ -2361,6 +2361,8 @@ Implemented and verified:
 
 ## 04.02 Document Sequence Service
 
+**Status:** `VERIFYING`
+
 - numeric visible numbers only.
 - branch + document type sequence.
 - allocation in same business transaction.
@@ -3896,8 +3898,11 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 **04.01 Idempotency Service:** `CLOSED` — Gap Analysis at `docs/gap-analysis/phase-04-01-idempotency-service.md`; canonical request hashing, transaction-bound claim/replay, payload mismatch rejection, rollback safety, known incomplete state handling, and bounded expiry cleanup implemented without schema/index changes.  
 **04.01 Implementation SHA:** `c39f99f7f16c95b099d157e3c784c6b5453c5eb1`.  
 **04.01 Implementation CI:** Run `#946` / `35377090817` — SUCCESS; PostgreSQL 17 eight-way parallel same-key gate and all regressions passed.  
-**04.01 Validation PR:** `#213` — validation-only; close WITHOUT MERGE after final same-SHA documentation validation.  
-**Next Action:** execute **04.02 Document Sequence Service only** after final 04.01 same-SHA closure validation.  
+**04.01 Final Verified SHA:** `fbdf02053f905178c209dedb293cd5d8eafe321f`.  
+**04.01 Final CI:** Run `#947` / `35377348558` — SUCCESS; `verify`, `backend-verify` including PostgreSQL 17 Idempotency Service integration, `browser-contract`, and `release-gate` all SUCCESS on the same SHA.  
+**04.01 Validation PR:** `#213` — CLOSED WITHOUT MERGE; `merged=false`.  
+**04.02 Document Sequence Service:** `VERIFYING` — Gap Analysis at `docs/gap-analysis/phase-04-02-document-sequence-service.md`; existing sequence schema/constraint reused unchanged.  
+**Next Action:** validate **04.02 Document Sequence Service only** with PostgreSQL 17 32-worker concurrency/rollback/deletion tests + Full CI.  
 **Forbidden Next Actions:** لا 04.03 قبل إغلاق 04.02، لا Module cutover، لا dual write، لا `main` merge، ولا Convex Production change.
 
 **Plan update — 2026-09-17 / ACCOUNTING CONSTRAINTS CLOSED:** تم إغلاق ثامن executable slice من 03.06 على SHA `ef03d141958c392032bd8caf16b5f880a193e86e`. Migration `0019`، ADR-0021، Accounting PK/FK/UNIQUE/CHECK layer، Finance Category → GL Account FK، والحفاظ على deferred Journal balance at COMMIT تم التحقق منهم فعليًا على PostgreSQL 17؛ Full CI run `35224498880` أخضر بالكامل وPR `#206` أُغلق بدون Merge. 03.06 ما زالت `IN_PROGRESS` و03.07 لم تبدأ.
@@ -3906,6 +3911,8 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 
 ---
 
+
+**Plan update — 2026-09-18 / 04.02 DOCUMENT SEQUENCE SERVICE STARTED:** تم عمل Gap Analysis مقابل Architecture Baseline v1.7. جدول `document_sequences` و`UNIQUE(branch_id, document_type)` موجودان ومتوافقان، لذلك لا Migration أو Index جديد. التنفيذ يضيف transaction-bound late allocation باستخدام atomic UPSERT/RETURNING، مع PostgreSQL 17 32-worker concurrency gate وrollback/no-reuse-after-deletion proofs. 04.03 ممنوع قبل إغلاق 04.02.
 
 **Plan update — 2026-09-18 / 04.01 IDEMPOTENCY SERVICE CLOSED:** تم إغلاق التنفيذ الوظيفي على SHA `c39f99f7f16c95b099d157e3c784c6b5453c5eb1` بعد Full CI Run `#946` / `35377090817` SUCCESS. الخدمة تعمل داخل نفس Business Transaction، تستخدم canonical SHA-256 request hash، تمنع payload mismatch، تعيد replay/incomplete state بدون duplicate business execution، rollback لا يترك phantom claim/effect، وexpiry cleanup bounded بـ`FOR UPDATE SKIP LOCKED`. اختبار PostgreSQL 17 المتوازي بثمانية callers أثبت تنفيذ work مرة واحدة فقط. لا Migration `0023` ولا Index جديد. PR `#213` validation-only ويخضع الآن لـFull CI نهائي على documentation closure SHA قبل إغلاقه بدون Merge. Next Action بعد نجاحه: 04.02 Document Sequence Service فقط.
 
