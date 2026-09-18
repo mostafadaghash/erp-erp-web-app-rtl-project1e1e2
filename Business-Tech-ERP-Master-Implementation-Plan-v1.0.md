@@ -2296,22 +2296,29 @@ requestId
 
 ## 03.08 DDL Verification Suite
 
+**Status:** `VERIFYING`
+
+Verification-only strategy: لا نكرر DDL أو Constraints أو Indexes المقفولة في 03.06/03.07. تم توثيق الـcoverage في `docs/gap-analysis/phase-03-08-ddl-verification.md`، وتظل الاختبارات القائمة هي الدليل التنفيذي للبنود التي تغطيها بالفعل.
+
 اختبارات آلية تشمل:
 
-- duplicate username case-insensitive rejection.
-- duplicate email case-insensitive rejection.
-- duplicate branch code rejection.
-- cross-branch warehouse references rejection.
-- cross-product unit references rejection.
-- duplicate barcode/SKU/serial rules.
-- active reservation uniqueness.
-- document number uniqueness.
-- tombstone uniqueness.
-- invalid negative values rejection.
-- journal line validation.
-- journal deferred balance failure at COMMIT.
-- valid journal commit.
-- delete restriction on historical entities.
+- duplicate username case-insensitive rejection — covered by the dedicated 03.08 integrated gate.
+- duplicate email case-insensitive rejection — covered by the dedicated 03.08 integrated gate.
+- duplicate branch code rejection — reused from the existing Core/Organization/Security constraint suite.
+- cross-branch warehouse references rejection — reused from existing Core/Inventory/Sales constraint suites.
+- cross-product unit references rejection — reused from the existing Product Catalog constraint suite.
+- duplicate barcode/SKU/serial rules — reused from Product/Inventory constraints + exact 03.07 catalog.
+- active reservation uniqueness — reused from Inventory/Sales constraints + exact 03.07 catalog.
+- document number uniqueness — reused from existing domain constraint suites.
+- tombstone uniqueness — reused from the Core constraint suite.
+- invalid negative values rejection — reused from existing domain constraints; permission-gated negative stock remains intentionally outside a global CHECK.
+- journal line validation — reused from Accounting constraints.
+- journal deferred balance failure at COMMIT — reused from Accounting constraints.
+- valid journal commit — reused from Accounting constraints.
+- delete restriction on historical entities — reused from existing historical-FK/delete restriction tests.
+- no direct PostgreSQL client exposure — covered by the dedicated 03.08 deployment contract test.
+
+New executable gate: `server/tests/postgresql-ddl-verification.integration.test.mjs`.
 
 ### Gate 03
 
@@ -2321,6 +2328,8 @@ requestId
 - [ ] index catalog matches v1.7.
 - [ ] no extra unexplained index.
 - [ ] no direct PostgreSQL exposure to client network.
+
+**Next substep:** validation-only PR + Full CI on the implementation SHA. بعد نجاحه يتم إغلاق 03.08 في نفس Master Plan وتشغيل Full CI مرة ثانية على الـfinal documentation SHA.
 
 ---
 
