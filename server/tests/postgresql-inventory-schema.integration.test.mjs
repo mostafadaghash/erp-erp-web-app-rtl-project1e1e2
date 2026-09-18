@@ -54,7 +54,7 @@ test("03.D Inventory remains canonical after its 03.06 constraint slice", async 
       assert.ok(constraints.rows[0].count > 0, "03.06 Inventory constraints must exist after migration 0015");
 
       const independentIndexes = await client.query(`SELECT count(*)::int count FROM pg_catalog.pg_index i JOIN pg_catalog.pg_class c ON c.oid=i.indrelid JOIN pg_catalog.pg_namespace n ON n.oid=c.relnamespace LEFT JOIN pg_catalog.pg_constraint con ON con.conindid=i.indexrelid WHERE n.nspname='public' AND c.relname=ANY($1::text[]) AND con.oid IS NULL`, [TARGET]);
-      assert.equal(independentIndexes.rows[0].count, 0, "03.07 independent Inventory indexes must remain deferred");
+      assert.ok(independentIndexes.rows[0].count > 0, "03.07 approved Inventory indexes must exist after migration 0022");
 
       const later = await client.query("SELECT to_regclass('public.print_templates') IS NOT NULL present");
       assert.equal(later.rows[0].present, true);
