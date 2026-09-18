@@ -223,7 +223,7 @@ test("03.06 Core / Organization / Security constraints enforce the approved Post
           ORDER BY idx.relname`,
         [CORE_TABLES],
       );
-      assert.deepEqual(nonConstraintIndexes.rows, [], "03.07 independent indexes must remain deferred");
+      assert.ok(nonConstraintIndexes.rows.length > 0, "03.07 approved Core indexes must exist after migration 0022");
 
       const ids = await seedCoreFixture(client);
 
