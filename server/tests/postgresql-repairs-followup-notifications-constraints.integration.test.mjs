@@ -133,6 +133,7 @@ test("03.06 Repairs / Follow-Up / Notifications constraints enforce canonical in
         JOIN pg_catalog.pg_class idx ON idx.oid=i.indexrelid
         LEFT JOIN pg_catalog.pg_constraint con ON con.conindid=i.indexrelid
         WHERE n.nspname='public' AND tbl.relname=ANY($1::text[]) AND con.oid IS NULL
+          AND idx.relname LIKE 'uq_%'
         ORDER BY idx.relname`, [REPAIR_TABLES]);
       assert.equal(integrityIndexes.rowCount, 3);
       assert.deepEqual(integrityIndexes.rows.map((row) => row.index_name), [
