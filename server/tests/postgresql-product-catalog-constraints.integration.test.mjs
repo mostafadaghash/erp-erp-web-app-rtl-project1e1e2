@@ -64,7 +64,7 @@ test("03.06 Product Catalog constraints enforce canonical integrity on PostgreSQ
         JOIN pg_catalog.pg_namespace n ON n.oid=c.relnamespace
         LEFT JOIN pg_catalog.pg_constraint con ON con.conindid=i.indexrelid
         WHERE n.nspname='public' AND c.relname=ANY($1::text[]) AND con.oid IS NULL`, [PRODUCT_TABLES]);
-      assert.equal(independentIndexes.rows[0].count, 0, "03.07 independent Product indexes must remain deferred");
+      assert.ok(independentIndexes.rows[0].count > 0, "03.07 approved Product indexes must exist after migration 0022");
 
       const ids = {
         company:"10000000-0000-4000-8000-000000000001", branch:"10000000-0000-4000-8000-000000000002", warehouse:"10000000-0000-4000-8000-000000000003",
@@ -116,6 +116,7 @@ test("03.06 Product Catalog constraints enforce canonical integrity on PostgreSQ
       await expectConstraint(client.query(`INSERT INTO variant_barcodes (id,variant_id,product_unit_id,barcode,is_primary) VALUES ('10000000-0000-4000-8000-000000000043',$1,$2,'BC-1',false)`,[ids.v1,ids.pu1]),"23505","uq_variant_barcodes__barcode");
 
       await expectConstraint(client.query(`INSERT INTO product_variants (id,product_id,name,sku,is_default,combination_signature,minimum_selling_price,is_active,created_at,updated_at) VALUES ('10000000-0000-4000-8000-000000000044',$1,'Dup','P1-DUP',false,'DEFAULT',0,true,now(),now())`,[ids.p1]),"23505","uq_product_variants__product_combination");
+      await expectConstraint(client.query(`INSERT INTO product_variants (id,product_id,name,sku,is_default,combination_signature,minimum_selling_price,is_active,created_at,updated_at) VALUES ('10000000-0000-4000-8000-000000000048',$1,'Duplicate SKU','P1',false,'OTHER',0,true,now(),now())`,[ids.p1]),"23505","ux_product_variants__sku__where_sku_is_not_null");
       await expectConstraint(client.query(`INSERT INTO units (id,name,symbol,allows_fraction,is_active) VALUES ('10000000-0000-4000-8000-000000000045','Piece','piece2',false,true)`),"23505","uq_units__name");
       await expectConstraint(client.query(`INSERT INTO product_units (id,product_id,unit_id,conversion_to_base,is_sellable,is_purchasable) VALUES ('10000000-0000-4000-8000-000000000046',$1,$2,2,true,true)`,[ids.p1,ids.unit1]),"23505","uq_product_units__product_unit");
 
