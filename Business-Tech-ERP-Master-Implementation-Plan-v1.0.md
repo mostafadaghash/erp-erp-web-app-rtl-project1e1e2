@@ -2237,13 +2237,27 @@ requestId
 
 **Status:** `IN_PROGRESS`
 
-تطبيق §28 حرفيًا:
+تطبيق §28 حرفيًا بعد تطبيق التصحيحات المعمارية versioned المعتمدة:
 
 - no duplicate PK indexes.
 - no redundant prefix indexes.
 - exact predicates للـpartial indexes.
 - GIN trigram فقط على approved name search columns.
 - no speculative indexes.
+
+### 03.07.A Pre-DDL Catalog / Physical-Schema Reconciliation
+
+**Status:** `CLOSED`
+
+- تم اعتماد `ADR-0024 — Phase 03.07 Index Catalog / Physical-Schema Reconciliation`.
+- تم حسم تعارض `receipts.sales_order_id`: العمود غير موجود في §25.12 ولا migration `0008`، والعلاقة canonical بالـSalesOrder موجودة على `customer_advances.sales_order_id` مع ربط الإيصال عبر `customer_advances.receipt_id`. لذلك لا يضاف العمود ولا ينفذ index `receipts(sales_order_id)`; سطر §28.6 مصنف Catalog Defect.
+- تم حسم تعارض `advance_applications.posting_batch_id`: العمود غير موجود في §25.12 ولا migration `0008`، وتطبيق العربون لا ينشئ FinancialMovement جديدًا. لذلك لا يضاف العمود ولا ينفذ index `advance_applications(posting_batch_id)`; سطر §28.6 مصنف Catalog Defect.
+- لا تغيير على Physical Schema ولا إعادة كتابة migrations قديمة.
+- لا Index Migration تم إنشاؤها في هذه الخطوة.
+- ADR-0017 يظل ملزمًا لتصحيح Installment open-status predicate.
+- ADR-0020 يظل ملزمًا لسلامة AdvanceApplication history وعدم اختراع uniqueness يزيل إمكانية reversal/re-application history.
+
+**Next substep:** تجميد Exact 03.07 Index Inventory لكل §28، وتصنيف كل entry إلى: already satisfied / create in 03.07 / omitted by ADR / blocked. لا إنشاء Index Migration قبل إغلاق هذا inventory.
 
 ## 03.08 DDL Verification Suite
 
@@ -3813,10 +3827,10 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 **03.06 Final CI:** run `35251535466` (Run `#935`) — `verify`, `backend-verify`, `browser-contract`, and `release-gate` all SUCCESS on the same SHA; PostgreSQL 17 Printing / Export / Reporting Read Models schema and behavioral integration gates both passed.  
 **03.06 Validation PR:** `#208` — CLOSED WITHOUT MERGE; `merged=false`.  
 **Installment Status Decision:** canonical V1 values remain `UPCOMING / DUE / PARTIAL / PAID / OVERDUE`.  
-**03.07 Index Catalog:** `IN_PROGRESS` — planning / discrepancy resolution only; no Index Migration has been created yet.  
-**03.07 Pre-DDL Blockers:** Architecture §28.6 references `receipts.sales_order_id` and `advance_applications.posting_batch_id`, while those columns are not present in the approved physical Finance/Settlement schema currently implemented. These two references must be reconciled against Architecture Baseline v1.7 before any Index DDL is written; no column is added merely to satisfy an index line.  
-**Next Action:** resolve and document the two §28.6 Index Catalog / physical-schema discrepancies above, then freeze the exact approved 03.07 index list. **Do not create an Index Migration yet.**  
-**Forbidden Next Actions:** لا إنشاء Index Migration قبل حسم التعارضين، لا بدء 03.08 DDL Verification، لا Business Module cutover، لا dual write، لا `main` merge، ولا Convex Production change.
+**03.07 Index Catalog:** `IN_PROGRESS` — Pre-DDL reconciliation `CLOSED` by ADR-0024; no Index Migration has been created yet.  
+**03.07 Resolved Defects:** `receipts.sales_order_id` and `advance_applications.posting_batch_id` in §28.6 are classified as Index Catalog defects because the canonical §25.12 / migration `0008` physical schema contains neither column. No schema column will be added merely to satisfy those index lines; both invalid index entries are omitted under ADR-0024.  
+**Next Action:** build and freeze the **Exact 03.07 Index Inventory** for all §28 entries, classifying every entry as already satisfied / create in 03.07 / omitted by accepted ADR / blocked. **Do not create an Index Migration yet.**  
+**Forbidden Next Actions:** لا إنشاء Index Migration قبل تجميد الـExact Index Inventory، لا بدء 03.08 DDL Verification، لا Business Module cutover، لا dual write، لا `main` merge، ولا Convex Production change.
 
 **Plan update — 2026-09-17 / ACCOUNTING CONSTRAINTS CLOSED:** تم إغلاق ثامن executable slice من 03.06 على SHA `ef03d141958c392032bd8caf16b5f880a193e86e`. Migration `0019`، ADR-0021، Accounting PK/FK/UNIQUE/CHECK layer، Finance Category → GL Account FK، والحفاظ على deferred Journal balance at COMMIT تم التحقق منهم فعليًا على PostgreSQL 17؛ Full CI run `35224498880` أخضر بالكامل وPR `#206` أُغلق بدون Merge. 03.06 ما زالت `IN_PROGRESS` و03.07 لم تبدأ.
 
@@ -3824,6 +3838,8 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 
 ---
 
+
+**Plan update — 2026-09-18 / 03.07 PRE-DDL BLOCKERS RESOLVED:** تم اعتماد ADR-0024 وحسم تعارضي §28.6 بدون تعديل الـPhysical Schema: `receipts.sales_order_id` و`advance_applications.posting_batch_id` مصنفان Catalog Defects ولا يتم إنشاء العمودين أو الفهرسين في V1. لم يتم إنشاء أي Index Migration. الـNext Action الوحيدة هي تجميد Exact 03.07 Index Inventory كاملًا قبل أي DDL.
 
 **Plan update — 2026-09-18 / 03.06 CONSTRAINTS CLOSED & 03.07 STARTED:** تم إغلاق Phase 03.06 بالكامل على verified code SHA `abe8587ef7a08cdb607e283ad01937bc9332247c` بعد Full CI run `35251535466` / Run `#935` وValidation PR `#208` المغلق بدون Merge. تم نقل Current Execution Pointer إلى 03.07 Index Catalog بحالة `IN_PROGRESS`، على أن تكون أول خطوة فقط هي حسم تعارضي §28.6 المتعلقين بـ`receipts.sales_order_id` و`advance_applications.posting_batch_id` قبل أي Index DDL. من الآن فصاعدًا هذا الملف هو النسخة الوحيدة داخل السورس ويتم تحديثه in-place؛ لا تُنشأ نسخ مرحلة جديدة داخل المستودع.
 
