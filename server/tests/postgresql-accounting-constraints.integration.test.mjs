@@ -129,7 +129,7 @@ test("03.06 Accounting constraints enforce canonical integrity on PostgreSQL 17"
         LEFT JOIN pg_catalog.pg_constraint con ON con.conindid=i.indexrelid
         WHERE n.nspname='public' AND tbl.relname=ANY($1::text[]) AND con.oid IS NULL
         ORDER BY idx.relname`, [ACCOUNTING_TABLES]);
-      assert.deepEqual(independentIndexes.rows, [], "03.07 Accounting indexes must remain deferred");
+      assert.ok(independentIndexes.rows.length > 0, "03.07 approved Accounting indexes must exist after migration 0022");
 
       const sourceFks = await client.query(`SELECT count(*)::int AS count
         FROM pg_catalog.pg_constraint con
@@ -240,8 +240,8 @@ test("03.06 Accounting constraints enforce canonical integrity on PostgreSQL 17"
       assert.equal(accountingSlice?.name, "accounting_constraints");
       assert.match(accountingSlice?.checksum ?? "", /^[0-9a-f]{64}$/);
       const latest = history.rows.at(-1);
-      assert.equal(latest?.version, "0021");
-      assert.equal(latest?.name, "printing_export_reporting_read_models_constraints");
+      assert.equal(latest?.version, "0022");
+      assert.equal(latest?.name, "index_catalog");
       assert.match(latest?.checksum ?? "", /^[0-9a-f]{64}$/);
     });
 
