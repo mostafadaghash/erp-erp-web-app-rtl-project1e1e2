@@ -109,8 +109,10 @@ async function queryIndexes(client) {
       pg_get_expr(i.indpred, i.indrelid, true) AS predicate,
       ARRAY(
         SELECT pg_get_indexdef(i.indexrelid, k, true) ||
+          CASE WHEN NOT opc.opcdefault THEN ' ' || opc.opcname ELSE '' END ||
           CASE WHEN (i.indoption[k - 1] & 1) = 1 THEN ' DESC' ELSE '' END
         FROM generate_series(1, i.indnkeyatts) AS k
+        JOIN pg_catalog.pg_opclass opc ON opc.oid = i.indclass[k - 1]
         ORDER BY k
       ) AS keys,
       con.oid IS NOT NULL AS constraint_backing
