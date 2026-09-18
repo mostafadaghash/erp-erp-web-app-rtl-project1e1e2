@@ -2430,6 +2430,8 @@ Implemented and verified:
 
 ## 04.05 Transactional Outbox
 
+**Status:** `VERIFYING`
+
 - Event inserted in source transaction.
 - Worker uses `FOR UPDATE SKIP LOCKED`.
 - retry_count managed.
@@ -3950,8 +3952,11 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 **04.04 Audit Service:** `CLOSED` — Gap Analysis at `docs/gap-analysis/phase-04-04-audit-service.md`; append-only transaction-bound Audit recording, server `created_at`, JSONB Before/After snapshots, nullable system context, frozen index inventory verification, and rollback atomicity completed without schema/index changes.  
 **04.04 Implementation SHA:** `106770cd0a699edc9f3f68bf5a6386ac1ced1281`.  
 **04.04 Implementation CI:** Run `#953` / `35389984264` — SUCCESS; PostgreSQL 17 Audit Service gate and all regressions passed.  
-**04.04 Validation PR:** `#216` — validation-only; close WITHOUT MERGE after final same-SHA documentation validation.  
-**Next Action:** execute **04.05 Transactional Outbox only** after final 04.04 same-SHA closure validation.  
+**04.04 Final Verified SHA:** `5fa53e6cc6f02db06c03b52201b8141bb56ba384`.  
+**04.04 Final CI:** Run `#954` / `35390227804` — SUCCESS; `verify`, `backend-verify` including PostgreSQL 17 Audit Service integration, `browser-contract`, and `release-gate` all SUCCESS on the same SHA.  
+**04.04 Validation PR:** `#216` — CLOSED WITHOUT MERGE; `merged=false`.  
+**04.05 Transactional Outbox:** `VERIFYING` — Gap Analysis at `docs/gap-analysis/phase-04-05-transactional-outbox.md`; existing outbox schema/CHECK/partial index reused unchanged.  
+**Next Action:** validate **04.05 Transactional Outbox only** with PostgreSQL 17 restart/retry/SKIP LOCKED worker-concurrency tests + Full CI.  
 **Forbidden Next Actions:** لا 04.06 قبل إغلاق 04.05، لا Module cutover، لا dual write، لا `main` merge، ولا Convex Production change.
 
 **Plan update — 2026-09-17 / ACCOUNTING CONSTRAINTS CLOSED:** تم إغلاق ثامن executable slice من 03.06 على SHA `ef03d141958c392032bd8caf16b5f880a193e86e`. Migration `0019`، ADR-0021، Accounting PK/FK/UNIQUE/CHECK layer، Finance Category → GL Account FK، والحفاظ على deferred Journal balance at COMMIT تم التحقق منهم فعليًا على PostgreSQL 17؛ Full CI run `35224498880` أخضر بالكامل وPR `#206` أُغلق بدون Merge. 03.06 ما زالت `IN_PROGRESS` و03.07 لم تبدأ.
@@ -3960,6 +3965,8 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 
 ---
 
+
+**Plan update — 2026-09-18 / 04.05 TRANSACTIONAL OUTBOX STARTED:** تم عمل Gap Analysis مقابل Architecture Baseline v1.7. جدول `outbox_events` وretry CHECK والـfrozen partial index على unprocessed rows موجودون ومتوافقون، لذلك لا Migration أو Index جديد. التنفيذ يضيف source-transaction enqueue + worker بـ`FOR UPDATE SKIP LOCKED` + SAVEPOINT-based failure isolation + `retry_count` management + server `processed_at` بعد نجاح consumer فقط، مع PostgreSQL 17 restart survival وtwo-worker concurrency proof. الـconsumer يستلم stable `event.id` كـidempotency identity بدون إضافة generic dedupe schema خارج الـBaseline. 04.06 ممنوع قبل إغلاق 04.05.
 
 **Plan update — 2026-09-18 / 04.04 AUDIT SERVICE CLOSED:** تم إغلاق التنفيذ الوظيفي على SHA `106770cd0a699edc9f3f68bf5a6386ac1ced1281` بعد Full CI Run `#953` / `35389984264` SUCCESS. الخدمة Append-only داخل Business Transaction قائمة، تسجل Who/What/When/Branch/Entity/Reason/Before/After حيث ينطبق، تولد `created_at` من PostgreSQL، وتتحقق من JSON-compatible Before/After snapshots قبل SQL. PostgreSQL 17 rollback proof أثبت أن الـAudit والـlinked business effect لا يتسربان عند فشل الـTransaction. لا Migration `0023` ولا Index جديد. PR `#216` validation-only ويخضع الآن لـFull CI نهائي على documentation closure SHA قبل إغلاقه بدون Merge. Next Action بعد نجاحه: 04.05 Transactional Outbox فقط.
 
