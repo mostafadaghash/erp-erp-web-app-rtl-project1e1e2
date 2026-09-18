@@ -116,7 +116,7 @@ test("03.06 Printing / Export / Reporting Read Models constraints enforce canoni
         LEFT JOIN pg_catalog.pg_constraint con ON con.conindid=i.indexrelid
         WHERE n.nspname='public' AND tbl.relname=ANY($1::text[]) AND con.oid IS NULL
         ORDER BY idx.relname`, [REPORTING_TABLES]);
-      assert.deepEqual(independentIndexes.rows, [], "03.07 Printing/Reporting performance indexes must remain deferred");
+      assert.deepEqual(independentIndexes.rows, [], "frozen 03.07 catalog authorizes no independent Printing/Reporting indexes");
 
       const aliases = await client.query(`SELECT
         to_regclass('public.export_jobs') IS NULL AS no_export_jobs,
@@ -204,7 +204,7 @@ test("03.06 Printing / Export / Reporting Read Models constraints enforce canoni
       const target = history.rows.find((row) => row.version === "0021");
       assert.equal(target?.name, "printing_export_reporting_read_models_constraints");
       assert.match(target?.checksum ?? "", /^[0-9a-f]{64}$/);
-      assert.equal(history.rows.at(-1)?.version, "0021");
+      assert.equal(history.rows.at(-1)?.version, "0022");
     });
 
     const second = await runMigrations({ databaseUrl });
