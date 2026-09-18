@@ -95,12 +95,12 @@ test("03.I Repairs / Follow-Up / Notifications physical shape remains canonical 
         FROM pg_catalog.pg_index i JOIN pg_catalog.pg_class c ON c.oid=i.indrelid
         JOIN pg_catalog.pg_namespace n ON n.oid=c.relnamespace JOIN pg_catalog.pg_class idx ON idx.oid=i.indexrelid
         LEFT JOIN pg_catalog.pg_constraint con ON con.conindid=i.indexrelid
-        WHERE n.nspname='public' AND c.relname=ANY($1::text[]) AND con.oid IS NULL ORDER BY idx.relname`, [REPAIR_TABLES]);
+        WHERE n.nspname='public' AND c.relname=ANY($1::text[]) AND con.oid IS NULL AND idx.relname LIKE 'uq_%' ORDER BY idx.relname`, [REPAIR_TABLES]);
       assert.deepEqual(integrityIndexes.rows, [
         { index_name: "uq_customer_followups__source_event" },
         { index_name: "uq_notifications__outbox_event_type" },
         { index_name: "uq_repair_assignments__active" },
-      ], "03.06 keeps only approved integrity partial uniques; other query/performance indexes remain deferred to 03.07");
+      ], "03.06 integrity partial uniques remain present after the 03.07 query/performance indexes are added");
 
       const tokenShape = await client.query(`SELECT
         EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='repair_tracking_tokens' AND column_name='token_hash') AS has_hash,
@@ -142,7 +142,7 @@ test("03.I Repairs / Follow-Up / Notifications physical shape remains canonical 
       const slice = history.rows.find((row) => row.version === "0020");
       assert.equal(slice?.name, "repairs_followup_notifications_constraints");
       assert.match(slice?.checksum ?? "", /^[0-9a-f]{64}$/);
-      assert.equal(history.rows.at(-1)?.version, "0021");
+      assert.equal(history.rows.at(-1)?.version, "0022");
     });
 
     const second = await runMigrations({ databaseUrl });
