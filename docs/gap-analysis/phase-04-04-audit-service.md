@@ -1,6 +1,6 @@
 # Phase 04.04 — Audit Service Gap Analysis
 
-**Status:** VERIFYING  
+**Status:** CLOSED  
 **Branch:** `agent/postgres-v1.7-core`  
 **Starting SHA:** `f93a298665894f68f53d8f8e9194b2f11a278046`
 
@@ -54,9 +54,24 @@ Sensitive business actions must write their Audit record in the same successful 
 - No 04.06 Error Mapping.
 - No domain command cutover, dual write, Convex Production change, or merge to `main`.
 
-## Exit procedure
+## Validation evidence
 
-1. Full CI on the 04.04 implementation SHA.
-2. If green, update the canonical Master Implementation Plan to `04.04 CLOSED`.
-3. Full CI again on the final documentation SHA.
-4. Close the validation-only PR without merge.
+- Implementation SHA: `106770cd0a699edc9f3f68bf5a6386ac1ced1281`.
+- Full implementation CI: Run `#953` / `35389984264` — SUCCESS.
+- PostgreSQL 17 Audit Service integration: SUCCESS.
+- Who / What / When / Branch / Entity / Reason / Before / After persistence: SUCCESS.
+- PostgreSQL-generated `created_at`: SUCCESS.
+- nullable system Audit context: SUCCESS.
+- JSONB snapshot serialization guards: SUCCESS.
+- frozen Audit index inventory: SUCCESS.
+- rollback proof: Audit row and linked business effect both rolled back with the failed transaction.
+- `verify`: SUCCESS.
+- `backend-verify`: SUCCESS.
+- `browser-contract`: SUCCESS.
+- `release-gate`: SUCCESS.
+- Validation PR: `#216` — validation-only; do not merge.
+- Final documentation closure SHA must pass Full CI before PR #216 is closed.
+
+## Next action
+
+After final same-SHA closure validation succeeds: `PHASE 04 / 04.05 Transactional Outbox` only.

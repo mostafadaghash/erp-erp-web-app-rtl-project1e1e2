@@ -2405,9 +2405,9 @@ Implemented and verified:
 
 ## 04.04 Audit Service
 
-**Status:** `VERIFYING`
+**Status:** `CLOSED`
 
-Capture where applicable:
+Implemented and verified:
 
 - Who
 - What
@@ -2417,8 +2417,16 @@ Capture where applicable:
 - Reason
 - Before
 - After
+- append-only Audit writes through the service.
+- PostgreSQL-generated `created_at`; callers cannot backdate Audit chronology.
+- JSONB Before/After snapshots reject ambiguous/non-JSON runtime values before SQL.
+- nullable branch/user/reason/snapshots preserved exactly as approved for system or non-applicable context.
+- Audit and sensitive business effects share the caller-owned Business Transaction and roll back together.
+- Existing `audit_logs` schema, FKs, and frozen Audit indexes reused unchanged; no migration/index added.
 
-Audit must be in the same successful transaction for sensitive business actions.
+**04.04 Implementation SHA:** `106770cd0a699edc9f3f68bf5a6386ac1ced1281`.  
+**04.04 Implementation CI:** Run `#953` / `35389984264` — SUCCESS; `verify`, `backend-verify` including PostgreSQL 17 Audit Service integration, `browser-contract`, and `release-gate` all SUCCESS.  
+**04.04 Validation PR:** `#216` — validation-only; close WITHOUT MERGE after final same-SHA documentation validation.
 
 ## 04.05 Transactional Outbox
 
@@ -3883,7 +3891,7 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 
 # 32. Current Execution Pointer
 
-**Current Phase:** `PHASE 04 — Core Infrastructure Services / 04.04 Audit Service`  
+**Current Phase:** `PHASE 04 — Core Infrastructure Services / 04.05 Transactional Outbox`  
 **Status:** `IN_PROGRESS`  
 **Integration Branch:** `agent/postgres-v1.7-core`  
 **Phase 01 Final SHA:** `b0d35101bf622264b655bcc574787989fadbcd83`  
@@ -3939,9 +3947,12 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 **04.03 Final Verified SHA:** `f93a298665894f68f53d8f8e9194b2f11a278046`.  
 **04.03 Final CI:** Run `#952` / `35389542327` — SUCCESS; `verify`, `backend-verify` including PostgreSQL 17 Posting Batch Service integration, `browser-contract`, and `release-gate` all SUCCESS on the same SHA.  
 **04.03 Validation PR:** `#215` — CLOSED WITHOUT MERGE; `merged=false`.  
-**04.04 Audit Service:** `VERIFYING` — Gap Analysis at `docs/gap-analysis/phase-04-04-audit-service.md`; existing audit schema/FKs/indexes reused unchanged.  
-**Next Action:** validate **04.04 Audit Service only** with PostgreSQL 17 snapshot/transaction rollback tests + Full CI.  
-**Forbidden Next Actions:** لا 04.05 قبل إغلاق 04.04، لا Module cutover، لا dual write، لا `main` merge، ولا Convex Production change.
+**04.04 Audit Service:** `CLOSED` — Gap Analysis at `docs/gap-analysis/phase-04-04-audit-service.md`; append-only transaction-bound Audit recording, server `created_at`, JSONB Before/After snapshots, nullable system context, frozen index inventory verification, and rollback atomicity completed without schema/index changes.  
+**04.04 Implementation SHA:** `106770cd0a699edc9f3f68bf5a6386ac1ced1281`.  
+**04.04 Implementation CI:** Run `#953` / `35389984264` — SUCCESS; PostgreSQL 17 Audit Service gate and all regressions passed.  
+**04.04 Validation PR:** `#216` — validation-only; close WITHOUT MERGE after final same-SHA documentation validation.  
+**Next Action:** execute **04.05 Transactional Outbox only** after final 04.04 same-SHA closure validation.  
+**Forbidden Next Actions:** لا 04.06 قبل إغلاق 04.05، لا Module cutover، لا dual write، لا `main` merge، ولا Convex Production change.
 
 **Plan update — 2026-09-17 / ACCOUNTING CONSTRAINTS CLOSED:** تم إغلاق ثامن executable slice من 03.06 على SHA `ef03d141958c392032bd8caf16b5f880a193e86e`. Migration `0019`، ADR-0021، Accounting PK/FK/UNIQUE/CHECK layer، Finance Category → GL Account FK، والحفاظ على deferred Journal balance at COMMIT تم التحقق منهم فعليًا على PostgreSQL 17؛ Full CI run `35224498880` أخضر بالكامل وPR `#206` أُغلق بدون Merge. 03.06 ما زالت `IN_PROGRESS` و03.07 لم تبدأ.
 
@@ -3949,6 +3960,8 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 
 ---
 
+
+**Plan update — 2026-09-18 / 04.04 AUDIT SERVICE CLOSED:** تم إغلاق التنفيذ الوظيفي على SHA `106770cd0a699edc9f3f68bf5a6386ac1ced1281` بعد Full CI Run `#953` / `35389984264` SUCCESS. الخدمة Append-only داخل Business Transaction قائمة، تسجل Who/What/When/Branch/Entity/Reason/Before/After حيث ينطبق، تولد `created_at` من PostgreSQL، وتتحقق من JSON-compatible Before/After snapshots قبل SQL. PostgreSQL 17 rollback proof أثبت أن الـAudit والـlinked business effect لا يتسربان عند فشل الـTransaction. لا Migration `0023` ولا Index جديد. PR `#216` validation-only ويخضع الآن لـFull CI نهائي على documentation closure SHA قبل إغلاقه بدون Merge. Next Action بعد نجاحه: 04.05 Transactional Outbox فقط.
 
 **Plan update — 2026-09-18 / 04.04 AUDIT SERVICE STARTED:** تم عمل Gap Analysis مقابل Architecture Baseline v1.7. جدول `audit_logs` والـFKs والـ3 frozen Audit indexes موجودون ومتوافقون، لذلك لا Migration أو Index جديد. التنفيذ يضيف append-only transaction-bound Audit Service يسجل Who/What/When/Branch/Entity/Reason/Before/After حيث ينطبق، مع PostgreSQL-generated `created_at` وJSONB snapshot validation وPostgreSQL 17 rollback proof يثبت أن الـAudit والـbusiness effect ينجحان أو يفشلان معًا. 04.05 ممنوع قبل إغلاق 04.04.
 
