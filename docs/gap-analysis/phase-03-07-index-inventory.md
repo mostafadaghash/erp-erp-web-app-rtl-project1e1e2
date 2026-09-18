@@ -1,12 +1,12 @@
 # Phase 03.07 — Exact Index Inventory
 
-**Status:** FROZEN  
+**Status:** FROZEN / IMPLEMENTED BY `0022_index_catalog`  
 **Date:** 2026-09-18  
 **Branch:** `agent/postgres-v1.7-core`  
 **Architecture authority:** `Business-Tech-ERP-Architecture-Baseline-v1.7-Final.docx` — §28  
 **Execution authority:** `Business-Tech-ERP-Master-Implementation-Plan-v1.0.md`  
 **Decision corrections:** ADR-0017, ADR-0024  
-**Boundary:** inventory/classification only. **No Index Migration is created by this step.**
+**Boundary:** this document remains the immutable classification contract. The frozen `CREATE_IN_03_07` set is implemented by forward migration `0022_index_catalog`; any later change requires measurement plus a new versioned decision.
 
 ## 1. Classification contract
 
@@ -29,7 +29,7 @@ The inventory is based on the committed schema/migrations through `0021_printing
 | BLOCKED | 0 |
 | **Total catalog decisions** | **231** |
 
-These 231 rows are catalog decisions, not 231 new indexes. Only the 155 `CREATE_IN_03_07` entries authorize new index DDL.
+These 231 rows are catalog decisions, not 231 new indexes. The 155 `CREATE_IN_03_07` entries are the complete authorized DDL set and are implemented exactly once by `0022_index_catalog`.
 
 ## 2. Governing rules applied during classification
 
@@ -244,13 +244,17 @@ The Phase 03.07 pre-DDL inventory is now **FROZEN**:
 - no missing-column index is permitted;
 - no redundant prefix index is permitted;
 - no existing PK/UNIQUE backing index is duplicated;
-- all 155 future index definitions are explicitly listed above;
+- all 155 index definitions are explicitly listed above and implemented by `0022_index_catalog`;
 - ADR-0017 and ADR-0024 corrections are incorporated;
-- no Index Migration exists yet.
+- executable manifest: `database/index-catalog/phase-03-07-indexes.json`;
+- PostgreSQL 17 exact catalog test: `server/tests/postgresql-index-catalog.integration.test.mjs`;
+- implementation validation Run `#941` / `35303952439` succeeded on code SHA `ba7eda5ee52f4b021d0afa36b7ab71653d0adb69`, including the exact index-catalog gate, backend build/smoke, `verify`, `browser-contract`, and `release-gate`.
 
-## 12. Next action — exactly one
+## 12. Implementation result and next action
 
-Create the **single forward-only Phase 03.07 Index Migration** from the 155 `CREATE_IN_03_07` entries above, with PostgreSQL 17 index-catalog integration tests that verify:
+The **single forward-only Phase 03.07 Index Migration** is now implemented as `0022_index_catalog`.
+
+The PostgreSQL 17 exact index-catalog integration verifies:
 
 1. exact columns/order/opclass/predicates/uniqueness;
 2. no duplicate PK/UNIQUE indexes;
@@ -260,4 +264,4 @@ Create the **single forward-only Phase 03.07 Index Migration** from the 155 `CRE
 6. migration checksum, idempotent rerun and verify-only behavior;
 7. no unapproved independent index exists.
 
-Do not start 03.08 until that migration and Full CI are closed on the same final SHA.
+**Next Action:** Phase `03.08 DDL Verification` only. Do not start Business Backend or module cutover before 03.08 closes.
