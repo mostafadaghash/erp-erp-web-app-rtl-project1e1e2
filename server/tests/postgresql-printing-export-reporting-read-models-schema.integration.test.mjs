@@ -88,7 +88,7 @@ test("03.J + 03.06 create canonical Printing / Export / Reports Read Models sche
          JOIN pg_catalog.pg_class idx ON idx.oid=i.indexrelid
          LEFT JOIN pg_catalog.pg_constraint con ON con.conindid=i.indexrelid
          WHERE n.nspname='public' AND c.relname = ANY($1::text[]) AND con.oid IS NULL`, [REPORTING_TABLES]);
-      assert.deepEqual(independentIndexes.rows, [], "03.07 Printing/Reporting performance indexes must remain deferred");
+      assert.deepEqual(independentIndexes.rows, [], "frozen 03.07 catalog authorizes no independent Printing/Reporting indexes");
 
       const branchSettingsShape = await client.query(
         `SELECT
@@ -111,7 +111,7 @@ test("03.J + 03.06 create canonical Printing / Export / Reports Read Models sche
       const constraintSlice = history.rows.find((row) => row.version === "0021");
       assert.equal(constraintSlice?.name, "printing_export_reporting_read_models_constraints");
       assert.match(constraintSlice?.checksum ?? "", /^[0-9a-f]{64}$/);
-      assert.equal(history.rows.at(-1)?.version, "0021");
+      assert.equal(history.rows.at(-1)?.version, "0022");
     });
 
     const second = await runMigrations({ databaseUrl });
