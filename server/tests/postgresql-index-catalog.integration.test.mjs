@@ -108,7 +108,8 @@ async function queryIndexes(client) {
       i.indisunique AS is_unique,
       pg_get_expr(i.indpred, i.indrelid, true) AS predicate,
       ARRAY(
-        SELECT pg_get_indexdef(i.indexrelid, k, true)
+        SELECT pg_get_indexdef(i.indexrelid, k, true) ||
+          CASE WHEN (i.indoption[k - 1] & 1) = 1 THEN ' DESC' ELSE '' END
         FROM generate_series(1, i.indnkeyatts) AS k
         ORDER BY k
       ) AS keys,
