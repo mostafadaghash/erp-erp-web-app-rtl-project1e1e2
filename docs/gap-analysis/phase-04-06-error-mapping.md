@@ -1,6 +1,6 @@
 # Phase 04.06 — Error Mapping Gap Analysis
 
-**Status:** VERIFYING  
+**Status:** CLOSED  
 **Branch:** `agent/postgres-v1.7-core`  
 **Starting SHA:** `0b9cbb70511e9df3a08bbb0311452bded0e7d7e6`
 
@@ -67,9 +67,22 @@ The Master Implementation Plan requires PostgreSQL/business errors to be mapped 
 - No frontend localization/cutover.
 - No module cutover, dual write, Convex Production change, or merge to `main`.
 
-## Exit procedure
+## Validation evidence
 
-1. Full CI on the 04.06 implementation SHA.
-2. If green, close 04.06 and Phase 04 in the canonical Master Plan.
-3. Full CI on the final documentation SHA.
-4. Close validation PR without merge.
+- Implementation SHA: `40e86d4e2937c9d9f2db3b3ebdcec50b8da9a048`.
+- Full implementation CI: Run `#957` / `35395761123` — SUCCESS.
+- Unit redaction/business mapping tests: SUCCESS.
+- PostgreSQL 17 Error Mapping integration: SUCCESS.
+- Real unique/FK/CHECK/NOT NULL/invalid-UUID driver failures mapped to stable public codes: SUCCESS.
+- Raw SQL/constraint/schema/runtime details excluded from public contract: SUCCESS.
+- deadlock/serialization stable code mapping: SUCCESS.
+- `verify`: SUCCESS.
+- `backend-verify`: SUCCESS.
+- `browser-contract`: SUCCESS.
+- `release-gate`: SUCCESS.
+- Validation PR: `#218` — validation-only; do not merge.
+- Final documentation closure SHA must pass Full CI before PR #218 is closed.
+
+## Next action
+
+After final same-SHA closure validation succeeds: `PHASE 05 / 05.01 Authentication` only.

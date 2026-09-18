@@ -2338,7 +2338,7 @@ New executable gate: `server/tests/postgresql-ddl-verification.integration.test.
 
 # 10. PHASE 04 — Core Infrastructure Services
 
-**Status:** `IN_PROGRESS`
+**Status:** `CLOSED`
 
 ## 04.01 Idempotency Service
 
@@ -2452,9 +2452,29 @@ Implemented and verified:
 
 ## 04.06 Error Mapping
 
-**Status:** `VERIFYING`
+**Status:** `CLOSED`
 
-Map PostgreSQL/business errors to stable `errorCode` values without leaking SQL/secrets.
+Implemented and verified:
+
+- centralized public contract = `errorCode + safe params`.
+- existing Idempotency and Posting Batch business errors map to stable codes with explicit safe `reason` only.
+- Idempotency keys and posting reference IDs are not exposed.
+- PostgreSQL `23505` → `DB_UNIQUE_CONFLICT`.
+- PostgreSQL `23503` → `DB_REFERENCE_CONFLICT`.
+- PostgreSQL `23514` → `DB_CHECK_VIOLATION`.
+- PostgreSQL `23502` → `DB_REQUIRED_VALUE_MISSING`.
+- PostgreSQL `22P02 / 22001 / 22003` → `DB_INVALID_INPUT`.
+- PostgreSQL `40P01` → `CONCURRENCY_DEADLOCK`.
+- PostgreSQL `40001` → `CONCURRENCY_SERIALIZATION`.
+- TypeError/RangeError → `INVALID_ARGUMENT` without exposing their message.
+- unknown PostgreSQL/runtime failures → `INTERNAL_ERROR` with empty params.
+- public output never copies SQL/driver/runtime fields such as `message/detail/hint/query/table/column/constraint/stack`.
+- UI localization remains downstream: Arabic/English presentation is based on `errorCode`, not raw backend text.
+- no schema or index changes.
+
+**04.06 Implementation SHA:** `40e86d4e2937c9d9f2db3b3ebdcec50b8da9a048`.  
+**04.06 Implementation CI:** Run `#957` / `35395761123` — SUCCESS; `verify`, `backend-verify` including PostgreSQL 17 Error Mapping integration, `browser-contract`, and `release-gate` all SUCCESS.  
+**04.06 Validation PR:** `#218` — validation-only; close WITHOUT MERGE after final same-SHA documentation validation.
 
 ### Gate 04
 
@@ -2468,7 +2488,7 @@ Map PostgreSQL/business errors to stable `errorCode` values without leaking SQL/
 
 # 11. PHASE 05 — Authentication, Authorization, Organization
 
-**Status:** `NOT_STARTED`
+**Status:** `READY_TO_START`
 
 ## 05.01 Authentication
 
@@ -3907,8 +3927,8 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 
 # 32. Current Execution Pointer
 
-**Current Phase:** `PHASE 04 — Core Infrastructure Services / 04.06 Error Mapping`  
-**Status:** `IN_PROGRESS`  
+**Current Phase:** `PHASE 05 — Authentication, Authorization, Organization / 05.01 Authentication`  
+**Status:** `READY_TO_START`  
 **Integration Branch:** `agent/postgres-v1.7-core`  
 **Phase 01 Final SHA:** `b0d35101bf622264b655bcc574787989fadbcd83`  
 **Phase 01 Validation PR:** `#183` — closed without merge.  
@@ -3975,9 +3995,13 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 **04.05 Final Verified SHA:** `0b9cbb70511e9df3a08bbb0311452bded0e7d7e6`.  
 **04.05 Final CI:** Run `#956` / `35392258769` — SUCCESS on the final same-SHA rerun; `verify`, `backend-verify` including PostgreSQL 17 Transactional Outbox integration, `browser-contract`, and `release-gate` all SUCCESS.  
 **04.05 Validation PR:** `#217` — CLOSED WITHOUT MERGE; `merged=false`.  
-**04.06 Error Mapping:** `VERIFYING` — Gap Analysis at `docs/gap-analysis/phase-04-06-error-mapping.md`; application-layer stable error contract only, no schema/index change.  
-**Next Action:** validate **04.06 Error Mapping only** with unit redaction tests + PostgreSQL 17 real-error mapping integration + Full CI.  
-**Forbidden Next Actions:** لا Phase 05 قبل إغلاق 04.06 وPhase 04، لا Module cutover، لا dual write، لا `main` merge، ولا Convex Production change.
+**04.06 Error Mapping:** `CLOSED` — Gap Analysis at `docs/gap-analysis/phase-04-06-error-mapping.md`; centralized stable `errorCode + safe params` contract, known Business error mapping, PostgreSQL SQLSTATE mapping, validation/concurrency mapping, and explicit redaction of SQL/driver/runtime internals completed without schema/index changes.  
+**04.06 Implementation SHA:** `40e86d4e2937c9d9f2db3b3ebdcec50b8da9a048`.  
+**04.06 Implementation CI:** Run `#957` / `35395761123` — SUCCESS; PostgreSQL 17 Error Mapping gate and all regressions passed.  
+**04.06 Validation PR:** `#218` — validation-only; close WITHOUT MERGE after final same-SHA documentation validation.  
+**PHASE 04:** `CLOSED` — all Gate 04 items complete.  
+**Next Action:** execute **PHASE 05 / 05.01 Authentication only** after final 04.06 same-SHA closure validation.  
+**Forbidden Next Actions:** لا 05.02 قبل إغلاق 05.01، لا Module cutover، لا dual write، لا `main` merge، ولا Convex Production change.
 
 **Plan update — 2026-09-17 / ACCOUNTING CONSTRAINTS CLOSED:** تم إغلاق ثامن executable slice من 03.06 على SHA `ef03d141958c392032bd8caf16b5f880a193e86e`. Migration `0019`، ADR-0021، Accounting PK/FK/UNIQUE/CHECK layer، Finance Category → GL Account FK، والحفاظ على deferred Journal balance at COMMIT تم التحقق منهم فعليًا على PostgreSQL 17؛ Full CI run `35224498880` أخضر بالكامل وPR `#206` أُغلق بدون Merge. 03.06 ما زالت `IN_PROGRESS` و03.07 لم تبدأ.
 
@@ -3985,6 +4009,8 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 
 ---
 
+
+**Plan update — 2026-09-19 / 04.06 ERROR MAPPING CLOSED:** تم إغلاق التنفيذ الوظيفي على SHA `40e86d4e2937c9d9f2db3b3ebdcec50b8da9a048` بعد Full CI Run `#957` / `35395761123` SUCCESS. تم إنشاء Mapper مركزي بعقد public ثابت `errorCode + safe params`، وربط أخطاء Business الحالية وPostgreSQL SQLSTATE الشائعة بأكواد مستقرة، مع منع تسريب raw message/detail/hint/query/table/column/constraint/stack أو idempotency keys/reference IDs. PostgreSQL 17 integration اختبر أخطاء UNIQUE/FK/CHECK/NOT NULL/invalid UUID فعلية. لا Migration ولا Index جديد. Phase 04 أصبحت CLOSED وظيفيًا، وPR `#218` validation-only يخضع الآن لـFull CI نهائي على documentation closure SHA قبل إغلاقه بدون Merge. Next Action بعد نجاحه: Phase 05 / 05.01 Authentication فقط.
 
 **Plan update — 2026-09-19 / 04.06 ERROR MAPPING STARTED:** تم عمل Gap Analysis مقابل Architecture Baseline v1.7. الـBaseline يفرض public contract = stable `errorCode` + safe params مع ترجمة UI وعدم عرض Stack Trace. لا يوجد Mapper مركزي حاليًا. التنفيذ يضيف application-layer mapper لأخطاء Business المعروفة وPostgreSQL SQLSTATE الشائعة، ويمنع نقل `message/detail/hint/query/table/column/constraint/stack` أو keys/references الحساسة إلى public output. لا Migration ولا Index جديد. Phase 05 ممنوعة قبل إغلاق 04.06 وPhase 04.
 
