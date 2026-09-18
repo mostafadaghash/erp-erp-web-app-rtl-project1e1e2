@@ -1,6 +1,6 @@
 # Phase 04.02 — Document Sequence Service Gap Analysis
 
-**Status:** VERIFYING  
+**Status:** CLOSED  
 **Branch:** `agent/postgres-v1.7-core`  
 **Starting SHA:** `fbdf02053f905178c209dedb293cd5d8eafe321f`
 
@@ -56,9 +56,25 @@ Architecture Baseline v1.7 and the Master Implementation Plan require:
 - No 04.06 Error Mapping.
 - No module cutover, dual write, Convex Production change, or merge to `main`.
 
-## Exit procedure
+## Validation evidence
 
-1. Full CI on the 04.02 implementation SHA.
-2. If green, update the canonical Master Implementation Plan to `04.02 CLOSED`.
-3. Full CI again on the final documentation SHA.
-4. Close the validation-only PR without merge.
+- Initial implementation SHA: `6d97aef86789ca6a69b458a97942141de007c565`.
+- Diagnostic CI: Run `#948` / `35380206600` — the service generated the correct unique `1..32` set, but a persisted-result assertion ordered a text alias lexicographically (`1,10,...,2`). This was a test-only defect.
+- Verified implementation SHA after numeric assertion fix: `eb1c02035bd1dc91e7045e3d6ed08e23b9342acd`.
+- Full implementation CI: Run `#949` / `35380340039` — SUCCESS.
+- PostgreSQL 17 Document Sequence Service integration: SUCCESS.
+- 32 concurrent workers on one branch/type: exactly `1..32`, no duplicate number.
+- independent branch/type scopes: SUCCESS.
+- late allocation after prior row lock: SUCCESS.
+- rollback proof: no sequence row and no business row leak; retry starts safely at the uncommitted number.
+- committed deletion/tombstone proof: next number is greater and the committed number is not reused.
+- `verify`: SUCCESS.
+- `backend-verify`: SUCCESS.
+- `browser-contract`: SUCCESS.
+- `release-gate`: SUCCESS.
+- Validation PR: `#214` — validation-only; do not merge.
+- Final documentation closure SHA must pass Full CI before PR #214 is closed.
+
+## Next action
+
+After final same-SHA closure validation succeeds: `PHASE 04 / 04.03 Posting Batch Service` only.

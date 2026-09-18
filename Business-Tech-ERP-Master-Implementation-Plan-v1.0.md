@@ -2361,7 +2361,9 @@ Implemented and verified:
 
 ## 04.02 Document Sequence Service
 
-**Status:** `VERIFYING`
+**Status:** `CLOSED`
+
+Implemented and verified:
 
 - numeric visible numbers only.
 - branch + document type sequence.
@@ -2369,6 +2371,15 @@ Implemented and verified:
 - allocate late after validation/locks.
 - atomic update returning value.
 - no reuse after deletion.
+- PostgreSQL 17 32-worker same-scope concurrency produces exactly one copy of each number `1..32`.
+- rollback removes both the sequence increment and business effect; a retry can safely allocate the uncommitted number.
+- committed deleted/tombstoned number is not reused; the next allocation remains monotonic.
+- Existing `document_sequences` table and `UNIQUE(branch_id, document_type)` reused unchanged; no migration/index added.
+
+**04.02 Implementation SHA:** `eb1c02035bd1dc91e7045e3d6ed08e23b9342acd`.  
+**04.02 Implementation CI:** Run `#949` / `35380340039` — SUCCESS; `verify`, `backend-verify` including PostgreSQL 17 Document Sequence Service integration, `browser-contract`, and `release-gate` all SUCCESS.  
+**04.02 Diagnostic Run:** Run `#948` exposed only a test assertion ordering defect: the persisted `bigint` values were cast to text and the SQL alias was ordered lexicographically. The service had already generated unique `1..32`; the test was corrected to order by the underlying numeric column.  
+**04.02 Validation PR:** `#214` — validation-only; close WITHOUT MERGE after final same-SHA documentation validation.
 
 ## 04.03 Posting Batch Service
 
@@ -2409,7 +2420,7 @@ Map PostgreSQL/business errors to stable `errorCode` values without leaking SQL/
 ### Gate 04
 
 - [x] parallel idempotency tests.
-- [ ] sequence concurrency test with many workers and no duplicate number.
+- [x] sequence concurrency test with many workers and no duplicate number.
 - [ ] rollback does not leak posting effects.
 - [ ] outbox survives process restart.
 - [ ] worker concurrency has no duplicate logical result.
@@ -3857,7 +3868,7 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 
 # 32. Current Execution Pointer
 
-**Current Phase:** `PHASE 04 — Core Infrastructure Services / 04.02 Document Sequence Service`  
+**Current Phase:** `PHASE 04 — Core Infrastructure Services / 04.03 Posting Batch Service`  
 **Status:** `IN_PROGRESS`  
 **Integration Branch:** `agent/postgres-v1.7-core`  
 **Phase 01 Final SHA:** `b0d35101bf622264b655bcc574787989fadbcd83`  
@@ -3901,9 +3912,12 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 **04.01 Final Verified SHA:** `fbdf02053f905178c209dedb293cd5d8eafe321f`.  
 **04.01 Final CI:** Run `#947` / `35377348558` — SUCCESS; `verify`, `backend-verify` including PostgreSQL 17 Idempotency Service integration, `browser-contract`, and `release-gate` all SUCCESS on the same SHA.  
 **04.01 Validation PR:** `#213` — CLOSED WITHOUT MERGE; `merged=false`.  
-**04.02 Document Sequence Service:** `VERIFYING` — Gap Analysis at `docs/gap-analysis/phase-04-02-document-sequence-service.md`; existing sequence schema/constraint reused unchanged.  
-**Next Action:** validate **04.02 Document Sequence Service only** with PostgreSQL 17 32-worker concurrency/rollback/deletion tests + Full CI.  
-**Forbidden Next Actions:** لا 04.03 قبل إغلاق 04.02، لا Module cutover، لا dual write، لا `main` merge، ولا Convex Production change.
+**04.02 Document Sequence Service:** `CLOSED` — Gap Analysis at `docs/gap-analysis/phase-04-02-document-sequence-service.md`; transaction-bound late allocation via atomic UPSERT/RETURNING, branch/type scope isolation, rollback safety, 32-worker contention safety, and no-reuse-after-deletion proof completed without schema/index changes.  
+**04.02 Implementation SHA:** `eb1c02035bd1dc91e7045e3d6ed08e23b9342acd`.  
+**04.02 Implementation CI:** Run `#949` / `35380340039` — SUCCESS; PostgreSQL 17 32-worker sequence gate and all regressions passed.  
+**04.02 Validation PR:** `#214` — validation-only; close WITHOUT MERGE after final same-SHA documentation validation.  
+**Next Action:** execute **04.03 Posting Batch Service only** after final 04.02 same-SHA closure validation.  
+**Forbidden Next Actions:** لا 04.04 قبل إغلاق 04.03، لا Module cutover، لا dual write، لا `main` merge، ولا Convex Production change.
 
 **Plan update — 2026-09-17 / ACCOUNTING CONSTRAINTS CLOSED:** تم إغلاق ثامن executable slice من 03.06 على SHA `ef03d141958c392032bd8caf16b5f880a193e86e`. Migration `0019`، ADR-0021، Accounting PK/FK/UNIQUE/CHECK layer، Finance Category → GL Account FK، والحفاظ على deferred Journal balance at COMMIT تم التحقق منهم فعليًا على PostgreSQL 17؛ Full CI run `35224498880` أخضر بالكامل وPR `#206` أُغلق بدون Merge. 03.06 ما زالت `IN_PROGRESS` و03.07 لم تبدأ.
 
@@ -3911,6 +3925,8 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 
 ---
 
+
+**Plan update — 2026-09-18 / 04.02 DOCUMENT SEQUENCE SERVICE CLOSED:** تم إغلاق التنفيذ الوظيفي على SHA `eb1c02035bd1dc91e7045e3d6ed08e23b9342acd` بعد Full CI Run `#949` / `35380340039` SUCCESS. الخدمة لا تبدأ Transaction مستقلة؛ تستقبل `PoolClient` من الـBusiness Transaction وتُستدعى late بعد validation/locks، وتستخدم atomic UPSERT/RETURNING على `document_sequences`. اختبار PostgreSQL 17 بـ32 workers أثبت أرقام `1..32` بدون duplicates، rollback لا يترك sequence/business effect، والرقم committed لا يعاد استخدامه بعد tombstone. Run `#948` كان Diagnostic failure في test-only lexicographic ORDER BY بعد cast إلى text؛ الأرقام المولدة كانت صحيحة وفريدة، وتم إصلاح assertion فقط. لا Migration `0023` ولا Index جديد. PR `#214` validation-only ويخضع الآن لـFull CI نهائي على documentation closure SHA قبل إغلاقه بدون Merge. Next Action بعد نجاحه: 04.03 Posting Batch Service فقط.
 
 **Plan update — 2026-09-18 / 04.02 DOCUMENT SEQUENCE SERVICE STARTED:** تم عمل Gap Analysis مقابل Architecture Baseline v1.7. جدول `document_sequences` و`UNIQUE(branch_id, document_type)` موجودان ومتوافقان، لذلك لا Migration أو Index جديد. التنفيذ يضيف transaction-bound late allocation باستخدام atomic UPSERT/RETURNING، مع PostgreSQL 17 32-worker concurrency gate وrollback/no-reuse-after-deletion proofs. 04.03 ممنوع قبل إغلاق 04.02.
 
