@@ -1,6 +1,6 @@
 # Phase 04.03 — Posting Batch Service Gap Analysis
 
-**Status:** VERIFYING  
+**Status:** CLOSED  
 **Branch:** `agent/postgres-v1.7-core`  
 **Starting SHA:** `20119820d41a24dd9f3bb235e7425ed9303e97a2`
 
@@ -54,9 +54,25 @@ Architecture Baseline v1.7 and the Master Implementation Plan require:
 - No 04.06 Error Mapping.
 - No domain posting engine, module cutover, dual write, Convex Production change, or merge to `main`.
 
-## Exit procedure
+## Validation evidence
 
-1. Full CI on the 04.03 implementation SHA.
-2. If green, update the canonical Master Implementation Plan to `04.03 CLOSED`.
-3. Full CI again on the final documentation SHA.
-4. Close the validation-only PR without merge.
+- Implementation SHA: `60d25e108a37bdfb6adbfad261c87f674fbf62d0`.
+- Full implementation CI: Run `#951` / `35389332195` — SUCCESS.
+- PostgreSQL 17 Posting Batch Service integration: SUCCESS.
+- `POST / CORRECTION / REVERSAL / DELETE_REVERSAL`: SUCCESS.
+- source traceability: SUCCESS.
+- server-generated `posted_at`: SUCCESS.
+- reversal self-reference + same branch/source validation: SUCCESS.
+- missing reversal target rejection: SUCCESS.
+- cross-source and cross-branch reversal rejection: SUCCESS.
+- rollback proof: Posting Batch row and linked posting effect both rolled back with the failed transaction.
+- `verify`: SUCCESS.
+- `backend-verify`: SUCCESS.
+- `browser-contract`: SUCCESS.
+- `release-gate`: SUCCESS.
+- Validation PR: `#215` — validation-only; do not merge.
+- Final documentation closure SHA must pass Full CI before PR #215 is closed.
+
+## Next action
+
+After final same-SHA closure validation succeeds: `PHASE 04 / 04.04 Audit Service` only.
