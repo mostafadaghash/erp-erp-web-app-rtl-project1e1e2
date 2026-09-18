@@ -1,6 +1,6 @@
 # Phase 04.05 — Transactional Outbox Gap Analysis
 
-**Status:** VERIFYING  
+**Status:** CLOSED  
 **Branch:** `agent/postgres-v1.7-core`  
 **Starting SHA:** `5fa53e6cc6f02db06c03b52201b8141bb56ba384`
 
@@ -57,9 +57,25 @@ Architecture Baseline v1.7 and the Master Implementation Plan require:
 - No Notifications/Read Models domain consumer cutover.
 - No module cutover, dual write, Convex Production change, or merge to `main`.
 
-## Exit procedure
+## Validation evidence
 
-1. Full CI on the 04.05 implementation SHA.
-2. If green, update the canonical Master Implementation Plan to `04.05 CLOSED`.
-3. Full CI again on the final documentation SHA.
-4. Close the validation-only PR without merge.
+- Implementation SHA: `b476939de62c00b9ebdad942c985513a76e2fb79`.
+- Full implementation CI: Run `#955` / `35391957524` — SUCCESS.
+- PostgreSQL 17 Transactional Outbox integration: SUCCESS.
+- source transaction rollback removes both business probe and outbox event: SUCCESS.
+- committed outbox event survives producer pool shutdown and a new worker process/pool: SUCCESS.
+- non-retryable consumer failure increments `retry_count`, leaves `processed_at = NULL`, and succeeds on a later retry: SUCCESS.
+- `processed_at` is written only after successful consumer work: SUCCESS.
+- two concurrent workers with `FOR UPDATE SKIP LOCKED` processed 40 events as two disjoint 20-event batches: SUCCESS.
+- stable event-id consumer idempotency proof: 40 logical results, each with exactly one delivery.
+- frozen outbox index inventory: SUCCESS.
+- `verify`: SUCCESS.
+- `backend-verify`: SUCCESS.
+- `browser-contract`: SUCCESS.
+- `release-gate`: SUCCESS.
+- Validation PR: `#217` — validation-only; do not merge.
+- Final documentation closure SHA must pass Full CI before PR #217 is closed.
+
+## Next action
+
+After final same-SHA closure validation succeeds: `PHASE 04 / 04.06 Error Mapping` only.

@@ -2430,13 +2430,25 @@ Implemented and verified:
 
 ## 04.05 Transactional Outbox
 
-**Status:** `VERIFYING`
+**Status:** `CLOSED`
+
+Implemented and verified:
 
 - Event inserted in source transaction.
 - Worker uses `FOR UPDATE SKIP LOCKED`.
-- retry_count managed.
-- processed_at only after successful consumer work.
-- consumers idempotent.
+- `retry_count` managed.
+- `processed_at` written only after successful consumer work.
+- consumers receive stable `event.id` as the idempotency identity.
+- DB-backed consumer effects can use the same worker transaction and commit atomically with `processed_at`.
+- non-retryable consumer failures are isolated by SAVEPOINT, increment `retry_count`, and remain pending.
+- deadlock/serialization errors are delegated to the existing bounded transaction retry policy.
+- committed outbox events survive producer/worker process restart.
+- two concurrent workers processed 40 events with disjoint claims and no duplicate logical result.
+- Existing `outbox_events` schema, retry CHECK, PK, and frozen partial index reused unchanged; no migration/index added.
+
+**04.05 Implementation SHA:** `b476939de62c00b9ebdad942c985513a76e2fb79`.  
+**04.05 Implementation CI:** Run `#955` / `35391957524` — SUCCESS; `verify`, `backend-verify` including PostgreSQL 17 Transactional Outbox integration, `browser-contract`, and `release-gate` all SUCCESS.  
+**04.05 Validation PR:** `#217` — validation-only; close WITHOUT MERGE after final same-SHA documentation validation.
 
 ## 04.06 Error Mapping
 
@@ -2447,8 +2459,8 @@ Map PostgreSQL/business errors to stable `errorCode` values without leaking SQL/
 - [x] parallel idempotency tests.
 - [x] sequence concurrency test with many workers and no duplicate number.
 - [x] rollback does not leak posting effects.
-- [ ] outbox survives process restart.
-- [ ] worker concurrency has no duplicate logical result.
+- [x] outbox survives process restart.
+- [x] worker concurrency has no duplicate logical result.
 
 ---
 
@@ -3893,7 +3905,7 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 
 # 32. Current Execution Pointer
 
-**Current Phase:** `PHASE 04 — Core Infrastructure Services / 04.05 Transactional Outbox`  
+**Current Phase:** `PHASE 04 — Core Infrastructure Services / 04.06 Error Mapping`  
 **Status:** `IN_PROGRESS`  
 **Integration Branch:** `agent/postgres-v1.7-core`  
 **Phase 01 Final SHA:** `b0d35101bf622264b655bcc574787989fadbcd83`  
@@ -3955,9 +3967,12 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 **04.04 Final Verified SHA:** `5fa53e6cc6f02db06c03b52201b8141bb56ba384`.  
 **04.04 Final CI:** Run `#954` / `35390227804` — SUCCESS; `verify`, `backend-verify` including PostgreSQL 17 Audit Service integration, `browser-contract`, and `release-gate` all SUCCESS on the same SHA.  
 **04.04 Validation PR:** `#216` — CLOSED WITHOUT MERGE; `merged=false`.  
-**04.05 Transactional Outbox:** `VERIFYING` — Gap Analysis at `docs/gap-analysis/phase-04-05-transactional-outbox.md`; existing outbox schema/CHECK/partial index reused unchanged.  
-**Next Action:** validate **04.05 Transactional Outbox only** with PostgreSQL 17 restart/retry/SKIP LOCKED worker-concurrency tests + Full CI.  
-**Forbidden Next Actions:** لا 04.06 قبل إغلاق 04.05، لا Module cutover، لا dual write، لا `main` merge، ولا Convex Production change.
+**04.05 Transactional Outbox:** `CLOSED` — Gap Analysis at `docs/gap-analysis/phase-04-05-transactional-outbox.md`; source-transaction enqueue, `FOR UPDATE SKIP LOCKED` workers, SAVEPOINT failure isolation, retry management, processed-at discipline, restart survival, stable event-id consumer idempotency identity, and two-worker no-duplicate logical result proof completed without schema/index changes.  
+**04.05 Implementation SHA:** `b476939de62c00b9ebdad942c985513a76e2fb79`.  
+**04.05 Implementation CI:** Run `#955` / `35391957524` — SUCCESS; PostgreSQL 17 Transactional Outbox gate and all regressions passed.  
+**04.05 Validation PR:** `#217` — validation-only; close WITHOUT MERGE after final same-SHA documentation validation.  
+**Next Action:** execute **04.06 Error Mapping only** after final 04.05 same-SHA closure validation.  
+**Forbidden Next Actions:** لا Phase 05 قبل إغلاق 04.06 وPhase 04، لا Module cutover، لا dual write، لا `main` merge، ولا Convex Production change.
 
 **Plan update — 2026-09-17 / ACCOUNTING CONSTRAINTS CLOSED:** تم إغلاق ثامن executable slice من 03.06 على SHA `ef03d141958c392032bd8caf16b5f880a193e86e`. Migration `0019`، ADR-0021، Accounting PK/FK/UNIQUE/CHECK layer، Finance Category → GL Account FK، والحفاظ على deferred Journal balance at COMMIT تم التحقق منهم فعليًا على PostgreSQL 17؛ Full CI run `35224498880` أخضر بالكامل وPR `#206` أُغلق بدون Merge. 03.06 ما زالت `IN_PROGRESS` و03.07 لم تبدأ.
 
@@ -3965,6 +3980,8 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 
 ---
 
+
+**Plan update — 2026-09-18 / 04.05 TRANSACTIONAL OUTBOX CLOSED:** تم إغلاق التنفيذ الوظيفي على SHA `b476939de62c00b9ebdad942c985513a76e2fb79` بعد Full CI Run `#955` / `35391957524` SUCCESS. الـDomain Event يُنشأ داخل source transaction، والWorker يستخدم `FOR UPDATE SKIP LOCKED` على الـunprocessed partial index. non-retryable consumer failure يُعزل بـSAVEPOINT ثم يزيد `retry_count` ويظل `processed_at = NULL`؛ أما deadlock/serialization فيُعاد عبر transaction helper المحدود. PostgreSQL 17 restart proof أثبت بقاء event committed بعد إعادة إنشاء الـprocess/pool، وtwo-worker test على 40 events أثبت disjoint claims وlogical result واحد لكل event باستخدام stable `event.id`. لا Migration `0023` ولا Index جديد. PR `#217` validation-only ويخضع الآن لـFull CI نهائي على documentation closure SHA قبل إغلاقه بدون Merge. Next Action بعد نجاحه: 04.06 Error Mapping فقط.
 
 **Plan update — 2026-09-18 / 04.05 TRANSACTIONAL OUTBOX STARTED:** تم عمل Gap Analysis مقابل Architecture Baseline v1.7. جدول `outbox_events` وretry CHECK والـfrozen partial index على unprocessed rows موجودون ومتوافقون، لذلك لا Migration أو Index جديد. التنفيذ يضيف source-transaction enqueue + worker بـ`FOR UPDATE SKIP LOCKED` + SAVEPOINT-based failure isolation + `retry_count` management + server `processed_at` بعد نجاح consumer فقط، مع PostgreSQL 17 restart survival وtwo-worker concurrency proof. الـconsumer يستلم stable `event.id` كـidempotency identity بدون إضافة generic dedupe schema خارج الـBaseline. 04.06 ممنوع قبل إغلاق 04.05.
 
