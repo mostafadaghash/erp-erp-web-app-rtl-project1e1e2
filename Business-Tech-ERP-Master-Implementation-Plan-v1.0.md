@@ -2452,6 +2452,8 @@ Implemented and verified:
 
 ## 04.06 Error Mapping
 
+**Status:** `VERIFYING`
+
 Map PostgreSQL/business errors to stable `errorCode` values without leaking SQL/secrets.
 
 ### Gate 04
@@ -3970,8 +3972,11 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 **04.05 Transactional Outbox:** `CLOSED` — Gap Analysis at `docs/gap-analysis/phase-04-05-transactional-outbox.md`; source-transaction enqueue, `FOR UPDATE SKIP LOCKED` workers, SAVEPOINT failure isolation, retry management, processed-at discipline, restart survival, stable event-id consumer idempotency identity, and two-worker no-duplicate logical result proof completed without schema/index changes.  
 **04.05 Implementation SHA:** `b476939de62c00b9ebdad942c985513a76e2fb79`.  
 **04.05 Implementation CI:** Run `#955` / `35391957524` — SUCCESS; PostgreSQL 17 Transactional Outbox gate and all regressions passed.  
-**04.05 Validation PR:** `#217` — validation-only; close WITHOUT MERGE after final same-SHA documentation validation.  
-**Next Action:** execute **04.06 Error Mapping only** after final 04.05 same-SHA closure validation.  
+**04.05 Final Verified SHA:** `0b9cbb70511e9df3a08bbb0311452bded0e7d7e6`.  
+**04.05 Final CI:** Run `#956` / `35392258769` — SUCCESS on the final same-SHA rerun; `verify`, `backend-verify` including PostgreSQL 17 Transactional Outbox integration, `browser-contract`, and `release-gate` all SUCCESS.  
+**04.05 Validation PR:** `#217` — CLOSED WITHOUT MERGE; `merged=false`.  
+**04.06 Error Mapping:** `VERIFYING` — Gap Analysis at `docs/gap-analysis/phase-04-06-error-mapping.md`; application-layer stable error contract only, no schema/index change.  
+**Next Action:** validate **04.06 Error Mapping only** with unit redaction tests + PostgreSQL 17 real-error mapping integration + Full CI.  
 **Forbidden Next Actions:** لا Phase 05 قبل إغلاق 04.06 وPhase 04، لا Module cutover، لا dual write، لا `main` merge، ولا Convex Production change.
 
 **Plan update — 2026-09-17 / ACCOUNTING CONSTRAINTS CLOSED:** تم إغلاق ثامن executable slice من 03.06 على SHA `ef03d141958c392032bd8caf16b5f880a193e86e`. Migration `0019`، ADR-0021، Accounting PK/FK/UNIQUE/CHECK layer، Finance Category → GL Account FK، والحفاظ على deferred Journal balance at COMMIT تم التحقق منهم فعليًا على PostgreSQL 17؛ Full CI run `35224498880` أخضر بالكامل وPR `#206` أُغلق بدون Merge. 03.06 ما زالت `IN_PROGRESS` و03.07 لم تبدأ.
@@ -3980,6 +3985,8 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 
 ---
 
+
+**Plan update — 2026-09-19 / 04.06 ERROR MAPPING STARTED:** تم عمل Gap Analysis مقابل Architecture Baseline v1.7. الـBaseline يفرض public contract = stable `errorCode` + safe params مع ترجمة UI وعدم عرض Stack Trace. لا يوجد Mapper مركزي حاليًا. التنفيذ يضيف application-layer mapper لأخطاء Business المعروفة وPostgreSQL SQLSTATE الشائعة، ويمنع نقل `message/detail/hint/query/table/column/constraint/stack` أو keys/references الحساسة إلى public output. لا Migration ولا Index جديد. Phase 05 ممنوعة قبل إغلاق 04.06 وPhase 04.
 
 **Plan update — 2026-09-18 / 04.05 TRANSACTIONAL OUTBOX CLOSED:** تم إغلاق التنفيذ الوظيفي على SHA `b476939de62c00b9ebdad942c985513a76e2fb79` بعد Full CI Run `#955` / `35391957524` SUCCESS. الـDomain Event يُنشأ داخل source transaction، والWorker يستخدم `FOR UPDATE SKIP LOCKED` على الـunprocessed partial index. non-retryable consumer failure يُعزل بـSAVEPOINT ثم يزيد `retry_count` ويظل `processed_at = NULL`؛ أما deadlock/serialization فيُعاد عبر transaction helper المحدود. PostgreSQL 17 restart proof أثبت بقاء event committed بعد إعادة إنشاء الـprocess/pool، وtwo-worker test على 40 events أثبت disjoint claims وlogical result واحد لكل event باستخدام stable `event.id`. لا Migration `0023` ولا Index جديد. PR `#217` validation-only ويخضع الآن لـFull CI نهائي على documentation closure SHA قبل إغلاقه بدون Merge. Next Action بعد نجاحه: 04.06 Error Mapping فقط.
 
