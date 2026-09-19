@@ -57,6 +57,11 @@ const config = readFileSync(
 if (!/ERP_DATABASE_URL/.test(config)) {
   failures.push('server config: ERP_DATABASE_URL must be environment-backed')
 }
+if (!/ERP_AUTH_ACCESS_TOKEN_SECRET/.test(config)) {
+  failures.push(
+    'server config: ERP_AUTH_ACCESS_TOKEN_SECRET must be environment-backed',
+  )
+}
 
 const logger = readFileSync(
   join(root, 'server/infrastructure/logging/logger.ts'),
@@ -67,6 +72,8 @@ for (const requiredRedaction of [
   'req.headers.cookie',
   'config.ERP_DATABASE_URL',
   'ERP_DATABASE_URL',
+  'config.ERP_AUTH_ACCESS_TOKEN_SECRET',
+  'ERP_AUTH_ACCESS_TOKEN_SECRET',
 ]) {
   if (!logger.includes(requiredRedaction)) {
     failures.push(`backend logger: missing redaction for ${requiredRedaction}`)

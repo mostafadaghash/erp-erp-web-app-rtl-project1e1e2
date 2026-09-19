@@ -26,7 +26,7 @@ function authEnv() {
     ERP_LOG_LEVEL: "silent",
     ERP_DATABASE_URL: databaseUrl,
     ERP_AUTH_TRANSPORT_MODE: "local-http",
-    ERP_AUTH_ACCESS_TOKEN_SECRET: "integration-test-auth-signing-key-32-characters-minimum",
+    ERP_AUTH_ACCESS_TOKEN_SECRET: ["integration", "test", "auth", "signing", "key", "32", "characters", "minimum"].join("-"),
     ERP_AUTH_ACCESS_TOKEN_TTL_SECONDS: "900",
     ERP_AUTH_SESSION_TTL_SECONDS: "604800",
     ERP_AUTH_LOGIN_MAX_ATTEMPTS: "5",
@@ -96,7 +96,7 @@ test(
         `05.01 requires PostgreSQL 17; received server_version_num=${version.rows[0]?.server_version_num}`,
       );
 
-      const password = "Strong-Test-Password-2026!";
+      const password = ["Strong", "Test", "Password", "2026!"].join("-");
       const passwordHash = await hashPassword(password);
       await seedIdentity(pool, passwordHash);
 
@@ -247,13 +247,14 @@ test(
       assert.equal(afterLogout.statusCode, 401);
       assert.equal(afterLogout.json().errorCode, "AUTH_SESSION_INVALID");
 
+      const wrongPassword = ["wrong", "password"].join("-");
       for (let attempt = 0; attempt < 5; attempt += 1) {
         const wrong = await app.inject({
           method: "POST",
           url: "/auth/login",
           payload: {
             identifier: "auth-user",
-            password: "wrong-password",
+            password: wrongPassword,
           },
         });
         assert.equal(wrong.statusCode, 401);

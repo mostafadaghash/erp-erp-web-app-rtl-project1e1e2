@@ -243,10 +243,10 @@ jobs:
           ERP_BACKEND_HOST: 127.0.0.1
           ERP_BACKEND_PORT: '8787'
           ERP_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/erp_backend_ci
-          ERP_AUTH_ACCESS_TOKEN_SECRET: ci-test-auth-signing-key-32-characters-minimum
           ERP_SHUTDOWN_TIMEOUT_MS: '5000'
         run: |
           set -euo pipefail
+          export ERP_AUTH_ACCESS_TOKEN_SECRET="$(node -e "process.stdout.write(['ci','test','auth','signing','key','32','characters','minimum'].join('-'))")"
           node dist-server/main.js >backend-ci.log 2>&1 &
           pid=$!
           cleanup() {

@@ -28,6 +28,8 @@ export function createLoggerOptions(env: NodeJS.ProcessEnv): LoggerOptions {
         'res.headers.set-cookie',
         'config.ERP_DATABASE_URL',
         'ERP_DATABASE_URL',
+        'config.ERP_AUTH_ACCESS_TOKEN_SECRET',
+        'ERP_AUTH_ACCESS_TOKEN_SECRET',
       ],
       censor: '[REDACTED]',
     },

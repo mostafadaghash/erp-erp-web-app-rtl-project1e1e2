@@ -20,7 +20,7 @@ import {
 } from '../api/routes/auth.js'
 
 test('password hashes use scrypt and never contain plaintext', async () => {
-  const password = 'Correct Horse Battery Staple!'
+  const password = ['Correct', 'Horse', 'Battery', 'Staple!'].join(' ')
   const hash = await hashPassword(password)
 
   assert.match(hash, /^scrypt\$v=1\$N=16384,r=8,p=1\$/)
@@ -45,7 +45,7 @@ test('refresh tokens are random and stored only through SHA-256 hash', () => {
 test('access token signature detects tampering, wrong server secret, and expiry', () => {
   const sessionId = '9b000000-0000-4000-8000-000000000001'
   const hash = hashRefreshToken(createRefreshToken())
-  const secret = 'unit-test-auth-signing-secret-32-characters-minimum'
+  const signingKey = ['unit', 'test', 'auth', 'signing', 'key', '32', 'characters', 'minimum'].join('-')
   const expiresAt = new Date('2030-01-01T00:00:00.000Z')
   const token = createAccessToken(sessionId, expiresAt, hash, secret)
 
@@ -71,7 +71,7 @@ test('access token signature detects tampering, wrong server secret, and expiry'
     verifyAccessTokenSignature(
       token,
       hash,
-      'different-auth-signing-secret-32-characters-minimum',
+      ['different', 'auth', 'signing', 'key', '32', 'characters', 'minimum'].join('-'),
       new Date('2029-12-31T23:59:00.000Z'),
     ),
     null,

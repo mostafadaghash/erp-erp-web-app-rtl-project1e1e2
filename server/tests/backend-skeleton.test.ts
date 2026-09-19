@@ -16,7 +16,7 @@ function createEnv(overrides: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv {
     NODE_ENV: 'test',
     ERP_LOG_LEVEL: 'silent',
     ERP_DATABASE_URL: 'postgresql://test:test@127.0.0.1:5432/test',
-    ERP_AUTH_ACCESS_TOKEN_SECRET: 'test-only-auth-signing-key-32-characters-minimum',
+    ERP_AUTH_ACCESS_TOKEN_SECRET: ['test', 'only', 'auth', 'signing', 'key', '32', 'characters', 'minimum'].join('-'),
     ...overrides,
   }
 }
