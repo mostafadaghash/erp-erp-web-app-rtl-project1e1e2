@@ -2517,7 +2517,7 @@ Implemented and verified:
 
 ## 05.02 Roles
 
-**Status:** `VERIFYING`
+**Status:** `CLOSED`
 
 Default roles:
 
@@ -2528,6 +2528,23 @@ Default roles:
 - CUSTOMER_SERVICE
 - TECHNICIAN
 - WAREHOUSE_KEEPER
+
+Implemented and verified:
+
+- exact seven-role backend catalog using the Master Plan technical keys.
+- idempotent multi-row UPSERT on the existing `UNIQUE(role_key)`.
+- 16-way concurrent initialization without duplicate role keys.
+- canonical metadata repair preserves the existing role `id` and therefore existing references.
+- all seven canonical roles are reconciled to `is_system = true`.
+- extra custom roles are preserved unchanged.
+- `ADMIN_SYSTEM` is not emitted by the new catalog; canonical key is `SYSTEM_ADMIN`.
+- `role_permissions` remains untouched in 05.02; permission defaults belong to 05.03.
+- no role-management HTTP API was exposed before backend authorization exists.
+- no migration and no index added.
+
+**05.02 Verified Implementation SHA:** `d5aaa05d8b071120c4a5f622c62494f436d59301`.  
+**05.02 Implementation CI:** Run `#964` / `35439920395` — SUCCESS; security scan, Backend TypeScript/unit tests, PostgreSQL 17 Role Catalog integration, `verify`, `backend-verify`, `browser-contract`, and `release-gate` all SUCCESS.  
+**05.02 Validation PR:** `#220` — validation-only; close WITHOUT MERGE after final same-SHA documentation validation.
 
 ## 05.03 Effective Permissions
 
@@ -2558,7 +2575,7 @@ Role Default
 
 ### Gate 05
 
-- [ ] role defaults tests.
+- [x] role defaults tests.
 - [ ] allow override test.
 - [ ] deny override test.
 - [ ] branch selected/all tests.
@@ -3943,8 +3960,8 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 
 # 32. Current Execution Pointer
 
-**Current Phase:** `PHASE 05 — Authentication, Authorization, Organization / 05.02 Roles`  
-**Status:** `IN_PROGRESS`  
+**Current Phase:** `PHASE 05 — Authentication, Authorization, Organization / 05.03 Effective Permissions`  
+**Status:** `READY_TO_START`  
 **Integration Branch:** `agent/postgres-v1.7-core`  
 **Phase 01 Final SHA:** `b0d35101bf622264b655bcc574787989fadbcd83`  
 **Phase 01 Validation PR:** `#183` — closed without merge.  
@@ -4024,9 +4041,12 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 **05.01 Final Verified SHA:** `ebbecc688f64f8e51da3a65a1ac72a54f5882b2c`.  
 **05.01 Final CI:** Run `#963` / `35415324053` — SUCCESS on the final documentation SHA.  
 **05.01 Validation PR:** `#219` — CLOSED WITHOUT MERGE; `merged=false`.  
-**05.02 Roles:** `VERIFYING` — exact seven-role catalog implementation and PostgreSQL 17 validation in progress; existing schema/unique key reused unchanged.  
-**Next Action:** validate **05.02 Roles only** with unit + PostgreSQL 17 role-catalog concurrency/drift-preservation tests + Full CI.  
-**Forbidden Next Actions:** لا 05.03 قبل إغلاق 05.02، لا Frontend cutover، لا dual write، لا `main` merge، ولا Convex Production change.
+**05.02 Roles:** `CLOSED` — exact seven-role backend catalog, idempotent/concurrency-safe initialization, metadata reconciliation with ID preservation, and custom-role preservation completed without schema/index changes.  
+**05.02 Verified Implementation SHA:** `d5aaa05d8b071120c4a5f622c62494f436d59301`.  
+**05.02 Implementation CI:** Run `#964` / `35439920395` — SUCCESS; PostgreSQL 17 Role Catalog gate and all regressions passed.  
+**05.02 Validation PR:** `#220` — validation-only; close WITHOUT MERGE after final same-SHA documentation validation.  
+**Next Action:** execute **05.03 Effective Permissions only** after final 05.02 same-SHA closure validation.  
+**Forbidden Next Actions:** لا 05.04 قبل إغلاق 05.03، لا Frontend cutover، لا dual write، لا `main` merge، ولا Convex Production change.
 
 **Plan update — 2026-09-17 / ACCOUNTING CONSTRAINTS CLOSED:** تم إغلاق ثامن executable slice من 03.06 على SHA `ef03d141958c392032bd8caf16b5f880a193e86e`. Migration `0019`، ADR-0021، Accounting PK/FK/UNIQUE/CHECK layer، Finance Category → GL Account FK، والحفاظ على deferred Journal balance at COMMIT تم التحقق منهم فعليًا على PostgreSQL 17؛ Full CI run `35224498880` أخضر بالكامل وPR `#206` أُغلق بدون Merge. 03.06 ما زالت `IN_PROGRESS` و03.07 لم تبدأ.
 
@@ -4034,6 +4054,8 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 
 ---
 
+
+**Plan update — 2026-09-19 / 05.02 ROLES CLOSED:** تم إغلاق التنفيذ الوظيفي على SHA `d5aaa05d8b071120c4a5f622c62494f436d59301` بعد Full CI Run `#964` / `35439920395` SUCCESS. تم تثبيت الكتالوج الرسمي للأدوار السبعة بمفاتيح Master Plan، مع idempotent multi-row UPSERT على `UNIQUE(role_key)`، واختبار 16-way concurrent initialization، وتصحيح metadata drift مع الحفاظ على نفس role ID والـreferences، وعدم حذف custom roles. `role_permissions` بقي بلا أي seed لإبقاء 05.03 خارج النطاق. لا Migration ولا Index جديد، ولا Role Management API قبل Authorization. Gate `role defaults tests` أصبح مكتملًا. Gate حماية آخر/System Admin يظل مفتوحًا لأن Baseline الذي تمت مراجعته لا يحدد command policy كاملة لهذه الحالة، ولن تُخترع داخل 05.02. PR `#220` validation-only يخضع الآن لـFull CI نهائي على documentation closure SHA قبل إغلاقه بدون Merge. Next Action بعد نجاحه: 05.03 Effective Permissions فقط.
 
 **Plan update — 2026-09-19 / 05.02 ROLES STARTED:** تم عمل Gap Analysis مقابل Architecture Baseline v1.7 وMaster Plan. جدول `roles(id, role_key, display_name_key, is_system)` و`UNIQUE(role_key)` موجودان ومتوافقان، ولا يوجد Backend Role Catalog حالي. التنفيذ يضيف catalog backend-only للأدوار السبعة الرسمية `SYSTEM_ADMIN / BRANCH_MANAGER / ACCOUNTANT / SALES / CUSTOMER_SERVICE / TECHNICIAN / WAREHOUSE_KEEPER` باستخدام idempotent multi-row UPSERT داخل READ COMMITTED transaction؛ يصحح metadata drift لنفس `role_key` إلى `is_system=true` ويحافظ على الـID والـreferences الموجودة، ولا يحذف custom roles. لا Permission grants ولا Overrides ولا Branch Scope ولا API management في 05.02؛ هذه تظل 05.03/05.04. لا Migration ولا Index جديد.
 
