@@ -2517,6 +2517,8 @@ Implemented and verified:
 
 ## 05.02 Roles
 
+**Status:** `VERIFYING`
+
 Default roles:
 
 - SYSTEM_ADMIN
@@ -3942,7 +3944,7 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 # 32. Current Execution Pointer
 
 **Current Phase:** `PHASE 05 — Authentication, Authorization, Organization / 05.02 Roles`  
-**Status:** `READY_TO_START`  
+**Status:** `IN_PROGRESS`  
 **Integration Branch:** `agent/postgres-v1.7-core`  
 **Phase 01 Final SHA:** `b0d35101bf622264b655bcc574787989fadbcd83`  
 **Phase 01 Validation PR:** `#183` — closed without merge.  
@@ -4019,8 +4021,11 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 **05.01 Authentication:** `CLOSED` — Gap Analysis at `docs/gap-analysis/phase-05-01-authentication.md`; backend-owned Login/Refresh/Logout/Me, Scrypt password hashing, hashed rotating refresh sessions, short-lived signed access tokens, session revocation/expiry, disabled-user enforcement, secure refresh-cookie transport, login rate limiting, and secret redaction completed without schema/index changes.  
 **05.01 Verified Implementation SHA:** `3558211d6db2dcac1a00c52b92747268fa17ebfd`.  
 **05.01 Implementation CI:** Run `#962` / `35415190981` — SUCCESS; PostgreSQL 17 Authentication gate and all regressions passed.  
-**05.01 Validation PR:** `#219` — validation-only; close WITHOUT MERGE after final same-SHA documentation validation.  
-**Next Action:** execute **05.02 Roles only** after final 05.01 same-SHA closure validation.  
+**05.01 Final Verified SHA:** `ebbecc688f64f8e51da3a65a1ac72a54f5882b2c`.  
+**05.01 Final CI:** Run `#963` / `35415324053` — SUCCESS on the final documentation SHA.  
+**05.01 Validation PR:** `#219` — CLOSED WITHOUT MERGE; `merged=false`.  
+**05.02 Roles:** `VERIFYING` — exact seven-role catalog implementation and PostgreSQL 17 validation in progress; existing schema/unique key reused unchanged.  
+**Next Action:** validate **05.02 Roles only** with unit + PostgreSQL 17 role-catalog concurrency/drift-preservation tests + Full CI.  
 **Forbidden Next Actions:** لا 05.03 قبل إغلاق 05.02، لا Frontend cutover، لا dual write، لا `main` merge، ولا Convex Production change.
 
 **Plan update — 2026-09-17 / ACCOUNTING CONSTRAINTS CLOSED:** تم إغلاق ثامن executable slice من 03.06 على SHA `ef03d141958c392032bd8caf16b5f880a193e86e`. Migration `0019`، ADR-0021، Accounting PK/FK/UNIQUE/CHECK layer، Finance Category → GL Account FK، والحفاظ على deferred Journal balance at COMMIT تم التحقق منهم فعليًا على PostgreSQL 17؛ Full CI run `35224498880` أخضر بالكامل وPR `#206` أُغلق بدون Merge. 03.06 ما زالت `IN_PROGRESS` و03.07 لم تبدأ.
@@ -4029,6 +4034,8 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 
 ---
 
+
+**Plan update — 2026-09-19 / 05.02 ROLES STARTED:** تم عمل Gap Analysis مقابل Architecture Baseline v1.7 وMaster Plan. جدول `roles(id, role_key, display_name_key, is_system)` و`UNIQUE(role_key)` موجودان ومتوافقان، ولا يوجد Backend Role Catalog حالي. التنفيذ يضيف catalog backend-only للأدوار السبعة الرسمية `SYSTEM_ADMIN / BRANCH_MANAGER / ACCOUNTANT / SALES / CUSTOMER_SERVICE / TECHNICIAN / WAREHOUSE_KEEPER` باستخدام idempotent multi-row UPSERT داخل READ COMMITTED transaction؛ يصحح metadata drift لنفس `role_key` إلى `is_system=true` ويحافظ على الـID والـreferences الموجودة، ولا يحذف custom roles. لا Permission grants ولا Overrides ولا Branch Scope ولا API management في 05.02؛ هذه تظل 05.03/05.04. لا Migration ولا Index جديد.
 
 **Plan update — 2026-09-19 / 05.01 AUTHENTICATION CLOSED:** تم إغلاق التنفيذ الوظيفي على SHA `3558211d6db2dcac1a00c52b92747268fa17ebfd` بعد Full CI Run `#962` / `35415190981` SUCCESS. Backend Auth أصبح يملك login/refresh/logout/me، Scrypt password hashes فقط، refresh-token hashes فقط، revocable/expiring sessions، refresh rotation، short-lived access tokens موقعة بـserver-only secret ومربوطة بالـsession/current refresh hash، disabled-account enforcement، HttpOnly/SameSite=Strict cookie مع Secure في HTTPS mode، وlogin rate limiting. الـsecurity scan وsecret redaction نجحا. Runs `#959` و`#960` و`#961` كانت تشخيصية وأغلقت مشاكل test fixture/typecheck/test-isolation قبل نجاح Run `#962`. لا Migration ولا Index جديد، ولا Frontend/Convex Auth cutover. PR `#219` validation-only ويخضع الآن لـFull CI نهائي على documentation closure SHA قبل إغلاقه بدون Merge. Next Action بعد نجاحه: 05.02 Roles فقط.
 
