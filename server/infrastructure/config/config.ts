@@ -1,5 +1,6 @@
 export type NodeEnvironment = 'development' | 'test' | 'production'
 export type LogLevel = 'fatal' | 'error' | 'warn' | 'info' | 'debug' | 'trace' | 'silent'
+export type AuthTransportMode = 'local-http' | 'https'
 
 export interface AppConfig {
   NODE_ENV: NodeEnvironment
@@ -11,11 +12,17 @@ export interface AppConfig {
   ERP_DB_IDLE_TIMEOUT_MS: number
   ERP_DB_CONNECTION_TIMEOUT_MS: number
   ERP_SHUTDOWN_TIMEOUT_MS: number
+  ERP_AUTH_TRANSPORT_MODE: AuthTransportMode
+  ERP_AUTH_ACCESS_TOKEN_SECRET: string
+  ERP_AUTH_ACCESS_TOKEN_TTL_SECONDS: number
+  ERP_AUTH_SESSION_TTL_SECONDS: number
+  ERP_AUTH_LOGIN_MAX_ATTEMPTS: number
+  ERP_AUTH_LOGIN_WINDOW_SECONDS: number
 }
 
 export const appConfigSchema = {
   type: 'object',
-  required: ['ERP_DATABASE_URL'],
+  required: ['ERP_DATABASE_URL', 'ERP_AUTH_ACCESS_TOKEN_SECRET'],
   properties: {
     NODE_ENV: {
       type: 'string',
@@ -65,6 +72,39 @@ export const appConfigSchema = {
       minimum: 1000,
       maximum: 60000,
       default: 10000,
+    },
+    ERP_AUTH_TRANSPORT_MODE: {
+      type: 'string',
+      enum: ['local-http', 'https'],
+      default: 'local-http',
+    },
+    ERP_AUTH_ACCESS_TOKEN_SECRET: {
+      type: 'string',
+      minLength: 32,
+    },
+    ERP_AUTH_ACCESS_TOKEN_TTL_SECONDS: {
+      type: 'integer',
+      minimum: 60,
+      maximum: 3600,
+      default: 900,
+    },
+    ERP_AUTH_SESSION_TTL_SECONDS: {
+      type: 'integer',
+      minimum: 900,
+      maximum: 2592000,
+      default: 604800,
+    },
+    ERP_AUTH_LOGIN_MAX_ATTEMPTS: {
+      type: 'integer',
+      minimum: 1,
+      maximum: 20,
+      default: 5,
+    },
+    ERP_AUTH_LOGIN_WINDOW_SECONDS: {
+      type: 'integer',
+      minimum: 60,
+      maximum: 3600,
+      default: 300,
     },
   },
 } as const

@@ -7,11 +7,12 @@ import {
   handleNotFoundRequest,
   handleRequestError,
 } from './api/errors/error-handler.js'
+import { registerAuthenticationRoutes } from './api/routes/auth.js'
 import { registerOperationalRoutes } from './api/routes/health.js'
 import { appConfigSchema, type AppConfig } from './infrastructure/config/config.js'
 import {
   createPostgresDatabase,
-  type DatabaseConnection,
+  type TransactionalDatabaseConnection,
 } from './infrastructure/database/database.js'
 import { createLoggerOptions } from './infrastructure/logging/logger.js'
 
@@ -20,7 +21,7 @@ export interface BuildServerOptions {
   databaseFactory?: (
     config: AppConfig,
     logger: FastifyBaseLogger,
-  ) => DatabaseConnection
+  ) => TransactionalDatabaseConnection
 }
 
 export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
@@ -57,6 +58,7 @@ export function buildServer(options: BuildServerOptions = {}): FastifyInstance {
     })
 
     await registerOperationalRoutes(instance)
+    await registerAuthenticationRoutes(instance)
   })
 
   return app

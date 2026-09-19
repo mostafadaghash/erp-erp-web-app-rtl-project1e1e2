@@ -4,9 +4,9 @@ import { test } from 'node:test'
 import { ApiError, type ErrorParams } from '../api/errors/api-error.js'
 import { buildServer } from '../app.js'
 import type { AppConfig } from '../infrastructure/config/config.js'
-import type { DatabaseConnection } from '../infrastructure/database/database.js'
+import type { TransactionalDatabaseConnection } from '../infrastructure/database/database.js'
 
-interface FakeDatabase extends DatabaseConnection {
+interface FakeDatabase extends TransactionalDatabaseConnection {
   queries: string[]
   closeCount: number
 }
@@ -16,6 +16,7 @@ function createEnv(overrides: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv {
     NODE_ENV: 'test',
     ERP_LOG_LEVEL: 'silent',
     ERP_DATABASE_URL: 'postgresql://test:test@127.0.0.1:5432/test',
+    ERP_AUTH_ACCESS_TOKEN_SECRET: 'test-only-auth-signing-key-32-characters-minimum',
     ...overrides,
   }
 }
@@ -27,6 +28,9 @@ function createFakeDatabase(options: { failProbe?: boolean } = {}): FakeDatabase
     async query(sql: string): Promise<void> {
       this.queries.push(sql)
       if (options.failProbe) throw new Error('database unavailable')
+    },
+    async transaction<T>(): Promise<T> {
+      throw new Error('fake transaction is not configured for this test')
     },
     async close(): Promise<void> {
       this.closeCount += 1
@@ -67,6 +71,11 @@ test('configuration defaults are typed and deterministic', async () => {
   assert.equal(capturedConfig.ERP_BACKEND_PORT, 8787)
   assert.equal(capturedConfig.ERP_DB_POOL_MAX, 10)
   assert.equal(capturedConfig.ERP_SHUTDOWN_TIMEOUT_MS, 10000)
+  assert.equal(capturedConfig.ERP_AUTH_TRANSPORT_MODE, 'local-http')
+  assert.equal(capturedConfig.ERP_AUTH_ACCESS_TOKEN_TTL_SECONDS, 900)
+  assert.equal(capturedConfig.ERP_AUTH_SESSION_TTL_SECONDS, 604800)
+  assert.equal(capturedConfig.ERP_AUTH_LOGIN_MAX_ATTEMPTS, 5)
+  assert.equal(capturedConfig.ERP_AUTH_LOGIN_WINDOW_SECONDS, 300)
 
   await app.close()
 })

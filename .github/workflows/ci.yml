@@ -133,6 +133,10 @@ jobs:
         env:
           ERP_TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/erp_backend_ci
         run: node --import tsx --test server/tests/error-mapper.integration.test.mjs
+      - name: PostgreSQL Authentication integration tests
+        env:
+          ERP_TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/erp_backend_ci
+        run: node --import tsx --test server/tests/authentication.integration.test.mjs
       - name: PostgreSQL extension integration tests
         env:
           ERP_TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/erp_backend_ci
@@ -239,6 +243,7 @@ jobs:
           ERP_BACKEND_HOST: 127.0.0.1
           ERP_BACKEND_PORT: '8787'
           ERP_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/erp_backend_ci
+          ERP_AUTH_ACCESS_TOKEN_SECRET: ci-test-auth-signing-key-32-characters-minimum
           ERP_SHUTDOWN_TIMEOUT_MS: '5000'
         run: |
           set -euo pipefail

@@ -2488,9 +2488,11 @@ Implemented and verified:
 
 # 11. PHASE 05 — Authentication, Authorization, Organization
 
-**Status:** `READY_TO_START`
+**Status:** `IN_PROGRESS`
 
 ## 05.01 Authentication
+
+**Status:** `VERIFYING`
 
 Replace Convex Auth for Local Core with backend-owned auth:
 
@@ -3998,10 +4000,13 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 **04.06 Error Mapping:** `CLOSED` — Gap Analysis at `docs/gap-analysis/phase-04-06-error-mapping.md`; centralized stable `errorCode + safe params` contract, known Business error mapping, PostgreSQL SQLSTATE mapping, validation/concurrency mapping, and explicit redaction of SQL/driver/runtime internals completed without schema/index changes.  
 **04.06 Implementation SHA:** `40e86d4e2937c9d9f2db3b3ebdcec50b8da9a048`.  
 **04.06 Implementation CI:** Run `#957` / `35395761123` — SUCCESS; PostgreSQL 17 Error Mapping gate and all regressions passed.  
-**04.06 Validation PR:** `#218` — validation-only; close WITHOUT MERGE after final same-SHA documentation validation.  
+**04.06 Final Verified SHA:** `bbccbfccd30e5797e9434b1880241429108233ad`.  
+**04.06 Final CI:** Run `#958` / `35396088571` — SUCCESS; `verify`, `backend-verify` including PostgreSQL 17 Error Mapping integration, `browser-contract`, and `release-gate` all SUCCESS on the same SHA.  
+**04.06 Validation PR:** `#218` — CLOSED WITHOUT MERGE; `merged=false`.  
 **PHASE 04:** `CLOSED` — all Gate 04 items complete.  
-**Next Action:** execute **PHASE 05 / 05.01 Authentication only** after final 04.06 same-SHA closure validation.  
-**Forbidden Next Actions:** لا 05.02 قبل إغلاق 05.01، لا Module cutover، لا dual write، لا `main` merge، ولا Convex Production change.
+**05.01 Authentication:** `VERIFYING` — Gap Analysis at `docs/gap-analysis/phase-05-01-authentication.md`; existing `users/auth_sessions` schema and frozen auth indexes reused unchanged.  
+**Next Action:** validate **05.01 Authentication only** with password/token/cookie/rate-limit unit tests + PostgreSQL 17 end-to-end Authentication integration + Full CI.  
+**Forbidden Next Actions:** لا 05.02 قبل إغلاق 05.01، لا Frontend cutover، لا dual write، لا `main` merge، ولا Convex Production change.
 
 **Plan update — 2026-09-17 / ACCOUNTING CONSTRAINTS CLOSED:** تم إغلاق ثامن executable slice من 03.06 على SHA `ef03d141958c392032bd8caf16b5f880a193e86e`. Migration `0019`، ADR-0021، Accounting PK/FK/UNIQUE/CHECK layer، Finance Category → GL Account FK، والحفاظ على deferred Journal balance at COMMIT تم التحقق منهم فعليًا على PostgreSQL 17؛ Full CI run `35224498880` أخضر بالكامل وPR `#206` أُغلق بدون Merge. 03.06 ما زالت `IN_PROGRESS` و03.07 لم تبدأ.
 
@@ -4009,6 +4014,8 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 
 ---
 
+
+**Plan update — 2026-09-19 / 05.01 AUTHENTICATION STARTED:** تم عمل Gap Analysis مقابل Architecture Baseline v1.7. جداول `users` و`auth_sessions` والـcase-insensitive user identity indexes و`UNIQUE(refresh_token_hash)` و`INDEX(user_id, expires_at)` موجودة ومتوافقة، لذلك لا Migration أو Index جديد. التنفيذ يبني backend-owned Auth Core داخل Central Backend فقط: Scrypt password hashes، random refresh tokens لا يخزن منها إلا SHA-256، revocable/expiring sessions، short-lived signed access tokens مربوطة بالجلسة وموقعة بـserver-only secret + current refresh hash، Refresh rotation، disabled-account enforcement، HttpOnly/SameSite=Strict refresh cookie مع Secure في وضع HTTPS، وlogin rate limiting. لا Frontend cutover في هذه المرحلة.
 
 **Plan update — 2026-09-19 / 04.06 ERROR MAPPING CLOSED:** تم إغلاق التنفيذ الوظيفي على SHA `40e86d4e2937c9d9f2db3b3ebdcec50b8da9a048` بعد Full CI Run `#957` / `35395761123` SUCCESS. تم إنشاء Mapper مركزي بعقد public ثابت `errorCode + safe params`، وربط أخطاء Business الحالية وPostgreSQL SQLSTATE الشائعة بأكواد مستقرة، مع منع تسريب raw message/detail/hint/query/table/column/constraint/stack أو idempotency keys/reference IDs. PostgreSQL 17 integration اختبر أخطاء UNIQUE/FK/CHECK/NOT NULL/invalid UUID فعلية. لا Migration ولا Index جديد. Phase 04 أصبحت CLOSED وظيفيًا، وPR `#218` validation-only يخضع الآن لـFull CI نهائي على documentation closure SHA قبل إغلاقه بدون Merge. Next Action بعد نجاحه: Phase 05 / 05.01 Authentication فقط.
 
