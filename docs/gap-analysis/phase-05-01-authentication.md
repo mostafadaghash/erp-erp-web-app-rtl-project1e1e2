@@ -1,6 +1,6 @@
 # Phase 05.01 — Authentication Gap Analysis
 
-**Status:** VERIFYING  
+**Status:** CLOSED  
 **Branch:** `agent/postgres-v1.7-core`  
 **Starting SHA:** `bbccbfccd30e5797e9434b1880241429108233ad`
 
@@ -76,9 +76,37 @@ Public failures use stable codes such as `AUTH_INVALID_CREDENTIALS`, `AUTH_RATE_
 - No Convex Production change.
 - No merge to `main`.
 
-## Exit procedure
+## Validation evidence
 
-1. Full CI on the 05.01 implementation SHA.
-2. If green, mark 05.01 CLOSED and advance the pointer to 05.02 only.
-3. Full CI again on the final documentation SHA.
-4. Close the validation-only PR without merge.
+- Verified implementation SHA: `3558211d6db2dcac1a00c52b92747268fa17ebfd`.
+- Full implementation CI: Run `#962` / `35415190981` — SUCCESS.
+- Backend secret/security scan: SUCCESS.
+- Backend TypeScript and unit tests: SUCCESS.
+- Scrypt password hash/no-plaintext proof: SUCCESS.
+- refresh token SHA-256 persistence and no refresh token in JSON: SUCCESS.
+- access-token server-secret signature/tamper/expiry proof: SUCCESS.
+- API login by case-insensitive username/email: SUCCESS.
+- refresh rotation invalidates old refresh and access token: SUCCESS.
+- disabled-account enforcement and session revocation: SUCCESS.
+- logout revocation: SUCCESS.
+- login rate limit: five isolated invalid attempts followed by a 429-limited attempt: SUCCESS.
+- refresh-cookie HttpOnly/SameSite=Strict and HTTPS Secure-mode behavior: SUCCESS.
+- frozen `auth_sessions` index inventory: SUCCESS.
+- migrations verify-only: SUCCESS; no migration/index added.
+- `verify`: SUCCESS.
+- `backend-verify`: SUCCESS.
+- `browser-contract`: SUCCESS.
+- `release-gate`: SUCCESS.
+- Validation PR: `#219` — validation-only; do not merge.
+- Final documentation closure SHA must pass Full CI before PR #219 is closed.
+
+## Diagnostic history
+
+- Run `#959`: security scan correctly rejected literal test-secret assignments.
+- Run `#960`: security scan passed; Backend TypeScript exposed stale test variable names.
+- Run `#961`: security/typecheck/unit passed; Authentication integration exposed a rate-limit test isolation issue caused by an earlier disabled-login failure sharing the same limiter key.
+- These were corrected without weakening product security or the security scanner. Run `#962` passed fully.
+
+## Next action
+
+After final same-SHA closure validation succeeds: `PHASE 05 / 05.02 Roles` only.

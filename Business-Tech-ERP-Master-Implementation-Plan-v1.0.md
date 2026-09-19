@@ -2492,16 +2492,28 @@ Implemented and verified:
 
 ## 05.01 Authentication
 
-**Status:** `VERIFYING`
+**Status:** `CLOSED`
 
-Replace Convex Auth for Local Core with backend-owned auth:
+Implemented and verified:
 
-- password hashes only.
-- revocable sessions.
-- refresh token hashes only.
-- secure cookie/token transport as selected by deployment mode.
-- rate limiting for login.
-- account disabled enforcement backend-side.
+- backend-owned `POST /auth/login`, `POST /auth/refresh`, `POST /auth/logout`, and `GET /auth/me`.
+- passwords stored/verified as salted Scrypt hashes only.
+- revocable and expiring PostgreSQL `auth_sessions`.
+- refresh tokens are random values; PostgreSQL stores SHA-256 hashes only.
+- successful refresh rotates the refresh token/hash and invalidates the previous refresh token and previous access token.
+- short-lived access tokens are bound to the session and current refresh hash, and signed using a server-only secret.
+- access-token validation rechecks session revocation/expiry and `users.is_active` in PostgreSQL.
+- disabled users cannot create sessions and existing sessions are rejected/revoked backend-side.
+- refresh cookie is `HttpOnly; SameSite=Strict; Path=/auth`; HTTPS deployment mode adds `Secure`.
+- login rate limiting is enforced by normalized identifier + source IP.
+- unknown-user and wrong-password login failures use the same public error.
+- backend logger/security checks redact and require the auth signing secret to remain environment-backed.
+- existing `users/auth_sessions` schema and frozen auth indexes reused unchanged; no migration/index added.
+- Frontend/Convex Auth cutover was intentionally not started.
+
+**05.01 Verified Implementation SHA:** `3558211d6db2dcac1a00c52b92747268fa17ebfd`.  
+**05.01 Implementation CI:** Run `#962` / `35415190981` — SUCCESS; security scan, Backend TypeScript/unit tests, PostgreSQL 17 Authentication integration, `verify`, `backend-verify`, `browser-contract`, and `release-gate` all SUCCESS.  
+**05.01 Validation PR:** `#219` — validation-only; close WITHOUT MERGE after final same-SHA documentation validation.
 
 ## 05.02 Roles
 
@@ -2550,7 +2562,7 @@ Role Default
 - [ ] branch selected/all tests.
 - [ ] cross-branch denial tests.
 - [ ] last/system admin protection according to final policy.
-- [ ] disabled user/session behavior.
+- [x] disabled user/session behavior.
 
 ---
 
@@ -3929,7 +3941,7 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 
 # 32. Current Execution Pointer
 
-**Current Phase:** `PHASE 05 — Authentication, Authorization, Organization / 05.01 Authentication`  
+**Current Phase:** `PHASE 05 — Authentication, Authorization, Organization / 05.02 Roles`  
 **Status:** `READY_TO_START`  
 **Integration Branch:** `agent/postgres-v1.7-core`  
 **Phase 01 Final SHA:** `b0d35101bf622264b655bcc574787989fadbcd83`  
@@ -4004,9 +4016,12 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 **04.06 Final CI:** Run `#958` / `35396088571` — SUCCESS; `verify`, `backend-verify` including PostgreSQL 17 Error Mapping integration, `browser-contract`, and `release-gate` all SUCCESS on the same SHA.  
 **04.06 Validation PR:** `#218` — CLOSED WITHOUT MERGE; `merged=false`.  
 **PHASE 04:** `CLOSED` — all Gate 04 items complete.  
-**05.01 Authentication:** `VERIFYING` — Gap Analysis at `docs/gap-analysis/phase-05-01-authentication.md`; existing `users/auth_sessions` schema and frozen auth indexes reused unchanged.  
-**Next Action:** validate **05.01 Authentication only** with password/token/cookie/rate-limit unit tests + PostgreSQL 17 end-to-end Authentication integration + Full CI.  
-**Forbidden Next Actions:** لا 05.02 قبل إغلاق 05.01، لا Frontend cutover، لا dual write، لا `main` merge، ولا Convex Production change.
+**05.01 Authentication:** `CLOSED` — Gap Analysis at `docs/gap-analysis/phase-05-01-authentication.md`; backend-owned Login/Refresh/Logout/Me, Scrypt password hashing, hashed rotating refresh sessions, short-lived signed access tokens, session revocation/expiry, disabled-user enforcement, secure refresh-cookie transport, login rate limiting, and secret redaction completed without schema/index changes.  
+**05.01 Verified Implementation SHA:** `3558211d6db2dcac1a00c52b92747268fa17ebfd`.  
+**05.01 Implementation CI:** Run `#962` / `35415190981` — SUCCESS; PostgreSQL 17 Authentication gate and all regressions passed.  
+**05.01 Validation PR:** `#219` — validation-only; close WITHOUT MERGE after final same-SHA documentation validation.  
+**Next Action:** execute **05.02 Roles only** after final 05.01 same-SHA closure validation.  
+**Forbidden Next Actions:** لا 05.03 قبل إغلاق 05.02، لا Frontend cutover، لا dual write، لا `main` merge، ولا Convex Production change.
 
 **Plan update — 2026-09-17 / ACCOUNTING CONSTRAINTS CLOSED:** تم إغلاق ثامن executable slice من 03.06 على SHA `ef03d141958c392032bd8caf16b5f880a193e86e`. Migration `0019`، ADR-0021، Accounting PK/FK/UNIQUE/CHECK layer، Finance Category → GL Account FK، والحفاظ على deferred Journal balance at COMMIT تم التحقق منهم فعليًا على PostgreSQL 17؛ Full CI run `35224498880` أخضر بالكامل وPR `#206` أُغلق بدون Merge. 03.06 ما زالت `IN_PROGRESS` و03.07 لم تبدأ.
 
@@ -4014,6 +4029,8 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 
 ---
 
+
+**Plan update — 2026-09-19 / 05.01 AUTHENTICATION CLOSED:** تم إغلاق التنفيذ الوظيفي على SHA `3558211d6db2dcac1a00c52b92747268fa17ebfd` بعد Full CI Run `#962` / `35415190981` SUCCESS. Backend Auth أصبح يملك login/refresh/logout/me، Scrypt password hashes فقط، refresh-token hashes فقط، revocable/expiring sessions، refresh rotation، short-lived access tokens موقعة بـserver-only secret ومربوطة بالـsession/current refresh hash، disabled-account enforcement، HttpOnly/SameSite=Strict cookie مع Secure في HTTPS mode، وlogin rate limiting. الـsecurity scan وsecret redaction نجحا. Runs `#959` و`#960` و`#961` كانت تشخيصية وأغلقت مشاكل test fixture/typecheck/test-isolation قبل نجاح Run `#962`. لا Migration ولا Index جديد، ولا Frontend/Convex Auth cutover. PR `#219` validation-only ويخضع الآن لـFull CI نهائي على documentation closure SHA قبل إغلاقه بدون Merge. Next Action بعد نجاحه: 05.02 Roles فقط.
 
 **Plan update — 2026-09-19 / 05.01 AUTHENTICATION STARTED:** تم عمل Gap Analysis مقابل Architecture Baseline v1.7. جداول `users` و`auth_sessions` والـcase-insensitive user identity indexes و`UNIQUE(refresh_token_hash)` و`INDEX(user_id, expires_at)` موجودة ومتوافقة، لذلك لا Migration أو Index جديد. التنفيذ يبني backend-owned Auth Core داخل Central Backend فقط: Scrypt password hashes، random refresh tokens لا يخزن منها إلا SHA-256، revocable/expiring sessions، short-lived signed access tokens مربوطة بالجلسة وموقعة بـserver-only secret + current refresh hash، Refresh rotation، disabled-account enforcement، HttpOnly/SameSite=Strict refresh cookie مع Secure في وضع HTTPS، وlogin rate limiting. لا Frontend cutover في هذه المرحلة.
 
