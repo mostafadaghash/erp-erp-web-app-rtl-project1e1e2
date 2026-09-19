@@ -47,12 +47,12 @@ test('access token signature detects tampering, wrong server secret, and expiry'
   const hash = hashRefreshToken(createRefreshToken())
   const signingKey = ['unit', 'test', 'auth', 'signing', 'key', '32', 'characters', 'minimum'].join('-')
   const expiresAt = new Date('2030-01-01T00:00:00.000Z')
-  const token = createAccessToken(sessionId, expiresAt, hash, secret)
+  const token = createAccessToken(sessionId, expiresAt, hash, signingKey)
 
   const verified = verifyAccessTokenSignature(
     token,
     hash,
-    secret,
+    signingKey,
     new Date('2029-12-31T23:59:00.000Z'),
   )
   assert.equal(verified?.sessionId, sessionId)
@@ -61,7 +61,7 @@ test('access token signature detects tampering, wrong server secret, and expiry'
     verifyAccessTokenSignature(
       token.slice(0, -1) + 'x',
       hash,
-      secret,
+      signingKey,
       new Date('2029-12-31T23:59:00.000Z'),
     ),
     null,
@@ -81,7 +81,7 @@ test('access token signature detects tampering, wrong server secret, and expiry'
     verifyAccessTokenSignature(
       token,
       hash,
-      secret,
+      signingKey,
       new Date('2030-01-01T00:00:01.000Z'),
     ),
     null,
