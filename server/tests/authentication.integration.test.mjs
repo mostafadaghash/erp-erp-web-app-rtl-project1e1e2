@@ -253,7 +253,7 @@ test(
           method: "POST",
           url: "/auth/login",
           payload: {
-            identifier: "auth-user",
+            identifier: "auth@example.test",
             password: wrongPassword,
           },
         });
@@ -265,7 +265,7 @@ test(
         method: "POST",
         url: "/auth/login",
         payload: {
-          identifier: "auth-user",
+          identifier: "auth@example.test",
           password,
         },
       });
