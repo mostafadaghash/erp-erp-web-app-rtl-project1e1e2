@@ -134,6 +134,10 @@ interface RoleRow extends QueryResultRow {
   role: CounterpartyRole
 }
 
+interface CounterpartyIdRow extends QueryResultRow {
+  id: string
+}
+
 interface CustomerProfileRow extends QueryResultRow {
   default_price_list_id: string | null
   credit_limit: string | null
@@ -394,7 +398,7 @@ export class CounterpartyService {
     }
 
     return this.database.transaction(async (client) => {
-      const result = await client.query<{ id: string }>(
+      const result = await client.query<CounterpartyIdRow>(
         `SELECT id
            FROM counterparties
           WHERE normalized_phone=$1
