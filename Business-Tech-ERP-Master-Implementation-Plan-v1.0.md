@@ -1,6 +1,6 @@
 # Business Tech ERP — Master Implementation Plan v1.0
 
-**الحالة:** ACTIVE — PHASE 06 CLOSED / PHASE 07 READY_TO_START  
+**الحالة:** ACTIVE — PHASE 07 IN PROGRESS  
 **تاريخ الإصدار:** 2026-09-11  
 **المشروع:** Business Tech ERP — Local Server Edition / PostgreSQL Core  
 **المرجع المعماري الرسمي:** `Business-Tech-ERP-Architecture-Baseline-v1.7-Final.docx`  
@@ -2739,7 +2739,23 @@ Implementation boundary:
 
 ## 07.01 Product Model
 
-**Status:** `IN_PROGRESS`
+**Status:** `CLOSED`
+
+Implementation boundary:
+
+- Product type remains `STOCK / SERVICE`.
+- simple Product creation is atomic: Product + Base ProductUnit + one internal Default Variant.
+- every created simple Product has exactly one Variant with `is_default=true`.
+- `products.base_unit_id` remains the only Base Unit source of truth.
+- existing deferred Product/Base ProductUnit/last-Variant integrity is reused.
+- Base ProductUnit is bootstrapped at conversion `1`; alternate-unit management remains 07.02.
+- Product creation is Audit-recorded.
+- no Migration and no Index change.
+- no SKU/Barcode, Dynamic Attributes, Pricing/Reorder, Frontend/Convex cutover.
+
+**07.01 Verified Implementation SHA:** `1327ec47a59d19fb02f32c2f20e2d38a13d20008`.  
+**07.01 Implementation CI:** Run `#1003` / `35518501734` — SUCCESS; `verify`, `backend-verify` including PostgreSQL 17 Product Model integration, `browser-contract`, and `release-gate` all SUCCESS on the same implementation SHA.  
+**07.01 Validation PR:** `#228` — validation-only; close WITHOUT MERGE after final same-SHA documentation validation.
 
 Implement:
 
@@ -2749,6 +2765,8 @@ Implement:
 - product base unit single source of truth.
 
 ## 07.02 Units
+
+**Status:** `READY_TO_START`
 
 - conversion to base.
 - sellable/purchasable flags.
@@ -2782,7 +2800,7 @@ Implement:
 
 ### Gate 07
 
-- [ ] default variant behavior.
+- [x] default variant behavior.
 - [ ] unit conversion tests.
 - [ ] fraction restriction tests.
 - [ ] SKU/barcode concurrency uniqueness.
@@ -4074,8 +4092,8 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 
 # 32. Current Execution Pointer
 
-**Current Phase:** `PHASE 07 — Product Catalog / Variants / Units / Pricing / 07.01 Product Model`  
-**Status:** `IN_PROGRESS`  
+**Current Phase:** `PHASE 07 — Product Catalog / Variants / Units / Pricing / 07.02 Units`  
+**Status:** `READY_TO_START`  
 **Integration Branch:** `agent/postgres-v1.7-core`  
 **Phase 01 Final SHA:** `b0d35101bf622264b655bcc574787989fadbcd83`  
 **Phase 01 Validation PR:** `#183` — closed without merge.  
@@ -4201,10 +4219,16 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 **06.03 Customer/Supplier Ledgers:** `CLOSED` — Gap Analysis at `docs/gap-analysis/phase-06-03-customer-supplier-ledgers.md`; separate append-only Customer/Supplier historical Sources of Truth, PostgreSQL UPDATE/DELETE immutability, Posting Batch branch/source coherence, role-specific validation, transaction-bound Branch Scope, branch-scoped statements, and reversal-as-new-history are complete. Migration `0023_counterparty_ledger_immutability` adds only immutability triggers and no Index/balance truth.  
 **06.03 Verified Implementation SHA:** `e137e2fdbb41daf25835b6218675bf72285d61bb`.  
 **06.03 Implementation CI:** Run `#1000` / `35486275350` — SUCCESS; `verify`, `backend-verify` including PostgreSQL 17 Customer/Supplier Ledger integration and all downstream schema/index/DDL regressions, `browser-contract`, and `release-gate` all SUCCESS on the same implementation SHA.  
-**06.03 Validation PR:** `#227` — validation-only; close WITHOUT MERGE after final same-SHA documentation validation.  
+**06.03 Final Verified SHA:** `cbf07cd1b00b9650d2b19b33accf0cd6ff4af0c0`.  
+**06.03 Final CI:** Run `#1002` / `35486439873` — SUCCESS on the final documentation SHA.  
+**06.03 Validation PR:** `#227` — CLOSED WITHOUT MERGE; `merged=false`.  
 **PHASE 06:** `CLOSED` — Unified Counterparty, Phone Normalization, separate immutable Customer/Supplier Ledgers, normalized-phone search, ledger immutability, and Branch Scope Gate 06 checks are complete.  
-**Next Action:** execute **PHASE 07 / 07.01 Product Model only** after final Phase 06 documentation-SHA validation.  
-**Forbidden Next Actions:** لا 07.02 قبل إغلاق 07.01، لا Frontend cutover، لا dual write، لا `main` merge، ولا Convex Production change.
+**07.01 Product Model:** `CLOSED` — Gap Analysis at `docs/gap-analysis/phase-07-01-product-model.md`; Backend `ProductModelService` creates a simple Product, Base ProductUnit and internal Default Variant atomically, preserves STOCK/SERVICE and Base Unit single-truth rules, reuses existing deferred DB integrity, records Audit, and exposes stable Product Model errors without schema/index changes.  
+**07.01 Verified Implementation SHA:** `1327ec47a59d19fb02f32c2f20e2d38a13d20008`.  
+**07.01 Implementation CI:** Run `#1003` / `35518501734` — SUCCESS; `verify`, `backend-verify` including PostgreSQL 17 Product Model integration and all regressions, `browser-contract`, and `release-gate` all SUCCESS on the same implementation SHA.  
+**07.01 Validation PR:** `#228` — validation-only; close WITHOUT MERGE after final same-SHA documentation validation.  
+**Next Action:** execute **PHASE 07 / 07.02 Units only** after final 07.01 documentation-SHA validation.  
+**Forbidden Next Actions:** لا 07.03 قبل إغلاق 07.02، لا Frontend cutover، لا dual write، لا `main` merge، ولا Convex Production change.
 
 **Plan update — 2026-09-17 / ACCOUNTING CONSTRAINTS CLOSED:** تم إغلاق ثامن executable slice من 03.06 على SHA `ef03d141958c392032bd8caf16b5f880a193e86e`. Migration `0019`، ADR-0021، Accounting PK/FK/UNIQUE/CHECK layer، Finance Category → GL Account FK، والحفاظ على deferred Journal balance at COMMIT تم التحقق منهم فعليًا على PostgreSQL 17؛ Full CI run `35224498880` أخضر بالكامل وPR `#206` أُغلق بدون Merge. 03.06 ما زالت `IN_PROGRESS` و03.07 لم تبدأ.
 
@@ -4212,6 +4236,8 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 
 ---
 
+
+**Plan update — 2026-09-20 / 07.01 PRODUCT MODEL CLOSED:** تم إغلاق 07.01 وظيفيًا على SHA `1327ec47a59d19fb02f32c2f20e2d38a13d20008` بعد Full CI Run `#1003` / `35518501734` SUCCESS. `ProductModelService` ينشئ Simple Product + Base ProductUnit + Internal Default Variant داخل Transaction واحدة، وPostgreSQL 17 أثبت STOCK/SERVICE، Variant واحد افتراضي `is_default=true`، Base ProductUnit تابع لنفس Product بعامل تحويل 1، غياب `product_units.is_base`، بقاء آخر Variant محميًا بالDeferred constraint، rollback بلا صفوف جزئية عند Category/Unit مفقود، وAudit `PRODUCT_CREATED`. Frozen Product indexes بقيت بلا تغيير، ولا Migration جديد بعد `0023`. Gate 07 بند default variant behavior أصبح مكتملًا فقط؛ بقية Gate 07 تظل مفتوحة لمراحل 07.02-07.05. 07.02 لم تبدأ؛ Next Action بعد final documentation-SHA CI: 07.02 Units فقط.
 
 **Plan update — 2026-09-20 / 07.01 PRODUCT MODEL STARTED:** تم عمل Gap Analysis مقابل Architecture Baseline v1.7 وMaster Plan. الـSchema الحالي يثبت بالفعل Product type = STOCK/SERVICE، وجود Variant واحد على الأقل، وproducts.base_unit_id كمصدر Base Unit الوحيد مع Deferred integrity لنفس Product، كما أن Frozen Product indexes موجودة؛ لذلك لا Migration ولا Index جديد في 07.01. التنفيذ سيضيف Backend ProductModelService لإنشاء Simple Product + Base ProductUnit + Internal Default Variant داخل Transaction واحدة مع Audit، مع اختبار default-variant behavior. لا يتم فتح alternate-unit/fraction management (07.02)، ولا SKU/Barcode (07.03)، ولا Dynamic Attributes/combination canonicalization (07.04)، ولا Pricing/Reorder، ولا Frontend/Convex cutover.
 
