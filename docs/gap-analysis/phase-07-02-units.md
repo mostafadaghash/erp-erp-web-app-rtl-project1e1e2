@@ -1,6 +1,6 @@
 # Phase 07.02 — Units Gap Analysis
 
-**Status:** `IN_PROGRESS`  
+**Status:** `CLOSED`  
 **Branch:** `agent/postgres-v1.7-core`  
 **Architecture Source:** Business Tech ERP Architecture Baseline v1.7  
 **Implementation Plan:** Business Tech ERP Master Implementation Plan v1.0
@@ -130,6 +130,30 @@ The remaining Gate 07 items stay open for 07.03 through 07.05.
 - no migration.
 - no index addition.
 
+## Closure evidence
+
+- Verified implementation SHA: `c9eb1b2a2e6059ec8d2443b21b256a0ab234b947`.
+- Full CI: Run `#1006` / `35530791427` — SUCCESS on the same implementation SHA.
+- `verify`: SUCCESS.
+- `backend-verify`: SUCCESS, including PostgreSQL 17 Units integration.
+- `browser-contract`: SUCCESS.
+- `release-gate`: SUCCESS.
+- Unit masters preserve `allows_fraction`.
+- ProductUnits store explicit positive `conversion_to_base`.
+- quantity conversion uses exact scale-6 integer arithmetic; no JavaScript floating point.
+- non-fraction Units reject fractional entered quantities.
+- fraction-enabled Units accept fractional quantities.
+- sellable/purchasable flags are enforced.
+- Cross-Product Variant + ProductUnit linkage is rejected.
+- Base ProductUnit conversion cannot be changed away from exactly 1.
+- conversions requiring silent rounding beyond quantity scale 6 are rejected.
+- Unit/ProductUnit mutations are Audit-recorded.
+- frozen Unit/ProductUnit index inventory remains unchanged.
+- migration history remains through `0023`; no 07.02 migration was added.
+- 07.01 Product Model regressions remain green.
+- 07.03 SKU/Barcode and later Product Catalog slices were not started.
+- Validation PR: `#229`, validation-only, to be closed without merge after final documentation-SHA CI.
+
 ## Next action
 
-Implement and validate 07.02 Units only. 07.03 remains forbidden until 07.02 closes.
+After final documentation-SHA validation, 07.02 is CLOSED. The next official step is PHASE 07 / 07.03 Barcodes / SKU, READY_TO_START only.
