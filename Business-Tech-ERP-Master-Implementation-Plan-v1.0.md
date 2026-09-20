@@ -2642,7 +2642,7 @@ Validation record: `docs/gap-analysis/phase-05-gate-last-system-admin.md`.
 
 ## 06.01 Unified Counterparty
 
-**Status:** `IN_PROGRESS`
+**Status:** `CLOSED`
 
 Implementation boundary:
 
@@ -2659,6 +2659,10 @@ Implementation boundary:
 - Customer/Supplier Ledger commands remain 06.03.
 - existing schema/constraints/frozen indexes are reused unchanged.
 - no Migration, no Index, no Frontend/Convex cutover.
+
+**06.01 Verified Implementation SHA:** `0a89fba47d243bac5f47c38eb51439292ea4afb0`.  
+**06.01 Implementation CI:** Run `#978` / `35483368078` — SUCCESS; `verify`, `backend-verify` including PostgreSQL 17 Unified Counterparty service integration, `browser-contract`, and `release-gate` all SUCCESS on the same implementation SHA.  
+**06.01 Validation PR:** `#225` — validation-only; close WITHOUT MERGE after final same-SHA documentation validation.
 
 Replace separate customer/supplier identity storage with:
 
@@ -2682,8 +2686,8 @@ Replace separate customer/supplier identity storage with:
 
 ### Gate 06
 
-- [ ] same account can be customer+supplier.
-- [ ] no duplicate role pair.
+- [x] same account can be customer+supplier.
+- [x] no duplicate role pair.
 - [ ] normalized phone search tests.
 - [ ] ledger immutability tests.
 - [ ] branch scope tests.
@@ -4029,8 +4033,8 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 
 # 32. Current Execution Pointer
 
-**Current Phase:** `PHASE 06 — Counterparties & Master Data / 06.01 Unified Counterparty`  
-**Status:** `IN_PROGRESS`  
+**Current Phase:** `PHASE 06 — Counterparties & Master Data / 06.02 Phone Normalization`  
+**Status:** `READY_TO_START`  
 **Integration Branch:** `agent/postgres-v1.7-core`  
 **Phase 01 Final SHA:** `b0d35101bf622264b655bcc574787989fadbcd83`  
 **Phase 01 Validation PR:** `#183` — closed without merge.  
@@ -4141,9 +4145,12 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 **Gate 05 Final CI:** Run `#977` / `35483023556` — SUCCESS; `verify`, `backend-verify` including PostgreSQL 17 last System Admin protection/concurrency integration, `browser-contract`, and `release-gate` all SUCCESS on the final documentation SHA.  
 **Gate 05 Validation PR:** `#224` — CLOSED WITHOUT MERGE; `merged=false`.  
 **PHASE 05:** `CLOSED` — Authentication, Roles, Effective Permissions, Branch Scope, Organization, and all Gate 05 checks are complete.  
-**06.01 Unified Counterparty:** `IN_PROGRESS` — Gap Analysis at `docs/gap-analysis/phase-06-01-unified-counterparty.md`; one shared Counterparty identity with CUSTOMER/SUPPLIER/OTHER roles, optional role-specific profiles, duplicate-safe role addition, active/inactive lifecycle, Audit, and PostgreSQL 17 behavioral validation are under implementation. No phone normalization/ledger command/schema/index/frontend work.  
-**Next Action:** complete and validate **06.01 Unified Counterparty only**.  
-**Forbidden Next Actions:** لا 06.02 قبل إغلاق 06.01، لا 06.03، لا Frontend cutover، لا dual write، لا `main` merge، ولا Convex Production change.
+**06.01 Unified Counterparty:** `CLOSED` — Gap Analysis at `docs/gap-analysis/phase-06-01-unified-counterparty.md`; one canonical Counterparty identity now supports CUSTOMER/SUPPLIER/OTHER roles, Customer+Supplier coexistence on one ID, optional role-specific profiles, duplicate-safe concurrent role addition, non-destructive active/inactive lifecycle, Audit, and stable Counterparty error mapping. No phone-normalization or ledger-command work was included.  
+**06.01 Verified Implementation SHA:** `0a89fba47d243bac5f47c38eb51439292ea4afb0`.  
+**06.01 Implementation CI:** Run `#978` / `35483368078` — SUCCESS; `verify`, `backend-verify` including PostgreSQL 17 Unified Counterparty service integration, `browser-contract`, and `release-gate` all SUCCESS on the same implementation SHA.  
+**06.01 Validation PR:** `#225` — validation-only; close WITHOUT MERGE after final same-SHA documentation validation.  
+**Next Action:** execute **06.02 Phone Normalization only** after final 06.01 documentation-SHA validation.  
+**Forbidden Next Actions:** لا 06.03 قبل إغلاق 06.02، لا Phase 07، لا Frontend cutover، لا dual write، لا `main` merge، ولا Convex Production change.
 
 **Plan update — 2026-09-17 / ACCOUNTING CONSTRAINTS CLOSED:** تم إغلاق ثامن executable slice من 03.06 على SHA `ef03d141958c392032bd8caf16b5f880a193e86e`. Migration `0019`، ADR-0021، Accounting PK/FK/UNIQUE/CHECK layer، Finance Category → GL Account FK، والحفاظ على deferred Journal balance at COMMIT تم التحقق منهم فعليًا على PostgreSQL 17؛ Full CI run `35224498880` أخضر بالكامل وPR `#206` أُغلق بدون Merge. 03.06 ما زالت `IN_PROGRESS` و03.07 لم تبدأ.
 
@@ -4151,6 +4158,8 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 
 ---
 
+
+**Plan update — 2026-09-20 / 06.01 UNIFIED COUNTERPARTY CLOSED:** تم إغلاق 06.01 وظيفيًا على SHA `0a89fba47d243bac5f47c38eb51439292ea4afb0` بعد Full CI Run `#978` / `35483368078` SUCCESS. تم تنفيذ هوية Counterparty واحدة مشتركة مع Roles `CUSTOMER/SUPPLIER/OTHER`، وإثبات أن نفس الحساب يكون Customer+Supplier على نفس ID مع Customer/Supplier Profiles اختيارية، ومنع mismatch بين الـProfile والـRole، وidempotent concurrent role add مع composite PK كحماية نهائية، وactive/inactive lifecycle وAudit وstable error contract. PostgreSQL 17 أثبت 8-way repeated role add ينتج Role Pair واحدًا فقط، والـLedger tables ظلت untouched، و`normalized_phone` بقي NULL وغير محسوب لأن Phone Normalization تظل 06.02. لا Migration ولا Index جديد ولا Frontend/Convex cutover. Gate 06 أصبح مكتملًا في بندي same account Customer+Supplier وno duplicate role pair فقط. Next Action بعد final documentation-SHA CI: 06.02 Phone Normalization فقط.
 
 **Plan update — 2026-09-20 / 06.01 UNIFIED COUNTERPARTY STARTED:** تم عمل Gap Analysis مقابل Architecture Baseline v1.7 وMaster Plan. الـSchema الحالي `counterparties/counterparty_roles/customer_profiles/supplier_profiles` والـPK/FK/CHECK والـFrozen Index Catalog موجودون ومتوافقون، لذلك لا Migration ولا Index جديد. التنفيذ يضيف Backend `CounterpartyService` لهوية واحدة مشتركة مع Roles `CUSTOMER/SUPPLIER/OTHER` وإمكانية الجمع بين Customer+Supplier على نفس ID، Profiles اختيارية مرتبطة بالدور، role add idempotent مع بقاء composite PK كحماية نهائية، active/inactive lifecycle، Audit وstable error contract. `normalized_phone` لا يتم حسابه في 06.01 لأن 06.02 فقط هي المسؤولة عن Phone Normalization/Search، وLedgers تظل 06.03. لا Frontend/Convex cutover ولا dual write.
 
