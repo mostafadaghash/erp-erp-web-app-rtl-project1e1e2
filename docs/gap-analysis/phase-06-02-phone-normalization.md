@@ -1,6 +1,6 @@
 # Phase 06.02 — Phone Normalization Gap Analysis
 
-**Status:** `IN_PROGRESS`  
+**Status:** `CLOSED`  
 **Branch:** `agent/postgres-v1.7-core`  
 **Architecture Source:** Business Tech ERP Architecture Baseline v1.7  
 **Implementation Plan:** Business Tech ERP Master Implementation Plan v1.0
@@ -143,6 +143,29 @@ The remaining Gate 06 items after 06.02 are:
 - no migration.
 - no index.
 
+## Closure evidence
+
+- Verified implementation SHA: `394afe351117571ebdf22113de9424de4c55f38c`.
+- Full CI: Run `#981` / `35484080467` — SUCCESS on the same implementation SHA.
+- `verify`: SUCCESS.
+- `backend-verify`: SUCCESS, including PostgreSQL 17 Phone Normalization integration.
+- `browser-contract`: SUCCESS.
+- `release-gate`: SUCCESS.
+- display phone preservation verified.
+- ASCII / Arabic-Indic / Extended Arabic-Indic normalization verified.
+- leading `+` and leading `00` equivalence verified.
+- local leading-zero preservation and no country-code inference verified.
+- create/update canonical storage verified.
+- old canonical value stops matching after phone update.
+- normalized search returns all matching Counterparties.
+- duplicate canonical phone values remain allowed.
+- existing 06.01 Unified Counterparty regressions remain green.
+- frozen `ix_counterparties__normalized_phone` inventory remains unchanged.
+- no migration added.
+- no index added.
+- no 06.03 ledger behavior implemented.
+- Validation PR: `#226`, validation-only, to be closed without merge after final documentation-SHA CI.
+
 ## Next action
 
-Run Full CI on the 06.02 implementation SHA through a validation-only PR. Only after the same-SHA PostgreSQL 17 normalization/search gate and all regressions are green may 06.02 be documented as CLOSED.
+After final documentation-SHA validation, 06.02 is CLOSED. The next official step is 06.03 Customer/Supplier Ledgers, READY_TO_START only.
