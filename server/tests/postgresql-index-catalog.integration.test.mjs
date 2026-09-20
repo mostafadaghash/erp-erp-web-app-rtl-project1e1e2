@@ -140,7 +140,7 @@ test("03.07 frozen Index Catalog is exact on PostgreSQL 17", async (t) => {
   await cleanupDatabase(databaseUrl);
   try {
     const first = await runMigrations({ databaseUrl });
-    assert.equal(first.applied.at(-1), "0022");
+    assert.equal(first.applied.at(-1), "0023");
 
     await withClient(databaseUrl, async (client) => {
       const indexes = await queryIndexes(client);
@@ -229,19 +229,22 @@ test("03.07 frozen Index Catalog is exact on PostgreSQL 17", async (t) => {
       const history = await client.query(
         "SELECT version,name,checksum FROM schema_migrations ORDER BY version",
       );
+      const indexCatalog = history.rows.find((row) => row.version === "0022");
+      assert.equal(indexCatalog?.name, "index_catalog");
+      assert.match(indexCatalog?.checksum ?? "", /^[0-9a-f]{64}$/);
       const latest = history.rows.at(-1);
-      assert.equal(latest?.version, "0022");
-      assert.equal(latest?.name, "index_catalog");
+      assert.equal(latest?.version, "0023");
+      assert.equal(latest?.name, "counterparty_ledger_immutability");
       assert.match(latest?.checksum ?? "", /^[0-9a-f]{64}$/);
     });
 
     const second = await runMigrations({ databaseUrl });
     assert.equal(second.applied.length, 0);
-    assert.equal(second.skipped.at(-1), "0022");
+    assert.equal(second.skipped.at(-1), "0023");
 
     const verification = await runMigrations({ databaseUrl, verifyOnly: true });
     assert.equal(verification.applied.length, 0);
-    assert.equal(verification.skipped.at(-1), "0022");
+    assert.equal(verification.skipped.at(-1), "0023");
   } finally {
     await cleanupDatabase(databaseUrl);
   }
