@@ -2766,7 +2766,25 @@ Implement:
 
 ## 07.02 Units
 
-**Status:** `IN_PROGRESS`
+**Status:** `CLOSED`
+
+Implementation boundary:
+
+- Unit master data uses `allows_fraction`.
+- ProductUnit carries explicit positive `conversion_to_base`.
+- `is_sellable/is_purchasable` are enforced.
+- selected-unit quantity validation honors fraction policy.
+- conversion to Base Unit is exact at approved quantity scale 6 and never uses JS floating point.
+- conversion requiring silent rounding beyond scale 6 is rejected.
+- Base ProductUnit conversion remains exactly 1.
+- Variant + ProductUnit from different Products is rejected.
+- Unit/ProductUnit writes are Audit-recorded.
+- no Migration and no Index change.
+- no SKU/Barcode, Dynamic Attributes, Pricing/Reorder or Frontend/Convex cutover.
+
+**07.02 Verified Implementation SHA:** `c9eb1b2a2e6059ec8d2443b21b256a0ab234b947`.  
+**07.02 Implementation CI:** Run `#1006` / `35530791427` — SUCCESS; `verify`, `backend-verify` including PostgreSQL 17 Units integration, `browser-contract`, and `release-gate` all SUCCESS on the same implementation SHA.  
+**07.02 Validation PR:** `#229` — validation-only; close WITHOUT MERGE after final same-SHA documentation validation.
 
 - conversion to base.
 - sellable/purchasable flags.
@@ -2774,6 +2792,8 @@ Implement:
 - no cross-product unit link.
 
 ## 07.03 Barcodes / SKU
+
+**Status:** `READY_TO_START`
 
 - unique catalog barcode.
 - unique non-null SKU.
@@ -2801,8 +2821,8 @@ Implement:
 ### Gate 07
 
 - [x] default variant behavior.
-- [ ] unit conversion tests.
-- [ ] fraction restriction tests.
+- [x] unit conversion tests.
+- [x] fraction restriction tests.
 - [ ] SKU/barcode concurrency uniqueness.
 - [ ] combination signature tests.
 - [ ] minimum price permission tests.
@@ -4092,8 +4112,8 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 
 # 32. Current Execution Pointer
 
-**Current Phase:** `PHASE 07 — Product Catalog / Variants / Units / Pricing / 07.02 Units`  
-**Status:** `IN_PROGRESS`  
+**Current Phase:** `PHASE 07 — Product Catalog / Variants / Units / Pricing / 07.03 Barcodes / SKU`  
+**Status:** `READY_TO_START`  
 **Integration Branch:** `agent/postgres-v1.7-core`  
 **Phase 01 Final SHA:** `b0d35101bf622264b655bcc574787989fadbcd83`  
 **Phase 01 Validation PR:** `#183` — closed without merge.  
@@ -4226,9 +4246,15 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 **07.01 Product Model:** `CLOSED` — Gap Analysis at `docs/gap-analysis/phase-07-01-product-model.md`; Backend `ProductModelService` creates a simple Product, Base ProductUnit and internal Default Variant atomically, preserves STOCK/SERVICE and Base Unit single-truth rules, reuses existing deferred DB integrity, records Audit, and exposes stable Product Model errors without schema/index changes.  
 **07.01 Verified Implementation SHA:** `1327ec47a59d19fb02f32c2f20e2d38a13d20008`.  
 **07.01 Implementation CI:** Run `#1003` / `35518501734` — SUCCESS; `verify`, `backend-verify` including PostgreSQL 17 Product Model integration and all regressions, `browser-contract`, and `release-gate` all SUCCESS on the same implementation SHA.  
-**07.01 Validation PR:** `#228` — validation-only; close WITHOUT MERGE after final same-SHA documentation validation.  
-**Next Action:** execute **PHASE 07 / 07.02 Units only** after final 07.01 documentation-SHA validation.  
-**Forbidden Next Actions:** لا 07.03 قبل إغلاق 07.02، لا Frontend cutover، لا dual write، لا `main` merge، ولا Convex Production change.
+**07.01 Final Verified SHA:** `66039a360f4efe96ec3edce6060447c82d108eb8`.  
+**07.01 Final CI:** Run `#1005` / `35518659339` — SUCCESS on the final documentation SHA.  
+**07.01 Validation PR:** `#228` — CLOSED WITHOUT MERGE; `merged=false`.  
+**07.02 Units:** `CLOSED` — Gap Analysis at `docs/gap-analysis/phase-07-02-units.md`; `ProductUnitService` manages Unit/ProductUnit behavior, exact numeric(18,6) conversion, fraction policy, sellable/purchasable use, Base ProductUnit factor=1, Cross-Product linkage rejection, and Audit without schema/index changes.  
+**07.02 Verified Implementation SHA:** `c9eb1b2a2e6059ec8d2443b21b256a0ab234b947`.  
+**07.02 Implementation CI:** Run `#1006` / `35530791427` — SUCCESS; `verify`, `backend-verify` including PostgreSQL 17 Units integration and all regressions, `browser-contract`, and `release-gate` all SUCCESS on the same implementation SHA.  
+**07.02 Validation PR:** `#229` — validation-only; close WITHOUT MERGE after final same-SHA documentation validation.  
+**Next Action:** execute **PHASE 07 / 07.03 Barcodes / SKU only** after final 07.02 documentation-SHA validation.  
+**Forbidden Next Actions:** لا 07.04 قبل إغلاق 07.03، لا Frontend cutover، لا dual write، لا `main` merge، ولا Convex Production change.
 
 **Plan update — 2026-09-17 / ACCOUNTING CONSTRAINTS CLOSED:** تم إغلاق ثامن executable slice من 03.06 على SHA `ef03d141958c392032bd8caf16b5f880a193e86e`. Migration `0019`، ADR-0021، Accounting PK/FK/UNIQUE/CHECK layer، Finance Category → GL Account FK، والحفاظ على deferred Journal balance at COMMIT تم التحقق منهم فعليًا على PostgreSQL 17؛ Full CI run `35224498880` أخضر بالكامل وPR `#206` أُغلق بدون Merge. 03.06 ما زالت `IN_PROGRESS` و03.07 لم تبدأ.
 
@@ -4236,6 +4262,8 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 
 ---
 
+
+**Plan update — 2026-09-20 / 07.02 UNITS CLOSED:** تم إغلاق 07.02 وظيفيًا على SHA `c9eb1b2a2e6059ec8d2443b21b256a0ab234b947` بعد Full CI Run `#1006` / `35530791427` SUCCESS. `ProductUnitService` أصبح يدير Unit/ProductUnit ويطبق `allows_fraction` و`is_sellable/is_purchasable`، ويحوّل الكميات إلى Base Unit بحساب exact scale-6 باستخدام BigInt بدل JavaScript float، ويرفض أي نتيجة تحتاج silent rounding خارج `numeric(18,6)`. PostgreSQL 17 أثبت integer/fraction behavior، exact conversion، Base ProductUnit factor=1، Cross-Product Variant+ProductUnit denial، Audit، وثبات Frozen Unit/ProductUnit indexes، مع بقاء migration tail عند `0023`. Gate 07 أصبح مكتملًا في unit conversion tests وfraction restriction tests، بينما SKU/Barcode وما بعده لم يبدأ. Next Action بعد final documentation-SHA CI: 07.03 Barcodes / SKU فقط.
 
 **Plan update — 2026-09-20 / 07.02 UNITS STARTED:** Gap Analysis مقابل Architecture Baseline v1.7 أثبت أن جداول `units/product_units` وUNIQUE/CHECK/Frozen Index موجودة ومتوافقة، وأن `products.base_unit_id` يظل المصدر الوحيد للـBase Unit؛ لذلك لا Migration ولا Index جديد في 07.02. التنفيذ سيضيف ProductUnitService لإدارة Unit/ProductUnit، Conversion إلى Base بدقة `numeric(18,6)` بدون JS float، تطبيق `allows_fraction` و`is_sellable/is_purchasable`، منع تغيير Base ProductUnit conversion عن 1، ومنع Variant + ProductUnit من Product مختلف. لا SKU/Barcode (07.03)، لا Dynamic Attributes، لا Pricing/Reorder، ولا Frontend/Convex cutover.
 
