@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto'
 import type { PoolClient, QueryResultRow } from 'pg'
 
 import { AuditService } from '../audit/audit-service.js'
+import { normalizePhone } from './phone-normalization.js'
 import type {
   TransactionOptions,
   TransactionWork,
@@ -275,6 +276,7 @@ function identitySnapshot(row: CounterpartyRow) {
   return {
     name: row.name,
     phone: row.phone,
+    normalizedPhone: row.normalized_phone,
     address: row.address,
     notes: row.notes,
     isActive: row.is_active,
@@ -299,16 +301,18 @@ export class CounterpartyService {
         input.actorUserId,
       )
       const counterpartyId = randomUUID()
+      const phone = normalizePhone(input.phone)
 
       await client.query(
         `INSERT INTO counterparties
           (id,name,phone,normalized_phone,address,notes,is_active,created_at,updated_at)
          VALUES
-          ($1,$2,$3,NULL,$4,$5,true,clock_timestamp(),clock_timestamp())`,
+          ($1,$2,$3,$4,$5,$6,true,clock_timestamp(),clock_timestamp())`,
         [
           counterpartyId,
           input.name.trim(),
-          normalizeNullableText(input.phone),
+          phone?.displayPhone ?? null,
+          phone?.normalizedPhone ?? null,
           normalizeNullableText(input.address),
           normalizeNullableText(input.notes),
         ],
@@ -357,7 +361,8 @@ export class CounterpartyService {
         entityId: counterpartyId,
         after: {
           name: input.name.trim(),
-          phone: normalizeNullableText(input.phone),
+          phone: phone?.displayPhone ?? null,
+          normalizedPhone: phone?.normalizedPhone ?? null,
           address: normalizeNullableText(input.address),
           notes: normalizeNullableText(input.notes),
           isActive: true,
@@ -379,6 +384,32 @@ export class CounterpartyService {
     )
   }
 
+  async searchByPhone(
+    phoneQuery: string,
+  ): Promise<readonly CounterpartyRecord[]> {
+    requireNonBlank('phoneQuery', phoneQuery)
+    const normalized = normalizePhone(phoneQuery)
+    if (!normalized) {
+      throw new TypeError('phoneQuery must contain a phone number')
+    }
+
+    return this.database.transaction(async (client) => {
+      const result = await client.query<{ id: string }>(
+        `SELECT id
+           FROM counterparties
+          WHERE normalized_phone=$1
+          ORDER BY id`,
+        [normalized.normalizedPhone],
+      )
+
+      return Promise.all(
+        result.rows.map((row) =>
+          this.readWithClient(client, row.id),
+        ),
+      )
+    })
+  }
+
   async updateIdentity(
     input: UpdateCounterpartyIdentityInput,
   ): Promise<CounterpartyRecord> {
@@ -396,17 +427,14 @@ export class CounterpartyService {
         input.counterpartyId,
       )
 
-      const phone = normalizeNullableText(input.phone)
+      const phone = normalizePhone(input.phone)
       const result = await client.query<CounterpartyRow>(
         `UPDATE counterparties
             SET name=$2,
                 phone=$3,
-                normalized_phone=CASE
-                  WHEN phone IS DISTINCT FROM $3 THEN NULL
-                  ELSE normalized_phone
-                END,
-                address=$4,
-                notes=$5,
+                normalized_phone=$4,
+                address=$5,
+                notes=$6,
                 updated_at=clock_timestamp()
           WHERE id=$1
           RETURNING
@@ -414,7 +442,8 @@ export class CounterpartyService {
         [
           input.counterpartyId,
           input.name.trim(),
-          phone,
+          phone?.displayPhone ?? null,
+          phone?.normalizedPhone ?? null,
           normalizeNullableText(input.address),
           normalizeNullableText(input.notes),
         ],
