@@ -1,6 +1,6 @@
 # Phase 05.05 — Organization Gap Analysis
 
-**Status:** `IN_PROGRESS`  
+**Status:** `CLOSED`  
 **Branch:** `agent/postgres-v1.7-core`  
 **Architecture Source:** Business Tech ERP Architecture Baseline v1.7  
 **Implementation Plan:** Business Tech ERP Master Implementation Plan v1.0
@@ -127,6 +127,30 @@ Therefore:
 - no new migration.
 - no new index.
 
+## Closure evidence
+
+- Verified implementation SHA: `1c5c3cdd582713c1e4c655ab5ee9c27519a647f9`.
+- Full CI: Run `#972` / `35482306897` — SUCCESS on the same implementation SHA.
+- `verify`: SUCCESS.
+- `backend-verify`: SUCCESS, including the PostgreSQL 17 Organization integration gate.
+- `browser-contract`: SUCCESS.
+- `release-gate`: SUCCESS.
+- Company Settings create/update/read verified.
+- atomic Branch + default Warehouse + branch_settings creation verified.
+- Branch deactivate/reactivate without deletion verified.
+- default Warehouse as branch_settings-only truth verified.
+- active same-branch default enforcement verified.
+- current default Warehouse move/deactivation rejection verified.
+- pre-movement Warehouse branch move verified.
+- post-movement Warehouse branch mutation rejection verified in Backend and by DB composite FK.
+- historical Warehouse deactivation verified.
+- Organization Audit and transaction rollback verified.
+- frozen Organization indexes unchanged.
+- no migration added.
+- no index added.
+- no Phase 06 behavior implemented.
+- Validation PR: `#223`, validation-only, to be closed without merge after final documentation-SHA CI.
+
 ## Next action
 
-Run Full CI on the 05.05 implementation SHA through a validation-only PR. Only after the same-SHA gates are green may 05.05 itself be documented as CLOSED.
+05.05 itself is complete. PHASE 05 remains open only because `last/system admin protection according to final policy` is still unresolved in the official sources. Phase 06 must not start until that Gate item has an approved final policy and passing tests.
