@@ -1,6 +1,6 @@
 # Phase 07.03 — Barcodes / SKU Gap Analysis
 
-**Status:** `IN_PROGRESS`  
+**Status:** `CLOSED`  
 **Branch:** `agent/postgres-v1.7-core`  
 **Architecture Source:** Business Tech ERP Architecture Baseline v1.7  
 **Implementation Plan:** Business Tech ERP Master Implementation Plan v1.0
@@ -129,6 +129,32 @@ Remaining Gate 07 items stay open for 07.04 and 07.05.
 - no migration.
 - no index addition.
 
+## Closure evidence
+
+- Verified implementation SHA: `02ef957e13c609a12a01f894ee0abafea10935ff`.
+- Full CI: Run `#1009` / `35534721633` — SUCCESS on the same implementation SHA.
+- `verify`: SUCCESS.
+- `backend-verify`: SUCCESS, including PostgreSQL 17 Barcode/SKU concurrency integration.
+- `browser-contract`: SUCCESS.
+- `release-gate`: SUCCESS.
+- mixed/lowercase SKU is stored canonically uppercase.
+- blank SKU is stored as NULL and multiple NULL SKUs remain allowed.
+- exact SKU lookup resolves through canonical uppercase equality.
+- direct duplicate non-null SKU is rejected.
+- concurrent duplicate SKU writers produce exactly one success and one stable `SKU_ALREADY_EXISTS` conflict.
+- Barcode is stored after outer-whitespace trimming with no undocumented format normalization.
+- same Variant can carry different Barcodes for different ProductUnits.
+- exact Barcode lookup returns Variant + ProductUnit.
+- Cross-Product Variant + ProductUnit Barcode linkage is rejected.
+- direct duplicate Barcode is rejected.
+- concurrent duplicate Barcode writers produce exactly one success and one stable `BARCODE_ALREADY_EXISTS` conflict.
+- identifier mutations are Audit-recorded in the same transaction.
+- frozen ProductVariant/Barcode identifier index inventory remains unchanged.
+- migration history remains through `0023`; no 07.03 migration was added.
+- 07.01 Product Model and 07.02 Units regressions remain green.
+- 07.04 Dynamic Attributes and later Product Catalog slices were not started.
+- Validation PR: `#230`, validation-only, to be closed without merge after final documentation-SHA CI.
+
 ## Next action
 
-Implement and validate 07.03 Barcodes / SKU only. 07.04 remains forbidden until 07.03 closes.
+After final documentation-SHA validation, 07.03 is CLOSED. The next official step is PHASE 07 / 07.04 Dynamic Attributes, READY_TO_START only.
