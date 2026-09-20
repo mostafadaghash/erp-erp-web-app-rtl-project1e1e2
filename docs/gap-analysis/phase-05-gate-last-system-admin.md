@@ -1,6 +1,6 @@
 # Gate 05 — Last / System Admin Protection
 
-**Status:** `IN_PROGRESS`  
+**Status:** `CLOSED`  
 **Branch:** `agent/postgres-v1.7-core`  
 **Architecture Source:** Business Tech ERP Architecture Baseline v1.7  
 **Implementation Plan:** Business Tech ERP Master Implementation Plan v1.0  
@@ -96,6 +96,29 @@ The canonical System Admin role row is the shared serialization guard. Therefore
 - no user-delete command.
 - no role-management expansion beyond the already-approved catalog.
 
+## Closure evidence
+
+- Final policy fixed and implemented exactly as documented above.
+- Verified implementation SHA: `6b7f6dd4f1297580c9ca682ee7a1e9479602b28b`.
+- Full CI: Run `#975` / `35482913070` — SUCCESS on the same implementation SHA.
+- `verify`: SUCCESS.
+- `backend-verify`: SUCCESS, including the PostgreSQL 17 last System Admin protection integration gate.
+- `browser-contract`: SUCCESS.
+- `release-gate`: SUCCESS.
+- one active canonical SYSTEM_ADMIN cannot be disabled.
+- one active canonical SYSTEM_ADMIN cannot be demoted.
+- custom `is_system=true` role does not satisfy the invariant.
+- promotion and re-enable paths are allowed.
+- concurrent disable race leaves exactly one active canonical SYSTEM_ADMIN.
+- concurrent demotion race leaves exactly one active canonical SYSTEM_ADMIN.
+- rejected mutations leave target state unchanged and do not write success Audit.
+- successful mutations write Audit inside the same transaction.
+- frozen `roles` and `users` index inventories remain unchanged.
+- no migration added.
+- no index added.
+- no Phase 06 behavior implemented.
+- Validation PR: `#224`, validation-only, to be closed without merge after final documentation-SHA CI.
+
 ## Next action
 
-Run Full CI through a validation-only PR. Only after the same-SHA PostgreSQL 17 concurrency gate and all regressions pass may Gate 05 and PHASE 05 be closed.
+After final documentation-SHA validation, PHASE 05 is CLOSED. The next official step is PHASE 06 / 06.01 Unified Counterparty, READY_TO_START only.
