@@ -1,6 +1,6 @@
 # Phase 06.03 — Customer/Supplier Ledgers Gap Analysis
 
-**Status:** `IN_PROGRESS`  
+**Status:** `CLOSED`  
 **Branch:** `agent/postgres-v1.7-core`  
 **Architecture Source:** Business Tech ERP Architecture Baseline v1.7  
 **Implementation Plan:** Business Tech ERP Master Implementation Plan v1.0
@@ -134,6 +134,30 @@ If both pass with the previous 06.01/06.02 gates, PHASE 06 can close.
 - no Convex Production change.
 - no index addition.
 
+## Closure evidence
+
+- Verified implementation SHA: `e137e2fdbb41daf25835b6218675bf72285d61bb`.
+- Full CI: Run `#1000` / `35486275350` — SUCCESS on the same implementation SHA.
+- `verify`: SUCCESS.
+- `backend-verify`: SUCCESS, including PostgreSQL 17 Customer/Supplier Ledger integration.
+- `browser-contract`: SUCCESS.
+- `release-gate`: SUCCESS.
+- Customer and Supplier histories remain physically and logically separate.
+- one dual-role Counterparty can carry independent Customer and Supplier ledger histories.
+- Customer/Supplier role requirements are enforced.
+- Posting Batch branch/source coherence is enforced before append.
+- SELECTED Branch Scope is rechecked inside the same transaction for append and statement reads.
+- cross-branch append/read is rejected and rejected append leaves no ledger row.
+- direct UPDATE/DELETE of historical ledger entries is rejected by PostgreSQL Migration `0023`.
+- reversal appends a new row while preserving the original historical row.
+- no mutable customer/supplier balance column was introduced.
+- frozen Customer/Supplier Ledger index inventories remain unchanged.
+- migration verify-only succeeds through `0023`.
+- no Sales/Purchasing/Finance settlement orchestration was pulled forward.
+- no Phase 07 behavior was implemented.
+- Runs `#992` and `#993` exposed only stale downstream test assumptions that `0022` remained the migration tail after adding `0023`; those regression assertions were updated while preserving explicit verification that `0022 = index_catalog`.
+- Validation PR: `#227`, validation-only, to be closed without merge after final documentation-SHA CI.
+
 ## Next action
 
-Run Full CI on the 06.03 implementation SHA through a validation-only PR. Only after PostgreSQL 17 immutability, reversal-history, branch-scope and all regression gates pass on the same SHA may 06.03 and Gate 06 be documented as CLOSED.
+After final documentation-SHA validation, 06.03, Gate 06, and PHASE 06 are CLOSED. The next official step is PHASE 07 / 07.01 Product Model, READY_TO_START only.
