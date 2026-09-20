@@ -287,9 +287,12 @@ test("03.06 Finance / Settlement constraints enforce canonical integrity on Post
       const financeConstraints = history.rows.find((row) => row.version === "0018");
       assert.equal(financeConstraints?.name, "finance_settlement_constraints");
       assert.match(financeConstraints?.checksum ?? "", /^[0-9a-f]{64}$/);
+      const indexCatalog = history.rows.find((row) => row.version === "0022");
+      assert.equal(indexCatalog?.name, "index_catalog");
+      assert.match(indexCatalog?.checksum ?? "", /^[0-9a-f]{64}$/);
       const latest = history.rows.at(-1);
-      assert.equal(latest?.version, "0022");
-      assert.equal(latest?.name, "index_catalog");
+      assert.equal(latest?.version, "0023");
+      assert.equal(latest?.name, "counterparty_ledger_immutability");
       assert.match(latest?.checksum ?? "", /^[0-9a-f]{64}$/);
     });
 
