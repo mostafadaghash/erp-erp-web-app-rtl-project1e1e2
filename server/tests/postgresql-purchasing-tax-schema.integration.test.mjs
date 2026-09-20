@@ -84,8 +84,8 @@ test("03.F Purchasing/Tax remains canonical after its 03.06 constraint slice", a
       assert.equal(purchasingSlice?.name, "purchasing_tax_constraints");
       assert.match(purchasingSlice?.checksum ?? "", /^[0-9a-f]{64}$/);
       const latest = history.rows.at(-1);
-      assert.equal(latest.version, "0022");
-      assert.equal(latest.name, "index_catalog");
+      assert.equal(latest.version, "0023");
+      assert.equal(latest.name, "counterparty_ledger_immutability");
       assert.match(latest.checksum, /^[0-9a-f]{64}$/);
     });
     const second = await runMigrations({ databaseUrl });
