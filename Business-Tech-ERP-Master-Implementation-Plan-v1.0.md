@@ -2793,7 +2793,7 @@ Implementation boundary:
 
 ## 07.03 Barcodes / SKU
 
-**Status:** `READY_TO_START`
+**Status:** `IN_PROGRESS`
 
 - unique catalog barcode.
 - unique non-null SKU.
@@ -4113,7 +4113,7 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 # 32. Current Execution Pointer
 
 **Current Phase:** `PHASE 07 — Product Catalog / Variants / Units / Pricing / 07.03 Barcodes / SKU`  
-**Status:** `READY_TO_START`  
+**Status:** `IN_PROGRESS`  
 **Integration Branch:** `agent/postgres-v1.7-core`  
 **Phase 01 Final SHA:** `b0d35101bf622264b655bcc574787989fadbcd83`  
 **Phase 01 Validation PR:** `#183` — closed without merge.  
@@ -4262,6 +4262,8 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 
 ---
 
+
+**Plan update — 2026-09-20 / 07.03 BARCODES-SKU STARTED:** Gap Analysis مقابل Architecture Baseline v1.7 أثبت أن nullable SKU + partial unique non-null SKU، وglobal unique Barcode، وBarcode Variant+ProductUnit same-Product integrity، وExact B-Tree lookups كلها موجودة في الـDDL/Frozen Index Catalog؛ لذلك لا Migration ولا Index جديد في 07.03. التنفيذ سيضيف ProductIdentifierService لتطبيع SKU إلى Uppercase، تعيين/مسح SKU، إضافة Barcode، Exact SKU/Barcode lookup، ترجمة known DB uniqueness conflicts إلى Stable Business Errors، واختبارات Concurrency فعلية على PostgreSQL 17. لا Dynamic Attributes (07.04)، لا Pricing/Reorder، ولا Frontend/Convex cutover.
 
 **Plan update — 2026-09-20 / 07.02 UNITS CLOSED:** تم إغلاق 07.02 وظيفيًا على SHA `c9eb1b2a2e6059ec8d2443b21b256a0ab234b947` بعد Full CI Run `#1006` / `35530791427` SUCCESS. `ProductUnitService` أصبح يدير Unit/ProductUnit ويطبق `allows_fraction` و`is_sellable/is_purchasable`، ويحوّل الكميات إلى Base Unit بحساب exact scale-6 باستخدام BigInt بدل JavaScript float، ويرفض أي نتيجة تحتاج silent rounding خارج `numeric(18,6)`. PostgreSQL 17 أثبت integer/fraction behavior، exact conversion، Base ProductUnit factor=1، Cross-Product Variant+ProductUnit denial، Audit، وثبات Frozen Unit/ProductUnit indexes، مع بقاء migration tail عند `0023`. Gate 07 أصبح مكتملًا في unit conversion tests وfraction restriction tests، بينما SKU/Barcode وما بعده لم يبدأ. Next Action بعد final documentation-SHA CI: 07.03 Barcodes / SKU فقط.
 
