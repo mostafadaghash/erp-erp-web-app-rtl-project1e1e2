@@ -64,9 +64,9 @@ async function seedUsers(pool, roleId) {
       (id,name,username,email,password_hash,role_id,default_branch_id,
        branch_scope_mode,preferred_language,is_active,last_login_at,created_at,updated_at)
      VALUES
-      ($1,'All Branches','phase05-all','phase05-all@example.test','test-only-hash',$4,$5,
+      ($1,'All Branches','phase05-all','phase05-all@example.test','test-only-hash',$2,$3,
        'ALL','ar-EG',true,NULL,now(),now())`,
-    [IDS.allUser, IDS.selectedUser, IDS.inactiveUser, roleId, IDS.branch1],
+    [IDS.allUser, roleId, IDS.branch1],
   );
 
   await withTransaction(pool, async (client) => {
