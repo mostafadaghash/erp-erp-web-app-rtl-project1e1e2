@@ -2570,19 +2570,23 @@ Role Default
 
 ## 05.04 Branch Scope
 
-**Status:** `IN_PROGRESS`
+**Status:** `CLOSED`
 
 Implementation boundary:
 
 - `SELECTED` grants only explicit `user_branch_access` rows.
 - `ALL` grants every existing V1 branch without requiring mapping rows.
-- `default_branch_id` must remain within effective branch access.
+- `default_branch_id` remains within effective branch access through the existing deferred PostgreSQL integrity rules.
 - missing/inactive users, missing branches, and unauthorized cross-branch targets fail closed.
 - sensitive Backend Business Queries/Commands use transaction-bound Permission + Branch Scope rechecks.
 - existing PostgreSQL CHECK/PK/FK/deferred default-branch constraints are reused unchanged.
 - no Migration, no Index, no Frontend/Convex cutover, and no 05.05 Organization behavior.
 
 كل Query/Command حساس يعيد فحص permission + branch scope في Backend.
+
+**05.04 Verified Implementation SHA:** `9826a8d187ec84627c20c9eb6ca9ad6dfd3101a8`.  
+**05.04 Implementation CI:** Run `#969` / `35481723808` — SUCCESS; `verify`, `backend-verify` including PostgreSQL 17 Branch Scope integration, `browser-contract`, and `release-gate` all SUCCESS on the same implementation SHA.  
+**05.04 Validation PR:** `#222` — validation-only; close WITHOUT MERGE after final same-SHA documentation validation.
 
 ## 05.05 Organization
 
@@ -2597,8 +2601,8 @@ Implementation boundary:
 - [x] role defaults tests.
 - [x] allow override test.
 - [x] deny override test.
-- [ ] branch selected/all tests.
-- [ ] cross-branch denial tests.
+- [x] branch selected/all tests.
+- [x] cross-branch denial tests.
 - [ ] last/system admin protection according to final policy.
 - [x] disabled user/session behavior.
 
@@ -3979,8 +3983,8 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 
 # 32. Current Execution Pointer
 
-**Current Phase:** `PHASE 05 — Authentication, Authorization, Organization / 05.04 Branch Scope`  
-**Status:** `IN_PROGRESS`  
+**Current Phase:** `PHASE 05 — Authentication, Authorization, Organization / 05.05 Organization`  
+**Status:** `READY_TO_START`  
 **Integration Branch:** `agent/postgres-v1.7-core`  
 **Phase 01 Final SHA:** `b0d35101bf622264b655bcc574787989fadbcd83`  
 **Phase 01 Validation PR:** `#183` — closed without merge.  
@@ -4072,9 +4076,12 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 **05.03 Final Verified SHA:** `ab17ebe3d3ef78a495143668d8d83d347b428475`.  
 **05.03 Final CI:** Run `#967` / `35481193186` — SUCCESS; `verify`, `backend-verify` including PostgreSQL 17 Effective Permissions integration, `browser-contract`, and `release-gate` all SUCCESS on the final documentation SHA.  
 **05.03 Validation PR:** `#221` — CLOSED WITHOUT MERGE; `merged=false`.  
-**05.04 Branch Scope:** `IN_PROGRESS` — Gap Analysis at `docs/gap-analysis/phase-05-04-branch-scope.md`; Backend SELECTED/ALL resolver, transaction-bound Permission + Branch Scope enforcement, default-branch integrity proofs, and cross-branch denial are under implementation without schema/index/frontend changes.  
-**Next Action:** complete and validate **05.04 Branch Scope only**.  
-**Forbidden Next Actions:** لا 05.05 قبل إغلاق 05.04، لا Frontend cutover، لا dual write، لا `main` merge، ولا Convex Production change.
+**05.04 Branch Scope:** `CLOSED` — Gap Analysis at `docs/gap-analysis/phase-05-04-branch-scope.md`; Backend SELECTED/ALL resolver, transaction-bound Effective Permission + Branch Scope enforcement, default-branch integrity proofs, and cross-branch fail-closed behavior completed without schema/index/frontend changes.  
+**05.04 Verified Implementation SHA:** `9826a8d187ec84627c20c9eb6ca9ad6dfd3101a8`.  
+**05.04 Implementation CI:** Run `#969` / `35481723808` — SUCCESS; `verify`, `backend-verify` including PostgreSQL 17 Branch Scope integration, `browser-contract`, and `release-gate` all SUCCESS on the same implementation SHA.  
+**05.04 Validation PR:** `#222` — validation-only; close WITHOUT MERGE after final same-SHA documentation validation.  
+**Next Action:** execute **05.05 Organization only** after final 05.04 documentation-SHA validation.  
+**Forbidden Next Actions:** لا Phase 06 قبل إغلاق 05.05 وGate 05، لا Frontend cutover، لا dual write، لا `main` merge، ولا Convex Production change.
 
 **Plan update — 2026-09-17 / ACCOUNTING CONSTRAINTS CLOSED:** تم إغلاق ثامن executable slice من 03.06 على SHA `ef03d141958c392032bd8caf16b5f880a193e86e`. Migration `0019`، ADR-0021، Accounting PK/FK/UNIQUE/CHECK layer، Finance Category → GL Account FK، والحفاظ على deferred Journal balance at COMMIT تم التحقق منهم فعليًا على PostgreSQL 17؛ Full CI run `35224498880` أخضر بالكامل وPR `#206` أُغلق بدون Merge. 03.06 ما زالت `IN_PROGRESS` و03.07 لم تبدأ.
 
@@ -4082,6 +4089,8 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 
 ---
 
+
+**Plan update — 2026-09-20 / 05.04 BRANCH SCOPE CLOSED:** تم إغلاق التنفيذ الوظيفي على SHA `9826a8d187ec84627c20c9eb6ca9ad6dfd3101a8` بعد Full CI Run `#969` / `35481723808` SUCCESS. تم تنفيذ Backend Branch Scope للوضعيْن `SELECTED/ALL`، واستخدام `user_branch_access` مع SELECTED، وfail-closed للوصول Cross-Branch غير المسموح والمستخدم غير الفعال/المفقود والفرع غير الموجود، مع transaction-bound Effective Permission + Branch Scope recheck للعمليات الحساسة. PostgreSQL 17 أثبت حماية `default_branch_id` بالـDeferred Constraints، وعدم احتياج ALL لأي mapping rows، وثبات Frozen Index Catalog وعدم إضافة Migration أو Index. 05.05 Organization لم يبدأ. PR `#222` validation-only ويخضع الآن لـFull CI نهائي على documentation closure SHA قبل إغلاقه بدون Merge. Next Action بعد نجاحه: 05.05 Organization فقط.
 
 **Plan update — 2026-09-20 / 05.04 BRANCH SCOPE STARTED:** تم عمل Gap Analysis مقابل Architecture Baseline v1.7 وMaster Plan. الـSchema الحالي يحتوي بالفعل على `branch_scope_mode = SELECTED/ALL` و`user_branch_access` وDeferred Constraints لحماية `default_branch_id`، مع Frozen Index Catalog مناسب؛ لذلك لا Migration ولا Index جديد. التنفيذ يضيف Backend Branch Scope resolver وBranch-scoped authorization يعيد فحص Effective Permission + Branch Scope داخل نفس Transaction للعمليات الحساسة، مع fail-closed للمستخدم غير الفعال/المفقود والفرع غير الموجود والوصول Cross-Branch غير المسموح. 05.05 Organization وFrontend/Convex cutover خارج النطاق.
 
