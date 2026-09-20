@@ -490,8 +490,22 @@ export class OrganizationService {
       const warehouse = await requireWarehouse(client, input.warehouseId)
       if (warehouse.branch_id === input.targetBranchId) return
 
-      const sourceBranch = await requireBranch(client, warehouse.branch_id)
-      await requireBranch(client, input.targetBranchId)
+      const branchLocks = await client.query<BranchRow>(
+        `SELECT id,company_id,name,code,is_active
+           FROM branches
+          WHERE id=ANY($1::uuid[])
+          ORDER BY id
+          FOR UPDATE`,
+        [[warehouse.branch_id, input.targetBranchId]],
+      )
+      const sourceBranch = branchLocks.rows.find(
+        (row) => row.id === warehouse.branch_id,
+      )
+      const targetBranch = branchLocks.rows.find(
+        (row) => row.id === input.targetBranchId,
+      )
+      if (!sourceBranch) throw new OrganizationError('BRANCH_NOT_FOUND')
+      if (!targetBranch) throw new OrganizationError('BRANCH_NOT_FOUND')
 
       const defaultUse = await client.query(
         `SELECT 1
