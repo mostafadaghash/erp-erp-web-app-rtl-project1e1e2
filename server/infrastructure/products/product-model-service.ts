@@ -71,7 +71,7 @@ export interface ProductModelRecord {
   name: string
   categoryId: string
   productType: ProductType
-  baseUnitMasterId: string
+  baseUnitId: string
   trackingSerial: boolean
   trackingBatch: boolean
   trackingExpiry: boolean
