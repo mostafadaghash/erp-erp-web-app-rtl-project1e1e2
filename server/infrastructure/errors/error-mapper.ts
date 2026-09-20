@@ -3,6 +3,7 @@ import { PostingBatchReferenceError } from '../posting/posting-batch-service.js'
 import { PermissionDeniedError } from '../authorization/effective-permission-service.js'
 import { BranchAccessDeniedError } from '../authorization/branch-scope-service.js'
 import { OrganizationError } from '../organization/organization-service.js'
+import { SystemAdminProtectionError } from '../authorization/system-admin-protection-service.js'
 
 export type SafeErrorParam = string | number | boolean | null
 export type SafeErrorParams = Readonly<Record<string, SafeErrorParam>>
@@ -18,6 +19,7 @@ export const ERROR_CODES = {
   PERMISSION_DENIED: 'PERMISSION_DENIED',
   BRANCH_ACCESS_DENIED: 'BRANCH_ACCESS_DENIED',
   ORGANIZATION_OPERATION_REJECTED: 'ORGANIZATION_OPERATION_REJECTED',
+  SYSTEM_ADMIN_PROTECTION_REJECTED: 'SYSTEM_ADMIN_PROTECTION_REJECTED',
   INVALID_ARGUMENT: 'INVALID_ARGUMENT',
   DB_UNIQUE_CONFLICT: 'DB_UNIQUE_CONFLICT',
   DB_REFERENCE_CONFLICT: 'DB_REFERENCE_CONFLICT',
@@ -103,6 +105,12 @@ export function toErrorContract(error: unknown): ErrorContract {
 
   if (error instanceof OrganizationError) {
     return contract(ERROR_CODES.ORGANIZATION_OPERATION_REJECTED, {
+      reason: error.reason,
+    })
+  }
+
+  if (error instanceof SystemAdminProtectionError) {
+    return contract(ERROR_CODES.SYSTEM_ADMIN_PROTECTION_REJECTED, {
       reason: error.reason,
     })
   }
