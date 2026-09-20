@@ -50,6 +50,7 @@ export const MIGRATIONS = [
   "0020",
   "0021",
   "0022",
+  "0023",
 ];
 
 export async function withClient(databaseUrl, fn) {
@@ -132,6 +133,7 @@ export async function cleanupReportingTables(databaseUrl) {
 
 export async function cleanupDatabase(databaseUrl) {
   await withClient(databaseUrl, async (client) => {
+    await client.query("DROP FUNCTION IF EXISTS public.fn_counterparty_ledger_entry_immutable() CASCADE");
     await cleanupCoreConstraintLayer(client);
     await cleanupProductConstraintLayer(client);
     await cleanupSalesConstraintLayer(client);
