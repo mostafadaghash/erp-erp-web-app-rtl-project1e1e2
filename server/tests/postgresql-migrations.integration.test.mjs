@@ -72,6 +72,7 @@ const MIGRATIONS = [
   { version: "0020", name: "repairs_followup_notifications_constraints", transactional: true },
   { version: "0021", name: "printing_export_reporting_read_models_constraints", transactional: true },
   { version: "0022", name: "index_catalog", transactional: true },
+  { version: "0023", name: "counterparty_ledger_immutability", transactional: true },
 ];
 
 async function withClient(fn) {
@@ -83,6 +84,7 @@ async function withClient(fn) {
 async function cleanup() {
   await cleanupReportingTables(databaseUrl);
   await withClient(async (client) => {
+    await client.query("DROP FUNCTION IF EXISTS public.fn_counterparty_ledger_entry_immutable() CASCADE");
     await client.query("DROP VIEW IF EXISTS public.purchase_returnable_quantities_v");
     await client.query("DROP VIEW IF EXISTS public.sales_returnable_quantities_v");
     await client.query("DROP TABLE IF EXISTS public.migration_transaction_probe");
