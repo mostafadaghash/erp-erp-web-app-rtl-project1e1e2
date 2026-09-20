@@ -119,7 +119,6 @@ interface CompanySettingsRow extends QueryResultRow {
 }
 
 interface BranchSettingsRow extends QueryResultRow {
-  company_id: string
   default_warehouse_id: string | null
 }
 
@@ -424,16 +423,16 @@ export class OrganizationService {
     requireNonBlank('actorUserId', input.actorUserId)
 
     return this.database.transaction(async (client) => {
+      const branch = await requireBranch(client, input.branchId)
       const settingsResult = await client.query<BranchSettingsRow>(
-        `SELECT b.company_id,bs.default_warehouse_id
-           FROM branches b
-           LEFT JOIN branch_settings bs ON bs.branch_id=b.id
-          WHERE b.id=$1
-          FOR UPDATE OF b,bs`,
+        `SELECT default_warehouse_id
+           FROM branch_settings
+          WHERE branch_id=$1
+          FOR UPDATE`,
         [input.branchId],
       )
-      const settings = settingsResult.rows[0]
-      if (!settings) throw new OrganizationError('BRANCH_NOT_FOUND')
+      const previousDefaultWarehouseId =
+        settingsResult.rows[0]?.default_warehouse_id ?? null
 
       const warehouse = await requireWarehouse(client, input.warehouseId)
       if (warehouse.branch_id !== input.branchId) {
@@ -453,16 +452,16 @@ export class OrganizationService {
         [input.branchId, input.warehouseId],
       )
 
-      if (settings.default_warehouse_id !== input.warehouseId) {
+      if (previousDefaultWarehouseId !== input.warehouseId) {
         await this.audit.record(client, {
-          companyId: settings.company_id,
+          companyId: branch.company_id,
           branchId: input.branchId,
           userId: input.actorUserId,
           action: 'ORGANIZATION_DEFAULT_WAREHOUSE_CHANGED',
           entityType: 'BRANCH_SETTINGS',
           entityId: input.branchId,
           before: {
-            defaultWarehouseId: settings.default_warehouse_id,
+            defaultWarehouseId: previousDefaultWarehouseId,
           },
           after: {
             defaultWarehouseId: input.warehouseId,
