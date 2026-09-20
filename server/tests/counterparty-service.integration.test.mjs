@@ -118,8 +118,8 @@ test(
       assert.equal(dual.phone, "0100 123 4567");
       assert.equal(
         dual.normalizedPhone,
-        null,
-        "06.01 must not implement 06.02 phone normalization",
+        "01001234567",
+        "later 06.02 behavior must preserve the 06.01 shared identity while adding canonical phone storage",
       );
       assert.deepEqual(dual.customerProfile, {
         defaultPriceListId: null,
@@ -244,7 +244,7 @@ test(
       });
       assert.equal(updated.name, "Role Evolution Account Updated");
       assert.equal(updated.phone, "0111 222 3333");
-      assert.equal(updated.normalizedPhone, null);
+      assert.equal(updated.normalizedPhone, "01112223333");
       assert.equal(updated.address, "Giza");
 
       const disabled = await counterparties.setActive({
