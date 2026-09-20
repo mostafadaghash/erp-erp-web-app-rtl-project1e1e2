@@ -55,7 +55,7 @@
     "local:lan:frontend": "vite --mode local-server-lan --host 0.0.0.0 --open",
     "backend:dev": "tsx watch server/main.ts",
     "backend:typecheck": "tsc -p server/tsconfig.json --noEmit --pretty false",
-    "backend:test": "node --import tsx --test server/tests/backend-skeleton.test.ts server/tests/idempotency-service.test.ts server/tests/document-sequence-service.test.ts server/tests/posting-batch-service.test.ts server/tests/audit-service.test.ts server/tests/transactional-outbox.test.ts server/tests/error-mapper.test.ts server/tests/authentication.test.ts server/tests/role-catalog.test.ts server/tests/effective-permissions.test.ts server/tests/branch-scope.test.ts server/tests/organization-service.test.ts server/tests/system-admin-protection.test.ts server/tests/counterparty-service.test.ts server/tests/phone-normalization.test.ts",
+    "backend:test": "node --import tsx --test server/tests/backend-skeleton.test.ts server/tests/idempotency-service.test.ts server/tests/document-sequence-service.test.ts server/tests/posting-batch-service.test.ts server/tests/audit-service.test.ts server/tests/transactional-outbox.test.ts server/tests/error-mapper.test.ts server/tests/authentication.test.ts server/tests/role-catalog.test.ts server/tests/effective-permissions.test.ts server/tests/branch-scope.test.ts server/tests/organization-service.test.ts server/tests/system-admin-protection.test.ts server/tests/counterparty-service.test.ts server/tests/phone-normalization.test.ts server/tests/counterparty-ledger-service.test.ts",
     "backend:build": "tsc -p server/tsconfig.build.json",
     "backend:start": "node dist-server/main.js",
     "backend:verify": "npm run backend:typecheck && npm run backend:test && npm run backend:build"
