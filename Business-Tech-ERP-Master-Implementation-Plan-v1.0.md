@@ -2612,7 +2612,7 @@ Implementation boundary:
 
 ### Gate 05
 
-**Final last/System Admin policy — IN_PROGRESS validation**
+**Final last/System Admin policy — CLOSED**
 
 - system must retain at least one **active canonical `SYSTEM_ADMIN`** user.
 - only role_key `SYSTEM_ADMIN` counts; custom roles do not satisfy this invariant even when `is_system=true`.
@@ -2631,14 +2631,14 @@ Validation record: `docs/gap-analysis/phase-05-gate-last-system-admin.md`.
 - [x] deny override test.
 - [x] branch selected/all tests.
 - [x] cross-branch denial tests.
-- [ ] last/system admin protection according to final policy.
+- [x] last/system admin protection according to final policy.
 - [x] disabled user/session behavior.
 
 ---
 
 # 12. PHASE 06 — Counterparties & Master Data
 
-**Status:** `NOT_STARTED`
+**Status:** `READY_TO_START`
 
 ## 06.01 Unified Counterparty
 
@@ -4011,8 +4011,8 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 
 # 32. Current Execution Pointer
 
-**Current Phase:** `PHASE 05 — Gate 05 / Last-System-Admin Protection`  
-**Status:** `IN_PROGRESS`  
+**Current Phase:** `PHASE 06 — Counterparties & Master Data / 06.01 Unified Counterparty`  
+**Status:** `READY_TO_START`  
 **Integration Branch:** `agent/postgres-v1.7-core`  
 **Phase 01 Final SHA:** `b0d35101bf622264b655bcc574787989fadbcd83`  
 **Phase 01 Validation PR:** `#183` — closed without merge.  
@@ -4116,9 +4116,13 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 **05.05 Final Verified SHA:** `b848489f16db3fffd9c9d3e0fb3e448d5bd5344e`.  
 **05.05 Final CI:** Run `#974` / `35482420355` — SUCCESS; `verify`, `backend-verify` including PostgreSQL 17 Organization integration, `browser-contract`, and `release-gate` all SUCCESS on the final documentation SHA.  
 **05.05 Validation PR:** `#223` — CLOSED WITHOUT MERGE; `merged=false`.  
-**Gate 05 Last/System Admin Protection:** `IN_PROGRESS` — final policy fixed in `docs/gap-analysis/phase-05-gate-last-system-admin.md`: at least one active canonical `SYSTEM_ADMIN` must remain; custom roles do not count; last active Admin disable/demotion is rejected; promotion/enable is allowed; concurrent removals serialize on the canonical role row with `FOR UPDATE`.  
-**Next Action:** validate and close the **last/System Admin protection Gate only** on PostgreSQL 17 + Full CI. Phase 06 remains forbidden until Gate 05 and PHASE 05 close.  
-**Forbidden Next Actions:** لا Phase 06 قبل إغلاق Gate 05، لا Frontend cutover، لا dual write، لا `main` merge، ولا Convex Production change.
+**Gate 05 Last/System Admin Protection:** `CLOSED` — final policy at `docs/gap-analysis/phase-05-gate-last-system-admin.md`: at least one active canonical `SYSTEM_ADMIN` must remain; custom roles do not count; last active Admin disable/demotion is rejected; promotion/enable is allowed; concurrent removals serialize on the canonical role row with `FOR UPDATE`.  
+**Gate 05 Verified Implementation SHA:** `6b7f6dd4f1297580c9ca682ee7a1e9479602b28b`.  
+**Gate 05 Implementation CI:** Run `#975` / `35482913070` — SUCCESS; `verify`, `backend-verify` including PostgreSQL 17 last System Admin protection/concurrency integration, `browser-contract`, and `release-gate` all SUCCESS on the same implementation SHA.  
+**Gate 05 Validation PR:** `#224` — validation-only; close WITHOUT MERGE after final same-SHA documentation validation.  
+**PHASE 05:** `CLOSED` — Authentication, Roles, Effective Permissions, Branch Scope, Organization, and all Gate 05 checks are complete.  
+**Next Action:** execute **PHASE 06 / 06.01 Unified Counterparty only** after final Phase 05 documentation-SHA validation.  
+**Forbidden Next Actions:** لا 06.02 قبل إغلاق 06.01، لا Frontend cutover، لا dual write، لا `main` merge، ولا Convex Production change.
 
 **Plan update — 2026-09-17 / ACCOUNTING CONSTRAINTS CLOSED:** تم إغلاق ثامن executable slice من 03.06 على SHA `ef03d141958c392032bd8caf16b5f880a193e86e`. Migration `0019`، ADR-0021، Accounting PK/FK/UNIQUE/CHECK layer، Finance Category → GL Account FK، والحفاظ على deferred Journal balance at COMMIT تم التحقق منهم فعليًا على PostgreSQL 17؛ Full CI run `35224498880` أخضر بالكامل وPR `#206` أُغلق بدون Merge. 03.06 ما زالت `IN_PROGRESS` و03.07 لم تبدأ.
 
@@ -4126,6 +4130,8 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 
 ---
 
+
+**Plan update — 2026-09-20 / GATE 05 LAST-SYSTEM-ADMIN PROTECTION CLOSED:** تم إغلاق آخر Gate في Phase 05 على SHA `6b7f6dd4f1297580c9ca682ee7a1e9479602b28b` بعد Full CI Run `#975` / `35482913070` SUCCESS. السياسة النهائية المثبتة: يجب أن يبقى دائمًا Active canonical `SYSTEM_ADMIN` واحد على الأقل؛ Custom Roles لا تُحسب حتى لو `is_system=true`؛ تعطيل/Demote آخر Admin يُرفض، بينما Enable/Promote مسموحان. الحماية تستخدم canonical role row كـserialization guard بـ`FOR UPDATE` تحت `READ COMMITTED`، واختبارات PostgreSQL 17 أثبتت أن محاولتي Disable أو Demotion المتزامنتين لا تنجحان معًا وأن العدد لا يصل للصفر. Audit وstable error contract نجحا، والـFrozen Index Catalog بقي بلا تغيير، ولا Migration أو Index جديد. بذلك PHASE 05 أصبحت CLOSED. Phase 06 لم تبدأ؛ Next Action بعد final documentation-SHA CI: 06.01 Unified Counterparty فقط.
 
 **Plan update — 2026-09-20 / GATE 05 LAST-SYSTEM-ADMIN PROTECTION STARTED:** بناءً على طلب حسم السياسة، تم تثبيت Final Policy بدل ترك الـGate معلقة: يجب أن يبقى دائمًا مستخدم نشط واحد على الأقل بدور `SYSTEM_ADMIN` القياسي؛ Custom Roles لا تُحسب حتى لو `is_system=true`. تعطيل أو Demote آخر Active System Admin يُرفض، بينما التفعيل/الترقية مسموحان. التنفيذ يستخدم صف `SYSTEM_ADMIN` نفسه كـserialization guard بـ`SELECT ... FOR UPDATE` ثم يقفل المستخدم المستهدف، بحيث محاولتا Disable/Demotion المتزامنتان لا تنجحان معًا تحت `READ COMMITTED`. تمت إضافة Backend protection service وAudit وstable error contract واختبار PostgreSQL 17 concurrency، بدون Migration أو Index أو Phase 06 أو Frontend/Convex cutover. الـGate ما زالت IN_PROGRESS لحين نجاح Full CI على نفس SHA.
 
