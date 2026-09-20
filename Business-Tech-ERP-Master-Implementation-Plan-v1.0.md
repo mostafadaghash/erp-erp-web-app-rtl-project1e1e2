@@ -2674,7 +2674,7 @@ Replace separate customer/supplier identity storage with:
 
 ## 06.02 Phone Normalization
 
-**Status:** `IN_PROGRESS`
+**Status:** `CLOSED`
 
 Implementation boundary:
 
@@ -2688,6 +2688,10 @@ Implementation boundary:
 - `normalized_phone` remains non-unique.
 - reuse frozen `ix_counterparties__normalized_phone`; no Migration or Index.
 - no 06.03 Ledgers and no Frontend/Convex cutover.
+
+**06.02 Verified Implementation SHA:** `394afe351117571ebdf22113de9424de4c55f38c`.  
+**06.02 Implementation CI:** Run `#981` / `35484080467` — SUCCESS; `verify`, `backend-verify` including PostgreSQL 17 Phone Normalization integration, `browser-contract`, and `release-gate` all SUCCESS on the same implementation SHA.  
+**06.02 Validation PR:** `#226` — validation-only; close WITHOUT MERGE after final same-SHA documentation validation.
 
 - preserve display phone.
 - calculate/store canonical `normalized_phone`.
@@ -2703,7 +2707,7 @@ Implementation boundary:
 
 - [x] same account can be customer+supplier.
 - [x] no duplicate role pair.
-- [ ] normalized phone search tests.
+- [x] normalized phone search tests.
 - [ ] ledger immutability tests.
 - [ ] branch scope tests.
 
@@ -4048,8 +4052,8 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 
 # 32. Current Execution Pointer
 
-**Current Phase:** `PHASE 06 — Counterparties & Master Data / 06.02 Phone Normalization`  
-**Status:** `IN_PROGRESS`  
+**Current Phase:** `PHASE 06 — Counterparties & Master Data / 06.03 Customer/Supplier Ledgers`  
+**Status:** `READY_TO_START`  
 **Integration Branch:** `agent/postgres-v1.7-core`  
 **Phase 01 Final SHA:** `b0d35101bf622264b655bcc574787989fadbcd83`  
 **Phase 01 Validation PR:** `#183` — closed without merge.  
@@ -4166,9 +4170,12 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 **06.01 Final Verified SHA:** `72c315d05b7645d1aadd3a4204e0031f1fb2c297`.  
 **06.01 Final CI:** Run `#980` / `35483480722` — SUCCESS; `verify`, `backend-verify` including PostgreSQL 17 Unified Counterparty service integration, `browser-contract`, and `release-gate` all SUCCESS on the final documentation SHA.  
 **06.01 Validation PR:** `#225` — CLOSED WITHOUT MERGE; `merged=false`.  
-**06.02 Phone Normalization:** `IN_PROGRESS` — Gap Analysis at `docs/gap-analysis/phase-06-02-phone-normalization.md`; display phone preservation, country-neutral canonical normalization, Arabic/Persian digit support, `+`/leading `00` equivalence, exact PostgreSQL search through `normalized_phone`, and frozen-index reuse are under implementation. No country-code inference, phone uniqueness, ledger commands, schema/index changes, or Frontend/Convex cutover.  
-**Next Action:** complete and validate **06.02 Phone Normalization only**.  
-**Forbidden Next Actions:** لا 06.03 قبل إغلاق 06.02، لا Phase 07، لا Frontend cutover، لا dual write، لا `main` merge، ولا Convex Production change.
+**06.02 Phone Normalization:** `CLOSED` — Gap Analysis at `docs/gap-analysis/phase-06-02-phone-normalization.md`; display phone is preserved while canonical `normalized_phone` is stored/searched, Arabic/Persian digits map to ASCII, leading `+` and `00` are equivalent international prefixes, local leading zeroes are preserved without country inference, and exact PostgreSQL search reuses the frozen phone index. Duplicate canonical phones remain allowed. No ledger/schema/index/frontend work was included.  
+**06.02 Verified Implementation SHA:** `394afe351117571ebdf22113de9424de4c55f38c`.  
+**06.02 Implementation CI:** Run `#981` / `35484080467` — SUCCESS; `verify`, `backend-verify` including PostgreSQL 17 Phone Normalization integration, `browser-contract`, and `release-gate` all SUCCESS on the same implementation SHA.  
+**06.02 Validation PR:** `#226` — validation-only; close WITHOUT MERGE after final same-SHA documentation validation.  
+**Next Action:** execute **06.03 Customer/Supplier Ledgers only** after final 06.02 documentation-SHA validation.  
+**Forbidden Next Actions:** لا Phase 07 قبل إغلاق 06.03 وGate 06، لا Frontend cutover، لا dual write، لا `main` merge، ولا Convex Production change.
 
 **Plan update — 2026-09-17 / ACCOUNTING CONSTRAINTS CLOSED:** تم إغلاق ثامن executable slice من 03.06 على SHA `ef03d141958c392032bd8caf16b5f880a193e86e`. Migration `0019`، ADR-0021، Accounting PK/FK/UNIQUE/CHECK layer، Finance Category → GL Account FK، والحفاظ على deferred Journal balance at COMMIT تم التحقق منهم فعليًا على PostgreSQL 17؛ Full CI run `35224498880` أخضر بالكامل وPR `#206` أُغلق بدون Merge. 03.06 ما زالت `IN_PROGRESS` و03.07 لم تبدأ.
 
@@ -4176,6 +4183,8 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 
 ---
 
+
+**Plan update — 2026-09-20 / 06.02 PHONE NORMALIZATION CLOSED:** تم إغلاق 06.02 وظيفيًا على SHA `394afe351117571ebdf22113de9424de4c55f38c` بعد Full CI Run `#981` / `35484080467` SUCCESS. `CounterpartyService` أصبح يحفظ display `phone` مع canonical `normalized_phone` في create/update ويبحث exact equality على `normalized_phone`. تم دعم ASCII/Arabic-Indic/Extended Arabic-Indic digits، وتكافؤ leading `+` مع leading `00`، والحفاظ على local leading zeroes بدون country-code inference. PostgreSQL 17 أثبت البحث بنفس canonical value، تحديث الرقم وإسقاط المطابقة القديمة، وإرجاع كل الحسابات ذات الهاتف المطبّع نفسه لأن phone ليس Unique. الـFrozen `ix_counterparties__normalized_phone` بقي بلا تغيير، ولا Migration أو Index جديد، ولم يبدأ 06.03. Gate 06 أصبح مكتملًا أيضًا في normalized phone search tests. Next Action بعد final documentation-SHA CI: 06.03 Customer/Supplier Ledgers فقط.
 
 **Plan update — 2026-09-20 / 06.02 PHONE NORMALIZATION STARTED:** الـArchitecture Baseline يفرض حفظ `phone` للعرض و`normalized_phone` كCanonical للبحث والمطابقة، ويجعل Phone Search داخل PostgreSQL عبر `normalized_phone`، لكنه لا يحدد default country code أو Egypt-only/E.164 conversion. لذلك تم تثبيت implementation-level rule محايدة للدولة: تحويل ASCII/Arabic-Indic/Extended Arabic-Indic digits إلى ASCII، إزالة تنسيق العرض فقط، اعتبار leading `+` وleading `00` international prefixes متكافئة، والحفاظ على local leading zeroes بدون country inference. `CounterpartyService` أصبح يحسب ويخزن canonical phone عند create/update ويبحث exact equality على `normalized_phone`. الـdisplay phone محفوظ، والـphone غير Unique، والـFrozen index `ix_counterparties__normalized_phone` يعاد استخدامه. لا Migration أو Index جديد، ولا 06.03/Frontend/Convex cutover.
 
