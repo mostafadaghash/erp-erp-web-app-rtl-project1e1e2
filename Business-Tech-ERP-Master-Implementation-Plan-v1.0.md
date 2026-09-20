@@ -2735,11 +2735,11 @@ Implementation boundary:
 
 # 13. PHASE 07 — Product Catalog / Variants / Units / Pricing
 
-**Status:** `READY_TO_START`
+**Status:** `IN_PROGRESS`
 
 ## 07.01 Product Model
 
-**Status:** `READY_TO_START`
+**Status:** `IN_PROGRESS`
 
 Implement:
 
@@ -4075,7 +4075,7 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 # 32. Current Execution Pointer
 
 **Current Phase:** `PHASE 07 — Product Catalog / Variants / Units / Pricing / 07.01 Product Model`  
-**Status:** `READY_TO_START`  
+**Status:** `IN_PROGRESS`  
 **Integration Branch:** `agent/postgres-v1.7-core`  
 **Phase 01 Final SHA:** `b0d35101bf622264b655bcc574787989fadbcd83`  
 **Phase 01 Validation PR:** `#183` — closed without merge.  
@@ -4212,6 +4212,8 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 
 ---
 
+
+**Plan update — 2026-09-20 / 07.01 PRODUCT MODEL STARTED:** تم عمل Gap Analysis مقابل Architecture Baseline v1.7 وMaster Plan. الـSchema الحالي يثبت بالفعل Product type = STOCK/SERVICE، وجود Variant واحد على الأقل، وproducts.base_unit_id كمصدر Base Unit الوحيد مع Deferred integrity لنفس Product، كما أن Frozen Product indexes موجودة؛ لذلك لا Migration ولا Index جديد في 07.01. التنفيذ سيضيف Backend ProductModelService لإنشاء Simple Product + Base ProductUnit + Internal Default Variant داخل Transaction واحدة مع Audit، مع اختبار default-variant behavior. لا يتم فتح alternate-unit/fraction management (07.02)، ولا SKU/Barcode (07.03)، ولا Dynamic Attributes/combination canonicalization (07.04)، ولا Pricing/Reorder، ولا Frontend/Convex cutover.
 
 **Plan update — 2026-09-20 / 06.03 CUSTOMER-SUPPLIER LEDGERS CLOSED:** تم إغلاق 06.03 وظيفيًا على SHA `e137e2fdbb41daf25835b6218675bf72285d61bb` بعد Full CI Run `#1000` / `35486275350` SUCCESS. تم تثبيت Customer/Supplier Ledgers كمصدرين تاريخيين منفصلين Append-only، مع Backend `CounterpartyLedgerService` يربط كل Entry بـPosting Batch رسمي ويتحقق من branch/source وCUSTOMER/SUPPLIER role وBranch Scope داخل نفس Transaction. Migration `0023_counterparty_ledger_immutability` تمنع UPDATE/DELETE مباشرة على الجدولين، والتصحيح/العكس يتم بصفوف جديدة مع بقاء الأصل. PostgreSQL 17 أثبت Cross-Branch denial للكتابة والقراءة، reversal preserves original history، وعدم وجود mutable customer/supplier balance truth، وثبات Frozen Ledger indexes. Runs `#992/#993` كشفت فقط stale regression assertions كانت تفترض أن `0022` آخر Migration؛ تم تحديثها إلى `0023` مع إبقاء فحص `0022=index_catalog`، ثم نجحت Finance/Accounting/Repairs/Reporting/Index Catalog/DDL gates كلها في Run #1000. بذلك Gate 06 وPHASE 06 CLOSED. Phase 07 لم تبدأ؛ Next Action بعد final documentation-SHA CI: 07.01 Product Model فقط.
 
