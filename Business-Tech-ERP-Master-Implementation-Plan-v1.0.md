@@ -2674,6 +2674,21 @@ Replace separate customer/supplier identity storage with:
 
 ## 06.02 Phone Normalization
 
+**Status:** `IN_PROGRESS`
+
+Implementation boundary:
+
+- preserve trimmed human-facing phone text in `counterparties.phone`.
+- store deterministic country-neutral canonical digits in `normalized_phone`.
+- map ASCII, Arabic-Indic, and Extended Arabic-Indic digits to ASCII.
+- remove supported display formatting only.
+- leading `+` and leading `00` are equivalent international prefixes.
+- local leading zeroes are preserved; no default country code is inferred.
+- search input uses the same normalizer and exact equality on `normalized_phone`.
+- `normalized_phone` remains non-unique.
+- reuse frozen `ix_counterparties__normalized_phone`; no Migration or Index.
+- no 06.03 Ledgers and no Frontend/Convex cutover.
+
 - preserve display phone.
 - calculate/store canonical `normalized_phone`.
 - search uses normalized value.
@@ -4034,7 +4049,7 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 # 32. Current Execution Pointer
 
 **Current Phase:** `PHASE 06 — Counterparties & Master Data / 06.02 Phone Normalization`  
-**Status:** `READY_TO_START`  
+**Status:** `IN_PROGRESS`  
 **Integration Branch:** `agent/postgres-v1.7-core`  
 **Phase 01 Final SHA:** `b0d35101bf622264b655bcc574787989fadbcd83`  
 **Phase 01 Validation PR:** `#183` — closed without merge.  
@@ -4148,8 +4163,11 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 **06.01 Unified Counterparty:** `CLOSED` — Gap Analysis at `docs/gap-analysis/phase-06-01-unified-counterparty.md`; one canonical Counterparty identity now supports CUSTOMER/SUPPLIER/OTHER roles, Customer+Supplier coexistence on one ID, optional role-specific profiles, duplicate-safe concurrent role addition, non-destructive active/inactive lifecycle, Audit, and stable Counterparty error mapping. No phone-normalization or ledger-command work was included.  
 **06.01 Verified Implementation SHA:** `0a89fba47d243bac5f47c38eb51439292ea4afb0`.  
 **06.01 Implementation CI:** Run `#978` / `35483368078` — SUCCESS; `verify`, `backend-verify` including PostgreSQL 17 Unified Counterparty service integration, `browser-contract`, and `release-gate` all SUCCESS on the same implementation SHA.  
-**06.01 Validation PR:** `#225` — validation-only; close WITHOUT MERGE after final same-SHA documentation validation.  
-**Next Action:** execute **06.02 Phone Normalization only** after final 06.01 documentation-SHA validation.  
+**06.01 Final Verified SHA:** `72c315d05b7645d1aadd3a4204e0031f1fb2c297`.  
+**06.01 Final CI:** Run `#980` / `35483480722` — SUCCESS; `verify`, `backend-verify` including PostgreSQL 17 Unified Counterparty service integration, `browser-contract`, and `release-gate` all SUCCESS on the final documentation SHA.  
+**06.01 Validation PR:** `#225` — CLOSED WITHOUT MERGE; `merged=false`.  
+**06.02 Phone Normalization:** `IN_PROGRESS` — Gap Analysis at `docs/gap-analysis/phase-06-02-phone-normalization.md`; display phone preservation, country-neutral canonical normalization, Arabic/Persian digit support, `+`/leading `00` equivalence, exact PostgreSQL search through `normalized_phone`, and frozen-index reuse are under implementation. No country-code inference, phone uniqueness, ledger commands, schema/index changes, or Frontend/Convex cutover.  
+**Next Action:** complete and validate **06.02 Phone Normalization only**.  
 **Forbidden Next Actions:** لا 06.03 قبل إغلاق 06.02، لا Phase 07، لا Frontend cutover، لا dual write، لا `main` merge، ولا Convex Production change.
 
 **Plan update — 2026-09-17 / ACCOUNTING CONSTRAINTS CLOSED:** تم إغلاق ثامن executable slice من 03.06 على SHA `ef03d141958c392032bd8caf16b5f880a193e86e`. Migration `0019`، ADR-0021، Accounting PK/FK/UNIQUE/CHECK layer، Finance Category → GL Account FK، والحفاظ على deferred Journal balance at COMMIT تم التحقق منهم فعليًا على PostgreSQL 17؛ Full CI run `35224498880` أخضر بالكامل وPR `#206` أُغلق بدون Merge. 03.06 ما زالت `IN_PROGRESS` و03.07 لم تبدأ.
@@ -4158,6 +4176,8 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 
 ---
 
+
+**Plan update — 2026-09-20 / 06.02 PHONE NORMALIZATION STARTED:** الـArchitecture Baseline يفرض حفظ `phone` للعرض و`normalized_phone` كCanonical للبحث والمطابقة، ويجعل Phone Search داخل PostgreSQL عبر `normalized_phone`، لكنه لا يحدد default country code أو Egypt-only/E.164 conversion. لذلك تم تثبيت implementation-level rule محايدة للدولة: تحويل ASCII/Arabic-Indic/Extended Arabic-Indic digits إلى ASCII، إزالة تنسيق العرض فقط، اعتبار leading `+` وleading `00` international prefixes متكافئة، والحفاظ على local leading zeroes بدون country inference. `CounterpartyService` أصبح يحسب ويخزن canonical phone عند create/update ويبحث exact equality على `normalized_phone`. الـdisplay phone محفوظ، والـphone غير Unique، والـFrozen index `ix_counterparties__normalized_phone` يعاد استخدامه. لا Migration أو Index جديد، ولا 06.03/Frontend/Convex cutover.
 
 **Plan update — 2026-09-20 / 06.01 UNIFIED COUNTERPARTY CLOSED:** تم إغلاق 06.01 وظيفيًا على SHA `0a89fba47d243bac5f47c38eb51439292ea4afb0` بعد Full CI Run `#978` / `35483368078` SUCCESS. تم تنفيذ هوية Counterparty واحدة مشتركة مع Roles `CUSTOMER/SUPPLIER/OTHER`، وإثبات أن نفس الحساب يكون Customer+Supplier على نفس ID مع Customer/Supplier Profiles اختيارية، ومنع mismatch بين الـProfile والـRole، وidempotent concurrent role add مع composite PK كحماية نهائية، وactive/inactive lifecycle وAudit وstable error contract. PostgreSQL 17 أثبت 8-way repeated role add ينتج Role Pair واحدًا فقط، والـLedger tables ظلت untouched، و`normalized_phone` بقي NULL وغير محسوب لأن Phone Normalization تظل 06.02. لا Migration ولا Index جديد ولا Frontend/Convex cutover. Gate 06 أصبح مكتملًا في بندي same account Customer+Supplier وno duplicate role pair فقط. Next Action بعد final documentation-SHA CI: 06.02 Phone Normalization فقط.
 
