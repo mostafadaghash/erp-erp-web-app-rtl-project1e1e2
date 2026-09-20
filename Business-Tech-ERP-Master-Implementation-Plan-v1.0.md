@@ -2548,7 +2548,7 @@ Implemented and verified:
 
 ## 05.03 Effective Permissions
 
-**Status:** `IN_PROGRESS`
+**Status:** `CLOSED`
 
 Implementation boundary:
 
@@ -2588,8 +2588,8 @@ Role Default
 ### Gate 05
 
 - [x] role defaults tests.
-- [ ] allow override test.
-- [ ] deny override test.
+- [x] allow override test.
+- [x] deny override test.
 - [ ] branch selected/all tests.
 - [ ] cross-branch denial tests.
 - [ ] last/system admin protection according to final policy.
@@ -3972,8 +3972,8 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 
 # 32. Current Execution Pointer
 
-**Current Phase:** `PHASE 05 — Authentication, Authorization, Organization / 05.03 Effective Permissions`  
-**Status:** `IN_PROGRESS`  
+**Current Phase:** `PHASE 05 — Authentication, Authorization, Organization / 05.04 Branch Scope`  
+**Status:** `READY_TO_START`  
 **Integration Branch:** `agent/postgres-v1.7-core`  
 **Phase 01 Final SHA:** `b0d35101bf622264b655bcc574787989fadbcd83`  
 **Phase 01 Validation PR:** `#183` — closed without merge.  
@@ -4059,9 +4059,12 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 **05.02 Final Verified SHA:** `624e99c67726bad237bd307ec6a41afb223b22e6`.  
 **05.02 Final CI:** Run `#965` / `35440053601` — SUCCESS on the final documentation SHA.  
 **05.02 Validation PR:** `#220` — CLOSED WITHOUT MERGE; `merged=false`.  
-**05.03 Effective Permissions:** `IN_PROGRESS` — Gap Analysis at `docs/gap-analysis/phase-05-03-effective-permissions.md`; backend resolver + ALLOW/DENY precedence + fail-closed enforcement under implementation, without Branch Scope/schema/index/frontend changes.  
-**Next Action:** complete and validate **05.03 Effective Permissions only**.  
-**Forbidden Next Actions:** لا 05.04 قبل إغلاق 05.03، لا Frontend cutover، لا dual write، لا `main` merge، ولا Convex Production change.
+**05.03 Effective Permissions:** `CLOSED` — Gap Analysis at `docs/gap-analysis/phase-05-03-effective-permissions.md`; backend-only resolver implements `Role Default → User ALLOW/DENY Override → Effective Permission`, logical `INHERIT` by absence of an override row, fail-closed handling for inactive/missing users and unknown permissions, and stable `PERMISSION_DENIED` mapping. No Branch Scope/schema/index/frontend/Convex cutover changes.  
+**05.03 Verified Implementation SHA:** `01f2e5c683a90b2465b8147a396fab394637ecbc`.  
+**05.03 Implementation CI:** Run `#966` / `35481086538` — SUCCESS; `verify`, `backend-verify` including PostgreSQL 17 Effective Permissions integration, `browser-contract`, and `release-gate` all SUCCESS on the same implementation SHA.  
+**05.03 Validation PR:** `#221` — validation-only; close WITHOUT MERGE after final same-SHA documentation validation.  
+**Next Action:** execute **05.04 Branch Scope only** after final 05.03 same-SHA closure validation.  
+**Forbidden Next Actions:** لا Frontend cutover، لا dual write، لا `main` merge، ولا Convex Production change.
 
 **Plan update — 2026-09-17 / ACCOUNTING CONSTRAINTS CLOSED:** تم إغلاق ثامن executable slice من 03.06 على SHA `ef03d141958c392032bd8caf16b5f880a193e86e`. Migration `0019`، ADR-0021، Accounting PK/FK/UNIQUE/CHECK layer، Finance Category → GL Account FK، والحفاظ على deferred Journal balance at COMMIT تم التحقق منهم فعليًا على PostgreSQL 17؛ Full CI run `35224498880` أخضر بالكامل وPR `#206` أُغلق بدون Merge. 03.06 ما زالت `IN_PROGRESS` و03.07 لم تبدأ.
 
@@ -4069,6 +4072,8 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 
 ---
 
+
+**Plan update — 2026-09-20 / 05.03 EFFECTIVE PERMISSIONS CLOSED:** تم إغلاق التنفيذ الوظيفي على SHA `01f2e5c683a90b2465b8147a396fab394637ecbc` بعد Full CI Run `#966` / `35481086538` SUCCESS. تم تنفيذ Backend Effective Permission resolver بالترتيب المعتمد `Role Default → User ALLOW/DENY Override → Effective Permission`، مع `INHERIT` بعدم وجود override row، fail-closed للمستخدم غير الفعال/المفقود وPermission غير الموجودة، و`PERMISSION_DENIED` public contract آمن. PostgreSQL 17 أثبت default allow/deny وALLOW/DENY precedence والرجوع إلى Role Default بعد حذف override، مع بقاء `user_branch_access` دون استخدام وإثبات عدم إضافة Migration أو Index. لم يتم نسخ Permission Matrix القديمة من Convex ولم يبدأ Branch Scope. PR `#221` validation-only ويخضع الآن لـFull CI نهائي على documentation closure SHA قبل إغلاقه بدون Merge. Next Action بعد نجاحه: 05.04 Branch Scope فقط.
 
 **Plan update — 2026-09-20 / 05.03 EFFECTIVE PERMISSIONS STARTED:** تم عمل Gap Analysis مقابل Architecture Baseline v1.7 وMaster Plan. جداول `permissions` و`role_permissions` و`user_permission_overrides` والـPK/FK/CHECK/UNIQUE المعتمدة موجودة ومتوافقة، لذلك لا Migration ولا Index جديد. التنفيذ يضيف Backend Effective Permission resolver بالترتيب `Role Default → User ALLOW/DENY Override → Effective`، ويمثل `INHERIT` بعدم وجود Override row، ويفشل مغلقًا للمستخدم غير الفعال/المفقود أو Permission غير الموجودة. لا يتم نسخ Permission Matrix القديمة من Convex لأن v1.7 لا يجمّد قائمة technical keys/role grants كاملة في هذا الجزء ولأنها تحتوي Legacy roles خارج الأدوار السبعة الرسمية. Branch Scope يظل 05.04 فقط، ولا Frontend/Convex cutover.
 

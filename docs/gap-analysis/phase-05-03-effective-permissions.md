@@ -1,6 +1,6 @@
 # Phase 05.03 — Effective Permissions Gap Analysis
 
-**Status:** `IN_PROGRESS`  
+**Status:** `CLOSED`  
 **Branch:** `agent/postgres-v1.7-core`  
 **Architecture Source:** Business Tech ERP Architecture Baseline v1.7  
 **Implementation Plan:** Business Tech ERP Master Implementation Plan v1.0
@@ -36,9 +36,9 @@ Branch Scope is explicitly excluded until 05.04.
 | `user_permission_overrides(user_id, permission_id, effect)` | موجود ومتوافق | reuse |
 | ALLOW/DENY CHECK + PK/FK integrity | موجود ومتوافق | reuse |
 | frozen indexes for permission mappings | موجود ومتوافق | no index change |
-| backend Effective Permission resolver | غير موجود | create |
-| stable permission-denied error contract | غير موجود | create |
-| allow/deny precedence tests | غير موجود | create |
+| backend Effective Permission resolver | تم إنشاؤه ومتوافق | verified |
+| stable permission-denied error contract | تم إنشاؤه ومتوافق | verified |
+| allow/deny precedence tests | تم إنشاؤها ونجحت | verified |
 | Branch SELECTED/ALL enforcement | مؤجل إلى 05.04 | do not implement here |
 
 ## Permission-catalog boundary
@@ -85,6 +85,20 @@ Therefore 05.03 does **not** invent that matrix and does not copy the current Co
 - no new migration.
 - no new index.
 
+## Closure evidence
+
+- Verified implementation SHA: `01f2e5c683a90b2465b8147a396fab394637ecbc`.
+- Full CI: Run `#966` / `35481086538` — SUCCESS on the same implementation SHA.
+- `verify`: SUCCESS.
+- `backend-verify`: SUCCESS, including the PostgreSQL 17 Effective Permissions integration gate.
+- `browser-contract`: SUCCESS.
+- `release-gate`: SUCCESS.
+- no migration added.
+- no index added.
+- no Branch Scope behavior implemented.
+- no frontend/Convex permission cutover.
+- Validation PR: `#221`, validation-only, to be closed without merge after final documentation-SHA CI.
+
 ## Next action
 
-Run Full CI on the 05.03 implementation SHA. Only after the same-SHA gates are green may 05.03 be documented as CLOSED. 05.04 remains forbidden until then.
+After final documentation-SHA validation, 05.04 Branch Scope is the one next action. It has not been started by 05.03.
