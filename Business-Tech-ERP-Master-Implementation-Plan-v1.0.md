@@ -2612,6 +2612,20 @@ Implementation boundary:
 
 ### Gate 05
 
+**Final last/System Admin policy — IN_PROGRESS validation**
+
+- system must retain at least one **active canonical `SYSTEM_ADMIN`** user.
+- only role_key `SYSTEM_ADMIN` counts; custom roles do not satisfy this invariant even when `is_system=true`.
+- disabling or demoting the last active `SYSTEM_ADMIN` is rejected.
+- enabling/promoting a System Admin is allowed.
+- disabling/demoting is allowed only when another active canonical `SYSTEM_ADMIN` remains.
+- protected user mutations serialize on the canonical `SYSTEM_ADMIN` role row with `SELECT ... FOR UPDATE`, then lock the target user, under the approved `READ COMMITTED` model.
+- successful mutations are audited in the same transaction.
+- no user-delete path is introduced by this Gate; any future delete path must enforce the same invariant.
+- no Migration or Index is required.
+
+Validation record: `docs/gap-analysis/phase-05-gate-last-system-admin.md`.
+
 - [x] role defaults tests.
 - [x] allow override test.
 - [x] deny override test.
@@ -3997,8 +4011,8 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 
 # 32. Current Execution Pointer
 
-**Current Phase:** `PHASE 05 — Gate 05 / Last-System-Admin Protection Policy`  
-**Status:** `BLOCKED_ON_OFFICIAL_POLICY`  
+**Current Phase:** `PHASE 05 — Gate 05 / Last-System-Admin Protection`  
+**Status:** `IN_PROGRESS`  
 **Integration Branch:** `agent/postgres-v1.7-core`  
 **Phase 01 Final SHA:** `b0d35101bf622264b655bcc574787989fadbcd83`  
 **Phase 01 Validation PR:** `#183` — closed without merge.  
@@ -4099,9 +4113,11 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 **05.05 Organization:** `CLOSED` — Gap Analysis at `docs/gap-analysis/phase-05-05-organization.md`; Company Settings, atomic Branch + default Warehouse creation, Branch active/inactive lifecycle, official default Warehouse via `branch_settings`, Warehouse history safety, historical Warehouse deactivation, stable Organization errors, and Organization Audit completed without schema/index/frontend changes.  
 **05.05 Verified Implementation SHA:** `1c5c3cdd582713c1e4c655ab5ee9c27519a647f9`.  
 **05.05 Implementation CI:** Run `#972` / `35482306897` — SUCCESS; `verify`, `backend-verify` including PostgreSQL 17 Organization integration, `browser-contract`, and `release-gate` all SUCCESS on the same implementation SHA.  
-**05.05 Validation PR:** `#223` — validation-only; close WITHOUT MERGE after final same-SHA documentation validation.  
-**PHASE 05:** remains OPEN only because Gate `last/system admin protection according to final policy` has no final command policy in the reviewed official sources.  
-**Next Action:** approve/resolve the official **last/System Admin protection policy** and implement/test that Gate only. Phase 06 remains forbidden until Gate 05 closes.  
+**05.05 Final Verified SHA:** `b848489f16db3fffd9c9d3e0fb3e448d5bd5344e`.  
+**05.05 Final CI:** Run `#974` / `35482420355` — SUCCESS; `verify`, `backend-verify` including PostgreSQL 17 Organization integration, `browser-contract`, and `release-gate` all SUCCESS on the final documentation SHA.  
+**05.05 Validation PR:** `#223` — CLOSED WITHOUT MERGE; `merged=false`.  
+**Gate 05 Last/System Admin Protection:** `IN_PROGRESS` — final policy fixed in `docs/gap-analysis/phase-05-gate-last-system-admin.md`: at least one active canonical `SYSTEM_ADMIN` must remain; custom roles do not count; last active Admin disable/demotion is rejected; promotion/enable is allowed; concurrent removals serialize on the canonical role row with `FOR UPDATE`.  
+**Next Action:** validate and close the **last/System Admin protection Gate only** on PostgreSQL 17 + Full CI. Phase 06 remains forbidden until Gate 05 and PHASE 05 close.  
 **Forbidden Next Actions:** لا Phase 06 قبل إغلاق Gate 05، لا Frontend cutover، لا dual write، لا `main` merge، ولا Convex Production change.
 
 **Plan update — 2026-09-17 / ACCOUNTING CONSTRAINTS CLOSED:** تم إغلاق ثامن executable slice من 03.06 على SHA `ef03d141958c392032bd8caf16b5f880a193e86e`. Migration `0019`، ADR-0021، Accounting PK/FK/UNIQUE/CHECK layer، Finance Category → GL Account FK، والحفاظ على deferred Journal balance at COMMIT تم التحقق منهم فعليًا على PostgreSQL 17؛ Full CI run `35224498880` أخضر بالكامل وPR `#206` أُغلق بدون Merge. 03.06 ما زالت `IN_PROGRESS` و03.07 لم تبدأ.
@@ -4110,6 +4126,8 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 
 ---
 
+
+**Plan update — 2026-09-20 / GATE 05 LAST-SYSTEM-ADMIN PROTECTION STARTED:** بناءً على طلب حسم السياسة، تم تثبيت Final Policy بدل ترك الـGate معلقة: يجب أن يبقى دائمًا مستخدم نشط واحد على الأقل بدور `SYSTEM_ADMIN` القياسي؛ Custom Roles لا تُحسب حتى لو `is_system=true`. تعطيل أو Demote آخر Active System Admin يُرفض، بينما التفعيل/الترقية مسموحان. التنفيذ يستخدم صف `SYSTEM_ADMIN` نفسه كـserialization guard بـ`SELECT ... FOR UPDATE` ثم يقفل المستخدم المستهدف، بحيث محاولتا Disable/Demotion المتزامنتان لا تنجحان معًا تحت `READ COMMITTED`. تمت إضافة Backend protection service وAudit وstable error contract واختبار PostgreSQL 17 concurrency، بدون Migration أو Index أو Phase 06 أو Frontend/Convex cutover. الـGate ما زالت IN_PROGRESS لحين نجاح Full CI على نفس SHA.
 
 **Plan update — 2026-09-20 / 05.05 ORGANIZATION CLOSED:** تم إغلاق 05.05 وظيفيًا على SHA `1c5c3cdd582713c1e4c655ab5ee9c27519a647f9` بعد Full CI Run `#972` / `35482306897` SUCCESS. تم تنفيذ Company Settings، إنشاء Branch + Default Warehouse + Branch Settings داخل Transaction واحدة، active/inactive Branch lifecycle دون حذف فعلي، اعتماد `branch_settings.default_warehouse_id` كمصدر Default Warehouse الوحيد، منع نقل/تعطيل الـDefault Warehouse، منع نقل Warehouse بعد Inventory Movements في Backend مع بقاء Composite FK كحماية DB نهائية، السماح بتعطيل المخزن التاريخي بدل حذفه، وAudit/rollback atomicity. لا Migration ولا Index جديد، ولم يبدأ Phase 06. 05.05 CLOSED لكن PHASE 05 لا تُغلق لأن Gate حماية آخر/System Admin ما زالت بلا final policy في official sources؛ لا يتم اختراعها. PR `#223` validation-only يخضع الآن لـFull CI نهائي على documentation closure SHA قبل إغلاقه بدون Merge.
 
