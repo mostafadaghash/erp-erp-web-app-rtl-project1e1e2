@@ -142,7 +142,7 @@ test("03.I Repairs / Follow-Up / Notifications physical shape remains canonical 
       const slice = history.rows.find((row) => row.version === "0020");
       assert.equal(slice?.name, "repairs_followup_notifications_constraints");
       assert.match(slice?.checksum ?? "", /^[0-9a-f]{64}$/);
-      assert.equal(history.rows.at(-1)?.version, "0022");
+      assert.equal(history.rows.at(-1)?.version, "0023");
     });
 
     const second = await runMigrations({ databaseUrl });
