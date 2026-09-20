@@ -5,6 +5,7 @@ import { BranchAccessDeniedError } from '../authorization/branch-scope-service.j
 import { OrganizationError } from '../organization/organization-service.js'
 import { SystemAdminProtectionError } from '../authorization/system-admin-protection-service.js'
 import { CounterpartyError } from '../counterparties/counterparty-service.js'
+import { CounterpartyLedgerError } from '../counterparties/counterparty-ledger-service.js'
 
 export type SafeErrorParam = string | number | boolean | null
 export type SafeErrorParams = Readonly<Record<string, SafeErrorParam>>
@@ -22,6 +23,7 @@ export const ERROR_CODES = {
   ORGANIZATION_OPERATION_REJECTED: 'ORGANIZATION_OPERATION_REJECTED',
   SYSTEM_ADMIN_PROTECTION_REJECTED: 'SYSTEM_ADMIN_PROTECTION_REJECTED',
   COUNTERPARTY_OPERATION_REJECTED: 'COUNTERPARTY_OPERATION_REJECTED',
+  COUNTERPARTY_LEDGER_OPERATION_REJECTED: 'COUNTERPARTY_LEDGER_OPERATION_REJECTED',
   INVALID_ARGUMENT: 'INVALID_ARGUMENT',
   DB_UNIQUE_CONFLICT: 'DB_UNIQUE_CONFLICT',
   DB_REFERENCE_CONFLICT: 'DB_REFERENCE_CONFLICT',
@@ -119,6 +121,12 @@ export function toErrorContract(error: unknown): ErrorContract {
 
   if (error instanceof CounterpartyError) {
     return contract(ERROR_CODES.COUNTERPARTY_OPERATION_REJECTED, {
+      reason: error.reason,
+    })
+  }
+
+  if (error instanceof CounterpartyLedgerError) {
+    return contract(ERROR_CODES.COUNTERPARTY_LEDGER_OPERATION_REJECTED, {
       reason: error.reason,
     })
   }
