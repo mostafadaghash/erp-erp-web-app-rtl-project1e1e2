@@ -1,6 +1,6 @@
 # Phase 06.01 — Unified Counterparty Gap Analysis
 
-**Status:** `IN_PROGRESS`  
+**Status:** `CLOSED`  
 **Branch:** `agent/postgres-v1.7-core`  
 **Architecture Source:** Business Tech ERP Architecture Baseline v1.7  
 **Implementation Plan:** Business Tech ERP Master Implementation Plan v1.0
@@ -131,6 +131,31 @@ The following remain open for their own official steps:
 - no migration.
 - no index.
 
+## Closure evidence
+
+- Verified implementation SHA: `0a89fba47d243bac5f47c38eb51439292ea4afb0`.
+- Full CI: Run `#978` / `35483368078` — SUCCESS on the same implementation SHA.
+- `verify`: SUCCESS.
+- `backend-verify`: SUCCESS, including the PostgreSQL 17 Unified Counterparty service gate.
+- `browser-contract`: SUCCESS.
+- `release-gate`: SUCCESS.
+- one Counterparty identity successfully carries CUSTOMER + SUPPLIER.
+- Customer Profile + Supplier Profile coexist on the same identity.
+- direct duplicate role pair is rejected by `pk_counterparty_roles`.
+- eight concurrent repeated role additions produce exactly one role pair.
+- profile/role coherence is enforced in Backend.
+- CUSTOMER/SUPPLIER/OTHER coexist on one identity.
+- identity active/inactive lifecycle preserves roles/profiles.
+- `normalized_phone` remains uncomputed in 06.01.
+- Customer/Supplier Ledger tables remain untouched by 06.01.
+- successful mutations are Audit-recorded.
+- invalid actor failure creates no Counterparty.
+- frozen Counterparty/Profile index inventory remains unchanged.
+- no migration added.
+- no index added.
+- no 06.02 or 06.03 behavior implemented.
+- Validation PR: `#225`, validation-only, to be closed without merge after final documentation-SHA CI.
+
 ## Next action
 
-Run Full CI on the 06.01 implementation SHA through a validation-only PR. Only after the same-SHA PostgreSQL 17 gate and all regressions are green may 06.01 be documented as CLOSED.
+After final documentation-SHA validation, 06.01 is CLOSED. The next official step is 06.02 Phone Normalization, READY_TO_START only.
