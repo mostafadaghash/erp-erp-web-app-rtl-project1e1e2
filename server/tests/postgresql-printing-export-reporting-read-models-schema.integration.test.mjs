@@ -111,7 +111,7 @@ test("03.J + 03.06 create canonical Printing / Export / Reports Read Models sche
       const constraintSlice = history.rows.find((row) => row.version === "0021");
       assert.equal(constraintSlice?.name, "printing_export_reporting_read_models_constraints");
       assert.match(constraintSlice?.checksum ?? "", /^[0-9a-f]{64}$/);
-      assert.equal(history.rows.at(-1)?.version, "0022");
+      assert.equal(history.rows.at(-1)?.version, "0023");
     });
 
     const second = await runMigrations({ databaseUrl });
