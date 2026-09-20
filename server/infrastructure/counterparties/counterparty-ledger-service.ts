@@ -111,6 +111,29 @@ function normalizeAmount(value: string): string {
   return value
 }
 
+function validateAppendInput(
+  kind: CounterpartyLedgerKind,
+  input: AppendCounterpartyLedgerEntryInput,
+): string {
+  validateKind(kind)
+  requireNonBlank('actorUserId', input.actorUserId)
+  requireNonBlank('counterpartyId', input.counterpartyId)
+  requireNonBlank('branchId', input.branchId)
+  requireNonBlank('entryType', input.entryType)
+  requireNonBlank('sourceType', input.sourceType)
+  requireNonBlank('sourceId', input.sourceId)
+  requireNonBlank('postingBatchId', input.postingBatchId)
+
+  if (
+    !(input.occurredAt instanceof Date) ||
+    Number.isNaN(input.occurredAt.getTime())
+  ) {
+    throw new TypeError('occurredAt must be a valid Date')
+  }
+
+  return normalizeAmount(input.amount)
+}
+
 function validateKind(kind: CounterpartyLedgerKind): void {
   if (!COUNTERPARTY_LEDGER_KINDS.includes(kind)) {
     throw new TypeError('Unsupported counterparty ledger kind')
@@ -221,7 +244,7 @@ export class CounterpartyLedgerService {
     kind: CounterpartyLedgerKind,
     input: AppendCounterpartyLedgerEntryInput,
   ): Promise<CounterpartyLedgerEntry> {
-    validateKind(kind)
+    validateAppendInput(kind, input)
     return this.database.transaction((client) =>
       this.appendWithinTransaction(client, kind, input),
     )
@@ -232,20 +255,7 @@ export class CounterpartyLedgerService {
     kind: CounterpartyLedgerKind,
     input: AppendCounterpartyLedgerEntryInput,
   ): Promise<CounterpartyLedgerEntry> {
-    validateKind(kind)
-    requireNonBlank('actorUserId', input.actorUserId)
-    requireNonBlank('counterpartyId', input.counterpartyId)
-    requireNonBlank('branchId', input.branchId)
-    requireNonBlank('entryType', input.entryType)
-    requireNonBlank('sourceType', input.sourceType)
-    requireNonBlank('sourceId', input.sourceId)
-    requireNonBlank('postingBatchId', input.postingBatchId)
-
-    if (!(input.occurredAt instanceof Date) || Number.isNaN(input.occurredAt.getTime())) {
-      throw new TypeError('occurredAt must be a valid Date')
-    }
-
-    const amount = normalizeAmount(input.amount)
+    const amount = validateAppendInput(kind, input)
 
     await this.branchScope.requireWithinTransaction(
       client as AuthorizationQueryClient,
