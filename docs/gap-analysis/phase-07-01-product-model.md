@@ -1,6 +1,6 @@
 # Phase 07.01 — Product Model Gap Analysis
 
-**Status:** `IN_PROGRESS`  
+**Status:** `CLOSED`  
 **Branch:** `agent/postgres-v1.7-core`  
 **Architecture Source:** Business Tech ERP Architecture Baseline v1.7  
 **Implementation Plan:** Business Tech ERP Master Implementation Plan v1.0
@@ -120,6 +120,28 @@ Other Gate 07 items remain open for 07.02 through 07.05.
 - no migration.
 - no index addition.
 
+## Closure evidence
+
+- Verified implementation SHA: `1327ec47a59d19fb02f32c2f20e2d38a13d20008`.
+- Full CI: Run `#1003` / `35518501734` — SUCCESS on the same implementation SHA.
+- `verify`: SUCCESS.
+- `backend-verify`: SUCCESS, including PostgreSQL 17 Product Model integration.
+- `browser-contract`: SUCCESS.
+- `release-gate`: SUCCESS.
+- STOCK and SERVICE simple Product creation passed.
+- each created simple Product has exactly one Variant and that Variant is `is_default=true`.
+- Product + Base ProductUnit + internal Default Variant commit atomically.
+- `products.base_unit_id` points to a ProductUnit owned by the same Product.
+- Base ProductUnit conversion is exactly 1.
+- `product_units.is_base` remains absent.
+- existing deferred DB integrity still rejects removal of the last Variant.
+- missing Category/Unit leaves no partial Product/ProductUnit/Variant rows.
+- `PRODUCT_CREATED` Audit is recorded in the same transaction.
+- frozen Product/ProductVariant/ProductUnit index inventory is unchanged.
+- migration history remains through `0023`; no 07.01 migration was added.
+- 07.02 Units, 07.03 SKU/Barcode, 07.04 Dynamic Attributes, Pricing/Reorder and Frontend/Convex cutover were not started.
+- Validation PR: `#228`, validation-only, to be closed without merge after final documentation-SHA CI.
+
 ## Next action
 
-Implement and validate the 07.01 Product Model service and default-variant behavior only. 07.02 remains forbidden until 07.01 closes.
+After final documentation-SHA validation, 07.01 is CLOSED. The next official step is PHASE 07 / 07.02 Units, READY_TO_START only.
