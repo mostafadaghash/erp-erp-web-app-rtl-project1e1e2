@@ -1,6 +1,6 @@
 # Business Tech ERP — Master Implementation Plan v1.0
 
-**الحالة:** ACTIVE — PHASE 04 IN PROGRESS  
+**الحالة:** ACTIVE — PHASE 06 CLOSED / PHASE 07 READY_TO_START  
 **تاريخ الإصدار:** 2026-09-11  
 **المشروع:** Business Tech ERP — Local Server Edition / PostgreSQL Core  
 **المرجع المعماري الرسمي:** `Business-Tech-ERP-Architecture-Baseline-v1.7-Final.docx`  
@@ -2638,7 +2638,7 @@ Validation record: `docs/gap-analysis/phase-05-gate-last-system-admin.md`.
 
 # 12. PHASE 06 — Counterparties & Master Data
 
-**Status:** `IN_PROGRESS`
+**Status:** `CLOSED`
 
 ## 06.01 Unified Counterparty
 
@@ -2699,7 +2699,7 @@ Implementation boundary:
 
 ## 06.03 Customer/Supplier Ledgers
 
-**Status:** `IN_PROGRESS`
+**Status:** `CLOSED`
 
 Implementation boundary:
 
@@ -2715,6 +2715,10 @@ Implementation boundary:
 - no Sales/Purchasing/Finance settlement orchestration is pulled forward.
 - no Frontend/Convex cutover.
 
+**06.03 Verified Implementation SHA:** `e137e2fdbb41daf25835b6218675bf72285d61bb`.  
+**06.03 Implementation CI:** Run `#1000` / `35486275350` — SUCCESS; `verify`, `backend-verify` including PostgreSQL 17 Customer/Supplier Ledger immutability/reversal/Branch Scope integration, `browser-contract`, and `release-gate` all SUCCESS on the same implementation SHA.  
+**06.03 Validation PR:** `#227` — validation-only; close WITHOUT MERGE after final same-SHA documentation validation.
+
 - separate historical ledgers.
 - no mutable customer/supplier balance truth.
 - official settlement only; no history erasure.
@@ -2724,16 +2728,18 @@ Implementation boundary:
 - [x] same account can be customer+supplier.
 - [x] no duplicate role pair.
 - [x] normalized phone search tests.
-- [ ] ledger immutability tests.
-- [ ] branch scope tests.
+- [x] ledger immutability tests.
+- [x] branch scope tests.
 
 ---
 
 # 13. PHASE 07 — Product Catalog / Variants / Units / Pricing
 
-**Status:** `NOT_STARTED`
+**Status:** `READY_TO_START`
 
 ## 07.01 Product Model
+
+**Status:** `READY_TO_START`
 
 Implement:
 
@@ -4068,8 +4074,8 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 
 # 32. Current Execution Pointer
 
-**Current Phase:** `PHASE 06 — Counterparties & Master Data / 06.03 Customer/Supplier Ledgers`  
-**Status:** `IN_PROGRESS`  
+**Current Phase:** `PHASE 07 — Product Catalog / Variants / Units / Pricing / 07.01 Product Model`  
+**Status:** `READY_TO_START`  
 **Integration Branch:** `agent/postgres-v1.7-core`  
 **Phase 01 Final SHA:** `b0d35101bf622264b655bcc574787989fadbcd83`  
 **Phase 01 Validation PR:** `#183` — closed without merge.  
@@ -4192,9 +4198,13 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 **06.02 Final Verified SHA:** `3e8078128a16a8a8215e73c914c2b32e4180cb19`.  
 **06.02 Final CI:** Run `#983` / `35484184424` — SUCCESS; `verify`, `backend-verify` including PostgreSQL 17 Phone Normalization integration, `browser-contract`, and `release-gate` all SUCCESS on the final documentation SHA.  
 **06.02 Validation PR:** `#226` — CLOSED WITHOUT MERGE; `merged=false`.  
-**06.03 Customer/Supplier Ledgers:** `IN_PROGRESS` — Gap Analysis at `docs/gap-analysis/phase-06-03-customer-supplier-ledgers.md`; separate append-only Customer/Supplier historical ledgers, DB-level immutability, Posting Batch/source/branch coherence, role-specific validation, transaction-bound Branch Scope, and branch-scoped statements are under implementation. Migration `0023` adds only immutability triggers; no Index or balance truth is introduced.  
-**Next Action:** complete and validate **06.03 Customer/Supplier Ledgers only**.  
-**Forbidden Next Actions:** لا Phase 07 قبل إغلاق 06.03 وGate 06، لا Frontend cutover، لا dual write، لا `main` merge، ولا Convex Production change.
+**06.03 Customer/Supplier Ledgers:** `CLOSED` — Gap Analysis at `docs/gap-analysis/phase-06-03-customer-supplier-ledgers.md`; separate append-only Customer/Supplier historical Sources of Truth, PostgreSQL UPDATE/DELETE immutability, Posting Batch branch/source coherence, role-specific validation, transaction-bound Branch Scope, branch-scoped statements, and reversal-as-new-history are complete. Migration `0023_counterparty_ledger_immutability` adds only immutability triggers and no Index/balance truth.  
+**06.03 Verified Implementation SHA:** `e137e2fdbb41daf25835b6218675bf72285d61bb`.  
+**06.03 Implementation CI:** Run `#1000` / `35486275350` — SUCCESS; `verify`, `backend-verify` including PostgreSQL 17 Customer/Supplier Ledger integration and all downstream schema/index/DDL regressions, `browser-contract`, and `release-gate` all SUCCESS on the same implementation SHA.  
+**06.03 Validation PR:** `#227` — validation-only; close WITHOUT MERGE after final same-SHA documentation validation.  
+**PHASE 06:** `CLOSED` — Unified Counterparty, Phone Normalization, separate immutable Customer/Supplier Ledgers, normalized-phone search, ledger immutability, and Branch Scope Gate 06 checks are complete.  
+**Next Action:** execute **PHASE 07 / 07.01 Product Model only** after final Phase 06 documentation-SHA validation.  
+**Forbidden Next Actions:** لا 07.02 قبل إغلاق 07.01، لا Frontend cutover، لا dual write، لا `main` merge، ولا Convex Production change.
 
 **Plan update — 2026-09-17 / ACCOUNTING CONSTRAINTS CLOSED:** تم إغلاق ثامن executable slice من 03.06 على SHA `ef03d141958c392032bd8caf16b5f880a193e86e`. Migration `0019`، ADR-0021، Accounting PK/FK/UNIQUE/CHECK layer، Finance Category → GL Account FK، والحفاظ على deferred Journal balance at COMMIT تم التحقق منهم فعليًا على PostgreSQL 17؛ Full CI run `35224498880` أخضر بالكامل وPR `#206` أُغلق بدون Merge. 03.06 ما زالت `IN_PROGRESS` و03.07 لم تبدأ.
 
@@ -4202,6 +4212,8 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 
 ---
 
+
+**Plan update — 2026-09-20 / 06.03 CUSTOMER-SUPPLIER LEDGERS CLOSED:** تم إغلاق 06.03 وظيفيًا على SHA `e137e2fdbb41daf25835b6218675bf72285d61bb` بعد Full CI Run `#1000` / `35486275350` SUCCESS. تم تثبيت Customer/Supplier Ledgers كمصدرين تاريخيين منفصلين Append-only، مع Backend `CounterpartyLedgerService` يربط كل Entry بـPosting Batch رسمي ويتحقق من branch/source وCUSTOMER/SUPPLIER role وBranch Scope داخل نفس Transaction. Migration `0023_counterparty_ledger_immutability` تمنع UPDATE/DELETE مباشرة على الجدولين، والتصحيح/العكس يتم بصفوف جديدة مع بقاء الأصل. PostgreSQL 17 أثبت Cross-Branch denial للكتابة والقراءة، reversal preserves original history، وعدم وجود mutable customer/supplier balance truth، وثبات Frozen Ledger indexes. Runs `#992/#993` كشفت فقط stale regression assertions كانت تفترض أن `0022` آخر Migration؛ تم تحديثها إلى `0023` مع إبقاء فحص `0022=index_catalog`، ثم نجحت Finance/Accounting/Repairs/Reporting/Index Catalog/DDL gates كلها في Run #1000. بذلك Gate 06 وPHASE 06 CLOSED. Phase 07 لم تبدأ؛ Next Action بعد final documentation-SHA CI: 07.01 Product Model فقط.
 
 **Plan update — 2026-09-20 / 06.03 CUSTOMER-SUPPLIER LEDGERS STARTED:** الـGap Analysis أثبت أن جداول Customer/Supplier Ledgers والـFK/CHECK/Frozen Index Catalog موجودة ومتوافقة، لكن الـBaseline يفرض Historical Immutability بينما الـDDL الحالي لا يمنع UPDATE/DELETE فعليًا. لذلك أضيفت Migration `0023_counterparty_ledger_immutability` بدون أي Index أو تغيير Shape، وتضيف فقط DB triggers تمنع UPDATE/DELETE على الجدولين. التنفيذ يضيف `CounterpartyLedgerService` append-only مرتبطًا بـPosting Batch رسمي، يتحقق من تطابق branch/source ومن CUSTOMER/SUPPLIER role، ويعيد فحص Branch Scope داخل نفس Transaction. لا يوجد setBalance ولا ledger edit/delete API؛ التصحيح يتم بصفوف CORRECTION/REVERSAL جديدة مع بقاء الأصل. لا يتم سحب Receipt/Disbursement/Sales/Purchasing settlement orchestration من مراحلها اللاحقة، ولا Phase 07 أو Frontend/Convex cutover.
 
