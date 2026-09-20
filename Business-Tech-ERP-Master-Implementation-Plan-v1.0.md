@@ -2699,6 +2699,22 @@ Implementation boundary:
 
 ## 06.03 Customer/Supplier Ledgers
 
+**Status:** `IN_PROGRESS`
+
+Implementation boundary:
+
+- separate historical `customer_ledger_entries` and `supplier_ledger_entries`.
+- no mutable customer/supplier balance truth.
+- append-only Backend service; no update/delete/setBalance API.
+- Customer Ledger requires CUSTOMER role; Supplier Ledger requires SUPPLIER role.
+- each entry must match its official Posting Batch branch/source.
+- append/read operations enforce Branch Scope inside the same transaction.
+- corrections/reversals append new Ledger rows and preserve the original history.
+- Migration `0023_counterparty_ledger_immutability` adds DB-level UPDATE/DELETE rejection for both historical ledgers.
+- frozen ledger indexes remain unchanged; no new Index.
+- no Sales/Purchasing/Finance settlement orchestration is pulled forward.
+- no Frontend/Convex cutover.
+
 - separate historical ledgers.
 - no mutable customer/supplier balance truth.
 - official settlement only; no history erasure.
@@ -4053,7 +4069,7 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 # 32. Current Execution Pointer
 
 **Current Phase:** `PHASE 06 — Counterparties & Master Data / 06.03 Customer/Supplier Ledgers`  
-**Status:** `READY_TO_START`  
+**Status:** `IN_PROGRESS`  
 **Integration Branch:** `agent/postgres-v1.7-core`  
 **Phase 01 Final SHA:** `b0d35101bf622264b655bcc574787989fadbcd83`  
 **Phase 01 Validation PR:** `#183` — closed without merge.  
@@ -4173,8 +4189,11 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 **06.02 Phone Normalization:** `CLOSED` — Gap Analysis at `docs/gap-analysis/phase-06-02-phone-normalization.md`; display phone is preserved while canonical `normalized_phone` is stored/searched, Arabic/Persian digits map to ASCII, leading `+` and `00` are equivalent international prefixes, local leading zeroes are preserved without country inference, and exact PostgreSQL search reuses the frozen phone index. Duplicate canonical phones remain allowed. No ledger/schema/index/frontend work was included.  
 **06.02 Verified Implementation SHA:** `394afe351117571ebdf22113de9424de4c55f38c`.  
 **06.02 Implementation CI:** Run `#981` / `35484080467` — SUCCESS; `verify`, `backend-verify` including PostgreSQL 17 Phone Normalization integration, `browser-contract`, and `release-gate` all SUCCESS on the same implementation SHA.  
-**06.02 Validation PR:** `#226` — validation-only; close WITHOUT MERGE after final same-SHA documentation validation.  
-**Next Action:** execute **06.03 Customer/Supplier Ledgers only** after final 06.02 documentation-SHA validation.  
+**06.02 Final Verified SHA:** `3e8078128a16a8a8215e73c914c2b32e4180cb19`.  
+**06.02 Final CI:** Run `#983` / `35484184424` — SUCCESS; `verify`, `backend-verify` including PostgreSQL 17 Phone Normalization integration, `browser-contract`, and `release-gate` all SUCCESS on the final documentation SHA.  
+**06.02 Validation PR:** `#226` — CLOSED WITHOUT MERGE; `merged=false`.  
+**06.03 Customer/Supplier Ledgers:** `IN_PROGRESS` — Gap Analysis at `docs/gap-analysis/phase-06-03-customer-supplier-ledgers.md`; separate append-only Customer/Supplier historical ledgers, DB-level immutability, Posting Batch/source/branch coherence, role-specific validation, transaction-bound Branch Scope, and branch-scoped statements are under implementation. Migration `0023` adds only immutability triggers; no Index or balance truth is introduced.  
+**Next Action:** complete and validate **06.03 Customer/Supplier Ledgers only**.  
 **Forbidden Next Actions:** لا Phase 07 قبل إغلاق 06.03 وGate 06، لا Frontend cutover، لا dual write، لا `main` merge، ولا Convex Production change.
 
 **Plan update — 2026-09-17 / ACCOUNTING CONSTRAINTS CLOSED:** تم إغلاق ثامن executable slice من 03.06 على SHA `ef03d141958c392032bd8caf16b5f880a193e86e`. Migration `0019`، ADR-0021، Accounting PK/FK/UNIQUE/CHECK layer، Finance Category → GL Account FK، والحفاظ على deferred Journal balance at COMMIT تم التحقق منهم فعليًا على PostgreSQL 17؛ Full CI run `35224498880` أخضر بالكامل وPR `#206` أُغلق بدون Merge. 03.06 ما زالت `IN_PROGRESS` و03.07 لم تبدأ.
@@ -4183,6 +4202,8 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 
 ---
 
+
+**Plan update — 2026-09-20 / 06.03 CUSTOMER-SUPPLIER LEDGERS STARTED:** الـGap Analysis أثبت أن جداول Customer/Supplier Ledgers والـFK/CHECK/Frozen Index Catalog موجودة ومتوافقة، لكن الـBaseline يفرض Historical Immutability بينما الـDDL الحالي لا يمنع UPDATE/DELETE فعليًا. لذلك أضيفت Migration `0023_counterparty_ledger_immutability` بدون أي Index أو تغيير Shape، وتضيف فقط DB triggers تمنع UPDATE/DELETE على الجدولين. التنفيذ يضيف `CounterpartyLedgerService` append-only مرتبطًا بـPosting Batch رسمي، يتحقق من تطابق branch/source ومن CUSTOMER/SUPPLIER role، ويعيد فحص Branch Scope داخل نفس Transaction. لا يوجد setBalance ولا ledger edit/delete API؛ التصحيح يتم بصفوف CORRECTION/REVERSAL جديدة مع بقاء الأصل. لا يتم سحب Receipt/Disbursement/Sales/Purchasing settlement orchestration من مراحلها اللاحقة، ولا Phase 07 أو Frontend/Convex cutover.
 
 **Plan update — 2026-09-20 / 06.02 PHONE NORMALIZATION CLOSED:** تم إغلاق 06.02 وظيفيًا على SHA `394afe351117571ebdf22113de9424de4c55f38c` بعد Full CI Run `#981` / `35484080467` SUCCESS. `CounterpartyService` أصبح يحفظ display `phone` مع canonical `normalized_phone` في create/update ويبحث exact equality على `normalized_phone`. تم دعم ASCII/Arabic-Indic/Extended Arabic-Indic digits، وتكافؤ leading `+` مع leading `00`، والحفاظ على local leading zeroes بدون country-code inference. PostgreSQL 17 أثبت البحث بنفس canonical value، تحديث الرقم وإسقاط المطابقة القديمة، وإرجاع كل الحسابات ذات الهاتف المطبّع نفسه لأن phone ليس Unique. الـFrozen `ix_counterparties__normalized_phone` بقي بلا تغيير، ولا Migration أو Index جديد، ولم يبدأ 06.03. Gate 06 أصبح مكتملًا أيضًا في normalized phone search tests. Next Action بعد final documentation-SHA CI: 06.03 Customer/Supplier Ledgers فقط.
 
