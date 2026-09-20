@@ -215,10 +215,8 @@ export class SystemAdminProtectionService {
             role_id,
             is_active,
             default_branch_id,
-            (SELECT company_id
-               FROM branches
-              WHERE id=users.default_branch_id) AS company_id`,
-        [input.userId, input.isActive],
+            $3::uuid AS company_id`,
+        [input.userId, input.isActive, user.company_id],
       )
       const updated = result.rows[0]
       if (!updated) {
@@ -285,10 +283,8 @@ export class SystemAdminProtectionService {
             role_id,
             is_active,
             default_branch_id,
-            (SELECT company_id
-               FROM branches
-              WHERE id=users.default_branch_id) AS company_id`,
-        [input.userId, targetRole.id],
+            $3::uuid AS company_id`,
+        [input.userId, targetRole.id, user.company_id],
       )
       const updated = result.rows[0]
       if (!updated) {
