@@ -2590,7 +2590,7 @@ Implementation boundary:
 
 ## 05.05 Organization
 
-**Status:** `IN_PROGRESS`
+**Status:** `CLOSED`
 
 Implementation boundary:
 
@@ -2604,6 +2604,10 @@ Implementation boundary:
 - Organization mutations are Audit-recorded.
 - existing constraints and frozen indexes are reused unchanged.
 - no Migration, no Index, no Frontend/Convex cutover, and no Phase 06 behavior.
+
+**05.05 Verified Implementation SHA:** `1c5c3cdd582713c1e4c655ab5ee9c27519a647f9`.  
+**05.05 Implementation CI:** Run `#972` / `35482306897` — SUCCESS; `verify`, `backend-verify` including PostgreSQL 17 Organization integration, `browser-contract`, and `release-gate` all SUCCESS on the same implementation SHA.  
+**05.05 Validation PR:** `#223` — validation-only; close WITHOUT MERGE after final same-SHA documentation validation.
 
 
 ### Gate 05
@@ -3993,8 +3997,8 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 
 # 32. Current Execution Pointer
 
-**Current Phase:** `PHASE 05 — Authentication, Authorization, Organization / 05.05 Organization`  
-**Status:** `IN_PROGRESS`  
+**Current Phase:** `PHASE 05 — Gate 05 / Last-System-Admin Protection Policy`  
+**Status:** `BLOCKED_ON_OFFICIAL_POLICY`  
 **Integration Branch:** `agent/postgres-v1.7-core`  
 **Phase 01 Final SHA:** `b0d35101bf622264b655bcc574787989fadbcd83`  
 **Phase 01 Validation PR:** `#183` — closed without merge.  
@@ -4092,10 +4096,13 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 **05.04 Final Verified SHA:** `4fad9168cf99ee544f94dabee3bed5d3176468f7`.  
 **05.04 Final CI:** Run `#971` / `35481834283` — SUCCESS; `verify`, `backend-verify` including PostgreSQL 17 Branch Scope integration, `browser-contract`, and `release-gate` all SUCCESS on the final documentation SHA.  
 **05.04 Validation PR:** `#222` — CLOSED WITHOUT MERGE; `merged=false`.  
-**05.05 Organization:** `IN_PROGRESS` — Gap Analysis at `docs/gap-analysis/phase-05-05-organization.md`; Company Settings, atomic Branch + default Warehouse creation, Branch active/inactive lifecycle, official default Warehouse via `branch_settings`, Warehouse history safety, and Organization Audit are under implementation without schema/index/frontend changes.  
-**Gate 05 note:** `last/system admin protection according to final policy` remains unresolved in the official sources; 05.05 does not invent this policy and PHASE 05 cannot be marked fully CLOSED while that Gate item remains open.  
-**Next Action:** complete and validate **05.05 Organization only**.  
-**Forbidden Next Actions:** لا Phase 06 قبل إغلاق 05.05 وGate 05، لا Frontend cutover، لا dual write، لا `main` merge، ولا Convex Production change.
+**05.05 Organization:** `CLOSED` — Gap Analysis at `docs/gap-analysis/phase-05-05-organization.md`; Company Settings, atomic Branch + default Warehouse creation, Branch active/inactive lifecycle, official default Warehouse via `branch_settings`, Warehouse history safety, historical Warehouse deactivation, stable Organization errors, and Organization Audit completed without schema/index/frontend changes.  
+**05.05 Verified Implementation SHA:** `1c5c3cdd582713c1e4c655ab5ee9c27519a647f9`.  
+**05.05 Implementation CI:** Run `#972` / `35482306897` — SUCCESS; `verify`, `backend-verify` including PostgreSQL 17 Organization integration, `browser-contract`, and `release-gate` all SUCCESS on the same implementation SHA.  
+**05.05 Validation PR:** `#223` — validation-only; close WITHOUT MERGE after final same-SHA documentation validation.  
+**PHASE 05:** remains OPEN only because Gate `last/system admin protection according to final policy` has no final command policy in the reviewed official sources.  
+**Next Action:** approve/resolve the official **last/System Admin protection policy** and implement/test that Gate only. Phase 06 remains forbidden until Gate 05 closes.  
+**Forbidden Next Actions:** لا Phase 06 قبل إغلاق Gate 05، لا Frontend cutover، لا dual write، لا `main` merge، ولا Convex Production change.
 
 **Plan update — 2026-09-17 / ACCOUNTING CONSTRAINTS CLOSED:** تم إغلاق ثامن executable slice من 03.06 على SHA `ef03d141958c392032bd8caf16b5f880a193e86e`. Migration `0019`، ADR-0021، Accounting PK/FK/UNIQUE/CHECK layer، Finance Category → GL Account FK، والحفاظ على deferred Journal balance at COMMIT تم التحقق منهم فعليًا على PostgreSQL 17؛ Full CI run `35224498880` أخضر بالكامل وPR `#206` أُغلق بدون Merge. 03.06 ما زالت `IN_PROGRESS` و03.07 لم تبدأ.
 
@@ -4103,6 +4110,8 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 
 ---
 
+
+**Plan update — 2026-09-20 / 05.05 ORGANIZATION CLOSED:** تم إغلاق 05.05 وظيفيًا على SHA `1c5c3cdd582713c1e4c655ab5ee9c27519a647f9` بعد Full CI Run `#972` / `35482306897` SUCCESS. تم تنفيذ Company Settings، إنشاء Branch + Default Warehouse + Branch Settings داخل Transaction واحدة، active/inactive Branch lifecycle دون حذف فعلي، اعتماد `branch_settings.default_warehouse_id` كمصدر Default Warehouse الوحيد، منع نقل/تعطيل الـDefault Warehouse، منع نقل Warehouse بعد Inventory Movements في Backend مع بقاء Composite FK كحماية DB نهائية، السماح بتعطيل المخزن التاريخي بدل حذفه، وAudit/rollback atomicity. لا Migration ولا Index جديد، ولم يبدأ Phase 06. 05.05 CLOSED لكن PHASE 05 لا تُغلق لأن Gate حماية آخر/System Admin ما زالت بلا final policy في official sources؛ لا يتم اختراعها. PR `#223` validation-only يخضع الآن لـFull CI نهائي على documentation closure SHA قبل إغلاقه بدون Merge.
 
 **Plan update — 2026-09-20 / 05.05 ORGANIZATION STARTED:** تم عمل Gap Analysis مقابل Architecture Baseline v1.7 وMaster Plan. جداول `companies/company_settings/branches/branch_settings/warehouses` والقيود المعتمدة موجودة ومتوافقة، بما فيها حماية Default Warehouse الفعال داخل نفس الفرع وComposite Warehouse+Branch FK لحركات المخزون، والـFrozen Index Catalog مكتمل؛ لذلك لا Migration ولا Index جديد. التنفيذ يضيف Organization Service للـCompany Settings، إنشاء Branch + Default Warehouse + Branch Settings بصورة Atomic، active/inactive lifecycle بدون حذف فعلي، Default Warehouse من `branch_settings` فقط، منع نقل Default Warehouse أو Warehouse له Inventory Movements، السماح بتعطيل المخزن التاريخي، وAudit داخل نفس Transaction. بند last/system admin protection يظل Gate منفصلًا مفتوحًا لأن official sources لا تحدد final command policy، ولن تُخترع داخل 05.05. Phase 06 وFrontend/Convex cutover ممنوعان.
 
