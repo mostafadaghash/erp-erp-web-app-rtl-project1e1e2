@@ -406,11 +406,13 @@ export class CounterpartyService {
         [normalized.normalizedPhone],
       )
 
-      return Promise.all(
-        result.rows.map((row) =>
-          this.readWithClient(client, row.id),
-        ),
-      )
+      const matches: CounterpartyRecord[] = []
+      for (const row of result.rows) {
+        matches.push(
+          await this.readWithClient(client, row.id),
+        )
+      }
+      return Object.freeze(matches)
     })
   }
 
