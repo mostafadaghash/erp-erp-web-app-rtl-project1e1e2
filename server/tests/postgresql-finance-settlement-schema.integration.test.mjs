@@ -76,9 +76,12 @@ test("03.G Finance / Settlement physical shape remains canonical after later 03.
       const financeSlice = history.rows.find((row) => row.version === "0018");
       assert.equal(financeSlice?.name, "finance_settlement_constraints");
       assert.match(financeSlice?.checksum ?? "", /^[0-9a-f]{64}$/);
+      const indexCatalog = history.rows.find((row) => row.version === "0022");
+      assert.equal(indexCatalog?.name, "index_catalog");
+      assert.match(indexCatalog?.checksum ?? "", /^[0-9a-f]{64}$/);
       const latest = history.rows.at(-1);
-      assert.equal(latest.version, "0022");
-      assert.equal(latest.name, "index_catalog");
+      assert.equal(latest.version, "0023");
+      assert.equal(latest.name, "counterparty_ledger_immutability");
       assert.match(latest.checksum ?? "", /^[0-9a-f]{64}$/);
     });
 
