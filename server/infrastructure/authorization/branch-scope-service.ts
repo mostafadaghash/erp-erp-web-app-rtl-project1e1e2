@@ -279,6 +279,33 @@ export class BranchScopeService {
     private readonly database: EffectivePermissionTransactionRunner,
   ) {}
 
+  async evaluateWithinTransaction(
+    client: AuthorizationQueryClient,
+    userId: string,
+    branchId: string,
+  ): Promise<BranchScopeDecision> {
+    assertNonEmpty('userId', userId)
+    assertNonEmpty('branchId', branchId)
+
+    return readBranchScope(client, userId, branchId)
+  }
+
+  async requireWithinTransaction(
+    client: AuthorizationQueryClient,
+    userId: string,
+    branchId: string,
+  ): Promise<BranchScopeDecision> {
+    const result = await this.evaluateWithinTransaction(
+      client,
+      userId,
+      branchId,
+    )
+    if (!result.allowed) {
+      throw new BranchAccessDeniedError(branchId)
+    }
+    return result
+  }
+
   async evaluate(
     userId: string,
     branchId: string,
@@ -287,7 +314,7 @@ export class BranchScopeService {
     assertNonEmpty('branchId', branchId)
 
     return this.database.transaction((client) =>
-      readBranchScope(client, userId, branchId),
+      this.evaluateWithinTransaction(client, userId, branchId),
     )
   }
 
