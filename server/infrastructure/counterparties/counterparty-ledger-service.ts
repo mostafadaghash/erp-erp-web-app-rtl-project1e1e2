@@ -111,7 +111,14 @@ function normalizeAmount(value: string): string {
   return value
 }
 
+function validateKind(kind: CounterpartyLedgerKind): void {
+  if (!COUNTERPARTY_LEDGER_KINDS.includes(kind)) {
+    throw new TypeError('Unsupported counterparty ledger kind')
+  }
+}
+
 function tableFor(kind: CounterpartyLedgerKind): string {
+  validateKind(kind)
   return kind === 'CUSTOMER'
     ? 'customer_ledger_entries'
     : 'supplier_ledger_entries'
@@ -214,6 +221,7 @@ export class CounterpartyLedgerService {
     kind: CounterpartyLedgerKind,
     input: AppendCounterpartyLedgerEntryInput,
   ): Promise<CounterpartyLedgerEntry> {
+    validateKind(kind)
     return this.database.transaction((client) =>
       this.appendWithinTransaction(client, kind, input),
     )
@@ -224,6 +232,7 @@ export class CounterpartyLedgerService {
     kind: CounterpartyLedgerKind,
     input: AppendCounterpartyLedgerEntryInput,
   ): Promise<CounterpartyLedgerEntry> {
+    validateKind(kind)
     requireNonBlank('actorUserId', input.actorUserId)
     requireNonBlank('counterpartyId', input.counterpartyId)
     requireNonBlank('branchId', input.branchId)
@@ -294,6 +303,7 @@ export class CounterpartyLedgerService {
     kind: CounterpartyLedgerKind,
     input: CounterpartyLedgerStatementInput,
   ): Promise<readonly CounterpartyLedgerEntry[]> {
+    validateKind(kind)
     requireNonBlank('actorUserId', input.actorUserId)
     requireNonBlank('counterpartyId', input.counterpartyId)
     requireNonBlank('branchId', input.branchId)
