@@ -2766,7 +2766,7 @@ Implement:
 
 ## 07.02 Units
 
-**Status:** `READY_TO_START`
+**Status:** `IN_PROGRESS`
 
 - conversion to base.
 - sellable/purchasable flags.
@@ -4093,7 +4093,7 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 # 32. Current Execution Pointer
 
 **Current Phase:** `PHASE 07 — Product Catalog / Variants / Units / Pricing / 07.02 Units`  
-**Status:** `READY_TO_START`  
+**Status:** `IN_PROGRESS`  
 **Integration Branch:** `agent/postgres-v1.7-core`  
 **Phase 01 Final SHA:** `b0d35101bf622264b655bcc574787989fadbcd83`  
 **Phase 01 Validation PR:** `#183` — closed without merge.  
@@ -4236,6 +4236,8 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 
 ---
 
+
+**Plan update — 2026-09-20 / 07.02 UNITS STARTED:** Gap Analysis مقابل Architecture Baseline v1.7 أثبت أن جداول `units/product_units` وUNIQUE/CHECK/Frozen Index موجودة ومتوافقة، وأن `products.base_unit_id` يظل المصدر الوحيد للـBase Unit؛ لذلك لا Migration ولا Index جديد في 07.02. التنفيذ سيضيف ProductUnitService لإدارة Unit/ProductUnit، Conversion إلى Base بدقة `numeric(18,6)` بدون JS float، تطبيق `allows_fraction` و`is_sellable/is_purchasable`، منع تغيير Base ProductUnit conversion عن 1، ومنع Variant + ProductUnit من Product مختلف. لا SKU/Barcode (07.03)، لا Dynamic Attributes، لا Pricing/Reorder، ولا Frontend/Convex cutover.
 
 **Plan update — 2026-09-20 / 07.01 PRODUCT MODEL CLOSED:** تم إغلاق 07.01 وظيفيًا على SHA `1327ec47a59d19fb02f32c2f20e2d38a13d20008` بعد Full CI Run `#1003` / `35518501734` SUCCESS. `ProductModelService` ينشئ Simple Product + Base ProductUnit + Internal Default Variant داخل Transaction واحدة، وPostgreSQL 17 أثبت STOCK/SERVICE، Variant واحد افتراضي `is_default=true`، Base ProductUnit تابع لنفس Product بعامل تحويل 1، غياب `product_units.is_base`، بقاء آخر Variant محميًا بالDeferred constraint، rollback بلا صفوف جزئية عند Category/Unit مفقود، وAudit `PRODUCT_CREATED`. Frozen Product indexes بقيت بلا تغيير، ولا Migration جديد بعد `0023`. Gate 07 بند default variant behavior أصبح مكتملًا فقط؛ بقية Gate 07 تظل مفتوحة لمراحل 07.02-07.05. 07.02 لم تبدأ؛ Next Action بعد final documentation-SHA CI: 07.02 Units فقط.
 
