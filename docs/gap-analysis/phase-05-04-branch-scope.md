@@ -1,6 +1,6 @@
 # Phase 05.04 — Branch Scope Gap Analysis
 
-**Status:** `IN_PROGRESS`  
+**Status:** `CLOSED`  
 **Branch:** `agent/postgres-v1.7-core`  
 **Architecture Source:** Business Tech ERP Architecture Baseline v1.7  
 **Implementation Plan:** Business Tech ERP Master Implementation Plan v1.0
@@ -94,6 +94,24 @@ The approved schema already contains:
 - no new migration.
 - no new index.
 
+## Closure evidence
+
+- Verified implementation SHA: `9826a8d187ec84627c20c9eb6ca9ad6dfd3101a8`.
+- Full CI: Run `#969` / `35481723808` — SUCCESS on the same implementation SHA.
+- `verify`: SUCCESS.
+- `backend-verify`: SUCCESS, including the PostgreSQL 17 Branch Scope integration gate.
+- `browser-contract`: SUCCESS.
+- `release-gate`: SUCCESS.
+- SELECTED/ALL behavior verified.
+- cross-branch denial verified.
+- default-branch deferred integrity verified.
+- transaction-bound Permission + Branch Scope recheck verified.
+- no migration added.
+- no index added.
+- no 05.05 Organization behavior.
+- no frontend/Convex branch cutover.
+- Validation PR: `#222`, validation-only, to be closed without merge after final documentation-SHA CI.
+
 ## Next action
 
-Run Full CI on the 05.04 implementation SHA through a validation-only PR. Only after the same-SHA gates are green may 05.04 be documented as CLOSED.
+After final documentation-SHA validation, 05.05 Organization is the one next action. It has not been started by 05.04.
