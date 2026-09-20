@@ -2793,13 +2793,33 @@ Implementation boundary:
 
 ## 07.03 Barcodes / SKU
 
-**Status:** `IN_PROGRESS`
+**Status:** `CLOSED`
+
+Implementation boundary:
+
+- nullable Variant SKU is normalized by Backend to uppercase.
+- non-null SKU uniqueness is enforced by the approved partial unique index.
+- catalog Barcode uniqueness is enforced by the approved UNIQUE constraint.
+- Barcode maps to Variant + ProductUnit and both must belong to the same Product.
+- the same Variant may have different Barcodes for different ProductUnits.
+- exact SKU/Barcode lookup uses equality on the frozen B-Tree/Unique catalog.
+- known SKU/Barcode uniqueness conflicts are translated to stable safe business errors.
+- identifier mutations are Audit-recorded.
+- PostgreSQL 17 concurrency races prove exactly one writer wins for duplicate SKU and duplicate Barcode.
+- no Migration and no Index change.
+- no Dynamic Attributes, Pricing/Reorder or Frontend/Convex cutover.
+
+**07.03 Verified Implementation SHA:** `02ef957e13c609a12a01f894ee0abafea10935ff`.  
+**07.03 Implementation CI:** Run `#1009` / `35534721633` — SUCCESS; `verify`, `backend-verify` including PostgreSQL 17 Barcode/SKU concurrency integration, `browser-contract`, and `release-gate` all SUCCESS on the same implementation SHA.  
+**07.03 Validation PR:** `#230` — validation-only; close WITHOUT MERGE after final same-SHA documentation validation.
 
 - unique catalog barcode.
 - unique non-null SKU.
 - barcode may differ by Variant + ProductUnit.
 
 ## 07.04 Dynamic Attributes
+
+**Status:** `READY_TO_START`
 
 - VARIANT/DESCRIPTIVE usage.
 - combination signature canonicalization.
@@ -2823,7 +2843,7 @@ Implementation boundary:
 - [x] default variant behavior.
 - [x] unit conversion tests.
 - [x] fraction restriction tests.
-- [ ] SKU/barcode concurrency uniqueness.
+- [x] SKU/barcode concurrency uniqueness.
 - [ ] combination signature tests.
 - [ ] minimum price permission tests.
 
@@ -4112,8 +4132,8 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 
 # 32. Current Execution Pointer
 
-**Current Phase:** `PHASE 07 — Product Catalog / Variants / Units / Pricing / 07.03 Barcodes / SKU`  
-**Status:** `IN_PROGRESS`  
+**Current Phase:** `PHASE 07 — Product Catalog / Variants / Units / Pricing / 07.04 Dynamic Attributes`  
+**Status:** `READY_TO_START`  
 **Integration Branch:** `agent/postgres-v1.7-core`  
 **Phase 01 Final SHA:** `b0d35101bf622264b655bcc574787989fadbcd83`  
 **Phase 01 Validation PR:** `#183` — closed without merge.  
@@ -4252,9 +4272,15 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 **07.02 Units:** `CLOSED` — Gap Analysis at `docs/gap-analysis/phase-07-02-units.md`; `ProductUnitService` manages Unit/ProductUnit behavior, exact numeric(18,6) conversion, fraction policy, sellable/purchasable use, Base ProductUnit factor=1, Cross-Product linkage rejection, and Audit without schema/index changes.  
 **07.02 Verified Implementation SHA:** `c9eb1b2a2e6059ec8d2443b21b256a0ab234b947`.  
 **07.02 Implementation CI:** Run `#1006` / `35530791427` — SUCCESS; `verify`, `backend-verify` including PostgreSQL 17 Units integration and all regressions, `browser-contract`, and `release-gate` all SUCCESS on the same implementation SHA.  
-**07.02 Validation PR:** `#229` — validation-only; close WITHOUT MERGE after final same-SHA documentation validation.  
-**Next Action:** execute **PHASE 07 / 07.03 Barcodes / SKU only** after final 07.02 documentation-SHA validation.  
-**Forbidden Next Actions:** لا 07.04 قبل إغلاق 07.03، لا Frontend cutover، لا dual write، لا `main` merge، ولا Convex Production change.
+**07.02 Final Verified SHA:** `20c585505a722ae3f8db7a59a64002d74bd7db7b`.  
+**07.02 Final CI:** Run `#1008` / `35530990040` — SUCCESS on the final documentation SHA.  
+**07.02 Validation PR:** `#229` — CLOSED WITHOUT MERGE; `merged=false`.  
+**07.03 Barcodes / SKU:** `CLOSED` — Gap Analysis at `docs/gap-analysis/phase-07-03-barcodes-sku.md`; `ProductIdentifierService` normalizes nullable SKU to uppercase, manages unique Barcodes mapped to Variant+ProductUnit, performs exact lookup, rejects Cross-Product linkage, translates known uniqueness conflicts to stable errors, and records Audit without schema/index changes.  
+**07.03 Verified Implementation SHA:** `02ef957e13c609a12a01f894ee0abafea10935ff`.  
+**07.03 Implementation CI:** Run `#1009` / `35534721633` — SUCCESS; `verify`, `backend-verify` including PostgreSQL 17 SKU/Barcode concurrency races and all regressions, `browser-contract`, and `release-gate` all SUCCESS on the same implementation SHA.  
+**07.03 Validation PR:** `#230` — validation-only; close WITHOUT MERGE after final same-SHA documentation validation.  
+**Next Action:** execute **PHASE 07 / 07.04 Dynamic Attributes only** after final 07.03 documentation-SHA validation.  
+**Forbidden Next Actions:** لا 07.05 قبل إغلاق 07.04، لا Frontend cutover، لا dual write، لا `main` merge، ولا Convex Production change.
 
 **Plan update — 2026-09-17 / ACCOUNTING CONSTRAINTS CLOSED:** تم إغلاق ثامن executable slice من 03.06 على SHA `ef03d141958c392032bd8caf16b5f880a193e86e`. Migration `0019`، ADR-0021، Accounting PK/FK/UNIQUE/CHECK layer، Finance Category → GL Account FK، والحفاظ على deferred Journal balance at COMMIT تم التحقق منهم فعليًا على PostgreSQL 17؛ Full CI run `35224498880` أخضر بالكامل وPR `#206` أُغلق بدون Merge. 03.06 ما زالت `IN_PROGRESS` و03.07 لم تبدأ.
 
@@ -4262,6 +4288,8 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 
 ---
 
+
+**Plan update — 2026-09-20 / 07.03 BARCODES-SKU CLOSED:** تم إغلاق 07.03 وظيفيًا على SHA `02ef957e13c609a12a01f894ee0abafea10935ff` بعد Full CI Run `#1009` / `35534721633` SUCCESS. `ProductIdentifierService` أصبح يحول SKU إلى Uppercase ويحفظ blank كـNULL، ويعتمد على partial unique SKU الرسمي وglobal unique Barcode الرسمي كحكم نهائي تحت الـConcurrency، مع Exact lookup وCross-Product Variant+ProductUnit denial وAudit. PostgreSQL 17 أثبت سباقين حقيقيين: duplicate SKU وduplicate Barcode، وفي كل منهما Writer واحد فقط نجح والآخر رجع Stable Conflict، مع ثبات Frozen identifier indexes وبقاء migration tail عند `0023`. Gate 07 بند SKU/barcode concurrency uniqueness أصبح مكتملًا. 07.04 لم تبدأ؛ Next Action بعد final documentation-SHA CI: 07.04 Dynamic Attributes فقط.
 
 **Plan update — 2026-09-20 / 07.03 BARCODES-SKU STARTED:** Gap Analysis مقابل Architecture Baseline v1.7 أثبت أن nullable SKU + partial unique non-null SKU، وglobal unique Barcode، وBarcode Variant+ProductUnit same-Product integrity، وExact B-Tree lookups كلها موجودة في الـDDL/Frozen Index Catalog؛ لذلك لا Migration ولا Index جديد في 07.03. التنفيذ سيضيف ProductIdentifierService لتطبيع SKU إلى Uppercase، تعيين/مسح SKU، إضافة Barcode، Exact SKU/Barcode lookup، ترجمة known DB uniqueness conflicts إلى Stable Business Errors، واختبارات Concurrency فعلية على PostgreSQL 17. لا Dynamic Attributes (07.04)، لا Pricing/Reorder، ولا Frontend/Convex cutover.
 
