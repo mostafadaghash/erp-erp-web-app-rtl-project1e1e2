@@ -1,6 +1,7 @@
 import { IdempotencyConflictError } from '../idempotency/idempotency-service.js'
 import { PostingBatchReferenceError } from '../posting/posting-batch-service.js'
 import { PermissionDeniedError } from '../authorization/effective-permission-service.js'
+import { BranchAccessDeniedError } from '../authorization/branch-scope-service.js'
 
 export type SafeErrorParam = string | number | boolean | null
 export type SafeErrorParams = Readonly<Record<string, SafeErrorParam>>
@@ -14,6 +15,7 @@ export const ERROR_CODES = {
   IDEMPOTENCY_KEY_CONFLICT: 'IDEMPOTENCY_KEY_CONFLICT',
   POSTING_BATCH_REFERENCE_ERROR: 'POSTING_BATCH_REFERENCE_ERROR',
   PERMISSION_DENIED: 'PERMISSION_DENIED',
+  BRANCH_ACCESS_DENIED: 'BRANCH_ACCESS_DENIED',
   INVALID_ARGUMENT: 'INVALID_ARGUMENT',
   DB_UNIQUE_CONFLICT: 'DB_UNIQUE_CONFLICT',
   DB_REFERENCE_CONFLICT: 'DB_REFERENCE_CONFLICT',
@@ -82,6 +84,12 @@ export function toErrorContract(error: unknown): ErrorContract {
   if (error instanceof PostingBatchReferenceError) {
     return contract(ERROR_CODES.POSTING_BATCH_REFERENCE_ERROR, {
       reason: error.reason,
+    })
+  }
+
+  if (error instanceof BranchAccessDeniedError) {
+    return contract(ERROR_CODES.BRANCH_ACCESS_DENIED, {
+      branchId: error.branchId,
     })
   }
 
