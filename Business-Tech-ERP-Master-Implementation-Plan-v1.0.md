@@ -2638,9 +2638,27 @@ Validation record: `docs/gap-analysis/phase-05-gate-last-system-admin.md`.
 
 # 12. PHASE 06 — Counterparties & Master Data
 
-**Status:** `READY_TO_START`
+**Status:** `IN_PROGRESS`
 
 ## 06.01 Unified Counterparty
+
+**Status:** `IN_PROGRESS`
+
+Implementation boundary:
+
+- one canonical Counterparty identity.
+- roles limited to `CUSTOMER / SUPPLIER / OTHER`.
+- same Counterparty may hold multiple roles simultaneously.
+- optional Customer Profile attached to the same identity.
+- optional Supplier Profile attached to the same identity.
+- Customer Profile requires CUSTOMER role; Supplier Profile requires SUPPLIER role.
+- role addition is idempotent at Backend level while the approved composite PK remains final duplicate defense.
+- Counterparty activation/deactivation is non-destructive.
+- successful master-data mutations are Audit-recorded.
+- `normalized_phone` is not calculated in 06.01; phone normalization/search remains 06.02.
+- Customer/Supplier Ledger commands remain 06.03.
+- existing schema/constraints/frozen indexes are reused unchanged.
+- no Migration, no Index, no Frontend/Convex cutover.
 
 Replace separate customer/supplier identity storage with:
 
@@ -4012,7 +4030,7 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 # 32. Current Execution Pointer
 
 **Current Phase:** `PHASE 06 — Counterparties & Master Data / 06.01 Unified Counterparty`  
-**Status:** `READY_TO_START`  
+**Status:** `IN_PROGRESS`  
 **Integration Branch:** `agent/postgres-v1.7-core`  
 **Phase 01 Final SHA:** `b0d35101bf622264b655bcc574787989fadbcd83`  
 **Phase 01 Validation PR:** `#183` — closed without merge.  
@@ -4119,10 +4137,13 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 **Gate 05 Last/System Admin Protection:** `CLOSED` — final policy at `docs/gap-analysis/phase-05-gate-last-system-admin.md`: at least one active canonical `SYSTEM_ADMIN` must remain; custom roles do not count; last active Admin disable/demotion is rejected; promotion/enable is allowed; concurrent removals serialize on the canonical role row with `FOR UPDATE`.  
 **Gate 05 Verified Implementation SHA:** `6b7f6dd4f1297580c9ca682ee7a1e9479602b28b`.  
 **Gate 05 Implementation CI:** Run `#975` / `35482913070` — SUCCESS; `verify`, `backend-verify` including PostgreSQL 17 last System Admin protection/concurrency integration, `browser-contract`, and `release-gate` all SUCCESS on the same implementation SHA.  
-**Gate 05 Validation PR:** `#224` — validation-only; close WITHOUT MERGE after final same-SHA documentation validation.  
+**Gate 05 Final Verified SHA:** `f9f35046a8451f171b73aff3ccb28e3a2dcdae6b`.  
+**Gate 05 Final CI:** Run `#977` / `35483023556` — SUCCESS; `verify`, `backend-verify` including PostgreSQL 17 last System Admin protection/concurrency integration, `browser-contract`, and `release-gate` all SUCCESS on the final documentation SHA.  
+**Gate 05 Validation PR:** `#224` — CLOSED WITHOUT MERGE; `merged=false`.  
 **PHASE 05:** `CLOSED` — Authentication, Roles, Effective Permissions, Branch Scope, Organization, and all Gate 05 checks are complete.  
-**Next Action:** execute **PHASE 06 / 06.01 Unified Counterparty only** after final Phase 05 documentation-SHA validation.  
-**Forbidden Next Actions:** لا 06.02 قبل إغلاق 06.01، لا Frontend cutover، لا dual write، لا `main` merge، ولا Convex Production change.
+**06.01 Unified Counterparty:** `IN_PROGRESS` — Gap Analysis at `docs/gap-analysis/phase-06-01-unified-counterparty.md`; one shared Counterparty identity with CUSTOMER/SUPPLIER/OTHER roles, optional role-specific profiles, duplicate-safe role addition, active/inactive lifecycle, Audit, and PostgreSQL 17 behavioral validation are under implementation. No phone normalization/ledger command/schema/index/frontend work.  
+**Next Action:** complete and validate **06.01 Unified Counterparty only**.  
+**Forbidden Next Actions:** لا 06.02 قبل إغلاق 06.01، لا 06.03، لا Frontend cutover، لا dual write، لا `main` merge، ولا Convex Production change.
 
 **Plan update — 2026-09-17 / ACCOUNTING CONSTRAINTS CLOSED:** تم إغلاق ثامن executable slice من 03.06 على SHA `ef03d141958c392032bd8caf16b5f880a193e86e`. Migration `0019`، ADR-0021، Accounting PK/FK/UNIQUE/CHECK layer، Finance Category → GL Account FK، والحفاظ على deferred Journal balance at COMMIT تم التحقق منهم فعليًا على PostgreSQL 17؛ Full CI run `35224498880` أخضر بالكامل وPR `#206` أُغلق بدون Merge. 03.06 ما زالت `IN_PROGRESS` و03.07 لم تبدأ.
 
@@ -4130,6 +4151,8 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 
 ---
 
+
+**Plan update — 2026-09-20 / 06.01 UNIFIED COUNTERPARTY STARTED:** تم عمل Gap Analysis مقابل Architecture Baseline v1.7 وMaster Plan. الـSchema الحالي `counterparties/counterparty_roles/customer_profiles/supplier_profiles` والـPK/FK/CHECK والـFrozen Index Catalog موجودون ومتوافقون، لذلك لا Migration ولا Index جديد. التنفيذ يضيف Backend `CounterpartyService` لهوية واحدة مشتركة مع Roles `CUSTOMER/SUPPLIER/OTHER` وإمكانية الجمع بين Customer+Supplier على نفس ID، Profiles اختيارية مرتبطة بالدور، role add idempotent مع بقاء composite PK كحماية نهائية، active/inactive lifecycle، Audit وstable error contract. `normalized_phone` لا يتم حسابه في 06.01 لأن 06.02 فقط هي المسؤولة عن Phone Normalization/Search، وLedgers تظل 06.03. لا Frontend/Convex cutover ولا dual write.
 
 **Plan update — 2026-09-20 / GATE 05 LAST-SYSTEM-ADMIN PROTECTION CLOSED:** تم إغلاق آخر Gate في Phase 05 على SHA `6b7f6dd4f1297580c9ca682ee7a1e9479602b28b` بعد Full CI Run `#975` / `35482913070` SUCCESS. السياسة النهائية المثبتة: يجب أن يبقى دائمًا Active canonical `SYSTEM_ADMIN` واحد على الأقل؛ Custom Roles لا تُحسب حتى لو `is_system=true`؛ تعطيل/Demote آخر Admin يُرفض، بينما Enable/Promote مسموحان. الحماية تستخدم canonical role row كـserialization guard بـ`FOR UPDATE` تحت `READ COMMITTED`، واختبارات PostgreSQL 17 أثبتت أن محاولتي Disable أو Demotion المتزامنتين لا تنجحان معًا وأن العدد لا يصل للصفر. Audit وstable error contract نجحا، والـFrozen Index Catalog بقي بلا تغيير، ولا Migration أو Index جديد. بذلك PHASE 05 أصبحت CLOSED. Phase 06 لم تبدأ؛ Next Action بعد final documentation-SHA CI: 06.01 Unified Counterparty فقط.
 
