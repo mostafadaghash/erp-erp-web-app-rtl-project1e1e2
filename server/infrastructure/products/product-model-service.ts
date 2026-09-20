@@ -42,7 +42,7 @@ export interface CreateSimpleProductInput {
   name: string
   categoryId: string
   productType: ProductType
-  baseUnitId: string
+  baseUnitMasterId: string
   trackingSerial?: boolean
   trackingBatch?: boolean
   trackingExpiry?: boolean
@@ -71,7 +71,7 @@ export interface ProductModelRecord {
   name: string
   categoryId: string
   productType: ProductType
-  baseUnitId: string
+  baseUnitMasterId: string
   trackingSerial: boolean
   trackingBatch: boolean
   trackingExpiry: boolean
@@ -152,7 +152,7 @@ function validateCreateInput(input: CreateSimpleProductInput): {
   requireNonBlank('actorUserId', input.actorUserId)
   requireNonBlank('product name', input.name)
   requireNonBlank('categoryId', input.categoryId)
-  requireNonBlank('baseUnitId', input.baseUnitId)
+  requireNonBlank('baseUnitMasterId', input.baseUnitMasterId)
   validateProductType(input.productType)
 
   const trackingSerial = input.trackingSerial ?? false
@@ -273,7 +273,7 @@ export class ProductModelService {
         input.actorUserId,
       )
       await requireCategory(client, input.categoryId)
-      await requireUnit(client, input.baseUnitId)
+      await requireUnit(client, input.baseUnitMasterId)
 
       const productId = randomUUID()
       const baseProductUnitId = randomUUID()
@@ -307,7 +307,7 @@ export class ProductModelService {
         [
           baseProductUnitId,
           productId,
-          input.baseUnitId,
+          input.baseUnitMasterId,
         ],
       )
 
@@ -337,7 +337,7 @@ export class ProductModelService {
           categoryId: input.categoryId,
           productType: input.productType,
           baseProductUnitId,
-          baseUnitId: input.baseUnitId,
+          baseUnitMasterId: input.baseUnitMasterId,
           trackingSerial: tracking.trackingSerial,
           trackingBatch: tracking.trackingBatch,
           trackingExpiry: tracking.trackingExpiry,
