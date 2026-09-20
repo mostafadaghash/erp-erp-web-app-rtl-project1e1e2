@@ -113,20 +113,22 @@ test(
           ($2,$3,'Branch Two','B2',true,now(),now())`,
         [IDS.branch1, IDS.branch2, IDS.company],
       );
-      await pool.query(
-        `INSERT INTO users
-          (id,name,username,email,password_hash,role_id,default_branch_id,
-           branch_scope_mode,preferred_language,is_active,last_login_at,created_at,updated_at)
-         VALUES
-          ($1,'Ledger Admin','phase06-ledger-admin','phase06-ledger-admin@example.test',
-           'test-only-hash',$2,$3,'SELECTED','ar-EG',true,NULL,now(),now())`,
-        [IDS.actor, systemAdmin.id, IDS.branch1],
-      );
-      await pool.query(
-        `INSERT INTO user_branch_access (user_id,branch_id)
-         VALUES ($1,$2)`,
-        [IDS.actor, IDS.branch1],
-      );
+      await withTransaction(pool, async (client) => {
+        await client.query(
+          `INSERT INTO users
+            (id,name,username,email,password_hash,role_id,default_branch_id,
+             branch_scope_mode,preferred_language,is_active,last_login_at,created_at,updated_at)
+           VALUES
+            ($1,'Ledger Admin','phase06-ledger-admin','phase06-ledger-admin@example.test',
+             'test-only-hash',$2,$3,'SELECTED','ar-EG',true,NULL,now(),now())`,
+          [IDS.actor, systemAdmin.id, IDS.branch1],
+        );
+        await client.query(
+          `INSERT INTO user_branch_access (user_id,branch_id)
+           VALUES ($1,$2)`,
+          [IDS.actor, IDS.branch1],
+        );
+      });
 
       await pool.query(
         `INSERT INTO counterparties
