@@ -51,6 +51,7 @@ export const MIGRATIONS = [
   "0021",
   "0022",
   "0023",
+  "0024",
 ];
 
 export async function withClient(databaseUrl, fn) {
@@ -133,6 +134,10 @@ export async function cleanupReportingTables(databaseUrl) {
 
 export async function cleanupDatabase(databaseUrl) {
   await withClient(databaseUrl, async (client) => {
+    await client.query("DROP FUNCTION IF EXISTS public.fn_inventory_ledger_row_immutable() CASCADE");
+    await client.query("DROP FUNCTION IF EXISTS public.fn_inventory_movement_has_lines_at_commit() CASCADE");
+    await client.query("DROP FUNCTION IF EXISTS public.fn_inventory_movement_line_direction_valid() CASCADE");
+    await client.query("DROP FUNCTION IF EXISTS public.fn_inventory_movement_posting_context_valid() CASCADE");
     await client.query("DROP FUNCTION IF EXISTS public.fn_counterparty_ledger_entry_immutable() CASCADE");
     await cleanupCoreConstraintLayer(client);
     await cleanupProductConstraintLayer(client);

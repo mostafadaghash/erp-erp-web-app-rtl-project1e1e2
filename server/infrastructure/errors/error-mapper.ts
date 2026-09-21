@@ -12,6 +12,7 @@ import { ProductIdentifierError } from '../products/product-identifier-service.j
 import { ProductAttributeError } from '../products/product-attribute-service.js'
 import { PriceListError } from '../products/price-list-service.js'
 import { ReorderLevelError } from '../products/reorder-level-service.js'
+import { InventoryLedgerError } from '../inventory/inventory-ledger-service.js'
 
 export type SafeErrorParam = string | number | boolean | null
 export type SafeErrorParams = Readonly<Record<string, SafeErrorParam>>
@@ -36,6 +37,7 @@ export const ERROR_CODES = {
   PRODUCT_ATTRIBUTE_OPERATION_REJECTED: 'PRODUCT_ATTRIBUTE_OPERATION_REJECTED',
   PRICE_LIST_OPERATION_REJECTED: 'PRICE_LIST_OPERATION_REJECTED',
   REORDER_LEVEL_OPERATION_REJECTED: 'REORDER_LEVEL_OPERATION_REJECTED',
+  INVENTORY_LEDGER_OPERATION_REJECTED: 'INVENTORY_LEDGER_OPERATION_REJECTED',
   INVALID_ARGUMENT: 'INVALID_ARGUMENT',
   DB_UNIQUE_CONFLICT: 'DB_UNIQUE_CONFLICT',
   DB_REFERENCE_CONFLICT: 'DB_REFERENCE_CONFLICT',
@@ -175,6 +177,12 @@ export function toErrorContract(error: unknown): ErrorContract {
 
   if (error instanceof ReorderLevelError) {
     return contract(ERROR_CODES.REORDER_LEVEL_OPERATION_REJECTED, {
+      reason: error.reason,
+    })
+  }
+
+  if (error instanceof InventoryLedgerError) {
+    return contract(ERROR_CODES.INVENTORY_LEDGER_OPERATION_REJECTED, {
       reason: error.reason,
     })
   }

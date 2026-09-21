@@ -2908,12 +2908,24 @@ Implementation boundary:
 
 ## 08.01 Inventory Ledger
 
-**Status:** `READY_TO_START`
+**Status:** `IN_PROGRESS`
 
 - append-only movement headers/lines.
 - movement types defined by v1.7.
 - signed quantities.
 - posting_batch traceability.
+
+Implementation boundary:
+
+- reuse approved `inventory_movements` / `inventory_movement_lines` physical schema and frozen §28 Inventory indexes.
+- add migration `0024_inventory_ledger_integrity` for the frozen movement vocabulary, non-zero signed quantities, IN/OUT direction integrity, PostingBatch source/time/actor trace, deferred non-empty movement integrity, and DB-level UPDATE/DELETE immutability.
+- movement vocabulary is exactly `OPENING/PURCHASE/SALE/SALES_RETURN/PURCHASE_RETURN/TRANSFER_OUT/TRANSFER_IN/ADJUSTMENT`.
+- `occurred_at` is copied from server-generated `posting_batches.posted_at`; callers cannot backdate ledger ordering.
+- `InventoryLedgerService.appendWithinTransaction()` accepts an existing transaction only so PostingBatch + Ledger + later module effects share one COMMIT.
+- normal movement Warehouse Branch must match PostingBatch Branch; `TRANSFER_IN` is the intentional exception for cross-branch transfers because its movement belongs to the target Warehouse while the shared PostingBatch belongs to the issuing/source Branch.
+- Branch Scope is rechecked for the affected Warehouse.
+- no Stock Position mutation, no Weighted Average Cost, no Reservations/Serials/Batches, no Accounting/COGS, and no Frontend/Convex cutover.
+- no Index change.
 
 ## 08.02 Stock Positions
 
@@ -4186,7 +4198,7 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 # 32. Current Execution Pointer
 
 **Current Phase:** `PHASE 08 — Inventory Core / 08.01 Inventory Ledger`  
-**Status:** `READY_TO_START`  
+**Status:** `IN_PROGRESS`  
 **Integration Branch:** `agent/postgres-v1.7-core`  
 **Phase 01 Final SHA:** `b0d35101bf622264b655bcc574787989fadbcd83`  
 **Phase 01 Validation PR:** `#183` — closed without merge.  
@@ -4481,3 +4493,6 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 
 
 **Plan update — 2026-09-21 / 07.06 REORDER LEVELS CLOSED + PHASE 07 CLOSED:** تم إغلاق 07.06 وظيفيًا على SHA `05b158a6b18d4b14c5ef51b2418da5ff41b00dec` بعد Full CI Run `#1017` / `35605263173` SUCCESS. `ReorderLevelService` يدير Minimum Quantity لكل Variant+Warehouse ويعرض Low Stock على القاعدة الرسمية `Available = On Hand - Reserved` مع Alert فقط عندما Available أقل من الحد. PostgreSQL 17 أثبت strict-less-than behavior، تأثير Reserved على Available، fallback صف Stock Position غير المادي إلى zero للقراءة فقط، ALL/SELECTED Branch Scope، Cross-Branch denial، idempotent clear، Audit، وثبات Frozen Reorder/Stock Position indexes وبقاء migration tail عند `0023`. لم يبدأ Phase 08 ولم تُنشأ Notifications/Outbox من read path. بذلك PHASE 07 بكل slices 07.01–07.06 وGate 07 أصبحت CLOSED. Next Action بعد final documentation-SHA CI: PHASE 08 / 08.01 Inventory Ledger فقط.
+
+
+**Plan update — 2026-09-21 / 08.01 INVENTORY LEDGER STARTED:** Gap Analysis مقابل Architecture Baseline v1.7 أثبت أن جداول Inventory Movement/Lines والـFKs والـFrozen indexes موجودة، لكن DB-level movement vocabulary/direction/PostingBatch context/immutability غير مكتملة. لذلك 08.01 تضيف migration `0024_inventory_ledger_integrity` بدون أي Index جديد. التنفيذ يبني append-only `InventoryLedgerService` داخل Transaction قائمة فقط؛ `occurred_at` يأتي من `posting_batches.posted_at` ولا يقبل Backdating من caller. PostgreSQL يحمي الأنواع الثمانية المعتمدة، signed IN/OUT، وجود Line قبل COMMIT، Source/Posting trace، وUPDATE/DELETE immutability. `TRANSFER_IN` يسمح بفرع الهدف المختلف عن PostingBatch المصدر في Cross-Branch Stock Transfer. لا Stock Positions/WA Cost/Reservations/Serials/Batches أو Phase 08.02.
