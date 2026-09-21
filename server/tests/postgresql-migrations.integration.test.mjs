@@ -73,6 +73,7 @@ const MIGRATIONS = [
   { version: "0021", name: "printing_export_reporting_read_models_constraints", transactional: true },
   { version: "0022", name: "index_catalog", transactional: true },
   { version: "0023", name: "counterparty_ledger_immutability", transactional: true },
+  { version: "0024", name: "inventory_ledger_integrity", transactional: true },
 ];
 
 async function withClient(fn) {
@@ -84,6 +85,9 @@ async function withClient(fn) {
 async function cleanup() {
   await cleanupReportingTables(databaseUrl);
   await withClient(async (client) => {
+    await client.query("DROP FUNCTION IF EXISTS public.fn_inventory_ledger_row_immutable() CASCADE");
+    await client.query("DROP FUNCTION IF EXISTS public.fn_inventory_movement_line_direction_valid() CASCADE");
+    await client.query("DROP FUNCTION IF EXISTS public.fn_inventory_movement_posting_context_valid() CASCADE");
     await client.query("DROP FUNCTION IF EXISTS public.fn_counterparty_ledger_entry_immutable() CASCADE");
     await client.query("DROP VIEW IF EXISTS public.purchase_returnable_quantities_v");
     await client.query("DROP VIEW IF EXISTS public.sales_returnable_quantities_v");
