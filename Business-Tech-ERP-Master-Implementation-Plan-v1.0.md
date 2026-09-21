@@ -2846,13 +2846,24 @@ Implementation boundary:
 
 ## 07.05 Price Lists
 
-**Status:** `READY_TO_START`
+**Status:** `IN_PROGRESS`
 
 - unlimited price lists.
 - price per price-list + variant + product-unit.
 - branch/customer default linkage.
 - manual price permission.
 - minimum selling price policy.
+
+Implementation boundary:
+
+- reuse the approved `price_lists`, `price_list_items`, Branch/Customer default FKs, and Variant minimum-price column.
+- add canonical PostgreSQL Backend Price List service only; no migration and no Index change.
+- introduce independent `sales.price.manual_edit` and `sales.price.below_minimum` permissions.
+- seed only the explicitly approved below-minimum Role Default: SYSTEM_ADMIN Allow; other canonical roles Deny on first catalog initialization. Manual-edit role defaults are not invented.
+- resolve explicit Price List → Customer default → Branch default and preserve `PRICE_LIST / MANUAL` source semantics for later Sales work.
+- compare Variant minimum consistently across ProductUnits through the approved conversion-to-base factor without JavaScript floating point.
+- Sales document repricing/posting and actual sensitive-sale Audit remain deferred to the Sales phase.
+- no 07.06 Reorder Levels and no Frontend/Convex cutover.
 
 ## 07.06 Reorder Levels
 
@@ -4154,7 +4165,7 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 # 32. Current Execution Pointer
 
 **Current Phase:** `PHASE 07 — Product Catalog / Variants / Units / Pricing / 07.05 Price Lists`  
-**Status:** `READY_TO_START`  
+**Status:** `IN_PROGRESS`  
 **Integration Branch:** `agent/postgres-v1.7-core`  
 **Phase 01 Final SHA:** `b0d35101bf622264b655bcc574787989fadbcd83`  
 **Phase 01 Validation PR:** `#183` — closed without merge.  
@@ -4429,3 +4440,5 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 ---
 
 ## End of Master Implementation Plan v1.0
+
+**Plan update — 2026-09-21 / 07.05 PRICE LISTS STARTED:** Gap Analysis مقابل Architecture Baseline v1.7 أثبت أن `price_lists` و`price_list_items` وBranch/Customer default FKs و`product_variants.minimum_selling_price` والـFrozen pricing index موجودون ومتوافقون، لذلك لا Migration ولا Index جديد. التنفيذ يضيف `PriceListService` لقوائم أسعار غير محدودة، سعر حسب PriceList+Variant+ProductUnit، Default للفرع/العميل، Resolution بأولوية Explicit ثم Customer ثم Branch، وMinimum Price policy عبر ProductUnit conversion بدون float. يتم إدخال Permission مستقل للتعديل اليدوي وPermission مستقل للبيع تحت الحد الأدنى؛ Default below-minimum المعتمد فقط SYSTEM_ADMIN، بينما Manual-edit role defaults لا يتم اختراعها. لا Sales repricing/posting ولا 07.06 ولا Frontend/Convex cutover.

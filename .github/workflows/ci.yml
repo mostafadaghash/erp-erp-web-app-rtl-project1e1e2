@@ -213,6 +213,10 @@ jobs:
         env:
           ERP_TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/erp_backend_ci
         run: node --import tsx --test server/tests/product-attribute-service.integration.test.mjs
+      - name: PostgreSQL Price Lists integration tests
+        env:
+          ERP_TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/erp_backend_ci
+        run: node --import tsx --test server/tests/price-list-service.integration.test.mjs
       - name: PostgreSQL product catalog schema integration tests
         env:
           ERP_TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/erp_backend_ci
