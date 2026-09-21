@@ -2846,7 +2846,7 @@ Implementation boundary:
 
 ## 07.05 Price Lists
 
-**Status:** `IN_PROGRESS`
+**Status:** `CLOSED`
 
 - unlimited price lists.
 - price per price-list + variant + product-unit.
@@ -2867,6 +2867,8 @@ Implementation boundary:
 
 ## 07.06 Reorder Levels
 
+**Status:** `READY_TO_START`
+
 - per Warehouse + Variant.
 - alerts honor branch scope.
 
@@ -2877,7 +2879,7 @@ Implementation boundary:
 - [x] fraction restriction tests.
 - [x] SKU/barcode concurrency uniqueness.
 - [x] combination signature tests.
-- [ ] minimum price permission tests.
+- [x] minimum price permission tests.
 
 ---
 
@@ -4164,8 +4166,8 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 
 # 32. Current Execution Pointer
 
-**Current Phase:** `PHASE 07 — Product Catalog / Variants / Units / Pricing / 07.05 Price Lists`  
-**Status:** `IN_PROGRESS`  
+**Current Phase:** `PHASE 07 — Product Catalog / Variants / Units / Pricing / 07.06 Reorder Levels`  
+**Status:** `READY_TO_START`  
 **Integration Branch:** `agent/postgres-v1.7-core`  
 **Phase 01 Final SHA:** `b0d35101bf622264b655bcc574787989fadbcd83`  
 **Phase 01 Validation PR:** `#183` — closed without merge.  
@@ -4317,8 +4319,12 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 **07.04 Verified Implementation SHA:** `828866588e14c552887da705deb8cbaf4d28ef6c`.  
 **07.04 Implementation CI:** Run `#1012` / `35600921253` — SUCCESS; `verify`, `backend-verify` including PostgreSQL 17 Dynamic Attributes concurrency and all regressions, `browser-contract`, and `release-gate` all SUCCESS on the same implementation SHA.  
 **07.04 Validation PR:** `#231` — validation-only; close WITHOUT MERGE after final same-SHA documentation validation.  
-**Next Action:** execute **PHASE 07 / 07.05 Price Lists only** after final 07.04 documentation-SHA validation.  
-**Forbidden Next Actions:** لا 07.06 قبل إغلاق 07.05، لا Frontend cutover، لا dual write، لا `main` merge، ولا Convex Production change.
+**07.05 Price Lists:** `CLOSED` — Gap Analysis at `docs/gap-analysis/phase-07-05-price-lists.md`; `PriceListService` implements unlimited Price Lists, PriceList+Variant+ProductUnit pricing, Branch/Customer defaults with Explicit→Customer→Branch resolution, fixed-decimal Variant minimum policy across ProductUnits, and independent manual/below-minimum permissions without migration/index changes.  
+**07.05 Verified Implementation SHA:** `12a7bb3d245d0905f2155b3d06051137f23580ba`.  
+**07.05 Implementation CI:** Run `#1015` / `35603555803` — SUCCESS; `verify`, `backend-verify` including PostgreSQL 17 Price Lists integration, `browser-contract`, and `release-gate` all SUCCESS on the same implementation SHA.  
+**07.05 Validation PR:** `#232` — validation-only; close WITHOUT MERGE after final same-SHA documentation validation.  
+**Next Action:** execute **PHASE 07 / 07.06 Reorder Levels only** after final 07.05 documentation-SHA validation.  
+**Forbidden Next Actions:** لا Phase 08 قبل إغلاق 07.06 وPhase 07، لا Frontend cutover، لا dual write، لا `main` merge، ولا Convex Production change.
 
 **Plan update — 2026-09-17 / ACCOUNTING CONSTRAINTS CLOSED:** تم إغلاق ثامن executable slice من 03.06 على SHA `ef03d141958c392032bd8caf16b5f880a193e86e`. Migration `0019`، ADR-0021، Accounting PK/FK/UNIQUE/CHECK layer، Finance Category → GL Account FK، والحفاظ على deferred Journal balance at COMMIT تم التحقق منهم فعليًا على PostgreSQL 17؛ Full CI run `35224498880` أخضر بالكامل وPR `#206` أُغلق بدون Merge. 03.06 ما زالت `IN_PROGRESS` و03.07 لم تبدأ.
 
@@ -4442,3 +4448,6 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 ## End of Master Implementation Plan v1.0
 
 **Plan update — 2026-09-21 / 07.05 PRICE LISTS STARTED:** Gap Analysis مقابل Architecture Baseline v1.7 أثبت أن `price_lists` و`price_list_items` وBranch/Customer default FKs و`product_variants.minimum_selling_price` والـFrozen pricing index موجودون ومتوافقون، لذلك لا Migration ولا Index جديد. التنفيذ يضيف `PriceListService` لقوائم أسعار غير محدودة، سعر حسب PriceList+Variant+ProductUnit، Default للفرع/العميل، Resolution بأولوية Explicit ثم Customer ثم Branch، وMinimum Price policy عبر ProductUnit conversion بدون float. يتم إدخال Permission مستقل للتعديل اليدوي وPermission مستقل للبيع تحت الحد الأدنى؛ Default below-minimum المعتمد فقط SYSTEM_ADMIN، بينما Manual-edit role defaults لا يتم اختراعها. لا Sales repricing/posting ولا 07.06 ولا Frontend/Convex cutover.
+
+
+**Plan update — 2026-09-21 / 07.05 PRICE LISTS CLOSED:** تم إغلاق 07.05 وظيفيًا على SHA `12a7bb3d245d0905f2155b3d06051137f23580ba` بعد Full CI Run `#1015` / `35603555803` SUCCESS. `PriceListService` يدير Price Lists غير محدودة، سعر دقيق حسب PriceList+Variant+ProductUnit، Default للفرع والعميل بأولوية Explicit ثم Customer ثم Branch، وMinimum Selling Price للVariant مع مقارنة صحيحة عبر `conversion_to_base` بدون float. تم إدخال `sales.price.manual_edit` و`sales.price.below_minimum` كصلاحيتين مستقلتين؛ Default البيع تحت الحد الأدنى SYSTEM_ADMIN فقط، وManual-edit role defaults لم يتم اختراعها. اختبارات PostgreSQL 17 أثبتت ALLOW/DENY overrides، alternate-unit floor، active/default lifecycle، Audit، وثبات Frozen indexes وبقاء migration tail عند `0023`. Gate 07 بند minimum price permission tests أصبح مكتملًا. 07.06 لم تبدأ؛ Next Action بعد final documentation-SHA CI: 07.06 Reorder Levels فقط.

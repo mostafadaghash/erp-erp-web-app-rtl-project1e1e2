@@ -1,6 +1,6 @@
 # Phase 07.05 — Price Lists Gap Analysis
 
-**Status:** `IN_PROGRESS`  
+**Status:** `CLOSED`  
 **Branch:** `agent/postgres-v1.7-core`  
 **Architecture Source:** Business Tech ERP Architecture Baseline v1.7  
 **Implementation Plan:** Business Tech ERP Master Implementation Plan v1.0
@@ -220,6 +220,29 @@ Gate 07 cannot close until this implementation passes Full CI on the same SHA an
 - no migration.
 - no index addition.
 
+## Closure evidence
+
+- Verified implementation SHA: `12a7bb3d245d0905f2155b3d06051137f23580ba`.
+- Full implementation CI: Run `#1015` / `35603555803` — SUCCESS on the same implementation SHA.
+- `verify`: SUCCESS.
+- `backend-verify`: SUCCESS, including the PostgreSQL 17 Price Lists integration gate.
+- `browser-contract`: SUCCESS.
+- `release-gate`: SUCCESS.
+- unlimited Price List catalog behavior was verified with multiple independent lists and no artificial cap.
+- exact PriceList+Variant+ProductUnit pricing persisted as `numeric(18,4)`.
+- cross-Product Variant/ProductUnit linkage and non-sellable ProductUnit pricing were rejected.
+- Branch default, Customer-over-Branch precedence, and explicit-over-default resolution were verified.
+- inactive/default lifecycle rules were verified.
+- `sales.price.manual_edit` and `sales.price.below_minimum` were introduced as independent permissions.
+- below-minimum initial Role Default was verified as SYSTEM_ADMIN-only; manual-edit Role Defaults were not invented.
+- Manual pricing, below-minimum denial, User ALLOW override, and User DENY-over-SystemAdmin-default behavior were verified.
+- alternate ProductUnit minimum-price comparison was verified through `conversion_to_base` without floating point.
+- pricing master-data Audit entries were verified.
+- frozen Price List index inventory remained unchanged.
+- migration history remained through `0023`; no 07.05 migration was added.
+- 07.01–07.04 and all later schema/integrity regressions remained green.
+- Validation PR: `#232`, validation-only; close WITHOUT MERGE after final documentation-SHA CI.
+
 ## Next action
 
-Implement and validate 07.05 only. Do not start 07.06 until 07.05 is CLOSED by the required same-SHA gates.
+After final documentation-SHA validation, 07.05 is CLOSED. The next official step is PHASE 07 / 07.06 Reorder Levels, READY_TO_START only.
