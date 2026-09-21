@@ -9,6 +9,7 @@ import { CounterpartyLedgerError } from '../counterparties/counterparty-ledger-s
 import { ProductModelError } from '../products/product-model-service.js'
 import { ProductUnitError } from '../products/product-unit-service.js'
 import { ProductIdentifierError } from '../products/product-identifier-service.js'
+import { ProductAttributeError } from '../products/product-attribute-service.js'
 
 export type SafeErrorParam = string | number | boolean | null
 export type SafeErrorParams = Readonly<Record<string, SafeErrorParam>>
@@ -30,6 +31,7 @@ export const ERROR_CODES = {
   PRODUCT_MODEL_OPERATION_REJECTED: 'PRODUCT_MODEL_OPERATION_REJECTED',
   PRODUCT_UNIT_OPERATION_REJECTED: 'PRODUCT_UNIT_OPERATION_REJECTED',
   PRODUCT_IDENTIFIER_OPERATION_REJECTED: 'PRODUCT_IDENTIFIER_OPERATION_REJECTED',
+  PRODUCT_ATTRIBUTE_OPERATION_REJECTED: 'PRODUCT_ATTRIBUTE_OPERATION_REJECTED',
   INVALID_ARGUMENT: 'INVALID_ARGUMENT',
   DB_UNIQUE_CONFLICT: 'DB_UNIQUE_CONFLICT',
   DB_REFERENCE_CONFLICT: 'DB_REFERENCE_CONFLICT',
@@ -151,6 +153,12 @@ export function toErrorContract(error: unknown): ErrorContract {
 
   if (error instanceof ProductIdentifierError) {
     return contract(ERROR_CODES.PRODUCT_IDENTIFIER_OPERATION_REJECTED, {
+      reason: error.reason,
+    })
+  }
+
+  if (error instanceof ProductAttributeError) {
+    return contract(ERROR_CODES.PRODUCT_ATTRIBUTE_OPERATION_REJECTED, {
       reason: error.reason,
     })
   }
