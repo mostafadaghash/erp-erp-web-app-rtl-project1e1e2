@@ -2819,7 +2819,7 @@ Implementation boundary:
 
 ## 07.04 Dynamic Attributes
 
-**Status:** `READY_TO_START`
+**Status:** `IN_PROGRESS`
 
 - VARIANT/DESCRIPTIVE usage.
 - combination signature canonicalization.
@@ -4133,7 +4133,7 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 # 32. Current Execution Pointer
 
 **Current Phase:** `PHASE 07 — Product Catalog / Variants / Units / Pricing / 07.04 Dynamic Attributes`  
-**Status:** `READY_TO_START`  
+**Status:** `IN_PROGRESS`  
 **Integration Branch:** `agent/postgres-v1.7-core`  
 **Phase 01 Final SHA:** `b0d35101bf622264b655bcc574787989fadbcd83`  
 **Phase 01 Validation PR:** `#183` — closed without merge.  
@@ -4288,6 +4288,8 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 
 ---
 
+
+**Plan update — 2026-09-21 / 07.04 DYNAMIC ATTRIBUTES STARTED:** Gap Analysis مقابل Architecture Baseline v1.7 أثبت أن جداول `attributes/attribute_values/product_attributes/variant_attribute_values` وUnique Product+Combination Signature وFrozen Attribute indexes موجودة ومتوافقة؛ لذلك لا Migration ولا Index جديد في 07.04. التنفيذ سيضيف ProductAttributeService لتعريف VARIANT/DESCRIPTIVE Attributes وقيمها وربطها بالProduct، وإنشاء Variants من قيم VARIANT فقط، وبناء `combination_signature` canonical من IDs مرتبة، ومنع duplicate combination تحت التزامن. أول Variant فعلي سيحوّل نفس Default Variant الداخلي بدل حذفه حفاظًا على SKU/Barcode الموجودة. لا Product-level descriptive value storage لأن الـBaseline schema لا يعرّفها، ولا Pricing (07.05) أو Reorder أو Frontend/Convex cutover.
 
 **Plan update — 2026-09-20 / 07.03 BARCODES-SKU CLOSED:** تم إغلاق 07.03 وظيفيًا على SHA `02ef957e13c609a12a01f894ee0abafea10935ff` بعد Full CI Run `#1009` / `35534721633` SUCCESS. `ProductIdentifierService` أصبح يحول SKU إلى Uppercase ويحفظ blank كـNULL، ويعتمد على partial unique SKU الرسمي وglobal unique Barcode الرسمي كحكم نهائي تحت الـConcurrency، مع Exact lookup وCross-Product Variant+ProductUnit denial وAudit. PostgreSQL 17 أثبت سباقين حقيقيين: duplicate SKU وduplicate Barcode، وفي كل منهما Writer واحد فقط نجح والآخر رجع Stable Conflict، مع ثبات Frozen identifier indexes وبقاء migration tail عند `0023`. Gate 07 بند SKU/barcode concurrency uniqueness أصبح مكتملًا. 07.04 لم تبدأ؛ Next Action بعد final documentation-SHA CI: 07.04 Dynamic Attributes فقط.
 
