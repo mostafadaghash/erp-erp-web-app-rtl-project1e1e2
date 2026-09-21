@@ -149,27 +149,29 @@ test(
           IDS.branch2,
         ],
       );
-      await pool.query(
-        `INSERT INTO users
-          (id,name,username,email,password_hash,role_id,default_branch_id,
-           branch_scope_mode,preferred_language,is_active,last_login_at,created_at,updated_at)
-         VALUES
-          ($1,'Inventory Admin','phase08-inventory-admin','phase08-inventory-admin@example.test',
-           'test-only-hash',$3,$4,'ALL','ar-EG',true,NULL,now(),now()),
-          ($2,'Branch One User','phase08-inventory-b1','phase08-inventory-b1@example.test',
-           'test-only-hash',$3,$4,'SELECTED','ar-EG',true,NULL,now(),now())`,
-        [
-          IDS.admin,
-          IDS.branch1User,
-          systemAdmin.id,
-          IDS.branch1,
-        ],
-      );
-      await pool.query(
-        `INSERT INTO user_branch_access (user_id,branch_id)
-         VALUES ($1,$2)`,
-        [IDS.branch1User, IDS.branch1],
-      );
+      await withTransaction(pool, async (client) => {
+        await client.query(
+          `INSERT INTO users
+            (id,name,username,email,password_hash,role_id,default_branch_id,
+             branch_scope_mode,preferred_language,is_active,last_login_at,created_at,updated_at)
+           VALUES
+            ($1,'Inventory Admin','phase08-inventory-admin','phase08-inventory-admin@example.test',
+             'test-only-hash',$3,$4,'ALL','ar-EG',true,NULL,now(),now()),
+            ($2,'Branch One User','phase08-inventory-b1','phase08-inventory-b1@example.test',
+             'test-only-hash',$3,$4,'SELECTED','ar-EG',true,NULL,now(),now())`,
+          [
+            IDS.admin,
+            IDS.branch1User,
+            systemAdmin.id,
+            IDS.branch1,
+          ],
+        );
+        await client.query(
+          `INSERT INTO user_branch_access (user_id,branch_id)
+           VALUES ($1,$2)`,
+          [IDS.branch1User, IDS.branch1],
+        );
+      });
       await pool.query(
         `INSERT INTO product_categories
           (id,name,parent_id,is_active)
