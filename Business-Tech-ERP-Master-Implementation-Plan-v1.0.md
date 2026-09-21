@@ -2867,10 +2867,23 @@ Implementation boundary:
 
 ## 07.06 Reorder Levels
 
-**Status:** `READY_TO_START`
+**Status:** `IN_PROGRESS`
 
 - per Warehouse + Variant.
 - alerts honor branch scope.
+
+Implementation boundary:
+
+- reuse approved `reorder_levels(variant_id, warehouse_id, minimum_quantity)`, its PK/FKs/CHECK, and the frozen Warehouse+Variant index.
+- low stock is defined exactly as `Available = On Hand - Reserved` and alerts only when `Available < minimum_quantity`.
+- set/read/clear threshold configuration is Branch-scoped by the Warehouse's Branch.
+- unfiltered alert reads honor `ALL / SELECTED` Branch Scope and explicit inaccessible Branch filters are rejected.
+- `inventory_stock_positions` is read only here as the rebuildable operational projection; Phase 08 remains the single owner of Stock Position mutation/locking.
+- missing not-yet-materialized Stock Position rows are treated as zero stock for the live alert read only; this does not create historical inventory truth.
+- threshold changes are Audit-recorded; no extra reorder-management Permission is invented because v1.7 fixes Branch Scope here but no additional permission key.
+- persistent Notification/Outbox emission is not fabricated on a read; it remains attached to the future Phase 08 Stock Position-changing command.
+- no Migration and no Index change.
+- no Phase 08 implementation and no Frontend/Convex cutover.
 
 ### Gate 07
 
@@ -4167,7 +4180,7 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 # 32. Current Execution Pointer
 
 **Current Phase:** `PHASE 07 — Product Catalog / Variants / Units / Pricing / 07.06 Reorder Levels`  
-**Status:** `READY_TO_START`  
+**Status:** `IN_PROGRESS`  
 **Integration Branch:** `agent/postgres-v1.7-core`  
 **Phase 01 Final SHA:** `b0d35101bf622264b655bcc574787989fadbcd83`  
 **Phase 01 Validation PR:** `#183` — closed without merge.  
@@ -4451,3 +4464,6 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 
 
 **Plan update — 2026-09-21 / 07.05 PRICE LISTS CLOSED:** تم إغلاق 07.05 وظيفيًا على SHA `12a7bb3d245d0905f2155b3d06051137f23580ba` بعد Full CI Run `#1015` / `35603555803` SUCCESS. `PriceListService` يدير Price Lists غير محدودة، سعر دقيق حسب PriceList+Variant+ProductUnit، Default للفرع والعميل بأولوية Explicit ثم Customer ثم Branch، وMinimum Selling Price للVariant مع مقارنة صحيحة عبر `conversion_to_base` بدون float. تم إدخال `sales.price.manual_edit` و`sales.price.below_minimum` كصلاحيتين مستقلتين؛ Default البيع تحت الحد الأدنى SYSTEM_ADMIN فقط، وManual-edit role defaults لم يتم اختراعها. اختبارات PostgreSQL 17 أثبتت ALLOW/DENY overrides، alternate-unit floor، active/default lifecycle، Audit، وثبات Frozen indexes وبقاء migration tail عند `0023`. Gate 07 بند minimum price permission tests أصبح مكتملًا. 07.06 لم تبدأ؛ Next Action بعد final documentation-SHA CI: 07.06 Reorder Levels فقط.
+
+
+**Plan update — 2026-09-21 / 07.06 REORDER LEVELS STARTED:** Gap Analysis مقابل Architecture Baseline v1.7 أثبت أن `reorder_levels` وPK Variant+Warehouse وFKs وCHECK nonnegative والـFrozen `ix_reorder_levels__warehouse_id_variant_id` موجودون ومتوافقون، لذلك لا Migration ولا Index جديد. التنفيذ يضيف `ReorderLevelService` لإدارة Minimum Quantity لكل Variant+Warehouse وقراءة Low Stock على القاعدة الرسمية `Available = On Hand - Reserved` مع Alert فقط عندما Available أقل من الحد. الإعداد والقراءة يخضعان Branch Scope، و`inventory_stock_positions` تُقرأ فقط كOperational Projection بينما Phase 08 تظل مالك mutation/locking. لا Notification/Outbox دائم يُنشأ عند القراءة؛ التوليد الدائم يؤجل لأمر Phase 08 الذي يغيّر Stock Position. لا Phase 08 ولا Frontend/Convex cutover.
