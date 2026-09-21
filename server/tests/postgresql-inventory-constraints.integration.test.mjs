@@ -137,17 +137,17 @@ test("03.06 Inventory constraints enforce canonical integrity on PostgreSQL 17",
 
       await expectConstraint(client.query(`INSERT INTO inventory_movements
         (id,branch_id,warehouse_id,movement_type,source_type,source_id,posting_batch_id,occurred_at,created_by,reason_code,notes)
-        VALUES ('30000000-0000-4000-8000-000000000024',$1,$2,'OPENING','TEST',$3,$4,now(),$5,NULL,NULL)`,
+        VALUES ('30000000-0000-4000-8000-000000000024',$1,$2,'OPENING','INVENTORY_TEST',$3,$4,now(),$5,NULL,NULL)`,
         [ids.branch1, ids.warehouse2, ids.source, ids.postingBatch, ids.user]), "23503", "fk_inventory_movements__warehouse_branch");
 
       const movement = "30000000-0000-4000-8000-000000000025";
       const movementLine = "30000000-0000-4000-8000-000000000026";
       await client.query(`INSERT INTO inventory_movements
         (id,branch_id,warehouse_id,movement_type,source_type,source_id,posting_batch_id,occurred_at,created_by,reason_code,notes)
-        VALUES ($1,$2,$3,'OPENING','TEST',$4,$5,now(),$6,NULL,NULL)`, [movement, ids.branch1, ids.warehouse1, ids.source, ids.postingBatch, ids.user]);
+        VALUES ($1,$2,$3,'OPENING','INVENTORY_TEST',$4,$5,now(),$6,NULL,NULL)`, [movement, ids.branch1, ids.warehouse1, ids.source, ids.postingBatch, ids.user]);
       await client.query(`INSERT INTO inventory_movement_lines
         (id,movement_id,variant_id,quantity_signed,unit_cost,total_cost)
-        VALUES ($1,$2,$3,-2.000000,10.0000,20.0000)`, [movementLine, movement, ids.variant]);
+        VALUES ($1,$2,$3,2.000000,10.0000,20.0000)`, [movementLine, movement, ids.variant]);
 
       await expectConstraint(client.query(`UPDATE warehouses SET branch_id=$1 WHERE id=$2`, [ids.branch2, ids.warehouse1]), "23503", "fk_inventory_movements__warehouse_branch");
       await expectConstraint(client.query(`DELETE FROM warehouses WHERE id=$1`, [ids.warehouse1]), "23503", "fk_inventory_movements__warehouse_branch");
