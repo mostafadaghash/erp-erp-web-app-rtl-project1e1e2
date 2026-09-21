@@ -1,6 +1,6 @@
 # Phase 07.06 — Reorder Levels Gap Analysis
 
-**Status:** `IN_PROGRESS`  
+**Status:** `CLOSED`  
 **Branch:** `agent/postgres-v1.7-core`  
 **Architecture Source:** Business Tech ERP Architecture Baseline v1.7  
 **Implementation Plan:** Business Tech ERP Master Implementation Plan v1.0
@@ -155,6 +155,29 @@ The Architecture says a low-stock alert is generated when Available falls below 
 - no migration.
 - no index addition.
 
+## Closure evidence
+
+- Verified implementation SHA: `05b158a6b18d4b14c5ef51b2418da5ff41b00dec`.
+- Full implementation CI: Run `#1017` / `35605263173` — SUCCESS on the same implementation SHA.
+- `verify`: SUCCESS.
+- `backend-verify`: SUCCESS, including the PostgreSQL 17 Reorder Levels integration gate.
+- `browser-contract`: SUCCESS.
+- `release-gate`: SUCCESS.
+- one threshold per Variant+Warehouse was preserved by the approved composite PK.
+- thresholds persisted as canonical `numeric(18,6)`.
+- low-stock detection was verified against `Available = On Hand - Reserved`, not On Hand alone.
+- equality with the minimum produced no alert; falling below the minimum produced the expected shortage.
+- missing not-yet-materialized Stock Position rows surfaced as zero Available for the live alert read.
+- `ALL` scope saw cross-branch alerts while `SELECTED` scope saw only granted branches.
+- cross-branch set/read and inaccessible explicit Branch filters were rejected.
+- clear was idempotent and removed the threshold/alert.
+- reorder configuration changes were Audit-recorded.
+- frozen Reorder Level and Inventory Stock Position index inventories remained unchanged.
+- migration history remained through `0023`; no 07.06 migration was added.
+- 07.01–07.05 plus all later schema/integrity regressions remained green.
+- no Stock Position mutation, persistent Notification/Outbox emission, Phase 08 implementation, or Frontend/Convex cutover was introduced.
+- Validation PR: `#233`, validation-only; close WITHOUT MERGE after final documentation-SHA CI.
+
 ## Next action
 
-Implement and validate 07.06 only. Do not start Phase 08 until 07.06 and Phase 07 are CLOSED by the required same-SHA gates.
+After final documentation-SHA validation, 07.06 and PHASE 07 are CLOSED. The next official step is PHASE 08 / 08.01 Inventory Ledger, READY_TO_START only.

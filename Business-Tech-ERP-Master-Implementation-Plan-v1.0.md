@@ -1,6 +1,6 @@
 # Business Tech ERP — Master Implementation Plan v1.0
 
-**الحالة:** ACTIVE — PHASE 07 IN PROGRESS  
+**الحالة:** ACTIVE — PHASE 08 READY_TO_START  
 **تاريخ الإصدار:** 2026-09-11  
 **المشروع:** Business Tech ERP — Local Server Edition / PostgreSQL Core  
 **المرجع المعماري الرسمي:** `Business-Tech-ERP-Architecture-Baseline-v1.7-Final.docx`  
@@ -2735,7 +2735,7 @@ Implementation boundary:
 
 # 13. PHASE 07 — Product Catalog / Variants / Units / Pricing
 
-**Status:** `IN_PROGRESS`
+**Status:** `CLOSED`
 
 ## 07.01 Product Model
 
@@ -2867,7 +2867,7 @@ Implementation boundary:
 
 ## 07.06 Reorder Levels
 
-**Status:** `IN_PROGRESS`
+**Status:** `CLOSED`
 
 - per Warehouse + Variant.
 - alerts honor branch scope.
@@ -2885,6 +2885,10 @@ Implementation boundary:
 - no Migration and no Index change.
 - no Phase 08 implementation and no Frontend/Convex cutover.
 
+**07.06 Verified Implementation SHA:** `05b158a6b18d4b14c5ef51b2418da5ff41b00dec`.  
+**07.06 Implementation CI:** Run `#1017` / `35605263173` — SUCCESS; `verify`, `backend-verify` including PostgreSQL 17 Reorder Levels integration, `browser-contract`, and `release-gate` all SUCCESS on the same implementation SHA.  
+**07.06 Validation PR:** `#233` — validation-only; close WITHOUT MERGE after final same-SHA documentation validation.
+
 ### Gate 07
 
 - [x] default variant behavior.
@@ -2898,11 +2902,13 @@ Implementation boundary:
 
 # 14. PHASE 08 — Inventory Core
 
-**Status:** `NOT_STARTED`
+**Status:** `READY_TO_START`
 
 هذه المرحلة Critical ولا يتم ربط Sales/Purchasing النهائي بها قبل نجاح Concurrency Gate.
 
 ## 08.01 Inventory Ledger
+
+**Status:** `READY_TO_START`
 
 - append-only movement headers/lines.
 - movement types defined by v1.7.
@@ -4179,8 +4185,8 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 
 # 32. Current Execution Pointer
 
-**Current Phase:** `PHASE 07 — Product Catalog / Variants / Units / Pricing / 07.06 Reorder Levels`  
-**Status:** `IN_PROGRESS`  
+**Current Phase:** `PHASE 08 — Inventory Core / 08.01 Inventory Ledger`  
+**Status:** `READY_TO_START`  
 **Integration Branch:** `agent/postgres-v1.7-core`  
 **Phase 01 Final SHA:** `b0d35101bf622264b655bcc574787989fadbcd83`  
 **Phase 01 Validation PR:** `#183` — closed without merge.  
@@ -4336,8 +4342,13 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 **07.05 Verified Implementation SHA:** `12a7bb3d245d0905f2155b3d06051137f23580ba`.  
 **07.05 Implementation CI:** Run `#1015` / `35603555803` — SUCCESS; `verify`, `backend-verify` including PostgreSQL 17 Price Lists integration, `browser-contract`, and `release-gate` all SUCCESS on the same implementation SHA.  
 **07.05 Validation PR:** `#232` — validation-only; close WITHOUT MERGE after final same-SHA documentation validation.  
-**Next Action:** execute **PHASE 07 / 07.06 Reorder Levels only** after final 07.05 documentation-SHA validation.  
-**Forbidden Next Actions:** لا Phase 08 قبل إغلاق 07.06 وPhase 07، لا Frontend cutover، لا dual write، لا `main` merge، ولا Convex Production change.
+**07.06 Reorder Levels:** `CLOSED` — Gap Analysis at `docs/gap-analysis/phase-07-06-reorder-levels.md`; `ReorderLevelService` manages Variant+Warehouse minimums and Branch-scoped live low-stock alerts using the v1.7 rule `Available = On Hand - Reserved` and `Available < minimum_quantity`, with Audit and no migration/index changes.  
+**07.06 Verified Implementation SHA:** `05b158a6b18d4b14c5ef51b2418da5ff41b00dec`.  
+**07.06 Implementation CI:** Run `#1017` / `35605263173` — SUCCESS; `verify`, `backend-verify` including PostgreSQL 17 Reorder Levels integration, `browser-contract`, and `release-gate` all SUCCESS on the same implementation SHA.  
+**07.06 Validation PR:** `#233` — validation-only; close WITHOUT MERGE after final same-SHA documentation validation.  
+**PHASE 07:** `CLOSED` — all Product Catalog slices 07.01–07.06 and Gate 07 are complete.  
+**Next Action:** execute **PHASE 08 / 08.01 Inventory Ledger only** after final 07.06 documentation-SHA validation.  
+**Forbidden Next Actions:** لا 08.02 قبل إغلاق 08.01، لا Frontend cutover، لا dual write، لا `main` merge، ولا Convex Production change.
 
 **Plan update — 2026-09-17 / ACCOUNTING CONSTRAINTS CLOSED:** تم إغلاق ثامن executable slice من 03.06 على SHA `ef03d141958c392032bd8caf16b5f880a193e86e`. Migration `0019`، ADR-0021، Accounting PK/FK/UNIQUE/CHECK layer، Finance Category → GL Account FK، والحفاظ على deferred Journal balance at COMMIT تم التحقق منهم فعليًا على PostgreSQL 17؛ Full CI run `35224498880` أخضر بالكامل وPR `#206` أُغلق بدون Merge. 03.06 ما زالت `IN_PROGRESS` و03.07 لم تبدأ.
 
@@ -4467,3 +4478,6 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 
 
 **Plan update — 2026-09-21 / 07.06 REORDER LEVELS STARTED:** Gap Analysis مقابل Architecture Baseline v1.7 أثبت أن `reorder_levels` وPK Variant+Warehouse وFKs وCHECK nonnegative والـFrozen `ix_reorder_levels__warehouse_id_variant_id` موجودون ومتوافقون، لذلك لا Migration ولا Index جديد. التنفيذ يضيف `ReorderLevelService` لإدارة Minimum Quantity لكل Variant+Warehouse وقراءة Low Stock على القاعدة الرسمية `Available = On Hand - Reserved` مع Alert فقط عندما Available أقل من الحد. الإعداد والقراءة يخضعان Branch Scope، و`inventory_stock_positions` تُقرأ فقط كOperational Projection بينما Phase 08 تظل مالك mutation/locking. لا Notification/Outbox دائم يُنشأ عند القراءة؛ التوليد الدائم يؤجل لأمر Phase 08 الذي يغيّر Stock Position. لا Phase 08 ولا Frontend/Convex cutover.
+
+
+**Plan update — 2026-09-21 / 07.06 REORDER LEVELS CLOSED + PHASE 07 CLOSED:** تم إغلاق 07.06 وظيفيًا على SHA `05b158a6b18d4b14c5ef51b2418da5ff41b00dec` بعد Full CI Run `#1017` / `35605263173` SUCCESS. `ReorderLevelService` يدير Minimum Quantity لكل Variant+Warehouse ويعرض Low Stock على القاعدة الرسمية `Available = On Hand - Reserved` مع Alert فقط عندما Available أقل من الحد. PostgreSQL 17 أثبت strict-less-than behavior، تأثير Reserved على Available، fallback صف Stock Position غير المادي إلى zero للقراءة فقط، ALL/SELECTED Branch Scope، Cross-Branch denial، idempotent clear، Audit، وثبات Frozen Reorder/Stock Position indexes وبقاء migration tail عند `0023`. لم يبدأ Phase 08 ولم تُنشأ Notifications/Outbox من read path. بذلك PHASE 07 بكل slices 07.01–07.06 وGate 07 أصبحت CLOSED. Next Action بعد final documentation-SHA CI: PHASE 08 / 08.01 Inventory Ledger فقط.
