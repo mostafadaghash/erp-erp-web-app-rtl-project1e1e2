@@ -485,6 +485,11 @@ export class ProductAttributeService {
     }
 
     const uniqueValueIds = [...new Set(input.attributeValueIds)]
+    if (uniqueValueIds.length !== input.attributeValueIds.length) {
+      throw new ProductAttributeError(
+        'DUPLICATE_ATTRIBUTE_SELECTION',
+      )
+    }
 
     try {
       return await this.database.transaction(async (client) => {
