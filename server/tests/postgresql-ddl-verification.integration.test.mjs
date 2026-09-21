@@ -111,8 +111,8 @@ test("03.08 final DDL verification covers case-insensitive user identity on Post
       );
       assert.equal(history.rowCount, MIGRATIONS.length);
       assert.deepEqual(history.rows.at(-1), {
-        version: "0023",
-        name: "counterparty_ledger_immutability",
+        version: "0024",
+        name: "inventory_ledger_integrity",
       });
       assert.deepEqual(
         history.rows.find((row) => row.version === "0022"),

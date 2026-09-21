@@ -93,7 +93,7 @@ test(
       const applied = await runMigrations({ databaseUrl });
       assert.deepEqual(applied.applied, MIGRATIONS);
       assert.deepEqual(applied.skipped, []);
-      assert.equal(MIGRATIONS.at(-1), "0023");
+      assert.equal(MIGRATIONS.at(-1), "0024");
 
       const version = await pool.query("SHOW server_version_num");
       const versionNumber = Number(version.rows[0]?.server_version_num);
@@ -342,8 +342,8 @@ test(
       );
       assert.equal(history.rowCount, MIGRATIONS.length);
       assert.deepEqual(history.rows.at(-1), {
-        version: "0023",
-        name: "counterparty_ledger_immutability",
+        version: "0024",
+        name: "inventory_ledger_integrity",
       });
 
       const verification = await runMigrations({
