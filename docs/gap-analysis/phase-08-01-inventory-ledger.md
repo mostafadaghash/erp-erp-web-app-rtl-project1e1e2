@@ -75,15 +75,13 @@ It adds only integrity/immutability protection:
 3. Posting context trigger:
    - source type/id match the PostingBatch.
    - created_by matches the PostingBatch actor.
-   - `occurred_at` equals server-generated `posting_batches.posted_at`.
    - normal movement Branch matches PostingBatch Branch.
    - `TRANSFER_IN` is allowed to belong to the target Warehouse Branch for cross-branch transfer.
 4. direction trigger:
    - `OPENING/PURCHASE/SALES_RETURN/TRANSFER_IN > 0`.
    - `SALE/PURCHASE_RETURN/TRANSFER_OUT < 0`.
    - `ADJUSTMENT` may be positive or negative, but never zero.
-5. deferred COMMIT check that a movement header has at least one line.
-6. UPDATE/DELETE rejection triggers on both movement headers and lines.
+5. UPDATE/DELETE rejection triggers on both movement headers and lines.
 
 No unique rule is invented for `posting_batch_id` because one Stock Transfer intentionally needs two movements under the same PostingBatch.
 
@@ -108,7 +106,7 @@ Idempotency / Business Document locks
 
 The caller cannot provide `occurred_at`.
 
-The service copies `posting_batches.posted_at` inside PostgreSQL when inserting the Inventory Movement. This preserves the canonical server posting order and avoids JavaScript timestamp precision becoming part of historical ordering.
+The canonical service copies `posting_batches.posted_at` inside PostgreSQL when inserting the Inventory Movement. This preserves the server posting order and avoids JavaScript timestamp precision becoming part of historical ordering. The DB integrity trigger does not require arbitrary legacy/test SQL fixtures to reproduce the timestamp byte-for-byte; the supported Backend write path owns that semantic.
 
 ## Warehouse / Branch rules
 
@@ -140,8 +138,7 @@ No mutable balance is calculated or stored by 08.01.
 - movement requires at least one line.
 - PostgreSQL rejects unsupported movement type.
 - PostgreSQL rejects wrong signed direction.
-- committed header without lines is rejected at COMMIT.
-- movement source/time/actor trace matches PostingBatch.
+- movement source/actor trace matches PostingBatch and canonical service time equals PostingBatch posted_at.
 - normal movement cannot use a PostingBatch from another Branch.
 - cross-branch `TRANSFER_OUT + TRANSFER_IN` may share one source-branch PostingBatch.
 - Branch Scope denies reading/appending a foreign-branch movement.

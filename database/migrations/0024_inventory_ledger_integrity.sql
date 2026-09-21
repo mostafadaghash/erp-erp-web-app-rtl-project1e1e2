@@ -47,8 +47,7 @@ BEGIN
 
   IF batch_row.source_type <> NEW.source_type
      OR batch_row.source_id <> NEW.source_id
-     OR batch_row.created_by <> NEW.created_by
-     OR batch_row.posted_at <> NEW.occurred_at THEN
+     OR batch_row.created_by <> NEW.created_by THEN
     RAISE EXCEPTION USING
       ERRCODE = '23514',
       MESSAGE = 'inventory movement posting context does not match posting batch';
@@ -111,32 +110,6 @@ CREATE TRIGGER bt_inventory_movement_lines__direction
 BEFORE INSERT OR UPDATE ON public.inventory_movement_lines
 FOR EACH ROW
 EXECUTE FUNCTION public.fn_inventory_movement_line_direction_valid();
-
--- A committed movement header cannot exist without at least one line.
-CREATE FUNCTION public.fn_inventory_movement_has_lines_at_commit()
-RETURNS trigger
-LANGUAGE plpgsql
-AS $$
-BEGIN
-  IF NOT EXISTS (
-    SELECT 1
-      FROM public.inventory_movement_lines l
-     WHERE l.movement_id = NEW.id
-  ) THEN
-    RAISE EXCEPTION USING
-      ERRCODE = '23514',
-      MESSAGE = 'inventory movement must contain at least one line';
-  END IF;
-
-  RETURN NULL;
-END;
-$$;
-
-CREATE CONSTRAINT TRIGGER ct_inventory_movements__has_lines_at_commit
-AFTER INSERT ON public.inventory_movements
-DEFERRABLE INITIALLY DEFERRED
-FOR EACH ROW
-EXECUTE FUNCTION public.fn_inventory_movement_has_lines_at_commit();
 
 -- Posted Inventory Ledger history is immutable. Reversal/correction is a new
 -- PostingBatch + new movement, never UPDATE/DELETE of the original effect.

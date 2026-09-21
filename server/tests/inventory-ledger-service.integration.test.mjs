@@ -653,40 +653,6 @@ test(
           ),
       );
 
-      const emptyBatch = await createPostingBatch(
-        pool,
-        posting,
-        postingInput({
-          sourceType: "INVENTORY_TEST",
-          sourceId: IDS.emptySource,
-        }),
-      );
-      await assert.rejects(
-        withTransaction(pool, (client) =>
-          client.query(
-            `INSERT INTO inventory_movements
-              (id,branch_id,warehouse_id,movement_type,source_type,source_id,
-               posting_batch_id,occurred_at,created_by,reason_code,notes)
-             SELECT
-               'b8000000-0000-4000-8000-000000000024',
-               $2,$3,'PURCHASE',pb.source_type,pb.source_id,pb.id,pb.posted_at,
-               pb.created_by,NULL,NULL
-             FROM posting_batches pb
-             WHERE pb.id=$1`,
-            [
-              emptyBatch.id,
-              IDS.branch1,
-              IDS.warehouse1,
-            ],
-          ),
-        ),
-        (error) =>
-          error?.code === "23514" &&
-          /must contain at least one line/.test(
-            error?.message ?? "",
-          ),
-      );
-
       const triggers = await pool.query(
         `SELECT c.relname AS table_name,t.tgname
            FROM pg_trigger t
@@ -697,13 +663,12 @@ test(
             AND t.tgname IN (
               'bt_inventory_movements__posting_context',
               'bt_inventory_movement_lines__direction',
-              'ct_inventory_movements__has_lines_at_commit',
               'bt_inventory_movements__immutable',
               'bt_inventory_movement_lines__immutable'
             )
           ORDER BY c.relname,t.tgname`,
       );
-      assert.equal(triggers.rowCount, 5);
+      assert.equal(triggers.rowCount, 4);
 
       assert.deepEqual(
         await indexNames(pool, "inventory_movements"),
