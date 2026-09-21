@@ -2819,13 +2819,34 @@ Implementation boundary:
 
 ## 07.04 Dynamic Attributes
 
-**Status:** `IN_PROGRESS`
+**Status:** `CLOSED`
+
+Implementation boundary:
+
+- Dynamic Attribute usage remains `VARIANT / DESCRIPTIVE`.
+- Attribute Value master data and Product↔Attribute mappings are supported.
+- Variant composition accepts only values from active, Product-linked `VARIANT` Attributes.
+- multiple selected values from the same Attribute are rejected.
+- `combination_signature` is canonical from sorted Attribute ID + Attribute Value ID pairs and is independent of input order/display labels.
+- Product row locking serializes Variant composition; approved `UNIQUE(product_id, combination_signature)` remains the final duplicate/concurrency defense.
+- the first real Variant reuses the internal Default Variant row so existing SKU/Barcode references survive, then becomes `is_default=false`.
+- later combinations create additional Variant rows.
+- Attribute/Product/Variant mutations are Audit-recorded.
+- no Product-level DESCRIPTIVE selected-value storage was invented because the Baseline schema does not define it.
+- no Migration and no Index change.
+- no Pricing/Reorder or Frontend/Convex cutover.
+
+**07.04 Verified Implementation SHA:** `828866588e14c552887da705deb8cbaf4d28ef6c`.  
+**07.04 Implementation CI:** Run `#1012` / `35600921253` — SUCCESS; `verify`, `backend-verify` including PostgreSQL 17 Dynamic Attributes concurrency integration, `browser-contract`, and `release-gate` all SUCCESS on the same implementation SHA.  
+**07.04 Validation PR:** `#231` — validation-only; close WITHOUT MERGE after final same-SHA documentation validation.
 
 - VARIANT/DESCRIPTIVE usage.
 - combination signature canonicalization.
 - prevent duplicate variant combination.
 
 ## 07.05 Price Lists
+
+**Status:** `READY_TO_START`
 
 - unlimited price lists.
 - price per price-list + variant + product-unit.
@@ -2844,7 +2865,7 @@ Implementation boundary:
 - [x] unit conversion tests.
 - [x] fraction restriction tests.
 - [x] SKU/barcode concurrency uniqueness.
-- [ ] combination signature tests.
+- [x] combination signature tests.
 - [ ] minimum price permission tests.
 
 ---
@@ -4132,8 +4153,8 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 
 # 32. Current Execution Pointer
 
-**Current Phase:** `PHASE 07 — Product Catalog / Variants / Units / Pricing / 07.04 Dynamic Attributes`  
-**Status:** `IN_PROGRESS`  
+**Current Phase:** `PHASE 07 — Product Catalog / Variants / Units / Pricing / 07.05 Price Lists`  
+**Status:** `READY_TO_START`  
 **Integration Branch:** `agent/postgres-v1.7-core`  
 **Phase 01 Final SHA:** `b0d35101bf622264b655bcc574787989fadbcd83`  
 **Phase 01 Validation PR:** `#183` — closed without merge.  
@@ -4278,9 +4299,15 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 **07.03 Barcodes / SKU:** `CLOSED` — Gap Analysis at `docs/gap-analysis/phase-07-03-barcodes-sku.md`; `ProductIdentifierService` normalizes nullable SKU to uppercase, manages unique Barcodes mapped to Variant+ProductUnit, performs exact lookup, rejects Cross-Product linkage, translates known uniqueness conflicts to stable errors, and records Audit without schema/index changes.  
 **07.03 Verified Implementation SHA:** `02ef957e13c609a12a01f894ee0abafea10935ff`.  
 **07.03 Implementation CI:** Run `#1009` / `35534721633` — SUCCESS; `verify`, `backend-verify` including PostgreSQL 17 SKU/Barcode concurrency races and all regressions, `browser-contract`, and `release-gate` all SUCCESS on the same implementation SHA.  
-**07.03 Validation PR:** `#230` — validation-only; close WITHOUT MERGE after final same-SHA documentation validation.  
-**Next Action:** execute **PHASE 07 / 07.04 Dynamic Attributes only** after final 07.03 documentation-SHA validation.  
-**Forbidden Next Actions:** لا 07.05 قبل إغلاق 07.04، لا Frontend cutover، لا dual write، لا `main` merge، ولا Convex Production change.
+**07.03 Final Verified SHA:** `083d1e72f063e47250c51aac0f2f235857a780cb`.  
+**07.03 Final CI:** Run `#1011` / `35534862282` — SUCCESS on the final documentation SHA.  
+**07.03 Validation PR:** `#230` — CLOSED WITHOUT MERGE; `merged=false`.  
+**07.04 Dynamic Attributes:** `CLOSED` — Gap Analysis at `docs/gap-analysis/phase-07-04-dynamic-attributes.md`; `ProductAttributeService` manages VARIANT/DESCRIPTIVE master data and Product mappings, builds canonical order-independent Variant signatures from IDs, reuses the internal Default Variant row for the first real combination to preserve identifier references, rejects invalid/descriptive/unlinked selections, and relies on the approved Product+Signature UNIQUE for duplicate/concurrency protection without schema/index changes.  
+**07.04 Verified Implementation SHA:** `828866588e14c552887da705deb8cbaf4d28ef6c`.  
+**07.04 Implementation CI:** Run `#1012` / `35600921253` — SUCCESS; `verify`, `backend-verify` including PostgreSQL 17 Dynamic Attributes concurrency and all regressions, `browser-contract`, and `release-gate` all SUCCESS on the same implementation SHA.  
+**07.04 Validation PR:** `#231` — validation-only; close WITHOUT MERGE after final same-SHA documentation validation.  
+**Next Action:** execute **PHASE 07 / 07.05 Price Lists only** after final 07.04 documentation-SHA validation.  
+**Forbidden Next Actions:** لا 07.06 قبل إغلاق 07.05، لا Frontend cutover، لا dual write، لا `main` merge، ولا Convex Production change.
 
 **Plan update — 2026-09-17 / ACCOUNTING CONSTRAINTS CLOSED:** تم إغلاق ثامن executable slice من 03.06 على SHA `ef03d141958c392032bd8caf16b5f880a193e86e`. Migration `0019`، ADR-0021، Accounting PK/FK/UNIQUE/CHECK layer، Finance Category → GL Account FK، والحفاظ على deferred Journal balance at COMMIT تم التحقق منهم فعليًا على PostgreSQL 17؛ Full CI run `35224498880` أخضر بالكامل وPR `#206` أُغلق بدون Merge. 03.06 ما زالت `IN_PROGRESS` و03.07 لم تبدأ.
 
@@ -4288,6 +4315,8 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 
 ---
 
+
+**Plan update — 2026-09-21 / 07.04 DYNAMIC ATTRIBUTES CLOSED:** تم إغلاق 07.04 وظيفيًا على SHA `828866588e14c552887da705deb8cbaf4d28ef6c` بعد Full CI Run `#1012` / `35600921253` SUCCESS. `ProductAttributeService` أصبح يدير VARIANT/DESCRIPTIVE Attributes وقيمها وربطها بالProduct، ويكوّن `combination_signature` canonical من IDs مرتبة بحيث ترتيب الإدخال أو تغيير أسماء العرض لا يغيّر الهوية. أول Variant فعلي يعيد استخدام نفس Default Variant الداخلي حفاظًا على SKU/Barcode، والـProduct row يُقفل قبل التركيب، وPostgreSQL 17 أثبت duplicate-combination race بWriter واحد فقط ناجح والآخر Stable Conflict. DESCRIPTIVE/unlinked/same-attribute multi-value selections مرفوضة، Frozen indexes بقيت بلا تغيير، ولا Migration جديد بعد `0023`. Gate 07 بند combination signature tests أصبح مكتملًا. 07.05 لم تبدأ؛ Next Action بعد final documentation-SHA CI: 07.05 Price Lists فقط.
 
 **Plan update — 2026-09-21 / 07.04 DYNAMIC ATTRIBUTES STARTED:** Gap Analysis مقابل Architecture Baseline v1.7 أثبت أن جداول `attributes/attribute_values/product_attributes/variant_attribute_values` وUnique Product+Combination Signature وFrozen Attribute indexes موجودة ومتوافقة؛ لذلك لا Migration ولا Index جديد في 07.04. التنفيذ سيضيف ProductAttributeService لتعريف VARIANT/DESCRIPTIVE Attributes وقيمها وربطها بالProduct، وإنشاء Variants من قيم VARIANT فقط، وبناء `combination_signature` canonical من IDs مرتبة، ومنع duplicate combination تحت التزامن. أول Variant فعلي سيحوّل نفس Default Variant الداخلي بدل حذفه حفاظًا على SKU/Barcode الموجودة. لا Product-level descriptive value storage لأن الـBaseline schema لا يعرّفها، ولا Pricing (07.05) أو Reorder أو Frontend/Convex cutover.
 
