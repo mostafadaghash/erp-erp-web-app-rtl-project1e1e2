@@ -1,6 +1,6 @@
 # Phase 07.04 — Dynamic Attributes Gap Analysis
 
-**Status:** `IN_PROGRESS`  
+**Status:** `CLOSED`  
 **Branch:** `agent/postgres-v1.7-core`  
 **Architecture Source:** Business Tech ERP Architecture Baseline v1.7  
 **Implementation Plan:** Business Tech ERP Master Implementation Plan v1.0
@@ -152,6 +152,32 @@ The remaining Gate 07 item stays open for 07.05.
 - no migration.
 - no index addition.
 
+## Closure evidence
+
+- Verified implementation SHA: `828866588e14c552887da705deb8cbaf4d28ef6c`.
+- Full CI: Run `#1012` / `35600921253` — SUCCESS on the same implementation SHA.
+- `verify`: SUCCESS.
+- `backend-verify`: SUCCESS, including PostgreSQL 17 Dynamic Attributes concurrency integration.
+- `browser-contract`: SUCCESS.
+- `release-gate`: SUCCESS.
+- VARIANT and DESCRIPTIVE Attribute definitions are supported without inventing a closed attribute_type vocabulary.
+- Product↔Attribute mapping is enforced before Variant composition.
+- DESCRIPTIVE values are rejected from Variant composition.
+- two values from the same Attribute are rejected.
+- canonical `combination_signature` is independent of input value order.
+- the first actual Variant reuses the internal Default Variant row, preserving pre-existing SKU/Barcode references, and becomes `is_default=false`.
+- later combinations create new Variant rows.
+- duplicate combinations are rejected by the approved Product+Signature UNIQUE.
+- concurrent duplicate-combination writers produce exactly one success and one stable `VARIANT_COMBINATION_ALREADY_EXISTS` conflict.
+- Variant composition rows match the selected Attribute Values.
+- Attribute/Product/Variant mutations are Audit-recorded.
+- frozen Attribute/ProductVariant index inventory remains unchanged.
+- migration history remains through `0023`; no 07.04 migration was added.
+- Product-level selected-value persistence for DESCRIPTIVE Attributes was not invented because the Baseline schema does not define it.
+- 07.01/07.02/07.03 regressions remain green.
+- 07.05 Pricing and later Product Catalog slices were not started.
+- Validation PR: `#231`, validation-only, to be closed without merge after final documentation-SHA CI.
+
 ## Next action
 
-Implement and validate 07.04 Dynamic Attributes only. 07.05 remains forbidden until 07.04 closes.
+After final documentation-SHA validation, 07.04 is CLOSED. The next official step is PHASE 07 / 07.05 Price Lists, READY_TO_START only.
