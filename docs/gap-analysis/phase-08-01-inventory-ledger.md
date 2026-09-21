@@ -1,6 +1,6 @@
 # Phase 08.01 — Inventory Ledger Gap Analysis
 
-**Status:** `IN_PROGRESS`  
+**Status:** `CLOSED`  
 **Branch:** `agent/postgres-v1.7-core`  
 **Architecture Source:** Business Tech ERP Architecture Baseline v1.7  
 **Implementation Plan:** Business Tech ERP Master Implementation Plan v1.0
@@ -166,6 +166,27 @@ No mutable balance is calculated or stored by 08.01.
 - no Convex Production change.
 - no Index addition.
 
+## Closure evidence
+
+- Verified implementation SHA: `5cd6437727ee00c6731e01666c0ac97ecdf87c2f`.
+- Full implementation CI: Run `#1025` / `35669544876` — SUCCESS on the same implementation SHA.
+- `verify`: SUCCESS.
+- `backend-verify`: SUCCESS, including the PostgreSQL 17 Inventory Ledger integration gate and all downstream schema/integrity regressions.
+- `browser-contract`: SUCCESS.
+- `release-gate`: SUCCESS.
+- migration `0024_inventory_ledger_integrity` is the migration tail and verify-only passes.
+- the approved eight movement types are enforced in PostgreSQL.
+- inbound/outbound signed direction and non-zero quantity are enforced.
+- canonical Backend inserts inherit source identity and server posting time from PostingBatch.
+- normal movement Branch/PostingBatch scope and cross-branch `TRANSFER_IN` semantics were verified.
+- Branch Scope prevents foreign-branch movement reads/appends.
+- movement headers and lines reject direct UPDATE/DELETE after posting.
+- reversal/correction remains append-only and preserves original historical rows.
+- 08.01 does not create or mutate `inventory_stock_positions`.
+- the frozen Inventory Ledger index inventory remains unchanged; migration 0024 adds no Index.
+- prior 07.x and PostgreSQL regressions are green on the same implementation SHA.
+- Validation PR: `#234`, validation-only; close WITHOUT MERGE after final documentation-SHA CI.
+
 ## Next action
 
-Implement and validate 08.01 only. Do not start 08.02 until 08.01 is CLOSED by the required same-SHA gates.
+After final documentation-SHA validation, 08.01 is CLOSED. The next official step is PHASE 08 / 08.02 Stock Positions, READY_TO_START only.

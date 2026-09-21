@@ -2902,13 +2902,13 @@ Implementation boundary:
 
 # 14. PHASE 08 — Inventory Core
 
-**Status:** `READY_TO_START`
+**Status:** `IN_PROGRESS`
 
 هذه المرحلة Critical ولا يتم ربط Sales/Purchasing النهائي بها قبل نجاح Concurrency Gate.
 
 ## 08.01 Inventory Ledger
 
-**Status:** `IN_PROGRESS`
+**Status:** `CLOSED`
 
 - append-only movement headers/lines.
 - movement types defined by v1.7.
@@ -2927,7 +2927,14 @@ Implementation boundary:
 - no Stock Position mutation, no Weighted Average Cost, no Reservations/Serials/Batches, no Accounting/COGS, and no Frontend/Convex cutover.
 - no Index change.
 
+**08.01 Verified Implementation SHA:** `5cd6437727ee00c6731e01666c0ac97ecdf87c2f`.  
+**08.01 Implementation CI:** Run `#1025` / `35669544876` — SUCCESS; `verify`, `backend-verify` including PostgreSQL 17 Inventory Ledger and downstream regressions, `browser-contract`, and `release-gate` all SUCCESS on the same implementation SHA.  
+**08.01 Migration Tail:** `0024_inventory_ledger_integrity` — no Index additions.  
+**08.01 Validation PR:** `#234` — validation-only; close WITHOUT MERGE after final same-SHA documentation validation.
+
 ## 08.02 Stock Positions
+
+**Status:** `READY_TO_START`
 
 For each Warehouse+Variant:
 
@@ -4197,8 +4204,8 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 
 # 32. Current Execution Pointer
 
-**Current Phase:** `PHASE 08 — Inventory Core / 08.01 Inventory Ledger`  
-**Status:** `IN_PROGRESS`  
+**Current Phase:** `PHASE 08 — Inventory Core / 08.02 Stock Positions`  
+**Status:** `READY_TO_START`  
 **Integration Branch:** `agent/postgres-v1.7-core`  
 **Phase 01 Final SHA:** `b0d35101bf622264b655bcc574787989fadbcd83`  
 **Phase 01 Validation PR:** `#183` — closed without merge.  
@@ -4359,8 +4366,13 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 **07.06 Implementation CI:** Run `#1017` / `35605263173` — SUCCESS; `verify`, `backend-verify` including PostgreSQL 17 Reorder Levels integration, `browser-contract`, and `release-gate` all SUCCESS on the same implementation SHA.  
 **07.06 Validation PR:** `#233` — validation-only; close WITHOUT MERGE after final same-SHA documentation validation.  
 **PHASE 07:** `CLOSED` — all Product Catalog slices 07.01–07.06 and Gate 07 are complete.  
-**Next Action:** execute **PHASE 08 / 08.01 Inventory Ledger only** after final 07.06 documentation-SHA validation.  
-**Forbidden Next Actions:** لا 08.02 قبل إغلاق 08.01، لا Frontend cutover، لا dual write، لا `main` merge، ولا Convex Production change.
+**08.01 Inventory Ledger:** `CLOSED` — Gap Analysis at `docs/gap-analysis/phase-08-01-inventory-ledger.md`; immutable append-only Inventory Movement/Lines, exact v1.7 movement vocabulary and signed direction, PostingBatch source/actor trace, canonical server posting time, Branch Scope, cross-branch TRANSFER_IN semantics, and PostgreSQL UPDATE/DELETE immutability are implemented.  
+**08.01 Verified Implementation SHA:** `5cd6437727ee00c6731e01666c0ac97ecdf87c2f`.  
+**08.01 Implementation CI:** Run `#1025` / `35669544876` — SUCCESS; `verify`, `backend-verify` including PostgreSQL 17 Inventory Ledger integration and all regressions, `browser-contract`, and `release-gate` all SUCCESS on the same implementation SHA.  
+**08.01 Migration:** `0024_inventory_ledger_integrity` — migration tail; no Index addition.  
+**08.01 Validation PR:** `#234` — validation-only; close WITHOUT MERGE after final same-SHA documentation validation.  
+**Next Action:** execute **PHASE 08 / 08.02 Stock Positions only** after final 08.01 documentation-SHA validation.  
+**Forbidden Next Actions:** لا 08.03 قبل إغلاق 08.02، لا Sales/Purchasing final cutover، لا Frontend cutover، لا dual write، لا `main` merge، ولا Convex Production change.
 
 **Plan update — 2026-09-17 / ACCOUNTING CONSTRAINTS CLOSED:** تم إغلاق ثامن executable slice من 03.06 على SHA `ef03d141958c392032bd8caf16b5f880a193e86e`. Migration `0019`، ADR-0021، Accounting PK/FK/UNIQUE/CHECK layer، Finance Category → GL Account FK، والحفاظ على deferred Journal balance at COMMIT تم التحقق منهم فعليًا على PostgreSQL 17؛ Full CI run `35224498880` أخضر بالكامل وPR `#206` أُغلق بدون Merge. 03.06 ما زالت `IN_PROGRESS` و03.07 لم تبدأ.
 
@@ -4496,3 +4508,6 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 
 
 **Plan update — 2026-09-21 / 08.01 INVENTORY LEDGER STARTED:** Gap Analysis مقابل Architecture Baseline v1.7 أثبت أن جداول Inventory Movement/Lines والـFKs والـFrozen indexes موجودة، لكن DB-level movement vocabulary/direction/PostingBatch context/immutability غير مكتملة. لذلك 08.01 تضيف migration `0024_inventory_ledger_integrity` بدون أي Index جديد. التنفيذ يبني append-only `InventoryLedgerService` داخل Transaction قائمة فقط؛ `occurred_at` يأتي من `posting_batches.posted_at` ولا يقبل Backdating من caller. PostgreSQL يحمي الأنواع الثمانية المعتمدة، signed IN/OUT، Source/Posting trace، وUPDATE/DELETE immutability. `TRANSFER_IN` يسمح بفرع الهدف المختلف عن PostingBatch المصدر في Cross-Branch Stock Transfer. لا Stock Positions/WA Cost/Reservations/Serials/Batches أو Phase 08.02.
+
+
+**Plan update — 2026-09-22 / 08.01 INVENTORY LEDGER CLOSED:** تم إغلاق 08.01 وظيفيًا على SHA `5cd6437727ee00c6731e01666c0ac97ecdf87c2f` بعد Full CI Run `#1025` / `35669544876` SUCCESS. Migration `0024_inventory_ledger_integrity` أصبحت migration tail وتضيف فقط integrity/immutability بلا Index جديد: vocabulary الأنواع الثمانية، signed IN/OUT non-zero، PostingBatch source/actor context، ورفض UPDATE/DELETE لحركات وسطور Inventory Ledger. `InventoryLedgerService` يكتب داخل Business Transaction قائمة فقط، ويأخذ source وserver `posted_at` من PostingBatch في canonical path، ويفرض Branch Scope مع استثناء `TRANSFER_IN` الصحيح للتحويل Cross-Branch. PostgreSQL 17 أثبت append-only reversal، foreign-branch denial، no Stock Position mutation، وثبات Frozen indexes. Runs التشخيصية السابقة كشفت fixtures قديمة لا تحترم invariants الجديدة وstale migration-tail assertions وتم تصحيح الاختبارات دون تخفيف قواعد الـLedger. 08.02 لم تبدأ؛ Next Action بعد final documentation-SHA CI: 08.02 Stock Positions فقط.
