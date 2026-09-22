@@ -80,7 +80,7 @@ test("03.G Finance / Settlement physical shape remains canonical after later 03.
       assert.equal(indexCatalog?.name, "index_catalog");
       assert.match(indexCatalog?.checksum ?? "", /^[0-9a-f]{64}$/);
       const latest = history.rows.at(-1);
-      assert.equal(latest.version, "0024");
+      assert.equal(latest.version, "0025");
       assert.equal(latest.name, "inventory_ledger_integrity");
       assert.match(latest.checksum ?? "", /^[0-9a-f]{64}$/);
     });
