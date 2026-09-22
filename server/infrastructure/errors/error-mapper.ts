@@ -17,6 +17,7 @@ import { StockPositionError } from '../inventory/stock-position-service.js'
 import { InventoryCostError } from '../inventory/inventory-cost-service.js'
 import { StockReservationError } from '../inventory/stock-reservation-service.js'
 import { SerialInventoryError } from '../inventory/serial-inventory-service.js'
+import { BatchInventoryError } from '../inventory/batch-inventory-service.js'
 
 export type SafeErrorParam = string | number | boolean | null
 export type SafeErrorParams = Readonly<Record<string, SafeErrorParam>>
@@ -46,6 +47,7 @@ export const ERROR_CODES = {
   INVENTORY_COST_OPERATION_REJECTED: 'INVENTORY_COST_OPERATION_REJECTED',
   STOCK_RESERVATION_OPERATION_REJECTED: 'STOCK_RESERVATION_OPERATION_REJECTED',
   SERIAL_INVENTORY_OPERATION_REJECTED: 'SERIAL_INVENTORY_OPERATION_REJECTED',
+  BATCH_INVENTORY_OPERATION_REJECTED: 'BATCH_INVENTORY_OPERATION_REJECTED',
   INVALID_ARGUMENT: 'INVALID_ARGUMENT',
   DB_UNIQUE_CONFLICT: 'DB_UNIQUE_CONFLICT',
   DB_REFERENCE_CONFLICT: 'DB_REFERENCE_CONFLICT',
@@ -215,6 +217,12 @@ export function toErrorContract(error: unknown): ErrorContract {
 
   if (error instanceof SerialInventoryError) {
     return contract(ERROR_CODES.SERIAL_INVENTORY_OPERATION_REJECTED, {
+      reason: error.reason,
+    })
+  }
+
+  if (error instanceof BatchInventoryError) {
+    return contract(ERROR_CODES.BATCH_INVENTORY_OPERATION_REJECTED, {
       reason: error.reason,
     })
   }
