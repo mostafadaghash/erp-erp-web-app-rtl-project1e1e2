@@ -2952,7 +2952,7 @@ Position row is lock row/projection, not history.
 
 ## 08.03 Weighted Average Cost
 
-**Status:** `READY_TO_START`
+**Status:** `IN_PROGRESS`
 
 Per Warehouse+Variant:
 
@@ -4212,7 +4212,7 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 # 32. Current Execution Pointer
 
 **Current Phase:** `PHASE 08 — Inventory Core / 08.03 Weighted Average Cost`  
-**Status:** `READY_TO_START`  
+**Status:** `IN_PROGRESS`  
 **Integration Branch:** `agent/postgres-v1.7-core`  
 **Phase 01 Final SHA:** `b0d35101bf622264b655bcc574787989fadbcd83`  
 **Phase 01 Validation PR:** `#183` — closed without merge.  
@@ -4383,8 +4383,9 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 **08.02 Implementation CI:** Run `#1027` / `35679070852` — SUCCESS; `verify`, `backend-verify` including PostgreSQL 17 Stock Positions integration and 20-way first-writer concurrency proof, `browser-contract`, and `release-gate` all SUCCESS on the same implementation SHA.  
 **08.02 Migration/Index:** no new migration; migration tail remains `0024_inventory_ledger_integrity`; no Index addition and Frozen Stock Position catalog remains unchanged.  
 **08.02 Validation PR:** `#235` — validation-only; close WITHOUT MERGE after final same-SHA documentation validation.  
-**Next Action:** execute **PHASE 08 / 08.03 Weighted Average Cost only** after final 08.02 documentation-SHA validation.  
-**Forbidden Next Actions:** لا 08.04 قبل إغلاق 08.03، لا Reservation lifecycle، لا Sales/Purchasing final cutover، لا Frontend cutover، لا dual write، لا `main` merge، ولا Convex Production change.
+**08.03 Weighted Average Cost:** `IN_PROGRESS` — Gap Analysis at `docs/gap-analysis/phase-08-03-weighted-average-cost.md`; implementation is limited to the synchronous rebuildable Variant+Warehouse Cost State with current WA outbound valuation, valued inbound mixing, explicit Last Purchase Cost updates, Inventory Value = On Hand × WA, fixed Stock-before-Cost locking, exact fixed-decimal math and projection drift guards. No migration or Index addition.  
+**Next Action:** implement and validate **PHASE 08 / 08.03 Weighted Average Cost only**.  
+**Forbidden Next Actions:** لا 08.04 قبل إغلاق 08.03، لا Reservation lifecycle، لا Stock Transfer document orchestration، لا Sales/Purchasing final cutover، لا Frontend cutover، لا dual write، لا `main` merge، ولا Convex Production change.
 
 **Plan update — 2026-09-17 / ACCOUNTING CONSTRAINTS CLOSED:** تم إغلاق ثامن executable slice من 03.06 على SHA `ef03d141958c392032bd8caf16b5f880a193e86e`. Migration `0019`، ADR-0021، Accounting PK/FK/UNIQUE/CHECK layer، Finance Category → GL Account FK، والحفاظ على deferred Journal balance at COMMIT تم التحقق منهم فعليًا على PostgreSQL 17؛ Full CI run `35224498880` أخضر بالكامل وPR `#206` أُغلق بدون Merge. 03.06 ما زالت `IN_PROGRESS` و03.07 لم تبدأ.
 
@@ -4529,3 +4530,6 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 
 
 **Plan update — 2026-09-22 / 08.02 STOCK POSITIONS CLOSED:** تم إغلاق 08.02 وظيفيًا على SHA `e5485ab1940fa953206ca950dca2af7bd996d8d6` بعد Full CI Run `#1027` / `35679070852` SUCCESS. `StockPositionService` أصبح يملك الـSynchronous Rebuildable Operational Projection + Lock Row لكل Warehouse+Variant: ينشئ الصف المفقود بصفر داخل نفس Business Transaction عبر `INSERT ... ON CONFLICT DO NOTHING`، ثم يقفل الصفوف بترتيب ثابت `warehouse_id → variant_id` باستخدام `SELECT ... FOR UPDATE`، ويطبق exact `numeric(18,6)` deltas بدون JavaScript float، ويشتق `available = on_hand - reserved`، ويرفع `version` مرة لكل mutation committed مع server `updated_at`. PostgreSQL 17 أثبت 20 concurrent first-writers بدون lost update وبنتيجة `on_hand=20` و`version=20`، كما أثبت rollback للصف الجديد، Branch Scope، fixed multi-row ordering، ورفض `reserved < 0`. لم نضع منعًا عالميًا للـnegative `on_hand` أو `available` لأن سياسة Negative Stock وReservation availability تخص Business Commands الأعلى، ولا يتم إخفاء Reservation shortfall بتعديل الرصيد المحجوز. لا Migration ولا Index جديد؛ migration tail بقي `0024` والـFrozen Index Catalog لم يتغير. PHASE 08 تظل `IN_PROGRESS`، و08.03 لم تبدأ؛ Next Action بعد final documentation-SHA CI: 08.03 Weighted Average Cost فقط.
+
+
+**Plan update — 2026-09-22 / 08.03 WEIGHTED AVERAGE COST STARTED:** Gap Analysis مقابل Architecture Baseline v1.7 أثبت أن `variant_warehouse_cost_projection` والـPK/FKs/CHECKs والـFrozen reverse index موجودة ومتوافقة، لذلك لا Migration ولا Index جديد. التنفيذ يضيف transaction-bound `InventoryCostService` فوق 08.02: يقفل Stock Position أولاً ثم Cost State بترتيب ثابت، ينشئ Cost row المفقود بأصفار داخل نفس المعاملة، ويحسب كل الكميات/القيم بـBigInt fixed-decimal بدون JavaScript float. الـInbound يخلط `current_value + inbound_value` على `new_quantity` لإعادة WA، والـOutbound يقيّم بالسعر `Current WA` بدون تغيير WA؛ `inventory_value` يعاد دائمًا كـ`On Hand × WA`، و`last_purchase_cost` لا يتغير إلا بطلب صريح من Purchase flow. لا يوجد caller-supplied backdating timestamp في primitive، وبالتالي ترتيب التكلفة يظل ترتيب الـBusiness Transaction/Posting الحالي. v1.7 يسمح Negative Stock لكنه لا يحدد Variance خاصًا لحالة وصول الكمية إلى صفر مع Residual Value غير صفرية؛ 08.03 ترفض هذه الحالة بـStable Error بدل اختراع Accounting rule. 08.04 وما بعدها لم تبدأ.

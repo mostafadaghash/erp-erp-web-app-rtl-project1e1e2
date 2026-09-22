@@ -14,6 +14,7 @@ import { PriceListError } from '../products/price-list-service.js'
 import { ReorderLevelError } from '../products/reorder-level-service.js'
 import { InventoryLedgerError } from '../inventory/inventory-ledger-service.js'
 import { StockPositionError } from '../inventory/stock-position-service.js'
+import { InventoryCostError } from '../inventory/inventory-cost-service.js'
 
 export type SafeErrorParam = string | number | boolean | null
 export type SafeErrorParams = Readonly<Record<string, SafeErrorParam>>
@@ -40,6 +41,7 @@ export const ERROR_CODES = {
   REORDER_LEVEL_OPERATION_REJECTED: 'REORDER_LEVEL_OPERATION_REJECTED',
   INVENTORY_LEDGER_OPERATION_REJECTED: 'INVENTORY_LEDGER_OPERATION_REJECTED',
   STOCK_POSITION_OPERATION_REJECTED: 'STOCK_POSITION_OPERATION_REJECTED',
+  INVENTORY_COST_OPERATION_REJECTED: 'INVENTORY_COST_OPERATION_REJECTED',
   INVALID_ARGUMENT: 'INVALID_ARGUMENT',
   DB_UNIQUE_CONFLICT: 'DB_UNIQUE_CONFLICT',
   DB_REFERENCE_CONFLICT: 'DB_REFERENCE_CONFLICT',
@@ -191,6 +193,12 @@ export function toErrorContract(error: unknown): ErrorContract {
 
   if (error instanceof StockPositionError) {
     return contract(ERROR_CODES.STOCK_POSITION_OPERATION_REJECTED, {
+      reason: error.reason,
+    })
+  }
+
+  if (error instanceof InventoryCostError) {
+    return contract(ERROR_CODES.INVENTORY_COST_OPERATION_REJECTED, {
       reason: error.reason,
     })
   }
