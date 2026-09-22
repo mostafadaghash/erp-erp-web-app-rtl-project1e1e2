@@ -243,8 +243,8 @@ test("03.06 Accounting constraints enforce canonical integrity on PostgreSQL 17"
       assert.equal(indexCatalog?.name, "index_catalog");
       assert.match(indexCatalog?.checksum ?? "", /^[0-9a-f]{64}$/);
       const latest = history.rows.at(-1);
-      assert.equal(latest?.version, "0024");
-      assert.equal(latest?.name, "inventory_ledger_integrity");
+      assert.equal(latest?.version, "0025");
+      assert.equal(latest?.name, "batch_expiry_permission");
       assert.match(latest?.checksum ?? "", /^[0-9a-f]{64}$/);
     });
 
