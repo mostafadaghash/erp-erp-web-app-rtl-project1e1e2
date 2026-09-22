@@ -140,7 +140,7 @@ test("03.07 frozen Index Catalog is exact on PostgreSQL 17", async (t) => {
   await cleanupDatabase(databaseUrl);
   try {
     const first = await runMigrations({ databaseUrl });
-    assert.equal(first.applied.at(-1), "0024");
+    assert.equal(first.applied.at(-1), "0025");
 
     await withClient(databaseUrl, async (client) => {
       const indexes = await queryIndexes(client);
