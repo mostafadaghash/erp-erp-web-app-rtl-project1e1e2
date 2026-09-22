@@ -83,7 +83,7 @@ test("03.06 Purchasing / Tax constraints enforce canonical integrity on PostgreS
       await expectConstraint(client.query(`DELETE FROM tax_codes WHERE id=$1`,[ids.tax]),"23503","fk_purchase_invoice_lines__tax_code");
       const history=await client.query("SELECT version,name,checksum FROM schema_migrations ORDER BY version"); assert.equal(history.rowCount,MIGRATIONS.length);
       const purchasingSlice=history.rows.find((row)=>row.version==="0017"); assert.equal(purchasingSlice?.name,"purchasing_tax_constraints"); assert.match(purchasingSlice?.checksum??"",/^[0-9a-f]{64}$/);
-      const latest=history.rows.at(-1); assert.equal(latest.version,"0024"); assert.equal(latest.name,"inventory_ledger_integrity"); assert.match(latest.checksum,/^[0-9a-f]{64}$/);
+      const latest=history.rows.at(-1); assert.equal(latest.version,"0025"); assert.equal(latest.name,"batch_expiry_permission"); assert.match(latest.checksum,/^[0-9a-f]{64}$/);
       const indexCatalog=history.rows.find((row)=>row.version==="0022"); assert.equal(indexCatalog?.name,"index_catalog"); assert.match(indexCatalog?.checksum??"",/^[0-9a-f]{64}$/);
     });
     const second=await runMigrations({databaseUrl}); assert.deepEqual(second.applied,[]); assert.deepEqual(second.skipped,MIGRATIONS);
