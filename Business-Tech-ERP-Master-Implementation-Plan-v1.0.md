@@ -2969,7 +2969,7 @@ No historical rewrite due to backdating.
 
 ## 08.04 Reservations
 
-**Status:** `IN_PROGRESS`
+**Status:** `CLOSED`
 
 - Confirm Sales Order increases reserved only.
 - one active logical reservation per order line + warehouse + variant.
@@ -2978,7 +2978,14 @@ No historical rewrite due to backdating.
 - release remaining on cancel.
 - warehouse change releases/revalidates/reserves atomically.
 
+**08.04 Verified Implementation SHA:** `5bb4691b0c13f78120111ce54af07563c5313a94`.  
+**08.04 Implementation CI:** Run `#1031` / `35726979984` — SUCCESS; `verify`, `backend-verify` including PostgreSQL 17 Stock Reservations concurrency/lifecycle coverage and all regressions, `browser-contract`, and `release-gate` all SUCCESS on the same implementation SHA.  
+**08.04 Migration/Index:** no new migration; migration tail remains `0024_inventory_ledger_integrity`; Frozen Reservation Index Catalog unchanged.  
+**08.04 Validation PR:** `#237` — validation-only; close WITHOUT MERGE after final same-SHA documentation validation.
+
 ## 08.05 Serials
+
+**Status:** `READY_TO_START`
 
 - unique within Variant.
 - current location/status operational projection.
@@ -3027,8 +3034,8 @@ Create controlled verification/rebuild procedures capable of recalculating opera
 
 ### Gate 08 — Mandatory Concurrency Suite
 
-- [ ] 2 simultaneous reservations for same stock cannot overreserve.
-- [ ] 20+ parallel reservation stress scenario.
+- [x] 2 simultaneous reservations for same stock cannot overreserve.
+- [x] 20+ parallel reservation stress scenario.
 - [ ] concurrent direct sales stock protection.
 - [ ] batch last-unit race.
 - [ ] serial double-use race.
@@ -4218,8 +4225,8 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 
 # 32. Current Execution Pointer
 
-**Current Phase:** `PHASE 08 — Inventory Core / 08.04 Reservations`  
-**Status:** `IN_PROGRESS`  
+**Current Phase:** `PHASE 08 — Inventory Core / 08.05 Serials`  
+**Status:** `READY_TO_START`  
 **Integration Branch:** `agent/postgres-v1.7-core`  
 **Phase 01 Final SHA:** `b0d35101bf622264b655bcc574787989fadbcd83`  
 **Phase 01 Validation PR:** `#183` — closed without merge.  
@@ -4395,9 +4402,13 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 **08.03 Implementation CI:** Run `#1029` / `35680403231` — SUCCESS; `verify`, `backend-verify` including PostgreSQL 17 Weighted Average Cost integration with purchase/return scenarios and 20-way valued first-writer concurrency, `browser-contract`, and `release-gate` all SUCCESS on the same implementation SHA.  
 **08.03 Migration/Index:** no new migration; migration tail remains `0024_inventory_ledger_integrity`; no Index addition and Frozen Cost Projection catalog remains unchanged.  
 **08.03 Validation PR:** `#236` — validation-only; close WITHOUT MERGE after final same-SHA documentation validation.  
-**08.04 Reservations:** `IN_PROGRESS` — Gap Analysis at `docs/gap-analysis/phase-08-04-reservations.md`; implementation is limited to the Stock Reservation primitive: active reservation create/delta update, remaining release, partial/full consumption, Warehouse replacement composition, Branch Scope, Base-Unit quantity ceiling, and strict SalesOrder→Line/Reservation→Stock Position locking with Available recheck. No migration or Index addition.  
-**Next Action:** implement and validate **PHASE 08 / 08.04 Reservations only**.  
-**Forbidden Next Actions:** لا 08.05 قبل إغلاق 08.04، لا Serial/Batch lifecycle، لا Stock Transfer document orchestration، لا Sales/Delivery posting cutover، لا Frontend cutover، لا dual write، لا `main` merge، ولا Convex Production change.
+**08.04 Reservations:** `CLOSED` — Gap Analysis at `docs/gap-analysis/phase-08-04-reservations.md`; `StockReservationService` now owns the transaction-bound reservation primitive with strict `SalesOrder → SalesOrderLine/active Reservation → Stock Position` locking, exact Base-Unit reservation deltas, Available recheck, partial/full consumption, idempotent remaining release, Warehouse replacement composition, Branch Scope, and historical terminal rows.  
+**08.04 Verified Implementation SHA:** `5bb4691b0c13f78120111ce54af07563c5313a94`.  
+**08.04 Implementation CI:** Run `#1031` / `35726979984` — SUCCESS; `verify`, `backend-verify` including PostgreSQL 17 reservation lifecycle, two-writer over-reservation race and 25-way stress, `browser-contract`, and `release-gate` all SUCCESS on the same implementation SHA.  
+**08.04 Migration/Index:** no new migration; migration tail remains `0024_inventory_ledger_integrity`; no Index addition and Frozen Reservation catalog remains unchanged.  
+**08.04 Validation PR:** `#237` — validation-only; close WITHOUT MERGE after final same-SHA documentation validation.  
+**Next Action:** execute **PHASE 08 / 08.05 Serials only** after final 08.04 documentation-SHA validation.  
+**Forbidden Next Actions:** لا 08.06 قبل إغلاق 08.05، لا Batch/Expiry lifecycle، لا Stock Transfer document orchestration، لا Sales/Delivery posting cutover، لا Frontend cutover، لا dual write، لا `main` merge، ولا Convex Production change.
 
 **Plan update — 2026-09-17 / ACCOUNTING CONSTRAINTS CLOSED:** تم إغلاق ثامن executable slice من 03.06 على SHA `ef03d141958c392032bd8caf16b5f880a193e86e`. Migration `0019`، ADR-0021، Accounting PK/FK/UNIQUE/CHECK layer، Finance Category → GL Account FK، والحفاظ على deferred Journal balance at COMMIT تم التحقق منهم فعليًا على PostgreSQL 17؛ Full CI run `35224498880` أخضر بالكامل وPR `#206` أُغلق بدون Merge. 03.06 ما زالت `IN_PROGRESS` و03.07 لم تبدأ.
 
@@ -4551,3 +4562,6 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 
 
 **Plan update — 2026-09-22 / 08.04 RESERVATIONS STARTED:** Gap Analysis مقابل Architecture Baseline v1.7 أثبت أن `stock_reservations` والـPK/FKs/status+quantity CHECKs والـSales-context deferred triggers والـ3 Frozen Reservation indexes موجودة ومتوافقة، لذلك لا Migration ولا Index جديد. التنفيذ يضيف transaction-bound `StockReservationService`: Lock order ثابت `SalesOrder → SalesOrderLine/active Reservation → Inventory Stock Position`؛ إنشاء/تعديل الحجز يغير `Reserved` فقط ولا يخصم `On Hand`، وأي زيادة تعيد فحص `Available` بعد قفل Position. `quantity` في ACTIVE/PARTIALLY_CONSUMED تُعامل صراحة كـremaining reserved quantity لتمكين rebuild للـReserved من الحجوزات النشطة؛ Partial consume ينقصها، Full consume يحول الصف CONSUMED، وCancel يترك الصف RELEASED تاريخيًا مع `released_at`. Warehouse replacement يقفل old/new positions بترتيب ثابت، يحرر القديم ويعيد الحجز في الهدف بعد Availability/Branch validation؛ تحديث SalesOrder warehouse نفسه يظل ملك Sales command ويجب أن يحدث داخل نفس Transaction قبل COMMIT وإلا deferred trigger يرفض العملية. Integration Gate يتضمن two-writer over-reservation race و25-way stress على رصيد 20. 08.05 وما بعدها لم تبدأ.
+
+
+**Plan update — 2026-09-22 / 08.04 RESERVATIONS CLOSED:** تم إغلاق 08.04 وظيفيًا على SHA `5bb4691b0c13f78120111ce54af07563c5313a94` بعد Full CI Run `#1031` / `35726979984` SUCCESS. `StockReservationService` أصبح يملك Reservation primitive داخل caller-owned Business Transaction: يقفل `SalesOrder → SalesOrderLine/active Reservation → Stock Position`، يزيد/ينقص `Reserved` فقط ولا يخصم `On Hand` عند الحجز، ويعيد فحص `Available` بعد القفل قبل أي زيادة. ACTIVE/PARTIALLY_CONSUMED تستخدم `quantity` كـremaining reserved quantity؛ partial consume ينقصها، full consume يحتفظ بصف CONSUMED تاريخي، وcancel يترك RELEASED + `released_at` بدون حذف. Warehouse replacement يحرر old ويعيد reserve في target atomically ويعتمد على deferred Sales-context trigger لضمان أن Sales command يغير Warehouse للطلب داخل نفس Transaction. PostgreSQL 17 أثبت order-edit exact deltas، Base-Unit ceiling، rollback عند insufficient availability، Branch Scope، historical terminal rows، two-writer 6+6 race على stock 10 بنتيجة writer واحد فقط، و25-way stress على stock 20 بنتيجة 20 success + 5 controlled rejections وReserved=20 بدون Over-Reservation. Gate 08 أول بندين Reservation Concurrency أصبحا مكتملين. لا Migration ولا Index جديد؛ migration tail بقي `0024`. PHASE 08 تظل `IN_PROGRESS`، و08.05 لم تبدأ؛ Next Action بعد final documentation-SHA CI: 08.05 Serials فقط.

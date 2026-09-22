@@ -1,6 +1,6 @@
 # Phase 08.04 — Reservations Gap Analysis
 
-**Status:** `IN_PROGRESS`  
+**Status:** `CLOSED`  
 **Branch:** `agent/postgres-v1.7-core`  
 **Architecture Source:** Business Tech ERP Architecture Baseline v1.7  
 **Implementation Plan:** Business Tech ERP Master Implementation Plan v1.0
@@ -184,6 +184,31 @@ For one line:
 - no migration.
 - no Index addition.
 
+## Closure evidence
+
+- Verified implementation SHA: `5bb4691b0c13f78120111ce54af07563c5313a94`.
+- Full implementation CI: Run `#1031` / `35726979984` — SUCCESS on the same implementation SHA.
+- `verify`: SUCCESS.
+- `backend-verify`: SUCCESS, including the PostgreSQL 17 Stock Reservations integration gate and all downstream regressions.
+- `browser-contract`: SUCCESS.
+- `release-gate`: SUCCESS.
+- first reservation increased `Reserved` only and left `On Hand` unchanged.
+- order-edit increases/decreases applied only exact Reserved deltas.
+- reservation quantity could not exceed the SalesOrderLine Base-Unit quantity.
+- insufficient Available rejected without partial mutation.
+- partial consume reduced Reserved while the reservation primitive itself left On Hand unchanged.
+- full consume preserved a historical CONSUMED row and removed it from active rebuilding.
+- cancellation released the exact remaining quantity, kept RELEASED history, and repeated release was a no-op.
+- Warehouse replacement released old and reserved target atomically; omitting the SalesOrder Warehouse update caused the existing deferred DB context constraint to reject COMMIT.
+- foreign-Branch reservation work was rejected by Branch Scope.
+- a real two-writer race for 6+6 units against stock 10 produced exactly one successful reservation and one `INSUFFICIENT_AVAILABLE`, with final Reserved=6.
+- a 25-way parallel stress scenario against stock 20 produced exactly 20 successful reservations and 5 rejections, with final On Hand=20, Reserved=20, Available=0 and no over-reservation.
+- no duplicate active logical reservation existed.
+- frozen Reservation indexes remained unchanged.
+- migration tail remains `0024_inventory_ledger_integrity`; 08.04 adds no migration.
+- Gate 08 items “2 simultaneous reservations…” and “20+ parallel reservation stress scenario” are satisfied.
+- Validation PR: `#237`, validation-only; close WITHOUT MERGE after final documentation-SHA CI.
+
 ## Next action
 
-Implement and validate 08.04 only. Do not start 08.05 until 08.04 is CLOSED by the required same-SHA gates.
+After final documentation-SHA validation, 08.04 is CLOSED. The next official step is PHASE 08 / 08.05 Serials, READY_TO_START only.
