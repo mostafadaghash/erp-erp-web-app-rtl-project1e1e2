@@ -2969,7 +2969,7 @@ No historical rewrite due to backdating.
 
 ## 08.04 Reservations
 
-**Status:** `READY_TO_START`
+**Status:** `IN_PROGRESS`
 
 - Confirm Sales Order increases reserved only.
 - one active logical reservation per order line + warehouse + variant.
@@ -4219,7 +4219,7 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 # 32. Current Execution Pointer
 
 **Current Phase:** `PHASE 08 — Inventory Core / 08.04 Reservations`  
-**Status:** `READY_TO_START`  
+**Status:** `IN_PROGRESS`  
 **Integration Branch:** `agent/postgres-v1.7-core`  
 **Phase 01 Final SHA:** `b0d35101bf622264b655bcc574787989fadbcd83`  
 **Phase 01 Validation PR:** `#183` — closed without merge.  
@@ -4395,8 +4395,9 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 **08.03 Implementation CI:** Run `#1029` / `35680403231` — SUCCESS; `verify`, `backend-verify` including PostgreSQL 17 Weighted Average Cost integration with purchase/return scenarios and 20-way valued first-writer concurrency, `browser-contract`, and `release-gate` all SUCCESS on the same implementation SHA.  
 **08.03 Migration/Index:** no new migration; migration tail remains `0024_inventory_ledger_integrity`; no Index addition and Frozen Cost Projection catalog remains unchanged.  
 **08.03 Validation PR:** `#236` — validation-only; close WITHOUT MERGE after final same-SHA documentation validation.  
-**Next Action:** execute **PHASE 08 / 08.04 Reservations only** after final 08.03 documentation-SHA validation.  
-**Forbidden Next Actions:** لا 08.05 قبل إغلاق 08.04، لا Serial/Batch lifecycle، لا Stock Transfer document orchestration، لا Sales/Purchasing final cutover، لا Frontend cutover، لا dual write، لا `main` merge، ولا Convex Production change.
+**08.04 Reservations:** `IN_PROGRESS` — Gap Analysis at `docs/gap-analysis/phase-08-04-reservations.md`; implementation is limited to the Stock Reservation primitive: active reservation create/delta update, remaining release, partial/full consumption, Warehouse replacement composition, Branch Scope, Base-Unit quantity ceiling, and strict SalesOrder→Line/Reservation→Stock Position locking with Available recheck. No migration or Index addition.  
+**Next Action:** implement and validate **PHASE 08 / 08.04 Reservations only**.  
+**Forbidden Next Actions:** لا 08.05 قبل إغلاق 08.04، لا Serial/Batch lifecycle، لا Stock Transfer document orchestration، لا Sales/Delivery posting cutover، لا Frontend cutover، لا dual write، لا `main` merge، ولا Convex Production change.
 
 **Plan update — 2026-09-17 / ACCOUNTING CONSTRAINTS CLOSED:** تم إغلاق ثامن executable slice من 03.06 على SHA `ef03d141958c392032bd8caf16b5f880a193e86e`. Migration `0019`، ADR-0021، Accounting PK/FK/UNIQUE/CHECK layer، Finance Category → GL Account FK، والحفاظ على deferred Journal balance at COMMIT تم التحقق منهم فعليًا على PostgreSQL 17؛ Full CI run `35224498880` أخضر بالكامل وPR `#206` أُغلق بدون Merge. 03.06 ما زالت `IN_PROGRESS` و03.07 لم تبدأ.
 
@@ -4547,3 +4548,6 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 
 
 **Plan update — 2026-09-22 / 08.03 WEIGHTED AVERAGE COST CLOSED:** تم إغلاق 08.03 وظيفيًا على SHA `92b465f973e772b10ce08d6da52a52a2c2a4a39e` بعد Full CI Run `#1029` / `35680403231` SUCCESS. `InventoryCostService` أصبح يملك الـSynchronous Rebuildable Cost State لكل Warehouse+Variant فوق 08.02: Lock order ثابت Stock Position ثم Cost State، exact BigInt fixed-decimal math، Purchase-style inbound يعيد WA ويحدث Last Purchase Cost صراحة، non-purchase valued inbound مثل linked Sales Return يدخل بالتكلفة التاريخية ولا يغير Last Purchase Cost، والـoutbound يخرج بالـCurrent WA بدون تغيير المتوسط. `inventory_value` يعاد دائمًا من `On Hand × WA`، والـread path لا ينشئ ghost rows. PostgreSQL 17 أثبت purchase/second-purchase WA، Sales Return historical-cost mixing، Purchase Return style outbound، deterministic rounding، rollback، Branch Scope، projection drift guard، fixed multi-key Stock-before-Cost ordering، و20 concurrent valued first-writers بدون lost update بنتيجة `on_hand=20`, `WA=100`, `inventory_value=2000`, `version=20`. Negative Stock يبقي signed inventory value ظاهرًا؛ edge غير المحدد معماريًا عند zero quantity مع residual value غير صفري يفشل صراحة بدل إسقاط القيمة. لا Migration ولا Index جديد؛ migration tail بقي `0024`. Gate 08 بند WA purchase/return scenarios أصبح مكتملًا. PHASE 08 تظل `IN_PROGRESS`، و08.04 لم تبدأ؛ Next Action بعد final documentation-SHA CI: 08.04 Reservations فقط.
+
+
+**Plan update — 2026-09-22 / 08.04 RESERVATIONS STARTED:** Gap Analysis مقابل Architecture Baseline v1.7 أثبت أن `stock_reservations` والـPK/FKs/status+quantity CHECKs والـSales-context deferred triggers والـ3 Frozen Reservation indexes موجودة ومتوافقة، لذلك لا Migration ولا Index جديد. التنفيذ يضيف transaction-bound `StockReservationService`: Lock order ثابت `SalesOrder → SalesOrderLine/active Reservation → Inventory Stock Position`؛ إنشاء/تعديل الحجز يغير `Reserved` فقط ولا يخصم `On Hand`، وأي زيادة تعيد فحص `Available` بعد قفل Position. `quantity` في ACTIVE/PARTIALLY_CONSUMED تُعامل صراحة كـremaining reserved quantity لتمكين rebuild للـReserved من الحجوزات النشطة؛ Partial consume ينقصها، Full consume يحول الصف CONSUMED، وCancel يترك الصف RELEASED تاريخيًا مع `released_at`. Warehouse replacement يقفل old/new positions بترتيب ثابت، يحرر القديم ويعيد الحجز في الهدف بعد Availability/Branch validation؛ تحديث SalesOrder warehouse نفسه يظل ملك Sales command ويجب أن يحدث داخل نفس Transaction قبل COMMIT وإلا deferred trigger يرفض العملية. Integration Gate يتضمن two-writer over-reservation race و25-way stress على رصيد 20. 08.05 وما بعدها لم تبدأ.
