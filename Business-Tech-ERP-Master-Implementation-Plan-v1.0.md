@@ -2985,14 +2985,21 @@ No historical rewrite due to backdating.
 
 ## 08.05 Serials
 
-**Status:** `READY_TO_START`
+**Status:** `CLOSED`
 
 - unique within Variant.
 - current location/status operational projection.
 - historical truth from movements.
 - prevent double sale/use.
 
+**08.05 Verified Implementation SHA:** `da1c6ac0f30a4fe2c2a36222a37f0f4f006b3581`.  
+**08.05 Implementation CI:** Run `35780284881` — SUCCESS; `verify`, `backend-verify` including PostgreSQL 17 Serial lifecycle/double-use race coverage and all regressions, `browser-contract`, and `release-gate` all SUCCESS on the same implementation SHA.  
+**08.05 Migration/Index:** no new migration or index; migration tail remains `0024_inventory_ledger_integrity`; Frozen Index Catalog unchanged.  
+**08.05 Validation PR:** `#238` — validation-only; close WITHOUT MERGE after final same-SHA documentation validation.
+
 ## 08.06 Batches / Expiry
+
+**Status:** `READY_TO_START`
 
 - batch identity per Variant.
 - batch quantities per warehouse.
@@ -3038,7 +3045,7 @@ Create controlled verification/rebuild procedures capable of recalculating opera
 - [x] 20+ parallel reservation stress scenario.
 - [ ] concurrent direct sales stock protection.
 - [ ] batch last-unit race.
-- [ ] serial double-use race.
+- [x] serial double-use race.
 - [ ] stock transfer source/target atomicity.
 - [ ] failed transfer rolls back both sides.
 - [x] WA purchase/return scenarios.
