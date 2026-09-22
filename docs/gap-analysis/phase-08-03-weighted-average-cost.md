@@ -1,6 +1,6 @@
 # Phase 08.03 — Weighted Average Cost Gap Analysis
 
-**Status:** `IN_PROGRESS`  
+**Status:** `CLOSED`  
 **Branch:** `agent/postgres-v1.7-core`  
 **Architecture Source:** Business Tech ERP Architecture Baseline v1.7  
 **Implementation Plan:** Business Tech ERP Master Implementation Plan v1.0
@@ -154,6 +154,32 @@ For multi-key prelocking, keys are sorted by `warehouse_id -> variant_id`. All S
 - no migration.
 - no Index addition.
 
+## Closure evidence
+
+- Verified implementation SHA: `92b465f973e772b10ce08d6da52a52a2c2a4a39e`.
+- Full implementation CI: Run `#1029` / `35680403231` — SUCCESS on the same implementation SHA.
+- `verify`: SUCCESS.
+- `backend-verify`: SUCCESS, including the PostgreSQL 17 Weighted Average Cost integration gate and all downstream regressions.
+- `browser-contract`: SUCCESS.
+- `release-gate`: SUCCESS.
+- initial purchase from zero stock produced exact WA, Last Purchase Cost and Inventory Value.
+- second purchase recalculated WA exactly.
+- outbound valuation used Current WA and preserved WA/Last Purchase Cost.
+- linked-Sales-Return style historical-cost inbound changed current WA without overwriting Last Purchase Cost.
+- Purchase-Return style outbound used Current WA.
+- deterministic numeric(18,4) rounding and `Inventory Value = On Hand × WA` were verified.
+- rollback removed both newly-created Stock Position and Cost State.
+- foreign-Branch mutation was rejected through Branch Scope.
+- direct projection drift was detected before valued mutation.
+- 20 concurrent first-writer valued inbounds on one initially missing key produced exact `on_hand = 20.000000`, `WA = 100.0000`, `inventory_value = 2000.0000`, and Stock Position `version = 20` without lost updates.
+- reverse-order multi-key callers used the canonical Stock-before-Cost and Warehouse->Variant lock ordering without deadlock.
+- negative stock kept signed Inventory Value visible.
+- the undefined edge `on_hand = 0` with non-zero residual value was rejected instead of silently discarding value.
+- read-only `getCost` does not create ghost projection rows.
+- frozen cost indexes remain unchanged.
+- migration tail remains `0024_inventory_ledger_integrity`; 08.03 adds no migration.
+- Validation PR: `#236`, validation-only; close WITHOUT MERGE after final documentation-SHA CI.
+
 ## Next action
 
-Implement and validate 08.03 only. Do not start 08.04 until 08.03 is CLOSED by the required same-SHA gates.
+After final documentation-SHA validation, 08.03 is CLOSED. The next official step is PHASE 08 / 08.04 Reservations, READY_TO_START only.
