@@ -2934,7 +2934,7 @@ Implementation boundary:
 
 ## 08.02 Stock Positions
 
-**Status:** `READY_TO_START`
+**Status:** `IN_PROGRESS`
 
 For each Warehouse+Variant:
 
@@ -4205,7 +4205,7 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 # 32. Current Execution Pointer
 
 **Current Phase:** `PHASE 08 — Inventory Core / 08.02 Stock Positions`  
-**Status:** `READY_TO_START`  
+**Status:** `IN_PROGRESS`  
 **Integration Branch:** `agent/postgres-v1.7-core`  
 **Phase 01 Final SHA:** `b0d35101bf622264b655bcc574787989fadbcd83`  
 **Phase 01 Validation PR:** `#183` — closed without merge.  
@@ -4371,8 +4371,9 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 **08.01 Implementation CI:** Run `#1025` / `35669544876` — SUCCESS; `verify`, `backend-verify` including PostgreSQL 17 Inventory Ledger integration and all regressions, `browser-contract`, and `release-gate` all SUCCESS on the same implementation SHA.  
 **08.01 Migration:** `0024_inventory_ledger_integrity` — migration tail; no Index addition.  
 **08.01 Validation PR:** `#234` — validation-only; close WITHOUT MERGE after final same-SHA documentation validation.  
-**Next Action:** execute **PHASE 08 / 08.02 Stock Positions only** after final 08.01 documentation-SHA validation.  
-**Forbidden Next Actions:** لا 08.03 قبل إغلاق 08.02، لا Sales/Purchasing final cutover، لا Frontend cutover، لا dual write، لا `main` merge، ولا Convex Production change.
+**08.02 Stock Positions:** `IN_PROGRESS` — Gap Analysis at `docs/gap-analysis/phase-08-02-stock-positions.md`; implementation is limited to the synchronous rebuildable Warehouse+Variant lock/projection primitive with exact deltas, derived availability, versioning, Branch Scope and fixed lock ordering. No migration or Index addition.  
+**Next Action:** implement and validate **PHASE 08 / 08.02 Stock Positions only**.  
+**Forbidden Next Actions:** لا 08.03 قبل إغلاق 08.02، لا Reservation lifecycle، لا Sales/Purchasing final cutover، لا Frontend cutover، لا dual write، لا `main` merge، ولا Convex Production change.
 
 **Plan update — 2026-09-17 / ACCOUNTING CONSTRAINTS CLOSED:** تم إغلاق ثامن executable slice من 03.06 على SHA `ef03d141958c392032bd8caf16b5f880a193e86e`. Migration `0019`، ADR-0021، Accounting PK/FK/UNIQUE/CHECK layer، Finance Category → GL Account FK، والحفاظ على deferred Journal balance at COMMIT تم التحقق منهم فعليًا على PostgreSQL 17؛ Full CI run `35224498880` أخضر بالكامل وPR `#206` أُغلق بدون Merge. 03.06 ما زالت `IN_PROGRESS` و03.07 لم تبدأ.
 
@@ -4511,3 +4512,6 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 
 
 **Plan update — 2026-09-22 / 08.01 INVENTORY LEDGER CLOSED:** تم إغلاق 08.01 وظيفيًا على SHA `5cd6437727ee00c6731e01666c0ac97ecdf87c2f` بعد Full CI Run `#1025` / `35669544876` SUCCESS. Migration `0024_inventory_ledger_integrity` أصبحت migration tail وتضيف فقط integrity/immutability بلا Index جديد: vocabulary الأنواع الثمانية، signed IN/OUT non-zero، PostingBatch source/actor context، ورفض UPDATE/DELETE لحركات وسطور Inventory Ledger. `InventoryLedgerService` يكتب داخل Business Transaction قائمة فقط، ويأخذ source وserver `posted_at` من PostingBatch في canonical path، ويفرض Branch Scope مع استثناء `TRANSFER_IN` الصحيح للتحويل Cross-Branch. PostgreSQL 17 أثبت append-only reversal، foreign-branch denial، no Stock Position mutation، وثبات Frozen indexes. Runs التشخيصية السابقة كشفت fixtures قديمة لا تحترم invariants الجديدة وstale migration-tail assertions وتم تصحيح الاختبارات دون تخفيف قواعد الـLedger. 08.02 لم تبدأ؛ Next Action بعد final documentation-SHA CI: 08.02 Stock Positions فقط.
+
+
+**Plan update — 2026-09-22 / 08.02 STOCK POSITIONS STARTED:** Gap Analysis مقابل Architecture Baseline v1.7 أثبت أن `inventory_stock_positions` والـPK/FKs وCHECKs والـFrozen reverse index موجودة ومتوافقة، وأن `available` يجوز أن يكون Generated أو derived expression، لذلك لا Migration ولا Index جديد. التنفيذ يضيف transaction-bound `StockPositionService`: إنشاء missing row بصفر عبر `INSERT ... ON CONFLICT DO NOTHING` داخل نفس المعاملة، قفل `SELECT ... FOR UPDATE` بترتيب ثابت `warehouse_id → variant_id`، exact numeric(18,6) deltas بدون float، `available = on_hand - reserved` مشتق، `version` يزيد مرة لكل mutation committed، وBranch Scope لكل Warehouse متأثر. `reserved < 0` مرفوض؛ لا يوضع global prohibition على negative `on_hand`/available لأن negative-stock permission وreservation availability سياسة Business Command أعلى، وReservation shortfall لا يُخفى بتعديل reserved تلقائيا. 08.03 وما بعدها لم تبدأ.
