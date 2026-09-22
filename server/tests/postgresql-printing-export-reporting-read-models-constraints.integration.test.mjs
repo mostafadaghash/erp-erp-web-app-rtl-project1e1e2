@@ -204,7 +204,7 @@ test("03.06 Printing / Export / Reporting Read Models constraints enforce canoni
       const target = history.rows.find((row) => row.version === "0021");
       assert.equal(target?.name, "printing_export_reporting_read_models_constraints");
       assert.match(target?.checksum ?? "", /^[0-9a-f]{64}$/);
-      assert.equal(history.rows.at(-1)?.version, "0024");
+      assert.equal(history.rows.at(-1)?.version, "0025");
     });
 
     const second = await runMigrations({ databaseUrl });
