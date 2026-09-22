@@ -2934,7 +2934,7 @@ Implementation boundary:
 
 ## 08.02 Stock Positions
 
-**Status:** `IN_PROGRESS`
+**Status:** `CLOSED`
 
 For each Warehouse+Variant:
 
@@ -2945,7 +2945,14 @@ For each Warehouse+Variant:
 
 Position row is lock row/projection, not history.
 
+**08.02 Verified Implementation SHA:** `e5485ab1940fa953206ca950dca2af7bd996d8d6`.  
+**08.02 Implementation CI:** Run `#1027` / `35679070852` — SUCCESS; `verify`, `backend-verify` including PostgreSQL 17 Stock Positions concurrency/rollback/integrity coverage and all regressions, `browser-contract`, and `release-gate` all SUCCESS on the same implementation SHA.  
+**08.02 Migration/Index:** no new migration; migration tail remains `0024_inventory_ledger_integrity`; Frozen Stock Position Index Catalog unchanged.  
+**08.02 Validation PR:** `#235` — validation-only; close WITHOUT MERGE after final same-SHA documentation validation.
+
 ## 08.03 Weighted Average Cost
+
+**Status:** `READY_TO_START`
 
 Per Warehouse+Variant:
 
@@ -4204,8 +4211,8 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 
 # 32. Current Execution Pointer
 
-**Current Phase:** `PHASE 08 — Inventory Core / 08.02 Stock Positions`  
-**Status:** `IN_PROGRESS`  
+**Current Phase:** `PHASE 08 — Inventory Core / 08.03 Weighted Average Cost`  
+**Status:** `READY_TO_START`  
 **Integration Branch:** `agent/postgres-v1.7-core`  
 **Phase 01 Final SHA:** `b0d35101bf622264b655bcc574787989fadbcd83`  
 **Phase 01 Validation PR:** `#183` — closed without merge.  
@@ -4371,9 +4378,13 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 **08.01 Implementation CI:** Run `#1025` / `35669544876` — SUCCESS; `verify`, `backend-verify` including PostgreSQL 17 Inventory Ledger integration and all regressions, `browser-contract`, and `release-gate` all SUCCESS on the same implementation SHA.  
 **08.01 Migration:** `0024_inventory_ledger_integrity` — migration tail; no Index addition.  
 **08.01 Validation PR:** `#234` — validation-only; close WITHOUT MERGE after final same-SHA documentation validation.  
-**08.02 Stock Positions:** `IN_PROGRESS` — Gap Analysis at `docs/gap-analysis/phase-08-02-stock-positions.md`; implementation is limited to the synchronous rebuildable Warehouse+Variant lock/projection primitive with exact deltas, derived availability, versioning, Branch Scope and fixed lock ordering. No migration or Index addition.  
-**Next Action:** implement and validate **PHASE 08 / 08.02 Stock Positions only**.  
-**Forbidden Next Actions:** لا 08.03 قبل إغلاق 08.02، لا Reservation lifecycle، لا Sales/Purchasing final cutover، لا Frontend cutover، لا dual write، لا `main` merge، ولا Convex Production change.
+**08.02 Stock Positions:** `CLOSED` — Gap Analysis at `docs/gap-analysis/phase-08-02-stock-positions.md`; `StockPositionService` now owns the synchronous rebuildable Warehouse+Variant lock/projection row with exact deltas, derived `available = on_hand - reserved`, versioning, Branch Scope, safe zero-row creation, and fixed `warehouse_id -> variant_id` lock ordering under `READ COMMITTED + SELECT ... FOR UPDATE`.  
+**08.02 Verified Implementation SHA:** `e5485ab1940fa953206ca950dca2af7bd996d8d6`.  
+**08.02 Implementation CI:** Run `#1027` / `35679070852` — SUCCESS; `verify`, `backend-verify` including PostgreSQL 17 Stock Positions integration and 20-way first-writer concurrency proof, `browser-contract`, and `release-gate` all SUCCESS on the same implementation SHA.  
+**08.02 Migration/Index:** no new migration; migration tail remains `0024_inventory_ledger_integrity`; no Index addition and Frozen Stock Position catalog remains unchanged.  
+**08.02 Validation PR:** `#235` — validation-only; close WITHOUT MERGE after final same-SHA documentation validation.  
+**Next Action:** execute **PHASE 08 / 08.03 Weighted Average Cost only** after final 08.02 documentation-SHA validation.  
+**Forbidden Next Actions:** لا 08.04 قبل إغلاق 08.03، لا Reservation lifecycle، لا Sales/Purchasing final cutover، لا Frontend cutover، لا dual write، لا `main` merge، ولا Convex Production change.
 
 **Plan update — 2026-09-17 / ACCOUNTING CONSTRAINTS CLOSED:** تم إغلاق ثامن executable slice من 03.06 على SHA `ef03d141958c392032bd8caf16b5f880a193e86e`. Migration `0019`، ADR-0021، Accounting PK/FK/UNIQUE/CHECK layer، Finance Category → GL Account FK، والحفاظ على deferred Journal balance at COMMIT تم التحقق منهم فعليًا على PostgreSQL 17؛ Full CI run `35224498880` أخضر بالكامل وPR `#206` أُغلق بدون Merge. 03.06 ما زالت `IN_PROGRESS` و03.07 لم تبدأ.
 
@@ -4515,3 +4526,6 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 
 
 **Plan update — 2026-09-22 / 08.02 STOCK POSITIONS STARTED:** Gap Analysis مقابل Architecture Baseline v1.7 أثبت أن `inventory_stock_positions` والـPK/FKs وCHECKs والـFrozen reverse index موجودة ومتوافقة، وأن `available` يجوز أن يكون Generated أو derived expression، لذلك لا Migration ولا Index جديد. التنفيذ يضيف transaction-bound `StockPositionService`: إنشاء missing row بصفر عبر `INSERT ... ON CONFLICT DO NOTHING` داخل نفس المعاملة، قفل `SELECT ... FOR UPDATE` بترتيب ثابت `warehouse_id → variant_id`، exact numeric(18,6) deltas بدون float، `available = on_hand - reserved` مشتق، `version` يزيد مرة لكل mutation committed، وBranch Scope لكل Warehouse متأثر. `reserved < 0` مرفوض؛ لا يوضع global prohibition على negative `on_hand`/available لأن negative-stock permission وreservation availability سياسة Business Command أعلى، وReservation shortfall لا يُخفى بتعديل reserved تلقائيا. 08.03 وما بعدها لم تبدأ.
+
+
+**Plan update — 2026-09-22 / 08.02 STOCK POSITIONS CLOSED:** تم إغلاق 08.02 وظيفيًا على SHA `e5485ab1940fa953206ca950dca2af7bd996d8d6` بعد Full CI Run `#1027` / `35679070852` SUCCESS. `StockPositionService` أصبح يملك الـSynchronous Rebuildable Operational Projection + Lock Row لكل Warehouse+Variant: ينشئ الصف المفقود بصفر داخل نفس Business Transaction عبر `INSERT ... ON CONFLICT DO NOTHING`، ثم يقفل الصفوف بترتيب ثابت `warehouse_id → variant_id` باستخدام `SELECT ... FOR UPDATE`، ويطبق exact `numeric(18,6)` deltas بدون JavaScript float، ويشتق `available = on_hand - reserved`، ويرفع `version` مرة لكل mutation committed مع server `updated_at`. PostgreSQL 17 أثبت 20 concurrent first-writers بدون lost update وبنتيجة `on_hand=20` و`version=20`، كما أثبت rollback للصف الجديد، Branch Scope، fixed multi-row ordering، ورفض `reserved < 0`. لم نضع منعًا عالميًا للـnegative `on_hand` أو `available` لأن سياسة Negative Stock وReservation availability تخص Business Commands الأعلى، ولا يتم إخفاء Reservation shortfall بتعديل الرصيد المحجوز. لا Migration ولا Index جديد؛ migration tail بقي `0024` والـFrozen Index Catalog لم يتغير. PHASE 08 تظل `IN_PROGRESS`، و08.03 لم تبدأ؛ Next Action بعد final documentation-SHA CI: 08.03 Weighted Average Cost فقط.

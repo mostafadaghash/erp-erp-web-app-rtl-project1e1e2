@@ -1,6 +1,6 @@
 # Phase 08.02 — Stock Positions Gap Analysis
 
-**Status:** `IN_PROGRESS`  
+**Status:** `CLOSED`  
 **Branch:** `agent/postgres-v1.7-core`  
 **Architecture Source:** Business Tech ERP Architecture Baseline v1.7  
 **Implementation Plan:** Business Tech ERP Master Implementation Plan v1.0
@@ -137,6 +137,25 @@ For a business transaction touching multiple positions:
 - no migration.
 - no Index addition.
 
+## Closure evidence
+
+- Verified implementation SHA: `e5485ab1940fa953206ca950dca2af7bd996d8d6`.
+- Full implementation CI: Run `#1027` / `35679070852` — SUCCESS on the same implementation SHA.
+- `verify`: SUCCESS.
+- `backend-verify`: SUCCESS, including the PostgreSQL 17 Stock Positions integration gate and all downstream regressions.
+- `browser-contract`: SUCCESS.
+- `release-gate`: SUCCESS.
+- 20 concurrent first writers against one initially missing Warehouse+Variant Position produced exact `on_hand = 20.000000`, `reserved = 0.000000`, `available = 20.000000`, and `version = 20` without lost updates.
+- reverse-order multi-position callers used the same canonical `warehouse_id -> variant_id` lock order without deadlock.
+- rollback removed a newly-created Position and its mutation.
+- Branch Scope rejected a foreign Warehouse.
+- a delta that would make `reserved < 0` was rejected and the committed Position remained unchanged.
+- negative `on_hand` and derived negative `available` remain visible rather than being silently rewritten.
+- `available` remains derived rather than independently writable.
+- frozen Stock Position indexes remain unchanged.
+- migration tail remains `0024_inventory_ledger_integrity`; 08.02 adds no migration.
+- Validation PR: `#235`, validation-only; close WITHOUT MERGE after final documentation-SHA CI.
+
 ## Next action
 
-Implement and validate 08.02 only. Do not start 08.03 until 08.02 is CLOSED by the required same-SHA gates.
+After final documentation-SHA validation, 08.02 is CLOSED. The next official step is PHASE 08 / 08.03 Weighted Average Cost, READY_TO_START only.
