@@ -341,8 +341,8 @@ export class StockTransferService {
           const row = result.rows[0]
           if (!row) throw new StockTransferError('BATCH_NOT_AVAILABLE')
           if (
-            quantity(row.on_hand).scaled -
-              quantity(row.reserved).scaled <
+            nonNegativeQuantity(row.on_hand).scaled -
+              nonNegativeQuantity(row.reserved).scaled <
             allocation.quantity.scaled
           ) {
             throw new StockTransferError('BATCH_NOT_AVAILABLE')
