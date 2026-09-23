@@ -1,6 +1,6 @@
 # Phase 08.06 — Batches / Expiry Gap Analysis
 
-**Status:** `IMPLEMENTED_PENDING_VALIDATION`  
+**Status:** `CLOSED`  
 **Branch:** `agent/postgres-v1.7-core`  
 **Architecture Source:** Business Tech ERP Architecture Baseline v1.7  
 **Implementation Plan:** Business Tech ERP Master Implementation Plan v1.0
@@ -40,5 +40,10 @@ Frozen Index Catalog unchanged. No new index.
 ## Explicit exclusions
 Stock Transfer, Stocktake, Adjustment, Projection Rebuild, Sales/Purchasing orchestration, frontend/Convex cutover, dual write, main merge, and Convex Production.
 
+## Validation closure
+- Final SHA: `3635197d8df73e7b3ff7368d43baff41de4ee487`.
+- Full CI Run `35788744125` / #1052: SUCCESS.
+- Validation PR #239: CLOSED WITHOUT MERGE.
+
 ## Next action
-Do not start 08.07 until 08.06 Full CI succeeds and the validation-only PR is closed without merge.
+08.07 Stock Transfer.

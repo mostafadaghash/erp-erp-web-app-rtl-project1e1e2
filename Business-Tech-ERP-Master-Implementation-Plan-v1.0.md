@@ -2999,7 +2999,7 @@ No historical rewrite due to backdating.
 
 ## 08.06 Batches / Expiry
 
-**Status:** `READY_TO_START`
+**Status:** `CLOSED`
 
 - batch identity per Variant.
 - batch quantities per warehouse.
@@ -3007,7 +3007,14 @@ No historical rewrite due to backdating.
 - FEFO query support.
 - expired sale blocked by default, explicit permission+reason+audit override.
 
+**08.06 Verified Implementation SHA:** `3635197d8df73e7b3ff7368d43baff41de4ee487`.  
+**08.06 Implementation CI:** Run `35788744125` / #1052 — SUCCESS; Full CI green on the same final SHA.  
+**08.06 Migration/Index:** migration `0025_batch_expiry_permission`; Frozen Index Catalog unchanged.  
+**08.06 Validation PR:** `#239` — CLOSED WITHOUT MERGE.
+
 ## 08.07 Stock Transfer
+
+**Status:** `IMPLEMENTED_PENDING_VALIDATION`
 
 - validate available source stock.
 - reserved stock not consumed by normal transfer.
@@ -3044,7 +3051,7 @@ Create controlled verification/rebuild procedures capable of recalculating opera
 - [x] 2 simultaneous reservations for same stock cannot overreserve.
 - [x] 20+ parallel reservation stress scenario.
 - [ ] concurrent direct sales stock protection.
-- [ ] batch last-unit race.
+- [x] batch last-unit race.
 - [x] serial double-use race.
 - [ ] stock transfer source/target atomicity.
 - [ ] failed transfer rolls back both sides.
