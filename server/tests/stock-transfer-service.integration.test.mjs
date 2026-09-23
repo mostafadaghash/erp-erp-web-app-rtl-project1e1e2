@@ -112,18 +112,30 @@ test(
         productType: "STOCK",
         baseUnitMasterId: piece.id,
       });
-      const tracked = await products.createSimpleProduct({
+      const batchTracked = await products.createSimpleProduct({
         actorUserId: IDS.admin,
-        name: "Transfer Tracked",
+        name: "Transfer Batch Tracked",
+        categoryId: IDS.category,
+        productType: "STOCK",
+        baseUnitMasterId: piece.id,
+      });
+      const serialTracked = await products.createSimpleProduct({
+        actorUserId: IDS.admin,
+        name: "Transfer Serial Tracked",
         categoryId: IDS.category,
         productType: "STOCK",
         baseUnitMasterId: piece.id,
       });
       const plainVariant = plain.variants[0].id;
-      const trackedVariant = tracked.variants[0].id;
+      const batchVariant = batchTracked.variants[0].id;
+      const serialVariant = serialTracked.variants[0].id;
       await pool.query(
-        "UPDATE products SET tracking_serial=true,tracking_batch=true WHERE id=$1",
-        [tracked.id],
+        "UPDATE products SET tracking_batch=true,tracking_expiry=true WHERE id=$1",
+        [batchTracked.id],
+      );
+      await pool.query(
+        "UPDATE products SET tracking_serial=true WHERE id=$1",
+        [serialTracked.id],
       );
 
       await withTransaction(pool, (client) =>
@@ -207,7 +219,7 @@ test(
         costs.applyInboundWithinTransaction(client, {
           actorUserId: IDS.admin,
           warehouseId: IDS.warehouse1,
-          variantId: trackedVariant,
+          variantId: batchVariant,
           quantity: "1",
           unitCost: "50",
           lastPurchaseCost: "50",
@@ -218,7 +230,7 @@ test(
       await pool.query(
         `INSERT INTO batches (id,variant_id,batch_number,expiry_date,created_at)
          VALUES ($1,$2,'LOT-1','2030-01-01',now())`,
-        [batchId, trackedVariant],
+        [batchId, batchVariant],
       );
       await pool.query(
         `INSERT INTO batch_stock_positions
@@ -230,18 +242,37 @@ test(
         `INSERT INTO serial_numbers
           (id,variant_id,serial_number,current_warehouse_id,status,created_at)
          VALUES ($1,$2,'SER-1',$3,'STOCK_IN',now())`,
-        [serialId, trackedVariant, IDS.warehouse1],
+        [serialId, serialVariant, IDS.warehouse1],
       );
 
-      const trackedTransfer = await transfers.create({
+      await withTransaction(pool, (client) =>
+        costs.applyInboundWithinTransaction(client, {
+          actorUserId: IDS.admin,
+          warehouseId: IDS.warehouse1,
+          variantId: serialVariant,
+          quantity: "1",
+          unitCost: "75",
+          lastPurchaseCost: "75",
+        }),
+      );
+      const batchTransfer = await transfers.create({
         actorUserId: IDS.admin,
         fromWarehouseId: IDS.warehouse1,
         toWarehouseId: IDS.warehouse2,
         lines: [{
-          variantId: trackedVariant,
+          variantId: batchVariant,
+          quantity: "1",
+          batches: [{ batchNumber: "LOT-1", quantity: "1" }],
+        }],
+      });
+      const serialTransfer = await transfers.create({
+        actorUserId: IDS.admin,
+        fromWarehouseId: IDS.warehouse1,
+        toWarehouseId: IDS.warehouse2,
+        lines: [{
+          variantId: serialVariant,
           quantity: "1",
           serialNumbers: ["SER-1"],
-          batches: [{ batchNumber: "LOT-1", quantity: "1" }],
         }],
       });
       const movedSerial = await pool.query(
@@ -275,7 +306,8 @@ test(
         serialHistory.rows.map((row) => row.movement_type),
         ["TRANSFER_IN", "TRANSFER_OUT"],
       );
-      assert.equal(trackedTransfer.status, "POSTED");
+      assert.equal(batchTransfer.status, "POSTED");
+      assert.equal(serialTransfer.status, "POSTED");
 
       // Deliberately fail after the source would otherwise be debited. One
       // transaction must roll every transfer effect back.
@@ -325,8 +357,8 @@ test(
           ORDER BY movement_type`,
       );
       assert.deepEqual(legs.rows, [
-        { movement_type: "TRANSFER_IN", count: 2 },
-        { movement_type: "TRANSFER_OUT", count: 2 },
+        { movement_type: "TRANSFER_IN", count: 3 },
+        { movement_type: "TRANSFER_OUT", count: 3 },
       ]);
     } finally {
       await pool.end();
