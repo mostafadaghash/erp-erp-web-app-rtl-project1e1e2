@@ -3030,7 +3030,7 @@ No historical rewrite due to backdating.
 
 ## 08.08 Stocktake
 
-**Status:** `READY_TO_START`
+**Status:** `IMPLEMENTED_PENDING_VALIDATION`
 
 - OPEN → COUNTED → APPROVED/CANCELLED.
 - book quantity snapshot.
