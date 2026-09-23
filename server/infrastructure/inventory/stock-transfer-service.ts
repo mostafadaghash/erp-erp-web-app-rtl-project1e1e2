@@ -119,15 +119,28 @@ function nonBlank(name: string, value: string): string {
   return value.trim()
 }
 
-function quantity(value: string): { normalized: string; scaled: bigint } {
+function parseQuantity(
+  value: string,
+  allowZero: boolean,
+): { normalized: string; scaled: bigint } {
   nonBlank('quantity', value)
   const match = /^(\d{1,12})(?:\.(\d{1,6}))?$/.exec(value.trim())
   if (!match) throw new TypeError('quantity must be numeric(18,6)')
   const scaled =
     BigInt(match[1] ?? '0') * QUANTITY_FACTOR +
     BigInt((match[2] ?? '').padEnd(6, '0') || '0')
-  if (scaled <= 0n) throw new RangeError('quantity must be greater than zero')
+  if (scaled < 0n || (!allowZero && scaled === 0n)) {
+    throw new RangeError('quantity must be greater than zero')
+  }
   return { normalized: format(scaled, 6), scaled }
+}
+
+function quantity(value: string) {
+  return parseQuantity(value, false)
+}
+
+function nonNegativeQuantity(value: string) {
+  return parseQuantity(value, true)
 }
 
 function money(value: string): bigint {
