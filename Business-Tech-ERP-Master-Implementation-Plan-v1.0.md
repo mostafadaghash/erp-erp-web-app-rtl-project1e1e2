@@ -3014,7 +3014,7 @@ No historical rewrite due to backdating.
 
 ## 08.07 Stock Transfer
 
-**Status:** `IMPLEMENTED_PENDING_VALIDATION`
+**Status:** `CLOSED`
 
 - validate available source stock.
 - reserved stock not consumed by normal transfer.
@@ -3023,7 +3023,14 @@ No historical rewrite due to backdating.
 - target WA recalculation.
 - no P&L impact by default.
 
+**08.07 Verified Implementation SHA:** `41da3bf8afa4555dc61b99d7248269cdd64ef3d3`.  
+**08.07 Implementation CI:** Run `35812921983` / #1056 — SUCCESS; Full CI green on the same final SHA.  
+**08.07 Migration/Index:** no migration/index change; migration tail remains `0025`; Frozen Index Catalog unchanged.  
+**08.07 Validation PR:** `#240` — CLOSED WITHOUT MERGE.
+
 ## 08.08 Stocktake
+
+**Status:** `READY_TO_START`
 
 - OPEN → COUNTED → APPROVED/CANCELLED.
 - book quantity snapshot.
@@ -3053,8 +3060,8 @@ Create controlled verification/rebuild procedures capable of recalculating opera
 - [ ] concurrent direct sales stock protection.
 - [x] batch last-unit race.
 - [x] serial double-use race.
-- [ ] stock transfer source/target atomicity.
-- [ ] failed transfer rolls back both sides.
+- [x] stock transfer source/target atomicity.
+- [x] failed transfer rolls back both sides.
 - [x] WA purchase/return scenarios.
 - [ ] projection rebuild equals live projection.
 - [ ] stocktake approval version rules.
