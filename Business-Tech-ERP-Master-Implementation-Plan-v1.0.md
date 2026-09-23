@@ -3030,7 +3030,7 @@ No historical rewrite due to backdating.
 
 ## 08.08 Stocktake
 
-**Status:** `IMPLEMENTED_PENDING_VALIDATION`
+**Status:** `CLOSED`
 
 - OPEN → COUNTED → APPROVED/CANCELLED.
 - book quantity snapshot.
@@ -3039,7 +3039,14 @@ No historical rewrite due to backdating.
 - approval locks positions and creates adjustment for differences.
 - approved session immutable.
 
+**08.08 Verified Implementation SHA:** `770ca4d10ad82bc1c115abc8b9ed24364c025e19`.  
+**08.08 Implementation CI:** Run `35815776481` / #1058 — SUCCESS; Full CI green on the same final SHA.  
+**08.08 Migration/Index:** no migration/index change; migration tail remains `0025`; Frozen Index Catalog unchanged.  
+**08.08 Validation PR:** `#241` — CLOSED WITHOUT MERGE.
+
 ## 08.09 Inventory Adjustment
+
+**Status:** `READY_TO_START`
 
 - formal document only.
 - no direct stock update.
@@ -3064,7 +3071,7 @@ Create controlled verification/rebuild procedures capable of recalculating opera
 - [x] failed transfer rolls back both sides.
 - [x] WA purchase/return scenarios.
 - [ ] projection rebuild equals live projection.
-- [ ] stocktake approval version rules.
+- [x] stocktake approval version rules.
 - [ ] adjustment shortfall behavior.
 
 ---
