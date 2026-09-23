@@ -1,6 +1,6 @@
 # Phase 08.07 — Stock Transfer Gap Analysis
 
-**Status:** `IMPLEMENTED_PENDING_VALIDATION`  
+**Status:** `CLOSED`  
 **Branch:** `agent/postgres-v1.7-core`  
 **Architecture Source:** Business Tech ERP Architecture Baseline v1.7  
 **Implementation Plan:** Business Tech ERP Master Implementation Plan v1.0
@@ -50,5 +50,10 @@ No new migration and no new index. Frozen Index Catalog remains unchanged; migra
 ## Explicit exclusions
 Stocktake, Inventory Adjustment, Projection Rebuild, Finance/Accounting reclassification, Purchasing, Sales, frontend cutover, Convex Production, dual write and main merge.
 
+## Validation closure
+- Final SHA: `41da3bf8afa4555dc61b99d7248269cdd64ef3d3`.
+- Full CI Run `35812921983` / #1056: SUCCESS.
+- Validation PR #240: CLOSED WITHOUT MERGE.
+
 ## Next action
-Do not start 08.08 until 08.07 Full CI succeeds and the validation-only PR is closed without merge.
+08.08 Stocktake.
