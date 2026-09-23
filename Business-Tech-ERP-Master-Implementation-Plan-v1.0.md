@@ -3046,7 +3046,7 @@ No historical rewrite due to backdating.
 
 ## 08.09 Inventory Adjustment
 
-**Status:** `READY_TO_START`
+**Status:** `IMPLEMENTED_PENDING_VALIDATION`
 
 - formal document only.
 - no direct stock update.
