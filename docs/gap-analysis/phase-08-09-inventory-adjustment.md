@@ -1,6 +1,6 @@
 # Phase 08.09 — Inventory Adjustment Gap Analysis
 
-**Status:** `IMPLEMENTED_PENDING_VALIDATION`  
+**Status:** `CLOSED`  
 **Branch:** `agent/postgres-v1.7-core`  
 **Architecture Source:** Business Tech ERP Architecture Baseline v1.7 §27.15  
 **Implementation Plan:** Business Tech ERP Master Implementation Plan v1.0
@@ -44,5 +44,11 @@ Migration tail becomes `0026 inventory_adjustment_permissions`. No index is adde
 - unauthorized negative stock is rejected.
 - PostgreSQL 17 integration + Full CI green on the same final SHA.
 
+## Validation record
+- Final implementation SHA: `e608c421e16ce614adef5f01f9999d87a6e7c6b4`.
+- Full CI #1069 / run `36036372044`: SUCCESS after re-running failed legacy verify job; backend-verify, browser-contract, verify, and release-gate all SUCCESS on the same SHA.
+- Validation-only PR #243: close WITHOUT MERGE after documentation SHA validation.
+- Accounting journal creation remains an explicit Phase 09 integration dependency, not represented as already complete.
+
 ## Next action
-Do not start 08.10 until 08.09 Full CI succeeds and its validation-only PR is closed without merge.
+08.10 Projection Rebuild gap analysis and implementation, only after final documentation CI succeeds and PR #243 closes without merge.
