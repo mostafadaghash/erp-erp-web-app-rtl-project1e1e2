@@ -241,8 +241,8 @@ test("03.06 Inventory constraints enforce canonical integrity on PostgreSQL 17",
       assert.equal(inventorySlice?.name, "inventory_constraints");
       assert.match(inventorySlice?.checksum ?? "", /^[0-9a-f]{64}$/);
       const latest = history.rows.at(-1);
-      assert.equal(latest.version, "0025");
-      assert.equal(latest.name, "batch_expiry_permission");
+      assert.equal(latest.version, "0026");
+      assert.equal(latest.name, "inventory_adjustment_permissions");
       assert.match(latest.checksum, /^[0-9a-f]{64}$/);
     });
 
