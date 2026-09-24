@@ -1,0 +1,8 @@
+{
+  "version": "0022",
+  "name": "index_catalog",
+  "transactional": true,
+  "preconditionSql": "SELECT EXISTS (SELECT 1 FROM public.schema_migrations WHERE version = '0021') AND NOT EXISTS (SELECT 1 FROM pg_catalog.pg_class WHERE relkind = 'i' AND relname = 'ix_company_phones__company_id') AS ok;",
+  "verificationSql": "SELECT (SELECT count(*)::int FROM pg_catalog.pg_class i JOIN pg_catalog.pg_namespace n ON n.oid = i.relnamespace WHERE n.nspname = 'public' AND i.relkind = 'i' AND i.relname ~ '^(ix|ux|gin)_') = 155 AS ok;",
+  "recovery": "Transactional failure rolls the Phase 03.07 Index Catalog migration back. After a successful production apply, recovery remains forward-only: do not drop approved indexes or rewrite committed migration history. Any future index change requires measurement, EXPLAIN (ANALYZE, BUFFERS), and a versioned decision."
+}

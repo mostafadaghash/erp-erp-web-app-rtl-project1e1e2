@@ -1,0 +1,8 @@
+{
+  "version": "0023",
+  "name": "counterparty_ledger_immutability",
+  "transactional": true,
+  "preconditionSql": "SELECT EXISTS (SELECT 1 FROM public.schema_migrations WHERE version = '0022') AND NOT EXISTS (SELECT 1 FROM pg_catalog.pg_trigger WHERE tgname IN ('bt_customer_ledger_entries__immutable','bt_supplier_ledger_entries__immutable') AND NOT tgisinternal) AS ok;",
+  "verificationSql": "SELECT (SELECT count(*)::int FROM pg_catalog.pg_trigger t JOIN pg_catalog.pg_class c ON c.oid=t.tgrelid JOIN pg_catalog.pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND NOT t.tgisinternal AND ((c.relname='customer_ledger_entries' AND t.tgname='bt_customer_ledger_entries__immutable') OR (c.relname='supplier_ledger_entries' AND t.tgname='bt_supplier_ledger_entries__immutable'))) = 2 AND EXISTS (SELECT 1 FROM pg_catalog.pg_proc p JOIN pg_catalog.pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname='public' AND p.proname='fn_counterparty_ledger_entry_immutable') AS ok;",
+  "recovery": "Transactional failure rolls the ledger immutability migration back. After a successful production apply, recovery remains forward-only: preserve historical Customer/Supplier Ledger entries and issue a reviewed corrective migration rather than dropping the immutability triggers or rewriting posted history."
+}

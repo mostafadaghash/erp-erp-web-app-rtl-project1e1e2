@@ -1,0 +1,8 @@
+{
+  "version": "0026",
+  "name": "inventory_adjustment_permissions",
+  "transactional": true,
+  "preconditionSql": "SELECT EXISTS (SELECT 1 FROM public.schema_migrations WHERE version = '0025') AND NOT EXISTS (SELECT 1 FROM public.permissions WHERE permission_key IN ('inventory.allow_negative_stock','inventory.set_adjustment_cost')) AS ok;",
+  "verificationSql": "SELECT (SELECT count(*)::int FROM public.permissions WHERE permission_key IN ('inventory.allow_negative_stock','inventory.set_adjustment_cost') AND module='inventory') = 2 AS ok;",
+  "recovery": "Transactional failure rolls back the permission-catalog migration. After successful apply, preserve the stable permission keys and use forward-only correction."
+}

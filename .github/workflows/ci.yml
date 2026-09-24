@@ -21,8 +21,12 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version-file: .nvmrc
           cache: npm
+      - name: Runtime version guard
+        run: |
+          test "$(node --version)" = "v24.21.0"
+          test "$(npm --version)" = "11.19.0"
       - run: npm ci --ignore-scripts
       - name: Dependency audit
         run: npm audit --audit-level=low
@@ -62,6 +66,312 @@ jobs:
         if: always()
         run: npm run release:preflight
 
+  backend-verify:
+    name: backend-verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: erp_backend_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d erp_backend_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - name: Runtime version guard
+        run: |
+          test "$(node --version)" = "v24.21.0"
+          test "$(npm --version)" = "11.19.0"
+      - run: npm ci --ignore-scripts
+      - name: Dependency audit
+        run: npm audit --audit-level=low
+      - name: Backend secret and security scan
+        run: node scripts/backend-security-check.mjs
+      - name: Backend typecheck
+        run: npm run backend:typecheck
+      - name: Backend unit tests
+        run: npm run backend:test
+      - name: Transaction helper unit tests
+        run: node --import tsx --test server/tests/transaction-helper.test.ts
+      - name: PostgreSQL transaction integration tests
+        env:
+          ERP_TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/erp_backend_ci
+        run: node --import tsx --test server/tests/transaction-helper.integration.test.ts
+      - name: PostgreSQL Idempotency Service integration tests
+        env:
+          ERP_TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/erp_backend_ci
+        run: node --import tsx --test server/tests/idempotency-service.integration.test.mjs
+      - name: PostgreSQL Document Sequence Service integration tests
+        env:
+          ERP_TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/erp_backend_ci
+        run: node --import tsx --test server/tests/document-sequence-service.integration.test.mjs
+      - name: PostgreSQL Posting Batch Service integration tests
+        env:
+          ERP_TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/erp_backend_ci
+        run: node --import tsx --test server/tests/posting-batch-service.integration.test.mjs
+      - name: PostgreSQL Audit Service integration tests
+        env:
+          ERP_TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/erp_backend_ci
+        run: node --import tsx --test server/tests/audit-service.integration.test.mjs
+      - name: PostgreSQL Transactional Outbox integration tests
+        env:
+          ERP_TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/erp_backend_ci
+        run: node --import tsx --test server/tests/transactional-outbox.integration.test.mjs
+      - name: PostgreSQL Error Mapping integration tests
+        env:
+          ERP_TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/erp_backend_ci
+        run: node --import tsx --test server/tests/error-mapper.integration.test.mjs
+      - name: PostgreSQL Authentication integration tests
+        env:
+          ERP_TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/erp_backend_ci
+        run: node --import tsx --test server/tests/authentication.integration.test.mjs
+      - name: PostgreSQL Role Catalog integration tests
+        env:
+          ERP_TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/erp_backend_ci
+        run: node --import tsx --test server/tests/role-catalog.integration.test.mjs
+      - name: PostgreSQL Effective Permissions integration tests
+        env:
+          ERP_TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/erp_backend_ci
+        run: node --import tsx --test server/tests/effective-permissions.integration.test.mjs
+      - name: PostgreSQL Branch Scope integration tests
+        env:
+          ERP_TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/erp_backend_ci
+        run: node --import tsx --test server/tests/branch-scope.integration.test.mjs
+      - name: PostgreSQL Organization integration tests
+        env:
+          ERP_TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/erp_backend_ci
+        run: node --import tsx --test server/tests/organization-service.integration.test.mjs
+      - name: PostgreSQL last System Admin protection tests
+        env:
+          ERP_TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/erp_backend_ci
+        run: node --import tsx --test server/tests/system-admin-protection.integration.test.mjs
+      - name: PostgreSQL extension integration tests
+        env:
+          ERP_TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/erp_backend_ci
+        run: node --import tsx --test server/tests/postgresql-extensions.integration.test.ts
+      - name: PostgreSQL data type integration tests
+        env:
+          ERP_TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/erp_backend_ci
+        run: node --import tsx --test server/tests/postgresql-data-types.integration.test.ts
+      - name: PostgreSQL migration framework integration tests
+        env:
+          ERP_TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/erp_backend_ci
+        run: node --test server/tests/postgresql-migrations.integration.test.mjs
+      - name: PostgreSQL core infrastructure schema integration tests
+        env:
+          ERP_TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/erp_backend_ci
+        run: node --test server/tests/postgresql-core-infrastructure-schema.integration.test.mjs
+      - name: PostgreSQL core organization/security constraint integration tests
+        env:
+          ERP_TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/erp_backend_ci
+        run: node --test server/tests/postgresql-core-organization-security-constraints.integration.test.mjs
+      - name: PostgreSQL counterparties schema integration tests
+        env:
+          ERP_TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/erp_backend_ci
+        run: node --test server/tests/postgresql-counterparties-schema.integration.test.mjs
+      - name: PostgreSQL counterparties/ledgers constraint integration tests
+        env:
+          ERP_TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/erp_backend_ci
+        run: node --test server/tests/postgresql-counterparties-ledgers-constraints.integration.test.mjs
+      - name: PostgreSQL Unified Counterparty service tests
+        env:
+          ERP_TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/erp_backend_ci
+        run: node --import tsx --test server/tests/counterparty-service.integration.test.mjs
+      - name: PostgreSQL Phone Normalization integration tests
+        env:
+          ERP_TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/erp_backend_ci
+        run: node --import tsx --test server/tests/phone-normalization.integration.test.mjs
+      - name: PostgreSQL Customer Supplier Ledger integration tests
+        env:
+          ERP_TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/erp_backend_ci
+        run: node --import tsx --test server/tests/counterparty-ledger-service.integration.test.mjs
+      - name: PostgreSQL Product Model integration tests
+        env:
+          ERP_TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/erp_backend_ci
+        run: node --import tsx --test server/tests/product-model-service.integration.test.mjs
+      - name: PostgreSQL Units integration tests
+        env:
+          ERP_TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/erp_backend_ci
+        run: node --import tsx --test server/tests/product-unit-service.integration.test.mjs
+      - name: PostgreSQL Barcode SKU integration tests
+        env:
+          ERP_TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/erp_backend_ci
+        run: node --import tsx --test server/tests/product-identifier-service.integration.test.mjs
+      - name: PostgreSQL Dynamic Attributes integration tests
+        env:
+          ERP_TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/erp_backend_ci
+        run: node --import tsx --test server/tests/product-attribute-service.integration.test.mjs
+      - name: PostgreSQL Price Lists integration tests
+        env:
+          ERP_TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/erp_backend_ci
+        run: node --import tsx --test server/tests/price-list-service.integration.test.mjs
+      - name: PostgreSQL Reorder Levels integration tests
+        env:
+          ERP_TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/erp_backend_ci
+        run: node --import tsx --test server/tests/reorder-level-service.integration.test.mjs
+      - name: PostgreSQL Inventory Ledger integration tests
+        env:
+          ERP_TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/erp_backend_ci
+        run: node --import tsx --test server/tests/inventory-ledger-service.integration.test.mjs
+      - name: PostgreSQL Stock Positions integration tests
+        env:
+          ERP_TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/erp_backend_ci
+        run: node --import tsx --test server/tests/stock-position-service.integration.test.mjs
+      - name: PostgreSQL Weighted Average Cost integration tests
+        env:
+          ERP_TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/erp_backend_ci
+        run: node --import tsx --test server/tests/inventory-cost-service.integration.test.mjs
+      - name: PostgreSQL Stock Reservations integration tests
+        env:
+          ERP_TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/erp_backend_ci
+        run: node --import tsx --test server/tests/stock-reservation-service.integration.test.mjs
+      - name: PostgreSQL Serials integration tests
+        env:
+          ERP_TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/erp_backend_ci
+        run: node --import tsx --test server/tests/serial-inventory-service.integration.test.mjs
+      - name: PostgreSQL Batch Expiry integration tests
+        env:
+          ERP_TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/erp_backend_ci
+        run: node --import tsx --test server/tests/batch-inventory-service.integration.test.mjs
+      - name: PostgreSQL Stock Transfer integration tests
+        env:
+          ERP_TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/erp_backend_ci
+        run: node --import tsx --test server/tests/stock-transfer-service.integration.test.mjs
+      - name: PostgreSQL Stocktake integration tests
+        env:
+          ERP_TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/erp_backend_ci
+        run: node --import tsx --test server/tests/stocktake-service.integration.test.mjs
+      - name: PostgreSQL Inventory Adjustment integration tests
+        env:
+          ERP_TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/erp_backend_ci
+        run: node --import tsx --test server/tests/inventory-adjustment-service.integration.test.mjs
+      - name: PostgreSQL product catalog schema integration tests
+        env:
+          ERP_TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/erp_backend_ci
+        run: node --test server/tests/postgresql-product-catalog-schema.integration.test.mjs
+      - name: PostgreSQL product catalog constraint integration tests
+        env:
+          ERP_TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/erp_backend_ci
+        run: node --test server/tests/postgresql-product-catalog-constraints.integration.test.mjs
+      - name: PostgreSQL inventory schema integration tests
+        env:
+          ERP_TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/erp_backend_ci
+        run: node --test server/tests/postgresql-inventory-schema.integration.test.mjs
+      - name: PostgreSQL inventory constraint integration tests
+        env:
+          ERP_TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/erp_backend_ci
+        run: node --test server/tests/postgresql-inventory-constraints.integration.test.mjs
+      - name: PostgreSQL sales schema integration tests
+        env:
+          ERP_TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/erp_backend_ci
+        run: node --test server/tests/postgresql-sales-schema.integration.test.mjs
+      - name: PostgreSQL sales constraint integration tests
+        env:
+          ERP_TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/erp_backend_ci
+        run: node --test server/tests/postgresql-sales-constraints.integration.test.mjs
+      - name: PostgreSQL purchasing/tax schema integration tests
+        env:
+          ERP_TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/erp_backend_ci
+        run: node --test server/tests/postgresql-purchasing-tax-schema.integration.test.mjs
+      - name: PostgreSQL purchasing/tax constraint integration tests
+        env:
+          ERP_TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/erp_backend_ci
+        run: node --test server/tests/postgresql-purchasing-tax-constraints.integration.test.mjs
+      - name: PostgreSQL finance/settlement schema integration tests
+        env:
+          ERP_TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/erp_backend_ci
+        run: node --test server/tests/postgresql-finance-settlement-schema.integration.test.mjs
+      - name: PostgreSQL accounting schema integration tests
+        env:
+          ERP_TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/erp_backend_ci
+        run: node --test server/tests/postgresql-accounting-schema.integration.test.mjs
+      - name: PostgreSQL accounting constraint integration tests
+        env:
+          ERP_TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/erp_backend_ci
+        run: node --test server/tests/postgresql-accounting-constraints.integration.test.mjs
+      - name: PostgreSQL repairs/follow-up/notifications schema integration tests
+        env:
+          ERP_TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/erp_backend_ci
+        run: node --test server/tests/postgresql-repairs-followup-notifications-schema.integration.test.mjs
+      - name: PostgreSQL repairs/follow-up/notifications constraint integration tests
+        env:
+          ERP_TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/erp_backend_ci
+        run: node --test server/tests/postgresql-repairs-followup-notifications-constraints.integration.test.mjs
+      - name: PostgreSQL printing/export/reporting read-model schema integration tests
+        env:
+          ERP_TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/erp_backend_ci
+        run: node --test server/tests/postgresql-printing-export-reporting-read-models-schema.integration.test.mjs
+      - name: PostgreSQL printing/export/reporting read-model constraint integration tests
+        env:
+          ERP_TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/erp_backend_ci
+        run: node --test server/tests/postgresql-printing-export-reporting-read-models-constraints.integration.test.mjs
+      - name: PostgreSQL exact index catalog integration tests
+        env:
+          ERP_TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/erp_backend_ci
+        run: node --test server/tests/postgresql-index-catalog.integration.test.mjs
+      - name: PostgreSQL Phase 03.08 DDL verification gate
+        env:
+          ERP_TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/erp_backend_ci
+        run: node --test server/tests/postgresql-ddl-verification.integration.test.mjs
+      - name: Backend build
+        run: npm run backend:build
+      - name: PostgreSQL health/readiness and graceful shutdown smoke
+        shell: bash
+        env:
+          NODE_ENV: test
+          ERP_LOG_LEVEL: info
+          ERP_BACKEND_HOST: 127.0.0.1
+          ERP_BACKEND_PORT: '8787'
+          ERP_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/erp_backend_ci
+          ERP_SHUTDOWN_TIMEOUT_MS: '5000'
+        run: |
+          set -euo pipefail
+          export ERP_AUTH_ACCESS_TOKEN_SECRET="$(node -e "process.stdout.write(['ci','test','auth','signing','key','32','characters','minimum'].join('-'))")"
+          node dist-server/main.js >backend-ci.log 2>&1 &
+          pid=$!
+          cleanup() {
+            if kill -0 "$pid" 2>/dev/null; then
+              kill -TERM "$pid" || true
+              wait "$pid" || true
+            fi
+          }
+          trap cleanup EXIT
+          started=0
+          for _ in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8787/health >health.json; then
+              started=1
+              break
+            fi
+            sleep 1
+          done
+          test "$started" = "1"
+          curl -fsS http://127.0.0.1:8787/ready >ready.json
+          node -e "const fs=require('fs'); const h=JSON.parse(fs.readFileSync('health.json')); if(h.status!=='ok'||!h.requestId) process.exit(1); const r=JSON.parse(fs.readFileSync('ready.json')); if(r.status!=='ready'||r.checks?.database!=='up'||!r.requestId) process.exit(1)"
+          kill -TERM "$pid"
+          wait "$pid"
+          trap - EXIT
+          grep -q 'backend shutdown completed' backend-ci.log
+      - name: Upload backend smoke log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-ci-log
+          path: backend-ci.log
+          if-no-files-found: warn
+          retention-days: 1
+
   browser-contract:
     name: browser-contract
     runs-on: ubuntu-latest
@@ -70,8 +380,12 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version-file: .nvmrc
           cache: npm
+      - name: Runtime version guard
+        run: |
+          test "$(node --version)" = "v24.21.0"
+          test "$(npm --version)" = "11.19.0"
       - run: npm ci --ignore-scripts
       - name: Install pinned Playwright runner without changing lockfile
         run: npm install --no-save --package-lock=false @playwright/test@1.62.1
@@ -80,15 +394,17 @@ jobs:
 
   release-gate:
     name: release-gate
-    needs: [verify, browser-contract]
+    needs: [verify, backend-verify, browser-contract]
     if: ${{ always() }}
     runs-on: ubuntu-latest
     steps:
-      - name: Require successful verification and browser contract
+      - name: Require successful legacy, backend, and browser verification
         env:
           VERIFY_RESULT: ${{ needs.verify.result }}
+          BACKEND_VERIFY_RESULT: ${{ needs.backend-verify.result }}
           BROWSER_CONTRACT_RESULT: ${{ needs.browser-contract.result }}
         run: |
           test "$VERIFY_RESULT" = "success"
+          test "$BACKEND_VERIFY_RESULT" = "success"
           test "$BROWSER_CONTRACT_RESULT" = "success"
           echo "CI release gate passed."

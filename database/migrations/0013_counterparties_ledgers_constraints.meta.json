@@ -1,0 +1,8 @@
+{
+  "version": "0013",
+  "name": "counterparties_ledgers_constraints",
+  "transactional": true,
+  "preconditionSql": "SELECT EXISTS (SELECT 1 FROM public.schema_migrations WHERE version = '0012') AND NOT EXISTS (SELECT 1 FROM pg_catalog.pg_constraint WHERE conname = 'pk_counterparties') AS ok;",
+  "verificationSql": "SELECT EXISTS (SELECT 1 FROM pg_catalog.pg_constraint WHERE conname = 'pk_counterparties' AND contype = 'p') AND EXISTS (SELECT 1 FROM pg_catalog.pg_constraint WHERE conname = 'pk_counterparty_roles' AND contype = 'p') AND EXISTS (SELECT 1 FROM pg_catalog.pg_constraint WHERE conname = 'pk_customer_profiles' AND contype = 'p') AND EXISTS (SELECT 1 FROM pg_catalog.pg_constraint WHERE conname = 'pk_supplier_profiles' AND contype = 'p') AND EXISTS (SELECT 1 FROM pg_catalog.pg_constraint WHERE conname = 'pk_customer_ledger_entries' AND contype = 'p') AND EXISTS (SELECT 1 FROM pg_catalog.pg_constraint WHERE conname = 'pk_supplier_ledger_entries' AND contype = 'p') AND EXISTS (SELECT 1 FROM pg_catalog.pg_constraint WHERE conname = 'ck_counterparty_roles__role' AND contype = 'c') AND EXISTS (SELECT 1 FROM pg_catalog.pg_constraint WHERE conname = 'fk_customer_ledger_entries__posting_batch' AND contype = 'f') AND EXISTS (SELECT 1 FROM pg_catalog.pg_constraint WHERE conname = 'fk_supplier_ledger_entries__posting_batch' AND contype = 'f') AS ok;",
+  "recovery": "Transactional failure rolls the migration back. After successful production apply, recovery is forward-only: preserve counterparty and historical ledger data and issue a corrective migration rather than dropping integrity constraints or rewriting committed migration history. Product-owned default price-list FK and all 03.07 search/performance indexes remain deferred."
+}
