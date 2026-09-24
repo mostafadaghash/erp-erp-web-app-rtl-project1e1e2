@@ -386,8 +386,8 @@ test(
       );
       assert.equal(history.rowCount, MIGRATIONS.length);
       assert.deepEqual(history.rows.at(-1), {
-        version: "0025",
-        name: "batch_expiry_permission",
+        version: "0026",
+        name: "inventory_adjustment_permissions",
       });
 
       const verification = await runMigrations({

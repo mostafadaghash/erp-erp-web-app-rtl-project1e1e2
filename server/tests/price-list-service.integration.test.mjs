@@ -96,7 +96,7 @@ test(
       const applied = await runMigrations({ databaseUrl });
       assert.deepEqual(applied.applied, MIGRATIONS);
       assert.deepEqual(applied.skipped, []);
-      assert.equal(MIGRATIONS.at(-1), "0025");
+      assert.equal(MIGRATIONS.at(-1), "0026");
 
       const version = await pool.query("SHOW server_version_num");
       const versionNumber = Number(
@@ -661,8 +661,8 @@ test(
       );
       assert.equal(history.rowCount, MIGRATIONS.length);
       assert.deepEqual(history.rows.at(-1), {
-        version: "0025",
-        name: "batch_expiry_permission",
+        version: "0026",
+        name: "inventory_adjustment_permissions",
       });
 
       const verification = await runMigrations({
