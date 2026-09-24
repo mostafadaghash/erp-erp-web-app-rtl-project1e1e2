@@ -67,7 +67,7 @@ test("08.09 Inventory Adjustment posts formally and surfaces reservation shortfa
   assert.deepEqual(adj,{reason_code:"DAMAGE",notes:"Damaged during handling"});
   const mov=(await pool.query(`SELECT im.movement_type,iml.quantity_signed::text,iml.unit_cost::text FROM inventory_movements im JOIN inventory_movement_lines iml ON iml.movement_id=im.id WHERE im.source_type='INVENTORY_ADJUSTMENT' AND im.source_id=$1`,[result.value.id])).rows[0];
   assert.deepEqual(mov,{movement_type:"ADJUSTMENT",quantity_signed:"-4.000000",unit_cost:"100.0000"});
-  const evt=await pool.query(`SELECT event_type,payload FROM outbox_events WHERE aggregate_id=$1 ORDER BY event_type`,[result.value.id]);
+  const evt=await pool.query(`SELECT event_type,payload_json FROM outbox_events WHERE aggregate_id=$1 ORDER BY event_type`,[result.value.id]);
   assert.ok(evt.rows.some(r=>r.event_type==="inventory.reservation_shortfall.detected"));
   assert.ok(evt.rows.some(r=>r.event_type==="accounting.inventory_adjustment.posted"));
   const replay=await adjustments.create({actorUserId:I.admin,idempotencyKey:"adj-shortfall-1",warehouseId:I.warehouse,reasonCode:"DAMAGE",notes:"Damaged during handling",lines:[{variantId,quantityDifference:"-4"}]});
