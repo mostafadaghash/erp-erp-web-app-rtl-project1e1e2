@@ -51,7 +51,7 @@ test("08.09 Inventory Adjustment posts formally and surfaces reservation shortfa
     VALUES($1,$2,1,$3,$4,$5,'CONFIRMED','PICKUP',$6,$6,NULL,NULL,NULL,1,now(),now())`,[I.order,I.branch,I.counterparty,I.warehouse,I.priceList,I.admin]);
   await pool.query(`INSERT INTO sales_order_lines(id,sales_order_id,variant_id,product_unit_id,ordered_quantity,unit_price,discount_amount,tax_code_id,line_total)
     VALUES($1,$2,$3,$4,8,100,0,NULL,800)`,[I.orderLine,I.order,variantId,productUnitId]);
-  const reserved=await reservations.setLineReservation({actorUserId:I.admin,salesOrderId:I.order,salesOrderLineId:I.orderLine,warehouseId:I.warehouse,variantId,desiredQuantity:"8"});
+  const reserved=await withTransaction(pool,c=>reservations.setLineReservationWithinTransaction(c,{actorUserId:I.admin,salesOrderId:I.order,salesOrderLineId:I.orderLine,warehouseId:I.warehouse,variantId,desiredQuantity:"8"}));
   assert.equal(reserved.quantity,"8.000000");
 
   await assert.rejects(adjustments.create({actorUserId:I.admin,idempotencyKey:"adj-other-no-note",warehouseId:I.warehouse,reasonCode:"OTHER",lines:[{variantId,quantityDifference:"-1"}]}),
