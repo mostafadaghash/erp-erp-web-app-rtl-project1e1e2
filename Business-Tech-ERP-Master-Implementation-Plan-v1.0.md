@@ -3046,7 +3046,7 @@ No historical rewrite due to backdating.
 
 ## 08.09 Inventory Adjustment
 
-**Status:** `IMPLEMENTED_PENDING_VALIDATION`
+**Status:** `CLOSED`
 
 - formal document only.
 - no direct stock update.
@@ -3055,6 +3055,12 @@ No historical rewrite due to backdating.
 - shortage/overage costing according to v1.7.
 - generate accounting effect when required.
 - detect reservation shortfall; never hide it by silently rewriting reservation.
+
+**08.09 Implementation SHA:** `e608c421e16ce614adef5f01f9999d87a6e7c6b4`.  
+**08.09 CI:** #1069 / `36036372044` SUCCESS on same SHA, including retry of transient printing acceptance job.  
+**08.09 Migration:** `0026 inventory_adjustment_permissions`; Frozen Index Catalog unchanged.  
+**08.09 Validation PR:** #243, validation only; close without merge after final documentation CI.  
+**Accounting dependency:** Phase 09 posting rules must wire actual Journal Entries before accounting cutover; no fabricated journal in 08.09.
 
 ## 08.10 Projection Rebuild
 
@@ -3072,7 +3078,7 @@ Create controlled verification/rebuild procedures capable of recalculating opera
 - [x] WA purchase/return scenarios.
 - [ ] projection rebuild equals live projection.
 - [x] stocktake approval version rules.
-- [ ] adjustment shortfall behavior.
+- [x] adjustment shortfall behavior.
 
 ---
 
