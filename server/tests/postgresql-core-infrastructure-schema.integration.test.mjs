@@ -47,7 +47,7 @@ test("03.A core schema remains canonical after later schema migrations", async (
       const target = history.rows.find((row) => row.version === "0002");
       assert.equal(target?.name, "core_infrastructure_organization_security");
       assert.match(target?.checksum ?? "", /^[0-9a-f]{64}$/);
-      assert.equal(history.rows.at(-1)?.version, "0025");
+      assert.equal(history.rows.at(-1)?.version, MIGRATIONS.at(-1));
     });
     const second = await runMigrations({ databaseUrl });
     assert.deepEqual(second.applied, []);
