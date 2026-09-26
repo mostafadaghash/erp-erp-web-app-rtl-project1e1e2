@@ -3064,7 +3064,11 @@ No historical rewrite due to backdating.
 
 ## 08.10 Projection Rebuild
 
+**Status:** `IN_PROGRESS` — gap analysis recorded; implementation and Exit Criteria not yet complete.
+
 Create controlled verification/rebuild procedures capable of recalculating operational projections from immutable ledgers in test/maintenance mode.
+
+**Gap Analysis:** `docs/gap-analysis/phase-08-10-projection-rebuild.md`. Do not start Phase 09 until Full CI and all Phase 08 gates pass on the same final SHA.
 
 ### Gate 08 — Mandatory Concurrency Suite
 
