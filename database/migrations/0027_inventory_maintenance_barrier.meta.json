@@ -1,0 +1,8 @@
+{
+  "version": "0027",
+  "name": "inventory_maintenance_barrier",
+  "transactional": true,
+  "preconditionSql": "SELECT EXISTS (SELECT 1 FROM public.schema_migrations WHERE version='0026') AND NOT EXISTS (SELECT 1 FROM pg_proc WHERE proname='fn_inventory_maintenance_writer_barrier') AS ok;",
+  "verificationSql": "SELECT (SELECT count(*) FROM pg_trigger WHERE tgname LIKE 'bt_%__maintenance' AND NOT tgisinternal)=8 AS ok;",
+  "recovery": "Transactional failure rolls back all triggers and function. After success use a forward-only migration to modify the shared maintenance barrier."
+}
