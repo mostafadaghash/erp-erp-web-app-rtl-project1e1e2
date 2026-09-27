@@ -7,7 +7,7 @@ CREATE FUNCTION public.fn_inventory_maintenance_writer_barrier()
 RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
   PERFORM pg_advisory_xact_lock_shared(721017, 810);
-  RETURN COALESCE(NEW, OLD);
+  RETURN NULL;
 END;
 $$;
 
