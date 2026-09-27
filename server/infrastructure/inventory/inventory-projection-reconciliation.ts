@@ -102,10 +102,10 @@ export async function reconcileBatchStockPositions(
   const result = await client.query<BatchDifferenceRow>(
     `WITH historical AS (
        SELECT im.warehouse_id, ilb.batch_id,
-              SUM(ilb.quantity)::numeric(18,6) AS on_hand
+              SUM(CASE WHEN iml.quantity_signed<0 THEN -ilb.quantity ELSE ilb.quantity END)::numeric(18,6) AS on_hand
          FROM inventory_movements im
-         JOIN inventory_line_batches ilb ON ilb.movement_line_id IN
-           (SELECT iml.id FROM inventory_movement_lines iml WHERE iml.movement_id=im.id)
+         JOIN inventory_movement_lines iml ON iml.movement_id=im.id
+         JOIN inventory_line_batches ilb ON ilb.movement_line_id=iml.id
         WHERE im.warehouse_id=$1
         GROUP BY im.warehouse_id,ilb.batch_id
      ), all_keys AS (
