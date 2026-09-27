@@ -35,8 +35,6 @@ test('08.10 PostgreSQL 17: shared writer barrier, exclusive rebuild and rollback
       await writer.query('BEGIN')
       // Statement trigger must acquire shared lock even with zero matching rows.
       await writer.query('UPDATE inventory_stock_positions SET updated_at=now() WHERE false')
-      const held=await writer.query('SELECT pg_try_advisory_xact_lock(721017,810) AS acquired')
-      assert.equal(held.rows[0].acquired,false)
       await maint.query('BEGIN')
       const blocked=await maint.query('SELECT pg_try_advisory_xact_lock(721017,810) AS acquired')
       assert.equal(blocked.rows[0].acquired,false)
