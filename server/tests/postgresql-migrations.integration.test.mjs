@@ -76,6 +76,7 @@ const MIGRATIONS = [
   { version: "0024", name: "inventory_ledger_integrity", transactional: true },
   { version: "0025", name: "batch_expiry_permission", transactional: true },
   { version: "0026", name: "inventory_adjustment_permissions", transactional: true },
+  { version: "0027", name: "inventory_maintenance_barrier", transactional: true },
 ];
 
 async function withClient(fn) {
