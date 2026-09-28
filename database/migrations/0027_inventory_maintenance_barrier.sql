@@ -3,7 +3,7 @@
 -- Exclusive maintenance lock waits for active writers and blocks new ones.
 -- Trigger obtains shared lock before any projection mutation. The maintenance
 -- transaction itself can acquire a shared lock while holding exclusive.
-CREATE FUNCTION public.fn_inventory_maintenance_writer_barrier()
+CREATE OR REPLACE FUNCTION public.fn_inventory_maintenance_writer_barrier()
 RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
   PERFORM pg_advisory_xact_lock_shared(721017, 810);
