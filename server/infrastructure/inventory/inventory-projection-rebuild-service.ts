@@ -1,4 +1,4 @@
-import type { PoolClient } from 'pg'
+import type { PoolClient, QueryResultRow } from 'pg'
 import type { TransactionOptions, TransactionWork } from '../database/transaction.js'
 import {
   reconcileBatchStockPositions,
@@ -74,7 +74,7 @@ export class InventoryProjectionRebuildService {
           inventory_value=EXCLUDED.inventory_value,updated_at=now()`,
           [cost.warehouseId,cost.variantId,cost.weightedAverageCost,cost.lastPurchaseCost,cost.inventoryValue])
       }
-      const existingCosts=await client.query<{variant_id:string}>(
+      const existingCosts=await client.query<QueryResultRow & {variant_id:string}>(
         'SELECT variant_id FROM variant_warehouse_cost_projection WHERE warehouse_id=$1',[input.warehouseId])
       for(const row of existingCosts.rows)if(!replayIds.has(row.variant_id))
         await client.query('DELETE FROM variant_warehouse_cost_projection WHERE warehouse_id=$1 AND variant_id=$2',[input.warehouseId,row.variant_id])
