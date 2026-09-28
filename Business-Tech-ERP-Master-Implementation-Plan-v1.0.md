@@ -3064,11 +3064,15 @@ No historical rewrite due to backdating.
 
 ## 08.10 Projection Rebuild
 
-**Status:** `IN_PROGRESS` — gap analysis recorded; implementation and Exit Criteria not yet complete.
+**Status:** `CLOSED`
 
 Create controlled verification/rebuild procedures capable of recalculating operational projections from immutable ledgers in test/maintenance mode.
 
-**Gap Analysis:** `docs/gap-analysis/phase-08-10-projection-rebuild.md`. Do not start Phase 09 until Full CI and all Phase 08 gates pass on the same final SHA.
+**08.10 Verified Implementation SHA:** `67da1af30461865eb358c3a983a8390219f55840`.  
+**08.10 CI:** #1097 / `36462833049` — SUCCESS; `verify`, `backend-verify`, `browser-contract`, and `release-gate` all SUCCESS on the same implementation SHA.  
+**08.10 Migration/Index:** migration `0027_inventory_maintenance_barrier`; Frozen Index Catalog unchanged.  
+**08.10 Cost Rebuild:** deterministic immutable-ledger replay in `posted_at` order, Phase 08.03 WA rounding preserved, `last_purchase_cost` updated only by PURCHASE, transactional repair plus post-repair verification.  
+**Gap Analysis:** `docs/gap-analysis/phase-08-10-projection-rebuild.md`.
 
 ### Gate 08 — Mandatory Concurrency Suite
 
@@ -3080,7 +3084,7 @@ Create controlled verification/rebuild procedures capable of recalculating opera
 - [x] stock transfer source/target atomicity.
 - [x] failed transfer rolls back both sides.
 - [x] WA purchase/return scenarios.
-- [ ] projection rebuild equals live projection.
+- [x] projection rebuild equals live projection.
 - [x] stocktake approval version rules.
 - [x] adjustment shortfall behavior.
 
