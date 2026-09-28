@@ -3,11 +3,12 @@ import type { TransactionOptions, TransactionWork } from '../database/transactio
 import {
   reconcileBatchStockPositions,
   reconcileInventoryStockPositions,
-  reconcileInventoryValue,
+  reconcileInventoryCosts,
+  replayInventoryCosts,
 } from './inventory-projection-reconciliation.js'
 
 export class InventoryRebuildError extends Error {
-  constructor(readonly reason: 'COST_REPLAY_REQUIRED'|'VERIFICATION_FAILED'|'WAREHOUSE_NOT_FOUND') {
+  constructor(readonly reason: 'VERIFICATION_FAILED'|'WAREHOUSE_NOT_FOUND') {
     super('Inventory projection rebuild rejected: '+reason)
     this.name='InventoryRebuildError'
   }
@@ -38,14 +39,12 @@ export class InventoryProjectionRebuildService {
       if(w.rowCount!==1)throw new InventoryRebuildError('WAREHOUSE_NOT_FOUND')
       const stock=await reconcileInventoryStockPositions(client,input.warehouseId)
       const batches=await reconcileBatchStockPositions(client,input.warehouseId)
-      const costs=await reconcileInventoryValue(client,input.warehouseId)
+      const costs=await reconcileInventoryCosts(client,input.warehouseId)
       const report:RebuildReport={warehouseId:input.warehouseId,
         stockDifferences:stock.length,batchDifferences:batches.length,
         costDifferences:costs.length,repaired:false}
       if(!input.repair)return report
-      // Historical cost replay is not equivalent to SUM(total_cost). Fail
-      // closed instead of silently changing WA/COGS or last purchase cost.
-      if(costs.length)throw new InventoryRebuildError('COST_REPLAY_REQUIRED')
+      const replayedCosts=await replayInventoryCosts(client,input.warehouseId)
       for(const line of stock){
         await client.query(`INSERT INTO inventory_stock_positions
           (warehouse_id,variant_id,on_hand,reserved,version,updated_at)
@@ -64,10 +63,25 @@ export class InventoryProjectionRebuildService {
           updated_at=now()`,
           [line.warehouseId,line.batchId,line.expectedOnHand,line.expectedReserved])
       }
+      const replayIds=new Set(replayedCosts.map(x=>x.variantId))
+      for(const cost of replayedCosts){
+        await client.query(`INSERT INTO variant_warehouse_cost_projection
+          (warehouse_id,variant_id,weighted_average_cost,last_purchase_cost,inventory_value,updated_at)
+          VALUES($1,$2,$3,$4,$5,now())
+          ON CONFLICT(warehouse_id,variant_id) DO UPDATE SET
+          weighted_average_cost=EXCLUDED.weighted_average_cost,
+          last_purchase_cost=EXCLUDED.last_purchase_cost,
+          inventory_value=EXCLUDED.inventory_value,updated_at=now()`,
+          [cost.warehouseId,cost.variantId,cost.weightedAverageCost,cost.lastPurchaseCost,cost.inventoryValue])
+      }
+      const existingCosts=await client.query<{variant_id:string}>(
+        'SELECT variant_id FROM variant_warehouse_cost_projection WHERE warehouse_id=$1',[input.warehouseId])
+      for(const row of existingCosts.rows)if(!replayIds.has(row.variant_id))
+        await client.query('DELETE FROM variant_warehouse_cost_projection WHERE warehouse_id=$1 AND variant_id=$2',[input.warehouseId,row.variant_id])
       const [remainingStock,remainingBatch,remainingCost]=await Promise.all([
         reconcileInventoryStockPositions(client,input.warehouseId),
         reconcileBatchStockPositions(client,input.warehouseId),
-        reconcileInventoryValue(client,input.warehouseId),
+        reconcileInventoryCosts(client,input.warehouseId),
       ])
       if(remainingStock.length||remainingBatch.length||remainingCost.length)
         throw new InventoryRebuildError('VERIFICATION_FAILED')
