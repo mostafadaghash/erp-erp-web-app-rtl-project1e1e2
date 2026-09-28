@@ -142,7 +142,7 @@ interface CostLedgerRow extends QueryResultRow {
   warehouse_id:string; variant_id:string; movement_type:string
   quantity_signed:string; unit_cost:string
 }
-const Q=1_000_000n, M=10_000n
+const Q=1_000_000n
 function decimal(value:string,scale:number):bigint {
   const m=/^(-?)(\d+)(?:\.(\d+))?$/.exec(value)
   if(!m)throw new TypeError('invalid historical decimal')
