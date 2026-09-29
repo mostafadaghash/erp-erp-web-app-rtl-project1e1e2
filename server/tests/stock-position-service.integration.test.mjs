@@ -351,6 +351,54 @@ test(
       assert.equal(concurrent?.available, "20.000000");
       assert.equal(concurrent?.version, workers);
 
+      // Gate 08: direct-sale stock protection at the Inventory Core boundary.
+      // Sales posting is Phase 11, so this harness deliberately exercises the
+      // exact lock/check/decrement primitive that Direct Sales must compose,
+      // without introducing a Sales document or write owner early.
+      async function directSaleInventoryBoundary(quantity) {
+        return withTransaction(pool, async (client) => {
+          const [locked] = await positions.lockManyWithinTransaction(client, {
+            actorUserId: IDS.admin,
+            positions: [{ warehouseId: IDS.warehouse3, variantId }],
+          });
+          assert.ok(locked);
+          if (Number(locked.available) < Number(quantity)) {
+            throw new Error("INSUFFICIENT_AVAILABLE_STOCK");
+          }
+          await delay(40);
+          return positions.applyDeltaWithinTransaction(client, {
+            actorUserId: IDS.admin,
+            warehouseId: IDS.warehouse3,
+            variantId,
+            onHandDelta: `-${quantity}`,
+            reservedDelta: "0",
+          });
+        });
+      }
+
+      const competingDirectSales = await Promise.allSettled([
+        directSaleInventoryBoundary("15"),
+        directSaleInventoryBoundary("15"),
+      ]);
+      assert.equal(
+        competingDirectSales.filter((x) => x.status === "fulfilled").length,
+        1,
+        "only one competing direct sale may consume the last 20 units",
+      );
+      const rejectedDirectSale = competingDirectSales.find(
+        (x) => x.status === "rejected",
+      );
+      assert.equal(rejectedDirectSale?.reason?.message, "INSUFFICIENT_AVAILABLE_STOCK");
+      const afterDirectSaleRace = await positions.getPosition({
+        actorUserId: IDS.admin,
+        warehouseId: IDS.warehouse3,
+        variantId,
+      });
+      assert.equal(afterDirectSaleRace?.onHand, "5.000000");
+      assert.equal(afterDirectSaleRace?.reserved, "0.000000");
+      assert.equal(afterDirectSaleRace?.available, "5.000000");
+      assert.equal(afterDirectSaleRace?.version, workers + 1);
+
       const physicalAvailable = await pool.query(
         `SELECT EXISTS (
            SELECT 1
