@@ -1,6 +1,6 @@
 # Business Tech ERP — Master Implementation Plan v1.0
 
-**الحالة:** ACTIVE — PHASE 08 READY_TO_START  
+**الحالة:** ACTIVE — PHASE 09 READY_TO_START  
 **تاريخ الإصدار:** 2026-09-11  
 **المشروع:** Business Tech ERP — Local Server Edition / PostgreSQL Core  
 **المرجع المعماري الرسمي:** `Business-Tech-ERP-Architecture-Baseline-v1.7-Final.docx`  
@@ -2902,7 +2902,7 @@ Implementation boundary:
 
 # 14. PHASE 08 — Inventory Core
 
-**Status:** `IN_PROGRESS`
+**Status:** `CLOSED`
 
 هذه المرحلة Critical ولا يتم ربط Sales/Purchasing النهائي بها قبل نجاح Concurrency Gate.
 
@@ -3078,7 +3078,7 @@ Create controlled verification/rebuild procedures capable of recalculating opera
 
 - [x] 2 simultaneous reservations for same stock cannot overreserve.
 - [x] 20+ parallel reservation stress scenario.
-- [ ] concurrent direct sales stock protection.
+- [x] concurrent direct sales stock protection.
 - [x] batch last-unit race.
 - [x] serial double-use race.
 - [x] stock transfer source/target atomicity.
@@ -3087,6 +3087,8 @@ Create controlled verification/rebuild procedures capable of recalculating opera
 - [x] projection rebuild equals live projection.
 - [x] stocktake approval version rules.
 - [x] adjustment shortfall behavior.
+
+**Gate 08 closure evidence:** Inventory Core boundary concurrency harness on SHA `55353cf9835ca859e77e7a9229d8e23aff950293` proved two simultaneous direct-sale-style consumers of 15 units against 20 available serialize on the same `Warehouse+Variant` lock row: exactly one succeeds, the other is rejected for insufficient available stock, and final on-hand is 5 with no oversell. This deliberately validates the Inventory Core primitive without creating the Phase 11 Sales write owner early. Full CI #1100 / run `36625354536` passed `verify`, `backend-verify`, `browser-contract`, and `release-gate` on that SHA.
 
 ---
 
