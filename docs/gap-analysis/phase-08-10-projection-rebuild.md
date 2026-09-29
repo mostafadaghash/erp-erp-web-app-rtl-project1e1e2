@@ -33,4 +33,6 @@
 - Cost projection repair replays immutable inventory history rather than copying the live projection, then verifies equality before COMMIT.
 - Rebuild remains a maintenance operation and emits no business movement or accounting entry.
 
-**Next action:** record final documentation validation. Phase 09 must not start until the remaining Gate 08 direct-sales concurrency dependency is resolved or formally sequenced to its owning Sales implementation phase.
+**Final Phase 08 gate evidence:** the Inventory Core direct-sale concurrency boundary harness passed on SHA `55353cf9835ca859e77e7a9229d8e23aff950293` in Full CI #1100 / run `36625354536`. Two simultaneous consumers cannot oversell the same `Warehouse+Variant`; the check is performed while holding the stock lock row. No Phase 11 Sales write owner was introduced early.
+
+**Next action:** Phase 09 — Finance & Accounting Foundation, starting with 09.01 Treasuries after final documentation CI is green.
