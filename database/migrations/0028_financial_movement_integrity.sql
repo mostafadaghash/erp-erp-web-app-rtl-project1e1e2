@@ -34,7 +34,7 @@ END;
 $$;
 
 CREATE TRIGGER bt_financial_movements__posting_context
-BEFORE INSERT OR UPDATE ON public.financial_movements
+AFTER INSERT ON public.financial_movements
 FOR EACH ROW
 EXECUTE FUNCTION public.fn_financial_movement_posting_context_valid();
 
