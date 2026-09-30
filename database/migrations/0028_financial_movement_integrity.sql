@@ -2,7 +2,7 @@
 -- Financial Movements are immutable Historical Sources of Truth.
 -- Treasury balance positions remain synchronous rebuildable projections.
 
-CREATE FUNCTION public.fn_financial_movement_posting_context_valid()
+CREATE OR REPLACE FUNCTION public.fn_financial_movement_posting_context_valid()
 RETURNS trigger
 LANGUAGE plpgsql
 AS $$
@@ -38,7 +38,7 @@ BEFORE INSERT OR UPDATE ON public.financial_movements
 FOR EACH ROW
 EXECUTE FUNCTION public.fn_financial_movement_posting_context_valid();
 
-CREATE FUNCTION public.fn_financial_movement_immutable()
+CREATE OR REPLACE FUNCTION public.fn_financial_movement_immutable()
 RETURNS trigger
 LANGUAGE plpgsql
 AS $$
