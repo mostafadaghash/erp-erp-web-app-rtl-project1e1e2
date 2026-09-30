@@ -272,9 +272,9 @@ test(
 
       const audit = await pool.query(
         `SELECT action,entity_type
-           FROM audit_log
+           FROM audit_logs
           WHERE entity_type='TREASURY'
-          ORDER BY occurred_at,id`,
+          ORDER BY created_at,id`,
       );
       assert.ok(audit.rows.some((row) => row.action === "TREASURY_CREATED"));
       assert.ok(audit.rows.some((row) => row.action === "TREASURY_UPDATED"));
