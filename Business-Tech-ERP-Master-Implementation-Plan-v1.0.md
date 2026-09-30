@@ -3098,7 +3098,7 @@ Create controlled verification/rebuild procedures capable of recalculating opera
 
 ## 09.01 Treasuries
 
-**Status:** `READY_FOR_IMPLEMENTATION` — Gap Analysis completed before any Treasury business-code or database change.  
+**Status:** `CLOSED` — implementation complete; final documentation SHA remains subject to the same full-CI closure gate described below.  
 **Gap Analysis:** `docs/gap-analysis/phase-09-01-treasuries.md` (analysis baseline SHA `4ad52230ed13445b0806644519f7a9fee7402920`).
 
 - user-defined names.
@@ -3106,6 +3106,13 @@ Create controlled verification/rebuild procedures capable of recalculating opera
 - no mandatory treasury type.
 - Cash/Bank/Wallet/InstaPay are treasuries by user naming.
 - Credit/Installment/Cheque are settlement modes, not treasuries.
+- Central Backend Treasury master service implemented without Financial Movements, receipts, disbursements, transfers, balance mutation, schema migration, index change, frontend cutover or Convex production change.
+- Validation PR: #245 (validation-only; no merge).
+- Validated implementation SHA: `ee778b532a3c5d7cb9147da492f095297ad48786`.
+- Full CI #1107 / run `36749615818`: SUCCESS on the validated implementation SHA; `verify`, `backend-verify`, `browser-contract` and `release-gate` all SUCCESS.
+- Phase closure is final only when the documentation commit carrying this status also passes the full CI on that same final SHA.
+
+**Next Action:** Phase 09.02 Financial Movements — Gap Analysis only before any 09.02 business-code or database change.
 
 ## 09.02 Financial Movements
 
