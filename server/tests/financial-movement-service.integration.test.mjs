@@ -63,7 +63,6 @@ test("09.02 Financial Movements are immutable and update Treasury positions atom
   const sum=await pool.query(`SELECT COALESCE(SUM(CASE WHEN direction='IN' THEN amount ELSE -amount END),0)::text AS balance FROM financial_movements WHERE treasury_id=$1`,[I.treasury]);
   assert.equal(sum.rows[0].balance,"100.0000");
 
-  await assert.rejects(()=>finance.getPosition(I.selected,I.treasury), err=>!(err instanceof Error) ? false : false).catch(()=>{});
   const otherTreasury="d9020000-0000-4000-8000-000000000008";
   await pool.query("INSERT INTO treasuries(id,branch_id,name,is_active,notes,created_at) VALUES ($1,$2,'Other',true,NULL,now())",[otherTreasury,I.branchB]);
   await assert.rejects(()=>finance.getPosition(I.selected,otherTreasury),BranchAccessDeniedError);
