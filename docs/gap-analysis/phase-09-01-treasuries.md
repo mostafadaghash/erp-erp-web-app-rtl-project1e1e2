@@ -172,10 +172,41 @@ At minimum:
 - disabling a Treasury does not delete history.
 - no test or implementation writes a balance onto the Treasury master row.
 
+## Implementation and validation closure
+
+Phase 09.01 implementation is complete within the approved Treasury-master boundary.
+
+Implemented:
+- Central Backend Treasury master service against the existing `treasuries` schema.
+- create, list, update/rename, activate and deactivate lifecycle.
+- Branch Scope and effective-permission enforcement.
+- trimmed non-empty user-defined names.
+- stable mapping of the frozen case-insensitive unique-name constraint.
+- audit events for Treasury master changes.
+- unit and PostgreSQL 17 integration coverage.
+
+Explicitly not implemented in 09.01:
+- Financial Movements or treasury balance-position mutation.
+- Receipts, disbursements or treasury transfers.
+- Advances, cheques, installments or GL posting.
+- Treasury type/code/current-balance fields.
+- schema migrations or new indexes.
+- frontend/Convex cutover.
+
+Implementation validation:
+- validation PR: #245, validation-only, not for merge.
+- validated code SHA: `ee778b532a3c5d7cb9147da492f095297ad48786`.
+- GitHub Actions CI #1107 / run `36749615818`: **SUCCESS**.
+- `verify`: SUCCESS.
+- `backend-verify`: SUCCESS, including Phase 09.01 Treasury unit and PostgreSQL 17 integration tests.
+- `browser-contract`: SUCCESS.
+- `release-gate`: SUCCESS.
+- dependency audit, backend typecheck, existing PostgreSQL regression gates and production validation gates completed successfully in the same run.
+
 ## Decision
 
-**Phase 09.01 is ready for implementation, but implementation has not started in this step.**
+**Phase 09.01 implementation and pre-closure validation are complete.**
 
-No code or database modification is required to begin the Treasury master itself. The correct next action is to implement the Central Backend Treasury service against the already-approved PostgreSQL schema and frozen index catalog, with Branch Scope and Permissions enforced server-side.
+Formal `CLOSED` status is recorded in the Master Implementation Plan only after the documentation commit itself passes the full CI on its own final SHA, preserving the rule that all gates must be green on the final phase commit.
 
-**Next action:** implement the Phase 09.01 Treasury backend slice and its tests only.
+**Next action:** Phase 09.02 Financial Movements — begin with Gap Analysis before any 09.02 business-code or database change.
