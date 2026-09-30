@@ -3116,10 +3116,21 @@ Create controlled verification/rebuild procedures capable of recalculating opera
 
 ## 09.02 Financial Movements
 
-**Status:** `READY_FOR_IMPLEMENTATION` — Gap Analysis completed before 09.02 business-code/database changes.  
+**Status:** `CLOSED` — implementation complete; final documentation SHA remains subject to the same full-CI closure gate described below.  
 **Gap Analysis:** `docs/gap-analysis/phase-09-02-financial-movements.md` (analysis baseline SHA `813505124b0233b68cf9b5cc497dd84307ddc79c`).
 
 - append-only IN/OUT ledger.
+- Financial Movements remain immutable Historical Sources of Truth; Treasury balance positions are synchronous rebuildable projections + lock rows.
+- Atomic writer updates movement + Treasury position in one transaction with Branch Scope, PostingBatch context validation and position locking.
+- Integrity migration `0028_financial_movement_integrity`; no new index and no physical business-model redesign.
+- Concurrency gate proves no lost updates and exact reconciliation between movement sum and position.
+- Receipt / Disbursement / Treasury Transfer business workflows remain outside 09.02.
+- Validation PR: #246 (validation-only; no merge).
+- Validated implementation SHA: `1f11d33f28e0f568099fd0d18c1bc917af53b9a8`.
+- Full CI #1145 / run `36767521058`: SUCCESS; `verify`, `backend-verify`, `browser-contract`, `release-gate` all SUCCESS.
+- Phase closure is final only when the documentation commit carrying this status also passes Full CI on that same final SHA.
+
+**Next Action:** Phase 09.03 Receipts / Disbursements — Gap Analysis only before any 09.03 business-code or database change.
 - source/posting batch references.
 - `treasury_balance_positions` maintained synchronously.
 
