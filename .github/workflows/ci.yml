@@ -269,6 +269,10 @@ jobs:
         env:
           ERP_TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/erp_backend_ci
         run: node --import tsx --test server/tests/financial-movement-service.integration.test.mjs
+      - name: PostgreSQL Receipt and Disbursement posting integration tests
+        env:
+          ERP_TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/erp_backend_ci
+        run: node --import tsx --test server/tests/cash-document-posting-service.integration.test.mjs
       - name: PostgreSQL product catalog schema integration tests
         env:
           ERP_TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/erp_backend_ci
