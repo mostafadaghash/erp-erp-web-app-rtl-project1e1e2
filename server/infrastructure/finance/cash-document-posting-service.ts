@@ -25,7 +25,7 @@ interface DocRow extends QueryResultRow {id:string;branch_id:string;document_num
 
 function req(n:string,v:string){if(typeof v!=='string'||!v.trim())throw new TypeError(`${n} must be a non-empty string`);return v.trim()}
 function opt(n:string,v:string|null|undefined){if(v==null)return null;return req(n,v)}
-function money(v:string){req('amount',v);const m=/^(\d{1,14})(?:\.(\d{1,4}))?$/.exec(v.trim());if(!m)throw new TypeError('amount must be positive numeric(18,4)');const s=BigInt(m[1])*10000n+BigInt((m[2]??'').padEnd(4,'0')||'0');if(s<=0n)throw new RangeError('amount must be greater than zero');return `${s/10000n}.${(s%10000n).toString().padStart(4,'0')}`}
+function money(v:string){req('amount',v);const m=/^(\d{1,14})(?:\.(\d{1,4}))?$/.exec(v.trim());if(!m)throw new TypeError('amount must be positive numeric(18,4)');const s=BigInt(m[1] ?? '0')*10000n+BigInt((m[2]??'').padEnd(4,'0')||'0');if(s<=0n)throw new RangeError('amount must be greater than zero');return `${s/10000n}.${(s%10000n).toString().padStart(4,'0')}`}
 function map(type:CashDocumentType,r:DocRow):CashDocumentRecord{return Object.freeze({id:r.id,type,branchId:r.branch_id,documentNumber:r.document_number,treasuryId:r.treasury_id,counterpartyId:r.counterparty_id,amount:r.amount,categoryId:r.category_id,reference:r.reference,notes:r.notes,occurredAt:r.occurred_at,postedAt:r.posted_at,createdBy:r.created_by})}
 
 export class CashDocumentPostingService {
