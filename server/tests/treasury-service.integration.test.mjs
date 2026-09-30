@@ -108,21 +108,23 @@ test(
           IDS.managePermission,
         ],
       );
-      await pool.query(
-        `INSERT INTO users
-          (id,name,username,email,password_hash,role_id,default_branch_id,
-           branch_scope_mode,preferred_language,is_active,last_login_at,created_at,updated_at)
-         VALUES
-          ($1,'Admin','phase09-admin','phase09-admin@example.test','test',$4,$5,'ALL','ar-EG',true,NULL,now(),now()),
-          ($2,'Selected','phase09-selected','phase09-selected@example.test','test',$4,$5,'SELECTED','ar-EG',true,NULL,now(),now()),
-          ($3,'Denied','phase09-denied','phase09-denied@example.test','test',$4,$5,'ALL','ar-EG',true,NULL,now(),now())`,
-        [IDS.admin, IDS.selectedUser, IDS.deniedUser, accountantRole.id, IDS.branchA],
-      );
-      await pool.query(
-        `INSERT INTO user_branch_access (user_id,branch_id)
-         VALUES ($1,$2)`,
-        [IDS.selectedUser, IDS.branchA],
-      );
+      await withTransaction(pool, async (client) => {
+        await client.query(
+          `INSERT INTO users
+            (id,name,username,email,password_hash,role_id,default_branch_id,
+             branch_scope_mode,preferred_language,is_active,last_login_at,created_at,updated_at)
+           VALUES
+            ($1,'Admin','phase09-admin','phase09-admin@example.test','test',$4,$5,'ALL','ar-EG',true,NULL,now(),now()),
+            ($2,'Selected','phase09-selected','phase09-selected@example.test','test',$4,$5,'SELECTED','ar-EG',true,NULL,now(),now()),
+            ($3,'Denied','phase09-denied','phase09-denied@example.test','test',$4,$5,'ALL','ar-EG',true,NULL,now(),now())`,
+          [IDS.admin, IDS.selectedUser, IDS.deniedUser, accountantRole.id, IDS.branchA],
+        );
+        await client.query(
+          `INSERT INTO user_branch_access (user_id,branch_id)
+           VALUES ($1,$2)`,
+          [IDS.selectedUser, IDS.branchA],
+        );
+      });
       await pool.query(
         `INSERT INTO user_permission_overrides
           (user_id,permission_id,effect,changed_by,changed_at)
