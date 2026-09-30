@@ -3094,9 +3094,12 @@ Create controlled verification/rebuild procedures capable of recalculating opera
 
 # 15. PHASE 09 — Finance & Accounting Foundation
 
-**Status:** `NOT_STARTED`
+**Status:** `IN_PROGRESS`
 
 ## 09.01 Treasuries
+
+**Status:** `READY_FOR_IMPLEMENTATION` — Gap Analysis completed before any Treasury business-code or database change.  
+**Gap Analysis:** `docs/gap-analysis/phase-09-01-treasuries.md` (analysis baseline SHA `4ad52230ed13445b0806644519f7a9fee7402920`).
 
 - user-defined names.
 - case-insensitive unique within branch.
