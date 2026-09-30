@@ -234,7 +234,7 @@ test("03.07 frozen Index Catalog is exact on PostgreSQL 17", async (t) => {
       assert.match(indexCatalog?.checksum ?? "", /^[0-9a-f]{64}$/);
       const latest = history.rows.at(-1);
       assert.equal(latest?.version,"0028");
-      assert.equal(latest?.name,"inventory_maintenance_barrier");
+      assert.equal(latest?.name,"financial_movement_integrity");
       assert.match(latest?.checksum ?? "", /^[0-9a-f]{64}$/);
     });
 
