@@ -78,6 +78,7 @@ const MIGRATIONS = [
   { version: "0026", name: "inventory_adjustment_permissions", transactional: true },
   { version: "0027", name: "inventory_maintenance_barrier", transactional: true },
   { version: "0028", name: "financial_movement_integrity", transactional: true },
+  { version: "0029", name: "receipt_disbursement_integrity", transactional: true },
 ];
 
 async function withClient(fn) {
@@ -89,6 +90,10 @@ async function withClient(fn) {
 async function cleanup() {
   await cleanupReportingTables(databaseUrl);
   await withClient(async (client) => {
+    await client.query("DROP FUNCTION IF EXISTS public.fn_posted_cash_document_immutable() CASCADE");
+    await client.query("DROP FUNCTION IF EXISTS public.fn_financial_movement_cash_source_singleton() CASCADE");
+    await client.query("DROP FUNCTION IF EXISTS public.fn_financial_movement_immutable() CASCADE");
+    await client.query("DROP FUNCTION IF EXISTS public.fn_financial_movement_posting_context_valid() CASCADE");
     await client.query("DROP FUNCTION IF EXISTS public.fn_inventory_ledger_row_immutable() CASCADE");
     await client.query("DROP FUNCTION IF EXISTS public.fn_inventory_movement_line_direction_valid() CASCADE");
     await client.query("DROP FUNCTION IF EXISTS public.fn_inventory_movement_posting_context_valid() CASCADE");
