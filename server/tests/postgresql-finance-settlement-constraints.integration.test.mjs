@@ -97,8 +97,8 @@ async function seedFixture(client) {
 
   await client.query(`INSERT INTO posting_batches
     (id,branch_id,source_type,source_id,operation_type,document_version,reverses_posting_batch_id,posted_at,created_by)
-    VALUES ($1,$3,'FINANCE_TEST',$4,'POST',1,NULL,now(),$5),($2,$6,'FINANCE_TEST',$7,'POST',1,NULL,now(),$5)`,
-    [ids.postingBatch1, ids.postingBatch2, ids.branch1, ids.source1, ids.user, ids.branch2, ids.source2]);
+    VALUES ($1,$3,'RECEIPT',$4,'POST',1,NULL,now(),$5),($2,$6,'RECEIPT',$7,'POST',1,NULL,now(),$5)`,
+    [ids.postingBatch1, ids.postingBatch2, ids.branch1, ids.receipt, ids.user, ids.branch2, ids.source2]);
 
   await client.query(`INSERT INTO receipts
     (id,branch_id,document_number,treasury_id,counterparty_id,amount,category_id,reference,notes,occurred_at,posted_at,created_by)
