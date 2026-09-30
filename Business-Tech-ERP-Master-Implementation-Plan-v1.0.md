@@ -3136,6 +3136,9 @@ Create controlled verification/rebuild procedures capable of recalculating opera
 
 ## 09.03 Receipts / Disbursements
 
+**Status:** `READY_FOR_IMPLEMENTATION` — Gap Analysis completed before 09.03 business-code/database changes.  
+**Gap Analysis:** `docs/gap-analysis/phase-09-03-receipts-disbursements.md` (analysis baseline SHA `670e3e903fc699028ab2effd3cb79edbdd31a27b`).
+
 - idempotent posting.
 - treasury row lock.
 - optional counterparty/target.
