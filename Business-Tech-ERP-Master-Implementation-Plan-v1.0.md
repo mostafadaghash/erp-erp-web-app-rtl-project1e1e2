@@ -3116,6 +3116,9 @@ Create controlled verification/rebuild procedures capable of recalculating opera
 
 ## 09.02 Financial Movements
 
+**Status:** `READY_FOR_IMPLEMENTATION` — Gap Analysis completed before 09.02 business-code/database changes.  
+**Gap Analysis:** `docs/gap-analysis/phase-09-02-financial-movements.md` (analysis baseline SHA `813505124b0233b68cf9b5cc497dd84307ddc79c`).
+
 - append-only IN/OUT ledger.
 - source/posting batch references.
 - `treasury_balance_positions` maintained synchronously.
