@@ -1,6 +1,6 @@
 # Phase 09.02 — Financial Movements Gap Analysis
 
-**Status:** GAP_ANALYSIS_COMPLETE — implementation may start only after this document.
+**Status:** IMPLEMENTED_AND_VALIDATED — formal closure pending final documentation CI.
 **Baseline:** Architecture Baseline v1.7.
 **Analysis branch:** `agent/postgres-v1.7-core`.
 **Analysis baseline SHA:** `813505124b0233b68cf9b5cc497dd84307ddc79c`.
@@ -82,3 +82,23 @@ Create a Central Backend Financial Movement service that:
 - no Receipt/Disbursement/Transfer rows are created by 09.02.
 
 **Next action:** implement only the Phase 09.02 Financial Movement writer, integrity migration and tests described above.
+
+
+## Implementation evidence
+
+- Integrity migration: `0028_financial_movement_integrity`.
+- Central Backend writer: `server/infrastructure/finance/financial-movement-service.ts`.
+- Unit gate: `server/tests/financial-movement-service.test.ts`.
+- PostgreSQL 17 transaction/concurrency gate: `server/tests/financial-movement-service.integration.test.mjs`.
+- Validation PR: #246 (validation-only; do not merge).
+- Validated implementation SHA: `1f11d33f28e0f568099fd0d18c1bc917af53b9a8`.
+- Full CI #1145 / run `36767521058`: **SUCCESS**.
+- `verify`, `backend-verify`, `browser-contract`, and `release-gate`: SUCCESS on the same implementation SHA.
+- Existing Finance/Settlement constraints, exact frozen Index Catalog, backend build and PostgreSQL smoke gates also passed.
+- No Receipt, Disbursement or Treasury Transfer business workflow was introduced.
+
+## Closure decision
+
+09.02 implementation satisfies its approved boundary. Final `CLOSED` status requires the documentation commit carrying the closure evidence to pass Full CI on that same final SHA.
+
+**Next action after closure:** Phase 09.03 — begin with Gap Analysis before any Receipt/Disbursement business-code or database change.
