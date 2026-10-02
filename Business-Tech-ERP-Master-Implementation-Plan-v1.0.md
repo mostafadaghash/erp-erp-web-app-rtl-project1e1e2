@@ -1,6 +1,6 @@
 # Business Tech ERP — Master Implementation Plan v1.0
 
-**الحالة:** ACTIVE — PHASE 09 / 09.05 READY_FOR_IMPLEMENTATION  
+**الحالة:** ACTIVE — PHASE 09 / 09.06 READY_TO_START  
 **تاريخ الإصدار:** 2026-09-11  
 **المشروع:** Business Tech ERP — Local Server Edition / PostgreSQL Core  
 **المرجع المعماري الرسمي:** `Business-Tech-ERP-Architecture-Baseline-v1.7-Final.docx`  
@@ -3176,22 +3176,30 @@ Create controlled verification/rebuild procedures capable of recalculating opera
 
 ## 09.05 Customer Advances
 
-**Status:** `READY_FOR_IMPLEMENTATION` — Gap Analysis completed before any 09.05 business-code/database change.  
-**Gap Analysis:** `docs/gap-analysis/phase-09-05-customer-advances.md` (analysis baseline SHA `79a26bac52992ff2f4da9edd9c7d50427e412dca`; corrected by ADR-0024/ADR-0025 before implementation).
+**Status:** `CLOSED` — implementation, concurrency/integrity verification and full regression validation complete; closure documentation commit must pass Full CI on that same final SHA.  
+**Gap Analysis:** `docs/gap-analysis/phase-09-05-customer-advances.md` (analysis baseline SHA `79a26bac52992ff2f4da9edd9c7d50427e412dca`; reconciled before implementation by accepted ADR-0024 and ADR-0025).
 
-- receipt + treasury movement + liability.
-- not sales revenue.
-- one advance per receipt.
-- remaining projection derived from applications.
-- apply using FOR UPDATE on advance.
-- no new cash movement during application.
-- reversal restores advance availability.
-- implementation must preserve ADR-0024 and the frozen Index Catalog: `advance_applications(posting_batch_id)` is intentionally **OMITTED_BY_ADR** in V1 and must not be added.
-- no 09.06+ work, GL Journal implementation, Sales partial-delivery cutover, frontend cutover or Convex production change starts in this Gap Analysis step.
+- Customer Advance receipt is one atomic command: SalesOrder/Branch/Counterparty validation + effective Finance permission/scope + canonical Receipt + exactly one IN Financial Movement + CustomerAdvance + Audit + Outbox.
+- The 09.03 Receipt writer was refactored for safe within-transaction composition; standalone Receipt/Disbursement behavior remains on the same canonical write path.
+- `customer_advances(receipt_id)` remains unique; source context enforces matching SalesOrder, Receipt, Counterparty, Branch and original amount.
+- Apply runs under `READ COMMITTED + SELECT ... FOR UPDATE` on the CustomerAdvance, rechecks Invoice context and remaining amount, and creates no new Receipt/Financial Movement or Treasury effect.
+- Concurrent advance applications cannot consume the same remaining amount.
+- Application history is append-only under ADR-0025: positive APPLY/REVERSAL rows preserve reversal and later re-application without UPDATE/DELETE and without `UNIQUE(advance_id,sales_invoice_id)`.
+- `remaining_amount_projection` is synchronously maintained and rebuildable from effective application history; it remains an Operational Projection rather than Historical Source of Truth.
+- SalesOrder cancellation does not automatically refund the advance; a real refund remains a separate Disbursement workflow.
+- Migration `0031_customer_advance_integrity` adds only integrity functions/triggers. It adds no business column and no index.
+- ADR-0024 remains preserved: `advance_applications.posting_batch_id` and its erroneous catalog index remain intentionally absent; the frozen Index Catalog is unchanged.
+- No Customer/Supplier Ledger or GL Journal effect was invented before the scheduled Sales/Accounting integration phases; no frontend cutover or Convex write was introduced.
+- PostgreSQL 17 gate `server/tests/customer-advance-service.integration.test.mjs` covers atomic receipt creation, idempotency replay/conflict, context rejection, no-cash apply/reverse, sequential application, over-consumption rejection, reversal/re-application, immutable history, concurrent double-consumption protection, unique Receipt race, forced rollback, projection rebuild, no automatic refund and ADR-0024 schema/index preservation.
+- Validated implementation SHA: `fb29fda9c9fe5e712bb0a940f464571808b15825`.
+- Full CI #1228 / run `37059134500`: SUCCESS; `verify`, `backend-verify` including the PostgreSQL 17 09.05 gate and all historical schema/index/DDL regressions, `browser-contract`, and `release-gate` all SUCCESS on the same implementation SHA.
+- Phase closure becomes final only when the documentation commit carrying this `CLOSED` status also passes Full CI on that same documentation SHA.
 
-**Next Action:** implement only the bounded 09.05 Customer Advances slice defined by the Gap Analysis, then run its PostgreSQL 17 concurrency/integrity gates and the full regression suite on one final SHA.
+**Next Action:** Phase 09.06 Cheques — Gap Analysis only before any 09.06 business-code or database change.
 
 ## 09.06 Cheques
+
+**Status:** `READY_TO_START`
 
 - PENDING/CLEARED/BOUNCED/CANCELLED.
 - no treasury movement on PENDING.
@@ -4325,10 +4333,10 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 
 # 32. Current Execution Pointer
 
-**Current Phase:** `PHASE 09 — Finance & Accounting Foundation / 09.05 Customer Advances`  
-**Status:** `READY_FOR_IMPLEMENTATION`  
+**Current Phase:** `PHASE 09 — Finance & Accounting Foundation / 09.06 Cheques`  
+**Status:** `READY_TO_START`  
 **Integration Branch:** `agent/postgres-v1.7-core`  
-**09.05 Gap Analysis:** `COMPLETE` at analysis baseline SHA `79a26bac52992ff2f4da9edd9c7d50427e412dca`; implementation has not started in this step.  
+**09.05 Customer Advances:** `CLOSED` on validated implementation SHA `fb29fda9c9fe5e712bb0a940f464571808b15825`; Full CI #1228 / run `37059134500` SUCCESS across `verify`, `backend-verify`, `browser-contract`, and `release-gate`. ADR-0024 and ADR-0025 remain authoritative. The documentation commit carrying this pointer must itself pass Full CI before 09.06 work begins.  
 **09.04 Treasury Transfer:** `CLOSED` on validated implementation SHA `255729e1591bc4b9335ec8ffe7eff2b887c16dd7`; Full CI #1218 / run `37052261290` SUCCESS across `verify`, `backend-verify`, `browser-contract`, and `release-gate`. The documentation commit carrying this pointer must itself pass Full CI before 09.05 work begins.  
 **09.03 Receipts / Disbursements:** `CLOSED` on validated implementation SHA `ce1c0f727602f00fc0852acb895a385b631655ef`; Full CI #1203 / run `37041562056` SUCCESS across `verify`, `backend-verify`, `browser-contract`, and `release-gate`.  
 **Phase 01 Final SHA:** `b0d35101bf622264b655bcc574787989fadbcd83`  
