@@ -240,11 +240,11 @@ test("03.07 frozen Index Catalog is exact on PostgreSQL 17", async (t) => {
 
     const second = await runMigrations({ databaseUrl });
     assert.equal(second.applied.length, 0);
-    assert.equal(second.skipped.at(-1),"0029");
+    assert.equal(second.skipped.at(-1),"0030");
 
     const verification = await runMigrations({ databaseUrl, verifyOnly: true });
     assert.equal(verification.applied.length, 0);
-    assert.equal(verification.skipped.at(-1), "0029");
+    assert.equal(verification.skipped.at(-1), "0030");
   } finally {
     await cleanupDatabase(databaseUrl);
   }
