@@ -125,15 +125,20 @@ test(
       );
       await pool.query(
         `INSERT INTO users(id,name,username,email,password_hash,role_id,default_branch_id,branch_scope_mode,preferred_language,is_active,created_at,updated_at)
-         VALUES
-          ($1,'Admin','0904-admin','0904-admin@example.test','x',$3,$4,'ALL','ar-EG',true,now(),now()),
-          ($2,'Selected','0904-selected','0904-selected@example.test','x',$3,$4,'SELECTED','ar-EG',true,now(),now())`,
-        [I.admin, I.selected, role.id, I.branchA],
+         VALUES($1,'Admin','0904-admin','0904-admin@example.test','x',$2,$3,'ALL','ar-EG',true,now(),now())`,
+        [I.admin, role.id, I.branchA],
       );
-      await pool.query(
-        "INSERT INTO user_branch_access(user_id,branch_id) VALUES($1,$2)",
-        [I.selected, I.branchA],
-      );
+      await withTransaction(pool, async (client) => {
+        await client.query(
+          `INSERT INTO users(id,name,username,email,password_hash,role_id,default_branch_id,branch_scope_mode,preferred_language,is_active,created_at,updated_at)
+           VALUES($1,'Selected','0904-selected','0904-selected@example.test','x',$2,$3,'SELECTED','ar-EG',true,now(),now())`,
+          [I.selected, role.id, I.branchA],
+        );
+        await client.query(
+          "INSERT INTO user_branch_access(user_id,branch_id) VALUES($1,$2)",
+          [I.selected, I.branchA],
+        );
+      });
       await pool.query(
         `INSERT INTO treasuries(id,branch_id,name,is_active,notes,created_at) VALUES
          ($1,$5,'A Main',true,NULL,now()),
