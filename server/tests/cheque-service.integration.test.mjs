@@ -100,8 +100,21 @@ test("09.06 Cheques are pending-without-cash, single-settlement and concurrency-
   const noAccounting=await pool.query("SELECT (SELECT count(*)::int FROM customer_ledger_entries) customer_ledger,(SELECT count(*)::int FROM supplier_ledger_entries) supplier_ledger,(SELECT count(*)::int FROM journal_entries) journals");
   assert.deepEqual(noAccounting.rows[0],{customer_ledger:0,supplier_ledger:0,journals:0});
 
-  const indexes=await pool.query("SELECT indexname FROM pg_indexes WHERE schemaname='public' AND tablename='cheques' AND indexname NOT LIKE '%pkey%' ORDER BY indexname");
-  assert.equal(indexes.rowCount,5);
+  const indexes=await pool.query(`SELECT idx.relname AS indexname
+    FROM pg_catalog.pg_index i
+    JOIN pg_catalog.pg_class tbl ON tbl.oid=i.indrelid
+    JOIN pg_catalog.pg_namespace n ON n.oid=tbl.relnamespace
+    JOIN pg_catalog.pg_class idx ON idx.oid=i.indexrelid
+    LEFT JOIN pg_catalog.pg_constraint con ON con.conindid=i.indexrelid
+   WHERE n.nspname='public' AND tbl.relname='cheques' AND con.oid IS NULL
+   ORDER BY idx.relname`);
+  assert.deepEqual(indexes.rows.map(r=>r.indexname),[
+    "ix_cheques__branch_id_due_date_id__where_status_pending",
+    "ix_cheques__branch_id_status_due_date_id",
+    "ix_cheques__cheque_number",
+    "ix_cheques__counterparty_id_status_due_date",
+    "ix_cheques__source_type_source_id",
+  ]);
   const verify=await runMigrations({databaseUrl:url,verifyOnly:true});assert.deepEqual(verify.applied,[]);assert.deepEqual(verify.skipped,MIGRATIONS);
  }finally{await pool.end().catch(()=>{});await cleanupDatabase(url).catch(()=>{})}
 });
