@@ -92,8 +92,8 @@ async function seedFixture(client) {
     (id,branch_id,document_number,document_date,document_version,counterparty_id,warehouse_id,price_list_id,
      source_sales_order_id,source_delivery_id,subtotal,discount_total,tax_total,grand_total,paid_total,due_total,
      payment_status,seller_user_id,customer_notes,internal_notes,posted_at,created_by,updated_at,deleted_at,deleted_by,delete_reason)
-    VALUES ($1,$2,1,CURRENT_DATE,1,$3,$4,$5,NULL,NULL,100,0,0,100,100,0,'PAID',$6,NULL,NULL,now(),$6,now(),NULL,NULL,NULL)`,
-    [ids.salesInvoice, ids.branch1, ids.counterparty, ids.warehouse1, ids.priceList, ids.user]);
+    VALUES ($1,$2,1,CURRENT_DATE,1,$3,$4,$5,$7,NULL,100,0,0,100,100,0,'PAID',$6,NULL,NULL,now(),$6,now(),NULL,NULL,NULL)`,
+    [ids.salesInvoice, ids.branch1, ids.counterparty, ids.warehouse1, ids.priceList, ids.user, ids.salesOrder]);
 
   await client.query(`INSERT INTO posting_batches
     (id,branch_id,source_type,source_id,operation_type,document_version,reverses_posting_batch_id,posted_at,created_by)
@@ -237,8 +237,9 @@ test("03.06 Finance / Settlement constraints enforce canonical integrity on Post
         "23514", "ck_customer_advances__remaining_projection_range");
 
       await client.query(`INSERT INTO advance_applications (id,advance_id,sales_invoice_id,amount,applied_at)
-        VALUES ('60000000-0000-4000-8000-000000000047',$1,$2,100,now()),
-               ('60000000-0000-4000-8000-000000000048',$1,$2,50,now())`, [ids.advance, ids.salesInvoice]);
+        VALUES ('60000000-0000-4000-8000-000000000047',$1,$2,100,now())`, [ids.advance, ids.salesInvoice]);
+      await client.query(`INSERT INTO advance_applications (id,advance_id,sales_invoice_id,amount,applied_at)
+        VALUES ('60000000-0000-4000-8000-000000000048',$1,$2,100,now())`, [ids.advance, ids.salesInvoice]);
       await expectConstraint(client.query(`INSERT INTO advance_applications (id,advance_id,sales_invoice_id,amount,applied_at)
         VALUES ('60000000-0000-4000-8000-000000000049',$1,$2,0,now())`, [ids.advance, ids.salesInvoice]),
         "23514", "ck_advance_applications__amount_positive");
@@ -291,8 +292,8 @@ test("03.06 Finance / Settlement constraints enforce canonical integrity on Post
       assert.equal(indexCatalog?.name, "index_catalog");
       assert.match(indexCatalog?.checksum ?? "", /^[0-9a-f]{64}$/);
       const latest = history.rows.at(-1);
-      assert.equal(latest?.version,"0030");
-      assert.equal(latest?.name,"treasury_transfer_integrity");
+      assert.equal(latest?.version,"0031");
+      assert.equal(latest?.name,"customer_advance_integrity");
       assert.match(latest?.checksum ?? "", /^[0-9a-f]{64}$/);
     });
 

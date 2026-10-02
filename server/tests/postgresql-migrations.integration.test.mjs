@@ -80,6 +80,7 @@ const MIGRATIONS = [
   { version: "0028", name: "financial_movement_integrity", transactional: true },
   { version: "0029", name: "receipt_disbursement_integrity", transactional: true },
   { version: "0030", name: "treasury_transfer_integrity", transactional: true },
+  { version: "0031", name: "customer_advance_integrity", transactional: true },
 ];
 
 async function withClient(fn) {
