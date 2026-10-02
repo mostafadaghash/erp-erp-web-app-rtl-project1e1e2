@@ -3149,7 +3149,12 @@ Create controlled verification/rebuild procedures capable of recalculating opera
 - Regression repair updated the legacy Product Catalog schema migration expectation to include canonical migration `0028`; no Product Catalog business logic, schema or index behavior changed.
 - Validated implementation SHA: `ce1c0f727602f00fc0852acb895a385b631655ef`.
 - Full CI #1203 / run `37041562056`: SUCCESS; `verify`, `backend-verify` including the PostgreSQL 17 09.03 gate and all historical schema/index/DDL regressions, `browser-contract`, and `release-gate` all SUCCESS on the same SHA.
-- Phase closure becomes final only when the documentation commit carrying this `CLOSED` status also passes Full CI on that same documentation SHA.
+- Validation PR `#250` was opened for validation only and closed without merge.
+- Closure pointer commit `087d47ef48a3e649959d4801f6502237e4c7718b` exposed an unrelated legacy printing-harness race in `inflateTar()`; no 09.05 Business/DB test failed.
+- The printing harness race was corrected by registering the child `close` listener before streaming the Chromium tar payload; no Business behavior, schema, Index Catalog or production runtime semantics changed.
+- Final validated closure head before this record: `3803a0c73d8614dba9b8bd89c3b2ca857e5062c7`.
+- Full CI #1230 / run `37065708639`: SUCCESS across `verify` (including Full tests + browser printing evidence), `backend-verify` (including PostgreSQL 17 Customer Advance and all historical schema/index/DDL regressions), `browser-contract`, and `release-gate` on that same head.
+- This final record commit itself must pass Full CI before 09.06 work begins.
 
 **Next Action:** Phase 09.04 Treasury Transfer — Gap Analysis only before any 09.04 business-code or database change.
 
@@ -4336,7 +4341,7 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 **Current Phase:** `PHASE 09 — Finance & Accounting Foundation / 09.06 Cheques`  
 **Status:** `READY_TO_START`  
 **Integration Branch:** `agent/postgres-v1.7-core`  
-**09.05 Customer Advances:** `CLOSED` on validated implementation SHA `fb29fda9c9fe5e712bb0a940f464571808b15825`; Full CI #1228 / run `37059134500` SUCCESS across `verify`, `backend-verify`, `browser-contract`, and `release-gate`. ADR-0024 and ADR-0025 remain authoritative. The documentation commit carrying this pointer must itself pass Full CI before 09.06 work begins.  
+**09.05 Customer Advances:** `CLOSED`; validated implementation SHA `fb29fda9c9fe5e712bb0a940f464571808b15825` passed Full CI #1228 / run `37059134500`. Validation PR `#250` was closed without merge. Unrelated printing-harness race was fixed on `3803a0c73d8614dba9b8bd89c3b2ca857e5062c7`, which passed Full CI #1230 / run `37065708639` including `verify`, `backend-verify`, `browser-contract`, and `release-gate`. ADR-0024 and ADR-0025 remain authoritative. This final record commit must itself pass Full CI before 09.06 work begins.  
 **09.04 Treasury Transfer:** `CLOSED` on validated implementation SHA `255729e1591bc4b9335ec8ffe7eff2b887c16dd7`; Full CI #1218 / run `37052261290` SUCCESS across `verify`, `backend-verify`, `browser-contract`, and `release-gate`. The documentation commit carrying this pointer must itself pass Full CI before 09.05 work begins.  
 **09.03 Receipts / Disbursements:** `CLOSED` on validated implementation SHA `ce1c0f727602f00fc0852acb895a385b631655ef`; Full CI #1203 / run `37041562056` SUCCESS across `verify`, `backend-verify`, `browser-contract`, and `release-gate`.  
 **Phase 01 Final SHA:** `b0d35101bf622264b655bcc574787989fadbcd83`  
