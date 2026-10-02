@@ -1,6 +1,6 @@
 # Business Tech ERP — Master Implementation Plan v1.0
 
-**الحالة:** ACTIVE — PHASE 09 READY_TO_START  
+**الحالة:** ACTIVE — PHASE 09 / 09.04 READY_TO_START  
 **تاريخ الإصدار:** 2026-09-11  
 **المشروع:** Business Tech ERP — Local Server Edition / PostgreSQL Core  
 **المرجع المعماري الرسمي:** `Business-Tech-ERP-Architecture-Baseline-v1.7-Final.docx`  
@@ -3136,16 +3136,26 @@ Create controlled verification/rebuild procedures capable of recalculating opera
 
 ## 09.03 Receipts / Disbursements
 
-**Status:** `READY_FOR_IMPLEMENTATION` — Gap Analysis completed before 09.03 business-code/database changes.  
+**Status:** `CLOSED` — implementation and regression repair complete; closure documentation commit must pass Full CI on that same final SHA.  
 **Gap Analysis:** `docs/gap-analysis/phase-09-03-receipts-disbursements.md` (analysis baseline SHA `670e3e903fc699028ab2effd3cb79edbdd31a27b`).
 
-- idempotent posting.
-- treasury row lock.
-- optional counterparty/target.
-- financial allocations.
-- no over-allocation.
+- Central Backend Receipt / Disbursement posting service implemented at `server/infrastructure/finance/cash-document-posting-service.ts`.
+- Receipt creates exactly one `IN` Financial Movement; Disbursement creates exactly one `OUT` Financial Movement.
+- Posting is atomic and idempotent with Branch Scope, active Treasury validation/locking, atomic document numbering, PostingBatch, Audit and Outbox in the same transaction.
+- Treasury balance is maintained only through the 09.02 Financial Movement writer and synchronous `treasury_balance_positions`; no direct balance write was introduced.
+- Forward-only integrity migration `0029_receipt_disbursement_integrity.sql` rejects UPDATE/DELETE of posted Receipt/Disbursement rows and rejects duplicate Receipt/Disbursement cash effects.
+- 09.03 intentionally introduces no target allocation, customer/supplier ledger settlement, cheque, installment, advance, GL journal, Treasury Transfer, frontend cutover or Convex write.
+- PostgreSQL 17 integration gate: `server/tests/cash-document-posting-service.integration.test.mjs` validates cash direction, projection reconciliation, concurrency-safe numbering, idempotent replay, payload conflict, immutable posted rows, duplicate cash-effect rejection and absence of deferred settlement effects.
+- Regression repair updated the legacy Product Catalog schema migration expectation to include canonical migration `0028`; no Product Catalog business logic, schema or index behavior changed.
+- Validated implementation SHA: `ce1c0f727602f00fc0852acb895a385b631655ef`.
+- Full CI #1203 / run `37041562056`: SUCCESS; `verify`, `backend-verify` including the PostgreSQL 17 09.03 gate and all historical schema/index/DDL regressions, `browser-contract`, and `release-gate` all SUCCESS on the same SHA.
+- Phase closure becomes final only when the documentation commit carrying this `CLOSED` status also passes Full CI on that same documentation SHA.
+
+**Next Action:** Phase 09.04 Treasury Transfer — Gap Analysis only before any 09.04 business-code or database change.
 
 ## 09.04 Treasury Transfer
+
+**Status:** `READY_TO_START`
 
 - lock from/to in deterministic order.
 - OUT + IN one transaction.
@@ -4296,9 +4306,10 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 
 # 32. Current Execution Pointer
 
-**Current Phase:** `PHASE 08 — Inventory Core / 08.05 Serials`  
+**Current Phase:** `PHASE 09 — Finance & Accounting Foundation / 09.04 Treasury Transfer`  
 **Status:** `READY_TO_START`  
 **Integration Branch:** `agent/postgres-v1.7-core`  
+**09.03 Receipts / Disbursements:** `CLOSED` on validated implementation SHA `ce1c0f727602f00fc0852acb895a385b631655ef`; Full CI #1203 / run `37041562056` SUCCESS across `verify`, `backend-verify`, `browser-contract`, and `release-gate`. The documentation commit carrying this pointer must itself pass Full CI before 09.04 work begins.  
 **Phase 01 Final SHA:** `b0d35101bf622264b655bcc574787989fadbcd83`  
 **Phase 01 Validation PR:** `#183` — closed without merge.  
 **Phase 02 Final SHA:** `922e880ab30b1a51bde14692063b321599d15948`  
