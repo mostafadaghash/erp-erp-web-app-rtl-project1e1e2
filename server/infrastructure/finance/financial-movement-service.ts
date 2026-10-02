@@ -167,7 +167,17 @@ export class FinancialMovementService {
       `SELECT id,branch_id,is_active FROM treasuries WHERE id=$1 FOR UPDATE`, [input.treasuryId])
     const treasury = treasuryResult.rows[0]
     if (!treasury) throw new FinancialMovementError('TREASURY_NOT_FOUND')
-    if (treasury.branch_id !== batch.branch_id) throw new FinancialMovementError('TREASURY_BRANCH_MISMATCH')
+    const crossBranchTransfer = batch.source_type === 'TREASURY_TRANSFER'
+    if (!crossBranchTransfer && treasury.branch_id !== batch.branch_id) {
+      throw new FinancialMovementError('TREASURY_BRANCH_MISMATCH')
+    }
+    if (crossBranchTransfer && treasury.branch_id !== batch.branch_id) {
+      await this.branchScope.requireWithinTransaction(
+        client as AuthorizationQueryClient,
+        input.actorUserId,
+        treasury.branch_id,
+      )
+    }
     if (!treasury.is_active && batch.operation_type !== 'REVERSAL' && batch.operation_type !== 'DELETE_REVERSAL') {
       throw new FinancialMovementError('TREASURY_INACTIVE')
     }
@@ -188,7 +198,7 @@ export class FinancialMovementService {
         (id,treasury_id,branch_id,direction,amount,source_type,source_id,posting_batch_id,counterparty_id,occurred_at,created_by)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
        RETURNING id,treasury_id,branch_id,direction,amount::text AS amount,source_type,source_id,posting_batch_id,counterparty_id,occurred_at,created_by`,
-      [movementId,input.treasuryId,batch.branch_id,input.direction,amount,batch.source_type,batch.source_id,batch.id,input.counterpartyId ?? null,input.occurredAt,input.actorUserId])
+      [movementId,input.treasuryId,treasury.branch_id,input.direction,amount,batch.source_type,batch.source_id,batch.id,input.counterpartyId ?? null,input.occurredAt,input.actorUserId])
     const movement = inserted.rows[0]
     if (!movement) throw new Error('Financial movement insert invariant failed')
 
