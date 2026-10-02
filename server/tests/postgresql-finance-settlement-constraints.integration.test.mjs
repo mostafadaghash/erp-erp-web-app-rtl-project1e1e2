@@ -251,7 +251,7 @@ test("03.06 Finance / Settlement constraints enforce canonical integrity on Post
       await expectConstraint(client.query(`INSERT INTO cheques
         (id,branch_id,counterparty_id,direction,cheque_number,bank_name,amount,due_date,status,source_type,source_id,settlement_financial_movement_id,notes,created_at)
         VALUES ('60000000-0000-4000-8000-000000000051',$1,$2,'RECEIVABLE','CHK-Y','Bank',100,CURRENT_DATE,'UNKNOWN','TEST',$3,NULL,NULL,now())`,
-        [ids.branch1, ids.counterparty, ids.source1]), "23514", "ck_cheques__status");
+        [ids.branch1, ids.counterparty, ids.source1]), "23514", "ct_cheques__initial_state");
       // 09.06 lifecycle integrity now rejects a pre-cleared row before the
       // historical settlement FK can fire. The FK itself is still asserted
       // structurally in expectedConstraints above.
