@@ -105,7 +105,7 @@ test(
       const applied = await runMigrations({ databaseUrl });
       assert.deepEqual(applied.applied, MIGRATIONS);
       assert.deepEqual(applied.skipped, []);
-      assert.equal(MIGRATIONS.at(-1), "0031");
+      assert.equal(MIGRATIONS.at(-1), "0032");
 
       const version = await pool.query("SHOW server_version_num");
       const versionNumber = Number(
@@ -547,8 +547,8 @@ test(
       );
       assert.equal(history.rowCount, MIGRATIONS.length);
       assert.deepEqual(history.rows.at(-1), {
-        version: "0031",
-        name: "customer_advance_integrity",
+        version: "0032",
+        name: "cheque_lifecycle_integrity",
       });
 
       const verification = await runMigrations({
