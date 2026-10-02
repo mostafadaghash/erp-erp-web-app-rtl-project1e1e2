@@ -1,6 +1,6 @@
 # Business Tech ERP — Master Implementation Plan v1.0
 
-**الحالة:** ACTIVE — PHASE 09 / 09.04 READY_TO_START  
+**الحالة:** ACTIVE — PHASE 09 / 09.05 READY_FOR_IMPLEMENTATION  
 **تاريخ الإصدار:** 2026-09-11  
 **المشروع:** Business Tech ERP — Local Server Edition / PostgreSQL Core  
 **المرجع المعماري الرسمي:** `Business-Tech-ERP-Architecture-Baseline-v1.7-Final.docx`  
@@ -3177,7 +3177,7 @@ Create controlled verification/rebuild procedures capable of recalculating opera
 ## 09.05 Customer Advances
 
 **Status:** `READY_FOR_IMPLEMENTATION` — Gap Analysis completed before any 09.05 business-code/database change.  
-**Gap Analysis:** `docs/gap-analysis/phase-09-05-customer-advances.md` (analysis baseline SHA `79a26bac52992ff2f4da9edd9c7d50427e412dca`).
+**Gap Analysis:** `docs/gap-analysis/phase-09-05-customer-advances.md` (analysis baseline SHA `79a26bac52992ff2f4da9edd9c7d50427e412dca`; corrected by ADR-0024/ADR-0025 before implementation).
 
 - receipt + treasury movement + liability.
 - not sales revenue.
@@ -3186,7 +3186,7 @@ Create controlled verification/rebuild procedures capable of recalculating opera
 - apply using FOR UPDATE on advance.
 - no new cash movement during application.
 - reversal restores advance availability.
-- implementation must preserve the approved locked Index Catalog, including the documented `advance_applications(posting_batch_id)` index that is currently missing from the physical implementation.
+- implementation must preserve ADR-0024 and the frozen Index Catalog: `advance_applications(posting_batch_id)` is intentionally **OMITTED_BY_ADR** in V1 and must not be added.
 - no 09.06+ work, GL Journal implementation, Sales partial-delivery cutover, frontend cutover or Convex production change starts in this Gap Analysis step.
 
 **Next Action:** implement only the bounded 09.05 Customer Advances slice defined by the Gap Analysis, then run its PostgreSQL 17 concurrency/integrity gates and the full regression suite on one final SHA.
