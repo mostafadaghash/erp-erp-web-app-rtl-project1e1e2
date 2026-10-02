@@ -277,6 +277,10 @@ jobs:
         env:
           ERP_TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/erp_backend_ci
         run: node --import tsx --test server/tests/treasury-transfer-service.integration.test.mjs
+      - name: PostgreSQL Customer Advance integration tests
+        env:
+          ERP_TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/erp_backend_ci
+        run: node --import tsx --test server/tests/customer-advance-service.integration.test.mjs
       - name: PostgreSQL product catalog schema integration tests
         env:
           ERP_TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/erp_backend_ci

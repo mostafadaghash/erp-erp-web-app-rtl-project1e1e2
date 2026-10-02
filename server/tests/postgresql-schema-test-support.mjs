@@ -58,6 +58,7 @@ export const MIGRATIONS = [
   "0028",
   "0029",
   "0030",
+  "0031",
 ];
 
 export async function withClient(databaseUrl, fn) {
@@ -140,6 +141,13 @@ export async function cleanupReportingTables(databaseUrl) {
 
 export async function cleanupDatabase(databaseUrl) {
   await withClient(databaseUrl, async (client) => {
+    await client.query("DROP FUNCTION IF EXISTS public.fn_advance_application_immutable() CASCADE");
+    await client.query("DROP FUNCTION IF EXISTS public.fn_advance_application_refresh_projection() CASCADE");
+    await client.query("DROP FUNCTION IF EXISTS public.fn_advance_application_insert_guard() CASCADE");
+    await client.query("DROP FUNCTION IF EXISTS public.fn_customer_advance_identity_immutable() CASCADE");
+    await client.query("DROP FUNCTION IF EXISTS public.fn_customer_advance_projection_guard() CASCADE");
+    await client.query("DROP FUNCTION IF EXISTS public.fn_customer_advance_context_valid() CASCADE");
+    await client.query("DROP FUNCTION IF EXISTS public.fn_customer_advance_effective_applied(uuid) CASCADE");
     await client.query("DROP FUNCTION IF EXISTS public.fn_posted_treasury_transfer_immutable() CASCADE");
     await client.query("DROP FUNCTION IF EXISTS public.fn_posted_cash_document_immutable() CASCADE");
     await client.query("DROP FUNCTION IF EXISTS public.fn_financial_movement_cash_source_singleton() CASCADE");
