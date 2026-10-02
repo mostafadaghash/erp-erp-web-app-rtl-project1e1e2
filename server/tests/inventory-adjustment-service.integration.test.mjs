@@ -31,7 +31,7 @@ test("08.09 Inventory Adjustment posts formally and surfaces reservation shortfa
  const roles=new RoleCatalogService(database),units=new ProductUnitService(database),products=new ProductModelService(database);
  const costs=new InventoryCostService(database),reservations=new StockReservationService(database),adjustments=new InventoryAdjustmentService(database);
  try{
-  const applied=await runMigrations({databaseUrl});assert.deepEqual(applied.applied,MIGRATIONS);assert.equal(MIGRATIONS.at(-1), "0031");
+  const applied=await runMigrations({databaseUrl});assert.deepEqual(applied.applied,MIGRATIONS);assert.equal(MIGRATIONS.at(-1), "0032");
   const v=Number((await pool.query("SHOW server_version_num")).rows[0].server_version_num);assert.ok(v>=170000&&v<180000);
   const rs=await roles.ensureDefaultRoles(),adminRole=rs.find(r=>r.roleKey==="SYSTEM_ADMIN");assert.ok(adminRole);
   await pool.query(`INSERT INTO companies(id,name,base_currency_code,default_language,timezone,is_active,created_at,updated_at)
