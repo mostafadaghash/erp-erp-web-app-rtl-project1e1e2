@@ -1,6 +1,6 @@
 # Business Tech ERP — Master Implementation Plan v1.0
 
-**الحالة:** ACTIVE — PHASE 09 / 09.06 READY_TO_START  
+**الحالة:** ACTIVE — PHASE 09 / 09.06 READY_FOR_IMPLEMENTATION  
 **تاريخ الإصدار:** 2026-09-11  
 **المشروع:** Business Tech ERP — Local Server Edition / PostgreSQL Core  
 **المرجع المعماري الرسمي:** `Business-Tech-ERP-Architecture-Baseline-v1.7-Final.docx`  
@@ -3204,13 +3204,18 @@ Create controlled verification/rebuild procedures capable of recalculating opera
 
 ## 09.06 Cheques
 
-**Status:** `READY_TO_START`
+**Status:** `READY_FOR_IMPLEMENTATION` — Gap Analysis completed before any 09.06 Business DDL/Backend change.  
+**Gap Analysis:** `docs/gap-analysis/phase-09-06-cheques.md` (analysis baseline SHA `617f1717b4f55e9cd65eb32e8211deb25f588da3`).
 
 - PENDING/CLEARED/BOUNCED/CANCELLED.
 - no treasury movement on PENDING.
 - settlement locks cheque.
 - movement only on CLEARED.
 - double clearing impossible.
+- lifecycle/accounting boundary follows the official phase order: 09.06 owns cheque state + cash settlement integrity; detailed Customer/Supplier Ledger + GL posting rules remain for 09.09 and must not be invented early.
+- no new Index Catalog entry is allowed in 09.06.
+
+**Next Action:** implement only the bounded 09.06 cheque lifecycle/settlement slice, then run PostgreSQL 17 concurrency/integrity gates and Full CI on one final SHA.
 
 ## 09.07 Installments
 
@@ -4339,7 +4344,7 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 # 32. Current Execution Pointer
 
 **Current Phase:** `PHASE 09 — Finance & Accounting Foundation / 09.06 Cheques`  
-**Status:** `READY_TO_START`  
+**Status:** `READY_FOR_IMPLEMENTATION`  
 **Integration Branch:** `agent/postgres-v1.7-core`  
 **09.05 Customer Advances:** `CLOSED`; validated implementation SHA `fb29fda9c9fe5e712bb0a940f464571808b15825` passed Full CI #1228 / run `37059134500`. Validation PR `#250` was closed without merge. Unrelated printing-harness race was fixed on `3803a0c73d8614dba9b8bd89c3b2ca857e5062c7`, which passed Full CI #1230 / run `37065708639` including `verify`, `backend-verify`, `browser-contract`, and `release-gate`. ADR-0024 and ADR-0025 remain authoritative. This final record commit must itself pass Full CI before 09.06 work begins.  
 **09.04 Treasury Transfer:** `CLOSED` on validated implementation SHA `255729e1591bc4b9335ec8ffe7eff2b887c16dd7`; Full CI #1218 / run `37052261290` SUCCESS across `verify`, `backend-verify`, `browser-contract`, and `release-gate`. The documentation commit carrying this pointer must itself pass Full CI before 09.05 work begins.  
