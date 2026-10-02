@@ -32,7 +32,7 @@ test("09.03 Receipt/Disbursement posting is idempotent, atomic, numbered and cas
   await assert.rejects(()=>pool.query("UPDATE receipts SET amount=2 WHERE id=$1",[receipt.resultReference]),/immutable/);
   await assert.rejects(()=>pool.query("DELETE FROM disbursements WHERE id=$1",[pay.resultReference]),/immutable/);
   await assert.rejects(()=>pool.query(`INSERT INTO financial_movements(id,treasury_id,branch_id,direction,amount,source_type,source_id,posting_batch_id,counterparty_id,occurred_at,created_by)
-    SELECT 'c9030000-0000-4000-8000-000000000099',treasury_id,branch_id,'IN',amount,'RECEIPT',id,fm.posting_batch_id,NULL,occurred_at,created_by FROM receipts r JOIN financial_movements fm ON fm.source_id=r.id AND fm.source_type='RECEIPT' WHERE r.id=$1`,[receipt.resultReference]),/already has a financial movement/);
+    SELECT 'c9030000-0000-4000-8000-000000000099',r.treasury_id,r.branch_id,'IN',r.amount,'RECEIPT',r.id,fm.posting_batch_id,NULL,r.occurred_at,r.created_by FROM receipts r JOIN financial_movements fm ON fm.source_id=r.id AND fm.source_type='RECEIPT' WHERE r.id=$1`,[receipt.resultReference]),/already has a financial movement/);
 
   const forbidden=await pool.query(`SELECT
    (SELECT count(*)::int FROM financial_allocations) allocations,
