@@ -53,7 +53,7 @@ test(
     try {
       const applied = await runMigrations({ databaseUrl });
       assert.deepEqual(applied.applied, MIGRATIONS);
-      assert.equal(MIGRATIONS.at(-1), "0028");
+      assert.equal(MIGRATIONS.at(-1), "0029");
 
       const version = await pool.query("SHOW server_version_num");
       const versionNumber = Number(version.rows[0]?.server_version_num);
