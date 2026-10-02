@@ -59,6 +59,7 @@ export const MIGRATIONS = [
   "0029",
   "0030",
   "0031",
+  "0032",
 ];
 
 export async function withClient(databaseUrl, fn) {
@@ -141,6 +142,8 @@ export async function cleanupReportingTables(databaseUrl) {
 
 export async function cleanupDatabase(databaseUrl) {
   await withClient(databaseUrl, async (client) => {
+    await client.query("DROP FUNCTION IF EXISTS public.fn_cheque_movement_deferred_link() CASCADE");
+    await client.query("DROP FUNCTION IF EXISTS public.fn_cheque_lifecycle_guard() CASCADE");
     await client.query("DROP FUNCTION IF EXISTS public.fn_advance_application_immutable() CASCADE");
     await client.query("DROP FUNCTION IF EXISTS public.fn_advance_application_refresh_projection() CASCADE");
     await client.query("DROP FUNCTION IF EXISTS public.fn_advance_application_insert_guard() CASCADE");

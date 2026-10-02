@@ -281,6 +281,10 @@ jobs:
         env:
           ERP_TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/erp_backend_ci
         run: node --import tsx --test server/tests/customer-advance-service.integration.test.mjs
+      - name: PostgreSQL Cheque lifecycle integration tests
+        env:
+          ERP_TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/erp_backend_ci
+        run: node --import tsx --test server/tests/cheque-service.integration.test.mjs
       - name: PostgreSQL product catalog schema integration tests
         env:
           ERP_TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/erp_backend_ci
