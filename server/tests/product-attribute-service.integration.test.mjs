@@ -547,8 +547,8 @@ test(
       );
       assert.equal(history.rowCount, MIGRATIONS.length);
       assert.deepEqual(history.rows.at(-1), {
-        version: "0028",
-        name: "financial_movement_integrity",
+        version: "0029",
+        name: "receipt_disbursement_integrity",
       });
 
       const verification = await runMigrations({
