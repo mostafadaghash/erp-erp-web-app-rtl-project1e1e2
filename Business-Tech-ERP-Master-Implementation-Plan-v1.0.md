@@ -3155,14 +3155,28 @@ Create controlled verification/rebuild procedures capable of recalculating opera
 
 ## 09.04 Treasury Transfer
 
-**Status:** `READY_TO_START`
+**Status:** `CLOSED` — implementation and regression repair complete; closure documentation commit must pass Full CI on that same final SHA.  
+**Gap Analysis:** `docs/gap-analysis/phase-09-04-treasury-transfer.md` (analysis baseline SHA `6f0c4e6d4012b02387e171e2d5397f75c63e7989`; Gap Analysis commit `862cfab35856dfb13d48ebec0d04aa063f49c95c`).
 
-- lock from/to in deterministic order.
-- OUT + IN one transaction.
-- same posting batch/source.
-- duplicate leg prevented by partial unique constraint.
+- Central Backend Treasury Transfer posting service implemented at `server/infrastructure/finance/treasury-transfer-service.ts`.
+- Idempotency + effective Permission/Branch Scope + active Treasury validation are enforced before posting; both source and target branches are checked for cross-branch transfers.
+- V1 cross-branch Treasury Transfer is supported: source Treasury remains in `issuing_branch_id`, while the target Treasury may belong to another allowed branch.
+- Source/target Treasury rows and their operational balance positions are locked in deterministic Treasury-ID order under the approved `READ COMMITTED + FOR UPDATE` model; sequence allocation remains late.
+- One `TREASURY_TRANSFER` PostingBatch produces exactly one OUT Financial Movement for the source Treasury and one IN Financial Movement for the target Treasury, with each movement attributed to the actual branch of its Treasury.
+- Forward-only migration `0030_treasury_transfer_integrity.sql` replaces the target same-branch FK with the approved cross-branch-safe FK, narrows Financial Movement posting-context validation for Treasury Transfer, and makes posted Treasury Transfer rows immutable.
+- The frozen Index Catalog was not changed; the existing partial unique index on `(posting_batch_id, direction)` for `TREASURY_TRANSFER` remains the duplicate-leg guard.
+- No Revenue/Expense effect, customer/supplier settlement, cheque/installment/advance effect, GL Journal, frontend cutover or Convex write was introduced in 09.04.
+- PostgreSQL 17 integration gate `server/tests/treasury-transfer-service.integration.test.mjs` covers same-branch/cross-branch posting, target-branch denial rollback, inactive/same Treasury rejection, idempotency replay/conflict, concurrent opposite-direction transfers, atomic numbering, forced second-leg rollback, immutable posted documents, duplicate-leg rejection, projection reconciliation and absence of deferred settlement/accounting effects.
+- Regression updates advanced historical schema/index/DDL migration-head expectations through canonical migration `0030` and replaced the obsolete same-branch target-Treasury assertion; no random index or unrelated business behavior change was introduced.
+- Validated implementation SHA: `255729e1591bc4b9335ec8ffe7eff2b887c16dd7`.
+- Full CI #1218 / run `37052261290`: SUCCESS; `verify`, `backend-verify` including PostgreSQL 17 Treasury Transfer plus historical schema/index/DDL regressions, `browser-contract`, and `release-gate` all SUCCESS on the same implementation SHA.
+- Phase closure becomes final only when the documentation commit carrying this `CLOSED` status also passes Full CI on that same documentation SHA.
+
+**Next Action:** Phase 09.05 Customer Advances — Gap Analysis only before any 09.05 business-code or database change.
 
 ## 09.05 Customer Advances
+
+**Status:** `READY_TO_START`
 
 - receipt + treasury movement + liability.
 - not sales revenue.
@@ -4306,10 +4320,11 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 
 # 32. Current Execution Pointer
 
-**Current Phase:** `PHASE 09 — Finance & Accounting Foundation / 09.04 Treasury Transfer`  
+**Current Phase:** `PHASE 09 — Finance & Accounting Foundation / 09.05 Customer Advances`  
 **Status:** `READY_TO_START`  
 **Integration Branch:** `agent/postgres-v1.7-core`  
-**09.03 Receipts / Disbursements:** `CLOSED` on validated implementation SHA `ce1c0f727602f00fc0852acb895a385b631655ef`; Full CI #1203 / run `37041562056` SUCCESS across `verify`, `backend-verify`, `browser-contract`, and `release-gate`. The documentation commit carrying this pointer must itself pass Full CI before 09.04 work begins.  
+**09.04 Treasury Transfer:** `CLOSED` on validated implementation SHA `255729e1591bc4b9335ec8ffe7eff2b887c16dd7`; Full CI #1218 / run `37052261290` SUCCESS across `verify`, `backend-verify`, `browser-contract`, and `release-gate`. The documentation commit carrying this pointer must itself pass Full CI before 09.05 work begins.  
+**09.03 Receipts / Disbursements:** `CLOSED` on validated implementation SHA `ce1c0f727602f00fc0852acb895a385b631655ef`; Full CI #1203 / run `37041562056` SUCCESS across `verify`, `backend-verify`, `browser-contract`, and `release-gate`.  
 **Phase 01 Final SHA:** `b0d35101bf622264b655bcc574787989fadbcd83`  
 **Phase 01 Validation PR:** `#183` — closed without merge.  
 **Phase 02 Final SHA:** `922e880ab30b1a51bde14692063b321599d15948`  
