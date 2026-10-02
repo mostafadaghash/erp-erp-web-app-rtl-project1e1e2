@@ -163,12 +163,13 @@ async function inflateTar(source, destination) {
   child.stderr.on("data", (chunk) => {
     stderr += chunk;
   });
+  const closePromise = once(child, "close");
   await pipeline(
     createReadStream(source),
     createBrotliDecompress(),
     child.stdin,
   );
-  const [code] = await once(child, "close");
+  const [code] = await closePromise;
   if (code !== 0) throw new Error(`تعذر فك حزمة Chromium: ${stderr.trim()}`);
 }
 
