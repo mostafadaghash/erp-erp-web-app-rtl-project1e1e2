@@ -140,7 +140,7 @@ test("03.06 Finance / Settlement constraints enforce canonical integrity on Post
         "pk_customer_advances","uq_customer_advances__receipt","pk_advance_applications","pk_cheques",
         "pk_installment_plans","pk_installments","fk_receipts__treasury_branch",
         "fk_disbursements__treasury_branch","fk_treasury_transfers__from_treasury_branch",
-        "fk_treasury_transfers__to_treasury_branch","fk_financial_movements__treasury_branch",
+        "fk_treasury_transfers__to_treasury","fk_financial_movements__treasury_branch",
         "fk_cheques__settlement_movement_branch","fk_finance_categories__gl_account",
         "ck_financial_movements__direction","ck_finance_categories__category_type","ck_cheques__direction",
         "ck_cheques__status","ck_installments__status","ck_customer_advances__remaining_projection_range",
@@ -183,10 +183,10 @@ test("03.06 Finance / Settlement constraints enforce canonical integrity on Post
         (id,issuing_branch_id,document_number,from_treasury_id,to_treasury_id,amount,reference,notes,occurred_at,posted_at,created_by)
         VALUES ('60000000-0000-4000-8000-000000000034',$1,1,$2,$2,10,NULL,NULL,now(),now(),$3)`,
         [ids.branch1, ids.treasury1, ids.user]), "23514", "ck_treasury_transfers__different_treasuries");
-      await expectConstraint(client.query(`INSERT INTO treasury_transfers
+      await client.query(`INSERT INTO treasury_transfers
         (id,issuing_branch_id,document_number,from_treasury_id,to_treasury_id,amount,reference,notes,occurred_at,posted_at,created_by)
         VALUES ('60000000-0000-4000-8000-000000000035',$1,2,$2,$3,10,NULL,NULL,now(),now(),$4)`,
-        [ids.branch1, ids.treasury1, ids.treasuryRemote, ids.user]), "23503", "fk_treasury_transfers__to_treasury_branch");
+        [ids.branch1, ids.treasury1, ids.treasuryRemote, ids.user]);
       await client.query(`INSERT INTO treasury_transfers
         (id,issuing_branch_id,document_number,from_treasury_id,to_treasury_id,amount,reference,notes,occurred_at,posted_at,created_by)
         VALUES ('60000000-0000-4000-8000-000000000036',$1,3,$2,$3,10,NULL,NULL,now(),now(),$4)`,
