@@ -3176,7 +3176,8 @@ Create controlled verification/rebuild procedures capable of recalculating opera
 
 ## 09.05 Customer Advances
 
-**Status:** `READY_TO_START`
+**Status:** `READY_FOR_IMPLEMENTATION` — Gap Analysis completed before any 09.05 business-code/database change.  
+**Gap Analysis:** `docs/gap-analysis/phase-09-05-customer-advances.md` (analysis baseline SHA `79a26bac52992ff2f4da9edd9c7d50427e412dca`).
 
 - receipt + treasury movement + liability.
 - not sales revenue.
@@ -3185,6 +3186,10 @@ Create controlled verification/rebuild procedures capable of recalculating opera
 - apply using FOR UPDATE on advance.
 - no new cash movement during application.
 - reversal restores advance availability.
+- implementation must preserve the approved locked Index Catalog, including the documented `advance_applications(posting_batch_id)` index that is currently missing from the physical implementation.
+- no 09.06+ work, GL Journal implementation, Sales partial-delivery cutover, frontend cutover or Convex production change starts in this Gap Analysis step.
+
+**Next Action:** implement only the bounded 09.05 Customer Advances slice defined by the Gap Analysis, then run its PostgreSQL 17 concurrency/integrity gates and the full regression suite on one final SHA.
 
 ## 09.06 Cheques
 
@@ -4321,8 +4326,9 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 # 32. Current Execution Pointer
 
 **Current Phase:** `PHASE 09 — Finance & Accounting Foundation / 09.05 Customer Advances`  
-**Status:** `READY_TO_START`  
+**Status:** `READY_FOR_IMPLEMENTATION`  
 **Integration Branch:** `agent/postgres-v1.7-core`  
+**09.05 Gap Analysis:** `COMPLETE` at analysis baseline SHA `79a26bac52992ff2f4da9edd9c7d50427e412dca`; implementation has not started in this step.  
 **09.04 Treasury Transfer:** `CLOSED` on validated implementation SHA `255729e1591bc4b9335ec8ffe7eff2b887c16dd7`; Full CI #1218 / run `37052261290` SUCCESS across `verify`, `backend-verify`, `browser-contract`, and `release-gate`. The documentation commit carrying this pointer must itself pass Full CI before 09.05 work begins.  
 **09.03 Receipts / Disbursements:** `CLOSED` on validated implementation SHA `ce1c0f727602f00fc0852acb895a385b631655ef`; Full CI #1203 / run `37041562056` SUCCESS across `verify`, `backend-verify`, `browser-contract`, and `release-gate`.  
 **Phase 01 Final SHA:** `b0d35101bf622264b655bcc574787989fadbcd83`  
