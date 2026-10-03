@@ -295,8 +295,8 @@ test("03.06 Finance / Settlement constraints enforce canonical integrity on Post
       assert.equal(indexCatalog?.name, "index_catalog");
       assert.match(indexCatalog?.checksum ?? "", /^[0-9a-f]{64}$/);
       const latest = history.rows.at(-1);
-      assert.equal(latest?.version,"0032");
-      assert.equal(latest?.name,"cheque_lifecycle_integrity");
+      assert.equal(latest?.version,"0033");
+      assert.equal(latest?.name,"installment_settlement_integrity");
       assert.match(latest?.checksum ?? "", /^[0-9a-f]{64}$/);
     });
 
