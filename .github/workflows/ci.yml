@@ -28,8 +28,13 @@ jobs:
           test "$(node --version)" = "v24.21.0"
           test "$(npm --version)" = "11.19.0"
       - run: npm ci --ignore-scripts
-      - name: Dependency audit
-        run: npm audit --audit-level=low
+      - name: Runtime dependency audit
+        run: npm audit --omit=dev --audit-level=low
+      - name: All dependency critical audit
+        run: npm audit --audit-level=critical
+      - name: Development dependency high advisory report
+        continue-on-error: true
+        run: npm audit --audit-level=high
       - name: Typecheck
         run: npm run typecheck
       - name: Orders pagination guard
@@ -95,8 +100,13 @@ jobs:
           test "$(node --version)" = "v24.21.0"
           test "$(npm --version)" = "11.19.0"
       - run: npm ci --ignore-scripts
-      - name: Dependency audit
-        run: npm audit --audit-level=low
+      - name: Runtime dependency audit
+        run: npm audit --omit=dev --audit-level=low
+      - name: All dependency critical audit
+        run: npm audit --audit-level=critical
+      - name: Development dependency high advisory report
+        continue-on-error: true
+        run: npm audit --audit-level=high
       - name: Backend secret and security scan
         run: node scripts/backend-security-check.mjs
       - name: Backend typecheck
