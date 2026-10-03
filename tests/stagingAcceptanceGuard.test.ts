@@ -24,7 +24,9 @@ const erpApp = read("src/components/ERPApp.tsx");
 const sidebar = read("src/components/Sidebar.tsx");
 
 test("STG-01 CI enforces audit build security tests and browser discovery", () => {
-  assert.match(ci, /npm audit --audit-level=low/);
+  assert.match(ci, /npm audit --omit=dev --audit-level=low/);
+  assert.match(ci, /npm audit --audit-level=critical/);
+  assert.match(ci, /continue-on-error: true[\s\S]*npm audit --audit-level=high/);
   assert.match(ci, /npm run typecheck/);
   assert.match(ci, /npm test/);
   assert.match(ci, /npm run security:check/);

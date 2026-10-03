@@ -1,0 +1,8 @@
+{
+  "version": "0032",
+  "name": "cheque_lifecycle_integrity",
+  "transactional": true,
+  "preconditionSql": "SELECT to_regclass('public.cheques') IS NOT NULL AND to_regclass('public.financial_movements') IS NOT NULL AND to_regprocedure('public.fn_customer_advance_effective_applied(uuid)') IS NOT NULL AS ok;",
+  "verificationSql": "SELECT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname='bt_cheques__lifecycle' AND NOT tgisinternal) AND EXISTS (SELECT 1 FROM pg_trigger WHERE tgname='ct_financial_movements__cheque_settlement_link' AND NOT tgisinternal) AND to_regprocedure('public.fn_cheque_lifecycle_guard()') IS NOT NULL AND to_regprocedure('public.fn_cheque_movement_deferred_link()') IS NOT NULL AS ok;",
+  "recovery": "Transactional failure restores the pre-09.06 state. After success use forward-only migrations; do not rewrite migration 0032."
+}

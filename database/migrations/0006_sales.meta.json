@@ -1,0 +1,8 @@
+{
+  "version": "0006",
+  "name": "sales",
+  "transactional": true,
+  "preconditionSql": "SELECT to_regclass('public.inventory_movements') IS NOT NULL AND to_regclass('public.stock_reservations') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM (VALUES ('sales_quotes'), ('sales_quote_lines'), ('sales_orders'), ('sales_order_lines'), ('sales_order_status_history'), ('sales_order_shipping_details'), ('sales_order_deliveries'), ('sales_order_delivery_lines'), ('sales_invoices'), ('sales_invoice_lines'), ('sales_returns'), ('sales_return_lines'), ('sales_returnable_quantities_v')) AS expected(relation_name) WHERE to_regclass('public.' || relation_name) IS NOT NULL) AS ok;",
+  "verificationSql": "SELECT (SELECT count(*) FROM (VALUES ('sales_quotes'), ('sales_quote_lines'), ('sales_orders'), ('sales_order_lines'), ('sales_order_status_history'), ('sales_order_shipping_details'), ('sales_order_deliveries'), ('sales_order_delivery_lines'), ('sales_invoices'), ('sales_invoice_lines'), ('sales_returns'), ('sales_return_lines'), ('sales_returnable_quantities_v')) AS expected(relation_name) WHERE to_regclass('public.' || relation_name) IS NOT NULL) = 13 AS ok;",
+  "recovery": "This migration is transactional. Any failure rolls back all 03.E Sales table/view creation and the migration-history insert. After successful application, corrections must be new reviewed forward migrations. PK/FK/composite-context/UNIQUE/PARTIAL UNIQUE/CHECK constraints remain intentionally deferred to 03.06; all project-owned indexes remain intentionally deferred to 03.07. The sales_returnable_quantities_v view is a read helper only and does not replace FOR UPDATE plus same-transaction recomputation for return posting."
+}

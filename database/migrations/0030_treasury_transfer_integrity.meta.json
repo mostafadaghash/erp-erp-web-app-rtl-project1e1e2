@@ -1,0 +1,8 @@
+{
+  "version": "0030",
+  "name": "treasury_transfer_integrity",
+  "transactional": true,
+  "preconditionSql": "SELECT to_regclass('public.treasury_transfers') IS NOT NULL AND to_regclass('public.financial_movements') IS NOT NULL AND EXISTS (SELECT 1 FROM pg_constraint WHERE conname='fk_treasury_transfers__to_treasury_branch') AS ok;",
+  "verificationSql": "SELECT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='fk_treasury_transfers__to_treasury') AND NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='fk_treasury_transfers__to_treasury_branch') AND EXISTS (SELECT 1 FROM pg_trigger WHERE tgname='bt_treasury_transfers__immutable' AND NOT tgisinternal) AS ok;",
+  "recovery": "Transactional failure restores the prior target-Treasury FK and 09.02 posting-context function. After success use a forward-only migration for changes."
+}

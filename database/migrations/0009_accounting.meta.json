@@ -1,0 +1,8 @@
+{
+  "version": "0009",
+  "name": "accounting",
+  "transactional": true,
+  "preconditionSql": "SELECT to_regclass('public.financial_movements') IS NOT NULL AND to_regclass('public.treasury_balance_positions') IS NOT NULL AND to_regclass('public.gl_accounts') IS NULL AND to_regclass('public.journal_entries') IS NULL AND to_regclass('public.journal_lines') IS NULL AND to_regprocedure('public.fn_journal_entries_balanced_at_commit()') IS NULL AS ok;",
+  "verificationSql": "SELECT to_regclass('public.gl_accounts') IS NOT NULL AND to_regclass('public.journal_entries') IS NOT NULL AND to_regclass('public.journal_lines') IS NOT NULL AND to_regprocedure('public.fn_journal_entries_balanced_at_commit()') IS NOT NULL AND EXISTS (SELECT 1 FROM pg_catalog.pg_trigger t JOIN pg_catalog.pg_class c ON c.oid=t.tgrelid JOIN pg_catalog.pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND c.relname='journal_lines' AND t.tgname='ct_journal_entries__balanced_at_commit' AND t.tgdeferrable AND t.tginitdeferred AND NOT t.tgisinternal) AS ok;",
+  "recovery": "This migration is transactional. Any failure rolls back all 03.H Accounting table/function/constraint-trigger creation plus the migration-history insert. After successful application, corrections must be new reviewed forward migrations. The journal-balance constraint trigger is intentionally implemented in 03.H because the approved 03.05 build order explicitly includes it; all other PK/FK/composite-context/UNIQUE/CHECK constraints remain deferred to 03.06 and all project-owned indexes remain deferred to 03.07."
+}
