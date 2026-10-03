@@ -151,9 +151,9 @@ test("09.07 Installments are schedule-only, allocation-backed and concurrency-sa
   const directBadPlan=await pool.query("SELECT count(*)::int c FROM installment_plans WHERE source_id=$1",[I.sale4]);assert.equal(directBadPlan.rows[0].c,1);
   await assert.rejects(()=>pool.query("INSERT INTO installment_plans(id,counterparty_id,source_type,source_id,total_amount,created_at) VALUES('ca070000-0000-4000-8000-000000000090',$1,'UNSUPPORTED',$2,25,now())",[I.customer,I.sale4]),/unsupported installment plan source type/);
 
-  const indexesPlan=await pool.query("SELECT indexname FROM pg_indexes WHERE schemaname='public' AND tablename='installment_plans' AND indexname NOT LIKE '%pkey%' ORDER BY indexname");
+  const indexesPlan=await pool.query("SELECT ic.relname AS indexname FROM pg_index i JOIN pg_class tc ON tc.oid=i.indrelid JOIN pg_namespace n ON n.oid=tc.relnamespace JOIN pg_class ic ON ic.oid=i.indexrelid LEFT JOIN pg_constraint con ON con.conindid=i.indexrelid WHERE n.nspname='public' AND tc.relname='installment_plans' AND con.oid IS NULL ORDER BY ic.relname");
   assert.deepEqual(indexesPlan.rows.map(x=>x.indexname),["ix_installment_plans__counterparty_id_source_type_source_id"]);
-  const indexesInstallment=await pool.query("SELECT indexname FROM pg_indexes WHERE schemaname='public' AND tablename='installments' AND indexname NOT LIKE '%pkey%' ORDER BY indexname");
+  const indexesInstallment=await pool.query("SELECT ic.relname AS indexname FROM pg_index i JOIN pg_class tc ON tc.oid=i.indrelid JOIN pg_namespace n ON n.oid=tc.relnamespace JOIN pg_class ic ON ic.oid=i.indexrelid LEFT JOIN pg_constraint con ON con.conindid=i.indexrelid WHERE n.nspname='public' AND tc.relname='installments' AND con.oid IS NULL ORDER BY ic.relname");
   assert.deepEqual(indexesInstallment.rows.map(x=>x.indexname),["ix_installments__plan_id_due_date","ix_installments__plan_id_due_date_id__where_status_in__28b32c13"]);
 
   const noPrematureAccounting=await pool.query("SELECT (SELECT count(*)::int FROM customer_ledger_entries) customer_ledger,(SELECT count(*)::int FROM supplier_ledger_entries) supplier_ledger,(SELECT count(*)::int FROM journal_entries) journals");
