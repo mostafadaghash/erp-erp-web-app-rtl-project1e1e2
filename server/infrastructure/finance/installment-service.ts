@@ -59,10 +59,10 @@ export interface RebuildInstallmentPlanInput{
 }
 export interface InstallmentPlanRecord{id:string;counterpartyId:string;sourceType:InstallmentSourceType;sourceId:string;totalAmount:string;createdAt:Date}
 export interface InstallmentRecord{id:string;planId:string;dueDate:string;amount:string;paidAmountProjection:string;status:InstallmentStatus}
-export interface CreatedInstallmentPlan{plan:InstallmentPlanRecord;installments:InstallmentRecord[]}
+export interface CreatedInstallmentPlan{plan:InstallmentPlanRecord;installments:readonly InstallmentRecord[]}
 export interface InstallmentAllocationRecord{id:string;financialSourceType:CashDocumentType;financialSourceId:string;installmentId:string;amount:string;createdAt:Date}
-export interface SettledInstallments{cash:PostedCashDocument;allocations:InstallmentAllocationRecord[];installments:InstallmentRecord[]}
-export interface RebuiltInstallmentPlan{planId:string;installments:InstallmentRecord[]}
+export interface SettledInstallments{cash:PostedCashDocument;allocations:readonly InstallmentAllocationRecord[];installments:readonly InstallmentRecord[]}
+export interface RebuiltInstallmentPlan{planId:string;installments:readonly InstallmentRecord[]}
 
 interface SourceRow extends QueryResultRow{
  branch_id:string;company_id:string;branch_active:boolean;timezone:string;counterparty_id:string|null;due_total:string;deleted_at:Date|null
