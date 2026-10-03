@@ -60,6 +60,7 @@ export const MIGRATIONS = [
   "0030",
   "0031",
   "0032",
+  "0033",
 ];
 
 export async function withClient(databaseUrl, fn) {
@@ -142,6 +143,14 @@ export async function cleanupReportingTables(databaseUrl) {
 
 export async function cleanupDatabase(databaseUrl) {
   await withClient(databaseUrl, async (client) => {
+    await client.query("DROP FUNCTION IF EXISTS public.fn_installment_allocation_refresh() CASCADE");
+    await client.query("DROP FUNCTION IF EXISTS public.fn_installment_allocation_guard() CASCADE");
+    await client.query("DROP FUNCTION IF EXISTS public.fn_installment_schedule_total_guard() CASCADE");
+    await client.query("DROP FUNCTION IF EXISTS public.fn_installment_row_guard() CASCADE");
+    await client.query("DROP FUNCTION IF EXISTS public.fn_installment_plan_guard() CASCADE");
+    await client.query("DROP FUNCTION IF EXISTS public.fn_installment_business_date(uuid) CASCADE");
+    await client.query("DROP FUNCTION IF EXISTS public.fn_installment_effective_paid(uuid) CASCADE");
+    await client.query("DROP FUNCTION IF EXISTS public.fn_installment_projected_status(numeric,numeric,date,date) CASCADE");
     await client.query("DROP FUNCTION IF EXISTS public.fn_cheque_movement_deferred_link() CASCADE");
     await client.query("DROP FUNCTION IF EXISTS public.fn_cheque_lifecycle_guard() CASCADE");
     await client.query("DROP FUNCTION IF EXISTS public.fn_advance_application_immutable() CASCADE");
