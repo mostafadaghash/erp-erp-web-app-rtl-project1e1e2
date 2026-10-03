@@ -1,6 +1,6 @@
 # Business Tech ERP — Master Implementation Plan v1.0
 
-**الحالة:** ACTIVE — PHASE 09 / 09.06 READY_FOR_IMPLEMENTATION  
+**الحالة:** ACTIVE — PHASE 09 / 09.07 READY_TO_START  
 **تاريخ الإصدار:** 2026-09-11  
 **المشروع:** Business Tech ERP — Local Server Edition / PostgreSQL Core  
 **المرجع المعماري الرسمي:** `Business-Tech-ERP-Architecture-Baseline-v1.7-Final.docx`  
@@ -3204,20 +3204,36 @@ Create controlled verification/rebuild procedures capable of recalculating opera
 
 ## 09.06 Cheques
 
-**Status:** `READY_FOR_IMPLEMENTATION` — Gap Analysis completed before any 09.06 Business DDL/Backend change.  
-**Gap Analysis:** `docs/gap-analysis/phase-09-06-cheques.md` (analysis baseline SHA `617f1717b4f55e9cd65eb32e8211deb25f588da3`).
+**Status:** `CLOSED` — implementation, integrity, concurrency and full regression validation complete.  
+**Gap Analysis:** `docs/gap-analysis/phase-09-06-cheques.md` (analysis baseline SHA `617f1717b4f55e9cd65eb32e8211deb25f588da3`; Gap Analysis commit `3c86ce2939907cc9c81a464da841f57d667364c1`).
 
-- PENDING/CLEARED/BOUNCED/CANCELLED.
-- no treasury movement on PENDING.
-- settlement locks cheque.
-- movement only on CLEARED.
-- double clearing impossible.
-- lifecycle/accounting boundary follows the official phase order: 09.06 owns cheque state + cash settlement integrity; detailed Customer/Supplier Ledger + GL posting rules remain for 09.09 and must not be invented early.
-- no new Index Catalog entry is allowed in 09.06.
+- Canonical Central Backend Cheque service implemented at `server/infrastructure/finance/cheque-service.ts`.
+- `PENDING` registration is cash-neutral and creates no Treasury/FinancialMovement effect.
+- Direction/status remain the approved V1 closed domains: `RECEIVABLE|PAYABLE` and `PENDING|CLEARED|BOUNCED|CANCELLED`.
+- Effective `finance.accounts.manage` permission + Branch Scope are rechecked inside each sensitive transaction.
+- RECEIVABLE requires Customer role; PAYABLE requires Supplier role.
+- Settlement locks the Cheque root row with `FOR UPDATE`, then validates/locks the active Treasury under the approved `READ COMMITTED` model.
+- `CLEARED` creates exactly one matching FinancialMovement: RECEIVABLE => IN, PAYABLE => OUT.
+- Migration `0032_cheque_lifecycle_integrity.sql` enforces initial PENDING/no-cash state, legal lifecycle transitions, settlement movement source/branch/counterparty/amount/direction matching, terminal immutability and deferred same-transaction Cheque↔FinancialMovement linking.
+- Concurrent settlement attempts are serialized by the Cheque root lock; after the first commit, the second observes a non-PENDING terminal state and is rejected. No duplicate collection/payment is committed.
+- `BOUNCED` and `CANCELLED` are allowed only from PENDING and create no Treasury movement.
+- Idempotent replay is supported; same key with a different payload conflicts.
+- Audit + Outbox commit atomically with lifecycle commands.
+- Forced second-stage failures roll back Cheque status, FinancialMovement, Treasury projection and transaction-side Audit/Outbox effects.
+- Existing Cheque Index Catalog remains unchanged; no new index or business column was added.
+- Detailed Customer/Supplier Ledger and GL posting-rule mapping for Cheques remains scheduled for 09.09; 09.06 does not invent premature accounting mappings.
+- Dedicated PostgreSQL 17 integration gate: `server/tests/cheque-service.integration.test.mjs`.
+- Core implementation SHA: `b66aa211ab286146cfd0b399f116b421734afcdc`.
+- Validated implementation head: `6741b836a6a440dccd3eb197623f5f6fa9dfabcb`.
+- Full CI #1243 / run `37070454742`: SUCCESS across `verify`, `backend-verify`, `browser-contract`, and `release-gate`.
+- Validation PR `#251` was opened for validation only and closed without merge.
+- This documentation commit must itself pass Full CI before 09.07 implementation work begins.
 
-**Next Action:** implement only the bounded 09.06 cheque lifecycle/settlement slice, then run PostgreSQL 17 concurrency/integrity gates and Full CI on one final SHA.
+**Next Action:** Phase 09.07 Installments — Gap Analysis only before any 09.07 Business DDL/Backend change.
 
 ## 09.07 Installments
+
+**Status:** `READY_TO_START`
 
 - schedule only, not parallel ledger.
 - status/paid projection rebuildable from allocations.
@@ -3259,7 +3275,7 @@ Implement centralized posting rules for at least:
 - [ ] every posted journal balances at COMMIT.
 - [ ] intentional unbalanced commit fails.
 - [ ] transfer one-side failure rolls back both legs.
-- [ ] cheque double-settlement concurrency test.
+- [x] cheque double-settlement concurrency test.
 - [ ] advance double-consumption concurrency test.
 - [ ] installment over-allocation concurrency test.
 - [ ] reversal restores accounting position without deleting history.
@@ -4343,9 +4359,10 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 
 # 32. Current Execution Pointer
 
-**Current Phase:** `PHASE 09 — Finance & Accounting Foundation / 09.06 Cheques`  
-**Status:** `READY_FOR_IMPLEMENTATION`  
+**Current Phase:** `PHASE 09 — Finance & Accounting Foundation / 09.07 Installments`  
+**Status:** `READY_TO_START`  
 **Integration Branch:** `agent/postgres-v1.7-core`  
+**09.06 Cheques:** `CLOSED`; core implementation SHA `b66aa211ab286146cfd0b399f116b421734afcdc`, validated implementation head `6741b836a6a440dccd3eb197623f5f6fa9dfabcb`, Full CI #1243 / run `37070454742` SUCCESS across `verify`, `backend-verify`, `browser-contract`, and `release-gate`. Validation PR `#251` closed without merge. This documentation commit must itself pass Full CI before 09.07 implementation begins.  
 **09.05 Customer Advances:** `CLOSED`; validated implementation SHA `fb29fda9c9fe5e712bb0a940f464571808b15825` passed Full CI #1228 / run `37059134500`. Validation PR `#250` was closed without merge. Unrelated printing-harness race was fixed on `3803a0c73d8614dba9b8bd89c3b2ca857e5062c7`, which passed Full CI #1230 / run `37065708639` including `verify`, `backend-verify`, `browser-contract`, and `release-gate`. ADR-0024 and ADR-0025 remain authoritative. This final record commit must itself pass Full CI before 09.06 work begins.  
 **09.04 Treasury Transfer:** `CLOSED` on validated implementation SHA `255729e1591bc4b9335ec8ffe7eff2b887c16dd7`; Full CI #1218 / run `37052261290` SUCCESS across `verify`, `backend-verify`, `browser-contract`, and `release-gate`. The documentation commit carrying this pointer must itself pass Full CI before 09.05 work begins.  
 **09.03 Receipts / Disbursements:** `CLOSED` on validated implementation SHA `ce1c0f727602f00fc0852acb895a385b631655ef`; Full CI #1203 / run `37041562056` SUCCESS across `verify`, `backend-verify`, `browser-contract`, and `release-gate`.  
