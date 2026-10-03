@@ -1,6 +1,6 @@
 # Business Tech ERP — Master Implementation Plan v1.0
 
-**الحالة:** ACTIVE — PHASE 09 / 09.07 GAP_ANALYSIS_COMPLETE / BLOCKED_PENDING_ADR  
+**الحالة:** ACTIVE — PHASE 09 / 09.07 READY_FOR_IMPLEMENTATION  
 **تاريخ الإصدار:** 2026-09-11  
 **المشروع:** Business Tech ERP — Local Server Edition / PostgreSQL Core  
 **المرجع المعماري الرسمي:** `Business-Tech-ERP-Architecture-Baseline-v1.7-Final.docx`  
@@ -3233,19 +3233,20 @@ Create controlled verification/rebuild procedures capable of recalculating opera
 
 ## 09.07 Installments
 
-**Status:** `GAP_ANALYSIS_COMPLETE / BLOCKED_PENDING_ADR` — no 09.07 Business DDL/Backend implementation may start until the unresolved installment lifecycle/source-resolution decisions are versioned.  
-**Gap Analysis:** `docs/gap-analysis/phase-09-07-installments.md` (analysis baseline SHA `e630166c23b4ce79b3d17ec6b551d1616f01554a`).
+**Status:** `READY_FOR_IMPLEMENTATION` — Gap Analysis complete and the blocking lifecycle/source-resolution decisions are frozen by ADR-0026 before 09.07 Business DDL/Backend changes.  
+**Gap Analysis:** `docs/gap-analysis/phase-09-07-installments.md` (analysis baseline SHA `e630166c23b4ce79b3d17ec6b551d1616f01554a`).  
+**Architecture Decision:** `docs/decisions/ADR-0026-installment-lifecycle-source-resolution.md`.
 
 - schedule only, not parallel ledger.
 - status/paid projection rebuildable from allocations.
 - partial settlement allowed.
 - over-allocation impossible under lock.
 - ADR-0017 remains authoritative for the canonical status vocabulary: `UPCOMING / DUE / PARTIAL / PAID / OVERDUE`.
-- the baseline does not resolve status precedence when an installment is both partially paid and past due; ADR-0017 explicitly deferred that decision to the Finance implementation.
-- the baseline shape stores `source_type/source_id` but not `branch_id` or payment direction on the plan; the exact closed source-type set and trusted source-resolution rules are not explicitly specified and must not be invented from client input.
+- ADR-0026 resolves status precedence deterministically: `PAID` first, otherwise past-due open installments are `OVERDUE`, otherwise partially paid installments are `PARTIAL`, otherwise due-today is `DUE`, else `UPCOMING`.
+- ADR-0026 freezes 09.07 V1 source adapters to `SALES_INVOICE` and `PURCHASE_INVOICE`; Branch, Counterparty and Receipt-vs-Disbursement direction are derived from the locked source invoice, never trusted from client input.
 - no new Index Catalog entry is required; the 03.07 corrected open-installment predicate remains authoritative.
 
-**Next Action:** create one bounded 09.07 architecture ADR that freezes installment status precedence/business-date semantics and trusted source-document resolution before any 09.07 Business DDL or Backend code.
+**Next Action:** implement only the bounded 09.07 Installment schedule/settlement slice defined by the Gap Analysis + ADR-0026, then run PostgreSQL 17 integrity/concurrency gates and Full CI on one final SHA.
 
 ## 09.08 GL / Journal Engine
 
@@ -4367,9 +4368,9 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 # 32. Current Execution Pointer
 
 **Current Phase:** `PHASE 09 — Finance & Accounting Foundation / 09.07 Installments`  
-**Status:** `GAP_ANALYSIS_COMPLETE / BLOCKED_PENDING_ADR`  
+**Status:** `READY_FOR_IMPLEMENTATION`  
 **Integration Branch:** `agent/postgres-v1.7-core`  
-**09.07 Gap Analysis:** complete against Architecture Baseline v1.7, ADR-0017 and the current PostgreSQL Core at baseline SHA `e630166c23b4ce79b3d17ec6b551d1616f01554a`. No 09.07 Business DDL/Backend implementation has started. The next action is the bounded Installment lifecycle/source-resolution ADR only.  
+**09.07 Gap Analysis:** complete against Architecture Baseline v1.7, ADR-0017 and the current PostgreSQL Core at baseline SHA `e630166c23b4ce79b3d17ec6b551d1616f01554a`. ADR-0026 now freezes Installment status precedence, business-date semantics and trusted source resolution. No 09.08+ work has started.  
 **09.06 Cheques:** `CLOSED`; core implementation SHA `b66aa211ab286146cfd0b399f116b421734afcdc`, validated implementation head `6741b836a6a440dccd3eb197623f5f6fa9dfabcb`, Full CI #1243 / run `37070454742` SUCCESS across `verify`, `backend-verify`, `browser-contract`, and `release-gate`. Validation PR `#251` closed without merge. This documentation commit must itself pass Full CI before 09.07 implementation begins.  
 **09.05 Customer Advances:** `CLOSED`; validated implementation SHA `fb29fda9c9fe5e712bb0a940f464571808b15825` passed Full CI #1228 / run `37059134500`. Validation PR `#250` was closed without merge. Unrelated printing-harness race was fixed on `3803a0c73d8614dba9b8bd89c3b2ca857e5062c7`, which passed Full CI #1230 / run `37065708639` including `verify`, `backend-verify`, `browser-contract`, and `release-gate`. ADR-0024 and ADR-0025 remain authoritative. This final record commit must itself pass Full CI before 09.06 work begins.  
 **09.04 Treasury Transfer:** `CLOSED` on validated implementation SHA `255729e1591bc4b9335ec8ffe7eff2b887c16dd7`; Full CI #1218 / run `37052261290` SUCCESS across `verify`, `backend-verify`, `browser-contract`, and `release-gate`. The documentation commit carrying this pointer must itself pass Full CI before 09.05 work begins.  
