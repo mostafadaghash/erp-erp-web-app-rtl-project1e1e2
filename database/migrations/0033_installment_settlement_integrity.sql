@@ -218,7 +218,11 @@ DECLARE
   planned numeric(18,4);
   scheduled numeric(18,4);
 BEGIN
-  target_plan_id:=CASE WHEN TG_TABLE_NAME='installment_plans' THEN NEW.id ELSE NEW.plan_id END;
+  IF TG_TABLE_NAME='installment_plans' THEN
+    target_plan_id:=NEW.id;
+  ELSE
+    target_plan_id:=NEW.plan_id;
+  END IF;
 
   SELECT total_amount INTO planned
     FROM public.installment_plans
