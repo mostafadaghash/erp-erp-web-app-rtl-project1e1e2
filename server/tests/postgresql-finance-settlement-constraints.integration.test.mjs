@@ -92,7 +92,7 @@ async function seedFixture(client) {
     (id,branch_id,document_number,document_date,document_version,counterparty_id,warehouse_id,price_list_id,
      source_sales_order_id,source_delivery_id,subtotal,discount_total,tax_total,grand_total,paid_total,due_total,
      payment_status,seller_user_id,customer_notes,internal_notes,posted_at,created_by,updated_at,deleted_at,deleted_by,delete_reason)
-    VALUES ($1,$2,1,CURRENT_DATE,1,$3,$4,$5,$7,NULL,100,0,0,100,100,0,'PAID',$6,NULL,NULL,now(),$6,now(),NULL,NULL,NULL)`,
+    VALUES ($1,$2,1,CURRENT_DATE,1,$3,$4,$5,$7,NULL,500,0,0,500,0,500,'UNPAID',$6,NULL,NULL,now(),$6,now(),NULL,NULL,NULL)`,
     [ids.salesInvoice, ids.branch1, ids.counterparty, ids.warehouse1, ids.priceList, ids.user, ids.salesOrder]);
 
   await client.query(`INSERT INTO posting_batches
@@ -264,13 +264,19 @@ test("03.06 Finance / Settlement constraints enforce canonical integrity on Post
         VALUES ('60000000-0000-4000-8000-000000000053',$1,$2,'RECEIVABLE','CHK-P','Bank',100,CURRENT_DATE,'PENDING','TEST',$3,NULL,NULL,now())`,
         [ids.branch1, ids.counterparty, ids.source1]);
 
-      const canonicalStatuses = ["UPCOMING","DUE","PARTIAL","PAID","OVERDUE"];
+      const canonicalStatuses = [
+        { status: "UPCOMING", dueOffset: 1, paid: 0 },
+        { status: "DUE", dueOffset: 0, paid: 0 },
+        { status: "PARTIAL", dueOffset: 2, paid: 25 },
+        { status: "PAID", dueOffset: 3, paid: 100 },
+        { status: "OVERDUE", dueOffset: -1, paid: 0 },
+      ];
       for (let i = 0; i < canonicalStatuses.length; i += 1) {
+        const fixture = canonicalStatuses[i];
         await client.query(`INSERT INTO installments (id,plan_id,due_date,amount,paid_amount_projection,status)
           VALUES ($1,$2,CURRENT_DATE + $3::int,100,$4,$5)`,
-          [`60000000-0000-4000-8000-${String(60 + i).padStart(12,"0")}`, ids.plan, i,
-            canonicalStatuses[i] === "PAID" ? 100 : canonicalStatuses[i] === "PARTIAL" ? 25 : 0,
-            canonicalStatuses[i]]);
+          [`60000000-0000-4000-8000-${String(60 + i).padStart(12,"0")}`, ids.plan, fixture.dueOffset,
+            fixture.paid, fixture.status]);
       }
       for (const invalidStatus of ["PENDING","PARTIALLY_PAID"]) {
         await expectConstraint(client.query(`INSERT INTO installments (id,plan_id,due_date,amount,paid_amount_projection,status)
