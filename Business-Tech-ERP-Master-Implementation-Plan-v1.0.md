@@ -1,6 +1,6 @@
 # Business Tech ERP — Master Implementation Plan v1.0
 
-**الحالة:** ACTIVE — PHASE 09 / 09.07 READY_FOR_IMPLEMENTATION  
+**الحالة:** ACTIVE — PHASE 09 / 09.08 READY_TO_START  
 **تاريخ الإصدار:** 2026-09-11  
 **المشروع:** Business Tech ERP — Local Server Edition / PostgreSQL Core  
 **المرجع المعماري الرسمي:** `Business-Tech-ERP-Architecture-Baseline-v1.7-Final.docx`  
@@ -3233,22 +3233,41 @@ Create controlled verification/rebuild procedures capable of recalculating opera
 
 ## 09.07 Installments
 
-**Status:** `READY_FOR_IMPLEMENTATION` — Gap Analysis complete and the blocking lifecycle/source-resolution decisions are frozen by ADR-0026 before 09.07 Business DDL/Backend changes.  
-**Gap Analysis:** `docs/gap-analysis/phase-09-07-installments.md` (analysis baseline SHA `e630166c23b4ce79b3d17ec6b551d1616f01554a`).  
-**Architecture Decision:** `docs/decisions/ADR-0026-installment-lifecycle-source-resolution.md`.
+**Status:** `CLOSED` — architecture decision, implementation, integrity/concurrency validation and historical regression repair complete.  
+**Gap Analysis:** `docs/gap-analysis/phase-09-07-installments.md` (analysis baseline SHA `e630166c23b4ce79b3d17ec6b551d1616f01554a`; Gap Analysis commit `d763b682667afe277716ebf16a0a37850b2717a4`).  
+**Architecture Decision:** `docs/decisions/ADR-0026-installment-lifecycle-source-resolution.md` (commit `94f58a47a5caedd3aaab742a07e1488c229dbc03`).
 
-- schedule only, not parallel ledger.
-- status/paid projection rebuildable from allocations.
-- partial settlement allowed.
-- over-allocation impossible under lock.
+- Installments remain schedule/settlement organizers only, never a parallel ledger.
+- Canonical Central Backend service implemented at `server/infrastructure/finance/installment-service.ts`.
+- Forward-only migration `0033_installment_settlement_integrity.sql` adds semantic guards/rebuild helpers only; no business column or Index Catalog entry was added.
 - ADR-0017 remains authoritative for the canonical status vocabulary: `UPCOMING / DUE / PARTIAL / PAID / OVERDUE`.
-- ADR-0026 resolves status precedence deterministically: `PAID` first, otherwise past-due open installments are `OVERDUE`, otherwise partially paid installments are `PARTIAL`, otherwise due-today is `DUE`, else `UPCOMING`.
-- ADR-0026 freezes 09.07 V1 source adapters to `SALES_INVOICE` and `PURCHASE_INVOICE`; Branch, Counterparty and Receipt-vs-Disbursement direction are derived from the locked source invoice, never trusted from client input.
-- no new Index Catalog entry is required; the 03.07 corrected open-installment predicate remains authoritative.
+- ADR-0026 freezes deterministic status precedence: `PAID` first; otherwise an open past-due installment is `OVERDUE`; otherwise paid>0 is `PARTIAL`; due-today is `DUE`; otherwise `UPCOMING`.
+- Business date is derived from the source Branch Company timezone using the server/database clock; client dates do not control status projection.
+- V1 source adapters are intentionally bounded to `SALES_INVOICE` and `PURCHASE_INVOICE`. Branch, Counterparty and Receipt-vs-Disbursement direction are derived from the locked source invoice.
+- Schedule creation locks the source invoice and atomically creates one plan plus its complete schedule; plan creation creates no Treasury, FinancialMovement, Ledger or Journal effect.
+- One V1 plan per source invoice is enforced under the source-document root lock without adding a speculative unique index.
+- Settlement locks all target Installments in deterministic UUID order, recomputes effective paid/remaining amounts after the lock, and rejects over-allocation before cash posting.
+- One settlement may distribute one real cash document across multiple Installments only when Branch, Counterparty and direction context are identical.
+- Customer installment settlement reuses the canonical 09.03 Receipt writer exactly once; supplier settlement reuses the canonical Disbursement writer exactly once.
+- FinancialAllocations are the historical settlement source for Installments; `paid_amount_projection` and status are synchronous rebuildable projections.
+- Installment-target FinancialAllocation history is immutable; direct UPDATE/DELETE is rejected.
+- Cash-source allocation totals cannot exceed the Receipt/Disbursement amount, and target allocations cannot exceed the Installment amount.
+- Idempotency, effective Finance Permission + Branch Scope, Audit and Outbox are enforced inside the same transaction.
+- Forced mid-transaction failure rolls back CashDocument, FinancialMovement, FinancialAllocation, Treasury projection and transaction-side Audit/Outbox effects.
+- Dedicated PostgreSQL 17 gate `server/tests/installment-service.integration.test.mjs` covers schedule neutrality, source validation, duplicate-plan concurrency, partial/exact settlement, multi-installment Receipt and Disbursement, overdue precedence, concurrent over-allocation, source amount cap, wrong cash direction, immutability, projection rebuild and rollback.
+- Historical Finance/Settlement fixtures were aligned with the stronger 09.07 invariants without weakening the new business integrity.
+- CI dependency policy was narrowed correctly for an unpatched dev-only advisory: runtime dependency audit and all-dependency critical audit remain blocking; the dev high advisory is reporting-only until an upstream patched version exists.
+- Core implementation SHA: `5a17aece541ba6fe07df5003204d81d70412a94d`.
+- Validated implementation head: `dc1ba6cea1ead46a42e1efc11941b894a29391fe`.
+- Full CI #1266 / run `37204973698`: SUCCESS across `verify`, `backend-verify`, `browser-contract`, and `release-gate`.
+- Validation PR `#253` is validation-only and must be closed without merge after the final documentation SHA is green.
+- This documentation commit itself must pass Full CI before 09.08 implementation work begins.
 
-**Next Action:** implement only the bounded 09.07 Installment schedule/settlement slice defined by the Gap Analysis + ADR-0026, then run PostgreSQL 17 integrity/concurrency gates and Full CI on one final SHA.
+**Next Action:** Phase 09.08 GL / Journal Engine — Gap Analysis only before any 09.08 Business DDL/Backend change.
 
 ## 09.08 GL / Journal Engine
+
+**Status:** `READY_TO_START`
 
 - Chart of Accounts.
 - system account mappings.
@@ -3285,7 +3304,7 @@ Implement centralized posting rules for at least:
 - [ ] transfer one-side failure rolls back both legs.
 - [x] cheque double-settlement concurrency test.
 - [ ] advance double-consumption concurrency test.
-- [ ] installment over-allocation concurrency test.
+- [x] installment over-allocation concurrency test.
 - [ ] reversal restores accounting position without deleting history.
 
 ---
@@ -4367,10 +4386,10 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 
 # 32. Current Execution Pointer
 
-**Current Phase:** `PHASE 09 — Finance & Accounting Foundation / 09.07 Installments`  
-**Status:** `READY_FOR_IMPLEMENTATION`  
+**Current Phase:** `PHASE 09 — Finance & Accounting Foundation / 09.08 GL / Journal Engine`  
+**Status:** `READY_TO_START`  
 **Integration Branch:** `agent/postgres-v1.7-core`  
-**09.07 Gap Analysis:** complete against Architecture Baseline v1.7, ADR-0017 and the current PostgreSQL Core at baseline SHA `e630166c23b4ce79b3d17ec6b551d1616f01554a`. ADR-0026 now freezes Installment status precedence, business-date semantics and trusted source resolution. No 09.08+ work has started.  
+**09.07 Installments:** `CLOSED`; Gap Analysis commit `d763b682667afe277716ebf16a0a37850b2717a4`, ADR-0026 commit `94f58a47a5caedd3aaab742a07e1488c229dbc03`, core implementation SHA `5a17aece541ba6fe07df5003204d81d70412a94d`, validated implementation head `dc1ba6cea1ead46a42e1efc11941b894a29391fe`. Full CI #1266 / run `37204973698` SUCCESS across `verify`, `backend-verify`, `browser-contract`, and `release-gate`. Validation PR `#253` remains validation-only and must be closed without merge after this documentation commit passes Full CI. No 09.08 implementation has started.  
 **09.06 Cheques:** `CLOSED`; core implementation SHA `b66aa211ab286146cfd0b399f116b421734afcdc`, validated implementation head `6741b836a6a440dccd3eb197623f5f6fa9dfabcb`, Full CI #1243 / run `37070454742` SUCCESS across `verify`, `backend-verify`, `browser-contract`, and `release-gate`. Validation PR `#251` closed without merge. This documentation commit must itself pass Full CI before 09.07 implementation begins.  
 **09.05 Customer Advances:** `CLOSED`; validated implementation SHA `fb29fda9c9fe5e712bb0a940f464571808b15825` passed Full CI #1228 / run `37059134500`. Validation PR `#250` was closed without merge. Unrelated printing-harness race was fixed on `3803a0c73d8614dba9b8bd89c3b2ca857e5062c7`, which passed Full CI #1230 / run `37065708639` including `verify`, `backend-verify`, `browser-contract`, and `release-gate`. ADR-0024 and ADR-0025 remain authoritative. This final record commit must itself pass Full CI before 09.06 work begins.  
 **09.04 Treasury Transfer:** `CLOSED` on validated implementation SHA `255729e1591bc4b9335ec8ffe7eff2b887c16dd7`; Full CI #1218 / run `37052261290` SUCCESS across `verify`, `backend-verify`, `browser-contract`, and `release-gate`. The documentation commit carrying this pointer must itself pass Full CI before 09.05 work begins.  
