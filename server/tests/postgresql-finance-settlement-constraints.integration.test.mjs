@@ -299,13 +299,21 @@ test("03.06 Finance / Settlement constraints enforce canonical integrity on Post
         canonicalStatuses.rows.map((row) => row.status),
         ["UPCOMING","DUE","PARTIAL","PAID","OVERDUE"],
       );
-      for (const invalidStatus of ["PENDING","PARTIALLY_PAID"]) {
+      // These historical 03.06 assertions isolate the original CHECK
+      // constraints. Phase 09.07 separately verifies the stronger projection
+      // trigger against FinancialAllocation history.
+      await client.query("ALTER TABLE installments DISABLE TRIGGER bt_installments__guard");
+      try {
+        for (const invalidStatus of ["PENDING","PARTIALLY_PAID"]) {
+          await expectConstraint(client.query(`INSERT INTO installments (id,plan_id,due_date,amount,paid_amount_projection,status)
+            VALUES (gen_random_uuid(),$1,CURRENT_DATE,100,0,$2)`, [ids.plan, invalidStatus]), "23514", "ck_installments__status");
+        }
         await expectConstraint(client.query(`INSERT INTO installments (id,plan_id,due_date,amount,paid_amount_projection,status)
-          VALUES (gen_random_uuid(),$1,CURRENT_DATE,100,0,$2)`, [ids.plan, invalidStatus]), "23514", "ck_installments__status");
+          VALUES ('60000000-0000-4000-8000-000000000070',$1,CURRENT_DATE,100,101,'PAID')`, [ids.plan]),
+          "23514", "ck_installments__paid_projection_range");
+      } finally {
+        await client.query("ALTER TABLE installments ENABLE TRIGGER bt_installments__guard");
       }
-      await expectConstraint(client.query(`INSERT INTO installments (id,plan_id,due_date,amount,paid_amount_projection,status)
-        VALUES ('60000000-0000-4000-8000-000000000070',$1,CURRENT_DATE,100,101,'PAID')`, [ids.plan]),
-        "23514", "ck_installments__paid_projection_range");
 
       await expectConstraint(client.query(`INSERT INTO treasuries (id,branch_id,name,is_active,notes,created_at)
         VALUES ('60000000-0000-4000-8000-000000000071',$1,'cash',true,NULL,now())`, [ids.branch1]),
