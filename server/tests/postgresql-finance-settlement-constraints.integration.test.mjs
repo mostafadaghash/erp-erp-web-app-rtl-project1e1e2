@@ -250,7 +250,7 @@ test("03.06 Finance / Settlement constraints enforce canonical integrity on Post
         "23505", "uq_financial_allocations__source_target");
       await expectConstraint(client.query(`INSERT INTO financial_allocations
         (id,financial_source_type,financial_source_id,target_type,target_id,amount,created_at)
-        VALUES ('60000000-0000-4000-8000-000000000044','RECEIPT','60000000-0000-4000-8000-000000000098','INSTALLMENT','60000000-0000-4000-8000-000000000097',0,now())`),
+        VALUES ('60000000-0000-4000-8000-000000000044','RECEIPT','60000000-0000-4000-8000-000000000098','SALES_INVOICE','60000000-0000-4000-8000-000000000097',0,now())`),
         "23514", "ck_financial_allocations__amount_positive");
       await client.query(`INSERT INTO financial_allocations
         (id,financial_source_type,financial_source_id,target_type,target_id,amount,created_at)
