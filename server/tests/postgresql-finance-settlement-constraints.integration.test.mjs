@@ -117,6 +117,10 @@ async function seedFixture(client) {
     VALUES ($1,$2,$3,$4,500.0000,500.0000,now())`,
     [ids.advance, ids.counterparty, ids.salesOrder, ids.receipt]);
 
+  // This historical 03.06 fixture isolates the closed-domain status CHECK.
+  // Phase 09.07's dedicated integration gate separately proves that
+  // paid/status projections match FinancialAllocation history.
+  await client.query("ALTER TABLE installments DISABLE TRIGGER bt_installments__guard");
   await client.query("BEGIN");
   try {
     await client.query(`INSERT INTO installment_plans (id,counterparty_id,source_type,source_id,total_amount,created_at)
@@ -129,24 +133,18 @@ async function seedFixture(client) {
       { id: "60000000-0000-4000-8000-000000000063", dueOffset: 3, paid: 100, status: "PAID" },
       { id: "60000000-0000-4000-8000-000000000064", dueOffset: -1, paid: 0, status: "OVERDUE" },
     ];
-    // This historical 03.06 fixture isolates the closed-domain status CHECK.
-    // Phase 09.07's dedicated integration gate separately proves that
-    // paid/status projections match FinancialAllocation history.
-    await client.query("ALTER TABLE installments DISABLE TRIGGER bt_installments__guard");
-    try {
-      for (const fixture of canonicalInstallments) {
-        await client.query(`INSERT INTO installments
-          (id,plan_id,due_date,amount,paid_amount_projection,status)
-          VALUES ($1,$2,CURRENT_DATE + $3::int,100,$4,$5)`,
-          [fixture.id, ids.plan, fixture.dueOffset, fixture.paid, fixture.status]);
-      }
-    } finally {
-      await client.query("ALTER TABLE installments ENABLE TRIGGER bt_installments__guard");
+    for (const fixture of canonicalInstallments) {
+      await client.query(`INSERT INTO installments
+        (id,plan_id,due_date,amount,paid_amount_projection,status)
+        VALUES ($1,$2,CURRENT_DATE + $3::int,100,$4,$5)`,
+        [fixture.id, ids.plan, fixture.dueOffset, fixture.paid, fixture.status]);
     }
     await client.query("COMMIT");
   } catch (error) {
     await client.query("ROLLBACK");
     throw error;
+  } finally {
+    await client.query("ALTER TABLE installments ENABLE TRIGGER bt_installments__guard");
   }
 
   return ids;
