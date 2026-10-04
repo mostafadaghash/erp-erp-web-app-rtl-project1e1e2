@@ -117,8 +117,29 @@ async function seedFixture(client) {
     VALUES ($1,$2,$3,$4,500.0000,500.0000,now())`,
     [ids.advance, ids.counterparty, ids.salesOrder, ids.receipt]);
 
-  await client.query(`INSERT INTO installment_plans (id,counterparty_id,source_type,source_id,total_amount,created_at)
-    VALUES ($1,$2,'SALES_INVOICE',$3,500.0000,now())`, [ids.plan, ids.counterparty, ids.salesInvoice]);
+  await client.query("BEGIN");
+  try {
+    await client.query(`INSERT INTO installment_plans (id,counterparty_id,source_type,source_id,total_amount,created_at)
+      VALUES ($1,$2,'SALES_INVOICE',$3,500.0000,now())`, [ids.plan, ids.counterparty, ids.salesInvoice]);
+
+    const canonicalInstallments = [
+      { id: "60000000-0000-4000-8000-000000000060", dueOffset: 1, paid: 0, status: "UPCOMING" },
+      { id: "60000000-0000-4000-8000-000000000061", dueOffset: 0, paid: 0, status: "DUE" },
+      { id: "60000000-0000-4000-8000-000000000062", dueOffset: 2, paid: 25, status: "PARTIAL" },
+      { id: "60000000-0000-4000-8000-000000000063", dueOffset: 3, paid: 100, status: "PAID" },
+      { id: "60000000-0000-4000-8000-000000000064", dueOffset: -1, paid: 0, status: "OVERDUE" },
+    ];
+    for (const fixture of canonicalInstallments) {
+      await client.query(`INSERT INTO installments
+        (id,plan_id,due_date,amount,paid_amount_projection,status)
+        VALUES ($1,$2,CURRENT_DATE + $3::int,100,$4,$5)`,
+        [fixture.id, ids.plan, fixture.dueOffset, fixture.paid, fixture.status]);
+    }
+    await client.query("COMMIT");
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  }
 
   return ids;
 }
@@ -264,20 +285,14 @@ test("03.06 Finance / Settlement constraints enforce canonical integrity on Post
         VALUES ('60000000-0000-4000-8000-000000000053',$1,$2,'RECEIVABLE','CHK-P','Bank',100,CURRENT_DATE,'PENDING','TEST',$3,NULL,NULL,now())`,
         [ids.branch1, ids.counterparty, ids.source1]);
 
-      const canonicalStatuses = [
-        { status: "UPCOMING", dueOffset: 1, paid: 0 },
-        { status: "DUE", dueOffset: 0, paid: 0 },
-        { status: "PARTIAL", dueOffset: 2, paid: 25 },
-        { status: "PAID", dueOffset: 3, paid: 100 },
-        { status: "OVERDUE", dueOffset: -1, paid: 0 },
-      ];
-      for (let i = 0; i < canonicalStatuses.length; i += 1) {
-        const fixture = canonicalStatuses[i];
-        await client.query(`INSERT INTO installments (id,plan_id,due_date,amount,paid_amount_projection,status)
-          VALUES ($1,$2,CURRENT_DATE + $3::int,100,$4,$5)`,
-          [`60000000-0000-4000-8000-${String(60 + i).padStart(12,"0")}`, ids.plan, fixture.dueOffset,
-            fixture.paid, fixture.status]);
-      }
+      const canonicalStatuses = await client.query(
+        `SELECT status FROM installments WHERE plan_id=$1 ORDER BY id`,
+        [ids.plan],
+      );
+      assert.deepEqual(
+        canonicalStatuses.rows.map((row) => row.status),
+        ["UPCOMING","DUE","PARTIAL","PAID","OVERDUE"],
+      );
       for (const invalidStatus of ["PENDING","PARTIALLY_PAID"]) {
         await expectConstraint(client.query(`INSERT INTO installments (id,plan_id,due_date,amount,paid_amount_projection,status)
           VALUES (gen_random_uuid(),$1,CURRENT_DATE,100,0,$2)`, [ids.plan, invalidStatus]), "23514", "ck_installments__status");
