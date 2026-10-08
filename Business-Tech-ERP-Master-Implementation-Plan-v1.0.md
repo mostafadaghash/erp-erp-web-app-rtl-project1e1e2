@@ -3259,9 +3259,10 @@ Create controlled verification/rebuild procedures capable of recalculating opera
 - CI dependency policy was narrowed correctly for an unpatched dev-only advisory: runtime dependency audit and all-dependency critical audit remain blocking; the dev high advisory is reporting-only until an upstream patched version exists.
 - Core implementation SHA: `5a17aece541ba6fe07df5003204d81d70412a94d`.
 - Validated implementation head: `dc1ba6cea1ead46a42e1efc11941b894a29391fe`.
-- Full CI #1266 / run `37204973698`: SUCCESS across `verify`, `backend-verify`, `browser-contract`, and `release-gate`.
-- Validation PR `#253` is validation-only and must be closed without merge after the final documentation SHA is green.
-- This documentation commit itself must pass Full CI before 09.08 implementation work begins.
+- Full CI #1266 / run `37204973698`: SUCCESS across `verify`, `backend-verify`, `browser-contract`, and `release-gate` on the validated implementation head.
+- Documentation closure commit `063aabdb0c1ae9fa3a417f21e5e39727af846cde` passed Full CI #1267 / run `37205234750`: SUCCESS across `verify`, `backend-verify`, `browser-contract`, and `release-gate`.
+- Validation PR `#253` was closed without merge after the green documentation closure run.
+- This final closure-record commit must itself pass Full CI before 09.08 implementation work begins.
 
 **Next Action:** Phase 09.08 GL / Journal Engine — Gap Analysis only before any 09.08 Business DDL/Backend change.
 
@@ -4389,7 +4390,7 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 **Current Phase:** `PHASE 09 — Finance & Accounting Foundation / 09.08 GL / Journal Engine`  
 **Status:** `READY_TO_START`  
 **Integration Branch:** `agent/postgres-v1.7-core`  
-**09.07 Installments:** `CLOSED`; Gap Analysis commit `d763b682667afe277716ebf16a0a37850b2717a4`, ADR-0026 commit `94f58a47a5caedd3aaab742a07e1488c229dbc03`, core implementation SHA `5a17aece541ba6fe07df5003204d81d70412a94d`, validated implementation head `dc1ba6cea1ead46a42e1efc11941b894a29391fe`. Full CI #1266 / run `37204973698` SUCCESS across `verify`, `backend-verify`, `browser-contract`, and `release-gate`. Validation PR `#253` remains validation-only and must be closed without merge after this documentation commit passes Full CI. No 09.08 implementation has started.  
+**09.07 Installments:** `CLOSED`; Gap Analysis commit `d763b682667afe277716ebf16a0a37850b2717a4`, ADR-0026 commit `94f58a47a5caedd3aaab742a07e1488c229dbc03`, core implementation SHA `5a17aece541ba6fe07df5003204d81d70412a94d`, validated implementation head `dc1ba6cea1ead46a42e1efc11941b894a29391fe`, documentation closure SHA `063aabdb0c1ae9fa3a417f21e5e39727af846cde`. Full CI #1266 / run `37204973698` and documentation Full CI #1267 / run `37205234750` both SUCCESS across `verify`, `backend-verify`, `browser-contract`, and `release-gate`. Validation PR `#253` closed without merge. This final closure-record commit must itself pass Full CI before 09.08 implementation begins.  
 **09.06 Cheques:** `CLOSED`; core implementation SHA `b66aa211ab286146cfd0b399f116b421734afcdc`, validated implementation head `6741b836a6a440dccd3eb197623f5f6fa9dfabcb`, Full CI #1243 / run `37070454742` SUCCESS across `verify`, `backend-verify`, `browser-contract`, and `release-gate`. Validation PR `#251` closed without merge. This documentation commit must itself pass Full CI before 09.07 implementation begins.  
 **09.05 Customer Advances:** `CLOSED`; validated implementation SHA `fb29fda9c9fe5e712bb0a940f464571808b15825` passed Full CI #1228 / run `37059134500`. Validation PR `#250` was closed without merge. Unrelated printing-harness race was fixed on `3803a0c73d8614dba9b8bd89c3b2ca857e5062c7`, which passed Full CI #1230 / run `37065708639` including `verify`, `backend-verify`, `browser-contract`, and `release-gate`. ADR-0024 and ADR-0025 remain authoritative. This final record commit must itself pass Full CI before 09.06 work begins.  
 **09.04 Treasury Transfer:** `CLOSED` on validated implementation SHA `255729e1591bc4b9335ec8ffe7eff2b887c16dd7`; Full CI #1218 / run `37052261290` SUCCESS across `verify`, `backend-verify`, `browser-contract`, and `release-gate`. The documentation commit carrying this pointer must itself pass Full CI before 09.05 work begins.  
