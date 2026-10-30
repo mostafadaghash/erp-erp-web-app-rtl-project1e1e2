@@ -114,7 +114,9 @@ test("0034 relation, approved constraints and role/scoped mappings remain exact"
       assert.ok(new Date(original.rows[0].updated_at).getUTCFullYear()>=2026);
       await insert(client,v,{scopeId:v.treasury2,account:v.otherAccount});
       await insert(client,v,{scope:"COMPANY",scopeId:v.company,role:"CUSTOMER_RECEIVABLE_CONTROL",account:v.child});
-      await expectError(insert(client,v,{scopeId:v.treasury2,account:v.account}),"23505","uq_system_account_mappings__role_target");
+      await expectError(client.query(`UPDATE system_account_mappings SET gl_account_id=$1
+        WHERE company_id=$2 AND scope_type='TREASURY' AND scope_id=$3 AND role_key='TREASURY_ASSET'`,
+        [v.account,v.company,v.treasury2]),"23505","uq_system_account_mappings__role_target");
       await expectError(insert(client,v,{scopeId:v.treasury,account:v.account}),"23505","pk_system_account_mappings");
       await expectError(insert(client,v,{scopeId:v.foreignTreasury,account:v.spare}),"23514","ct_system_account_mappings__company");
       await expectError(insert(client,v,{company:v.foreignCompany,scopeId:v.treasury,account:v.foreignAccount}),"23514","ct_system_account_mappings__company");
