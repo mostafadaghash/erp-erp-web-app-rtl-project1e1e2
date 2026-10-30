@@ -61,6 +61,7 @@ export const MIGRATIONS = [
   "0031",
   "0032",
   "0033",
+  "0034",
 ];
 
 export async function withClient(databaseUrl, fn) {
@@ -135,6 +136,7 @@ export async function cleanupReportingTables(databaseUrl) {
     await cleanupPurchasingConstraintLayer(client);
     await cleanupAccountingConstraintLayer(client);
     await cleanupReportingConstraintLayer(client);
+    await client.query("DROP TABLE IF EXISTS public.system_account_mappings");
     for (const table of [...REPORTING_TABLES].reverse()) {
       await client.query(`DROP TABLE IF EXISTS public.${table}`);
     }
