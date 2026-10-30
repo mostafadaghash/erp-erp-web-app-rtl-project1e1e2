@@ -53,7 +53,7 @@ test(
     try {
       const applied = await runMigrations({ databaseUrl });
       assert.deepEqual(applied.applied, MIGRATIONS);
-      assert.equal(MIGRATIONS.at(-1), "0033");
+      assert.equal(MIGRATIONS.at(-1), "0034");
 
       const catalogRoles = await roles.ensureDefaultRoles();
       const systemAdmin = catalogRoles.find(
