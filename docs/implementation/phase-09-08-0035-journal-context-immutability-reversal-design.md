@@ -1,6 +1,6 @@
 # Phase 09.08 / Proposed 0035 — Journal Context, Immutability and Reversal Integrity Design
 
-**Status:** REVIEW / DESIGN COMPLETE; ADR-0028 PROPOSED, NOT ACCEPTED; NO 0035 MIGRATION AUTHORIZED
+**Status:** DESIGN COMPLETE; ADR-0028 ACCEPTED (ARCHITECTURE ONLY); 0035 SQL/META NOT STARTED
 **Reviewed:** 2026-10-30
 **Review baseline:** `b0c40405e1b1e4f373462c7fcc7557a3723ba233
 **Authority:** Architecture Baseline v1.7 ``6.5, 24.16–24.17, 25.14, 25.20, 26.4–26.7, 27.16, 27.19, 28.6; accepted `docs/decisions/ADR-0027-system-account-mapping-gl-context.md`; `docs/gap-analysis/phase-09-08-gl-journal-engine.md`; `docs/decisions/ADR-0021-phase03-accounting-constraints.md`.
@@ -62,9 +62,9 @@ Business-generated JournalEntry and its lines are **append-only once committed**
 
 A trigger that merely blocks UPDATE/DELETE is insufficient, because a later transaction could append two offsetting lines and leave `SUM(debit)=SUM(credit)` intact. Likewise, a client-supplied `posted` flag or an unprotected session `GUC` is not a durable database barrier.
 
-**Preferred proposal (requires ADR-0028 acceptance):** append one immutable `journal_entry_seals` record per JournalEntry at COMMIT, based on the exact final ordered contents of all its lines. Future mutations/inserts must fail even when totals remain balanced.
+**Approved architecture approach (ADR-0028 accepted; implementation and concurrency proof still required):** append one immutable `journal_entry_seals` record per JournalEntry at COMMIT, based on the exact final ordered contents of all its lines. Future mutations/inserts must fail even when totals remain balanced.
 
-Possible *proposed* seal schema (not yet accepted as physical Baseline):
+Accepted *additive architecture design* for 0035, not yet implemented or verified in PostgreSQL:
 - `entry_id uuid PRIMARY KEY REFERENCES journal_entries(id) ON DELETE RESTRICT`;
 - `line_count integer NOT NULL`;
 - `line_snapshot jsonb NOT NULL`, a canonical ordered array containing each line's immutable ID, account ID, debit and credit exact numeric(18,4) textual representations and optional counterparty;
@@ -142,9 +142,9 @@ The `0034` migration preflight and test expectations must be revisioned **withou
 | Legacy `0009` balance trigger | Preserve exactly | Already canonical and necessary |
 | Header/Line UPDATE+DELETE guards | Design accepted within ADR-0027 scope | Do not rewrite historical facts |
 | Late balanced Line INSERT guard | **Mandatory**, storage mechanism proposed via ADR-0028 | Otherwise history is mutable while totals stay equal |
-| Durable commit-time `journal_entry_seals` | **Proposed; needs ADR-0028 acceptance** | Reliable exact snapshot without unsafe transaction-ID assumptions |
+| Durable commit-time `journal_entry_seals` | **Accepted in ADR-0028; implementation unverified** | Reliable exact snapshot without unsafe transaction-ID assumptions |
 | Reversal exact multiset and one successful reverse per entry | Proposed within 0035 integrity contract, subject to 0035 tests | Prevent valid-looking, but incorrect compensations |
-| `0035` implementation | **NOT STARTED / NOT AUTHORIZED** | Requires seal architecture acceptance and concurrency proofs |
+| `0035` implementation | **NOT STARTED / SEPARATE GATE REQUIRED** | Accepted design alone does not prove concurrency or authorize production application |
 | `09.09` Posting Rules | OUT OF SCOPE | No sales/purchase/Finance debit-credit recipe here |
 
 ## 6. Design exit and single next action
@@ -153,7 +153,7 @@ The `0034` migration preflight and test expectations must be revisioned **withou
 - [x] Distinguished existing COMMIT balance from missing immutability and context enforcement.
 - [x] Proposed exact 0035 SQL guard, precondition, concurrency and negative-test contracts.
 - [x] Identified durable seal relation as a *new* physical schema proposal requiring a focused architecture decision.
-- [ ] ADR-0028 explicitly accepted or revised.
-- [ ] No 0035 DDL, Journal Writer, Posting Rules, data or production changes performed.
+- [x] ADR-0028 accepted as an architectural integrity addendum (no 0035 implementation or validation yet).
+- [x] No 0035 DDL, Journal Writer, Posting Rules, data or production changes performed in the architectural decision step.
 
-**Next Action (one only):** review/accept or revise `docs/decisions/ADR-0028-journal-commit-seal-and-reversal-integrity.md`. Once accepted, a separately gated step may implement **0035 integrity DDL only**. 09.08 itself remains IN_PROGRESS; Journal Writer and 09.09 remain blocked until their own steps.
+**Next Action (one only):** independent forward-only **0035 integrity DDL + metadata + PostgreSQL 17 negative/concurrency/security tests ONLY**. Check its own final same-SHA Full CI before closure. 09.08 remains IN_PROGRESS; Journal Writer, Posting Rules, populated-production DDL, frontend cutover and `main` merge remain blocked.
