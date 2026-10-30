@@ -1,6 +1,6 @@
 # Business Tech ERP — Master Implementation Plan v1.0
 
-**الحالة:** ACTIVE — PHASE 09 / 09.08 0034_MAPPING_INTEGRITY_IMPLEMENTED / FINAL_CLOSURE_CI_PENDING  
+**الحالة:** ACTIVE — PHASE 09 / 09.08 0034_MAPPING_INTEGRITY_CLOSED / JOURNAL_CONTEXT_NEXT  
 **تاريخ الإصدار:** 2026-09-11  
 **المشروع:** Business Tech ERP — Local Server Edition / PostgreSQL Core  
 **المرجع المعماري الرسمي:** `Business-Tech-ERP-Architecture-Baseline-v1.7-Final.docx`  
@@ -3266,11 +3266,11 @@ Create controlled verification/rebuild procedures capable of recalculating opera
 - The transitive lock was updated to patched `shell-quote@1.12.0` without framework, runtime or Business changes. Security-repair SHA `a60f5dfaf3583aee3fb8fce0e221cecd4889cf44` passed Full CI #1270 / run `37798906260`: SUCCESS across `verify`, `backend-verify`, `browser-contract`, and `release-gate`.
 - This documentation record commit must itself pass Full CI before 09.08 implementation work begins.
 
-**Next Action:** complete final documentation-SHA Full CI and close validation PR #258 without merge for **0034**. Then review only the bounded 09.08 Journal context/immutability/reversal integrity design for a potential forward-only 0035 slice; do not begin Journal Backend Writer or 09.09 Posting Rules. Any populated target database must independently pass read-only 0033 preflight and backup checks before 0034 application.
+**Next Action:** after final closure-status SHA CI succeeds and PR #258 is closed without Merge, perform **only the bounded 09.08 Journal context/immutability/reversal integrity design/Gap Review** for prospective forward-only `0035`; no Journal Backend Writer, 09.09 Posting Rules, `main` merge or Convex Production change. Actual populated database must independently pass 0033 preflight and verified backup before applying 0034.
 
 ## 09.08 GL / Journal Engine
 
-**Status:** `0034_MAPPING_INTEGRITY_IMPLEMENTED / FINAL_CLOSURE_CI_PENDING` — forward-only `0034_gl_system_account_mapping_integrity.sql` plus `.meta.json`, active-leaf Company/Treasury mapping and integrity guards implemented, and PostgreSQL 17 integrity/concurrency/dirty-history preconditions passed Full CI #1297 / run `41095299470` on implementation SHA `b9a140c48e26be9d0417b90504749140761b5569` (four Gates SUCCESS). Final documentation SHA CI and PR #258 no-merge closure pending. No Journal Backend Writer, 09.09 Posting Rules, 0035 migration or populated target DB change.  
+**Status:** `0034_MAPPING_INTEGRITY_CLOSED / 09.08_IN_PROGRESS` — forward-only `0034_gl_system_account_mapping_integrity` with metadata and PostgreSQL 17 integrity/concurrency/precondition tests passed Full CI #1297 / run `41095299470` at SHA `b9a140c48e26be9d0417b90504749140761b5569`, and documentation Full CI #1298 / run `41096103880` at SHA `5302317adf9f054185e95b9b3879be96f74b3b51`, all four Gates SUCCESS. Final closure-status SHA must independently pass Full CI; then validation PR #258 closes without merge. **No Journal Writer, 0035, 09.09 Posting Rules, or populated target DB migration.**  
 **Migration Design / Preflight:** `docs/implementation/phase-09-08-migration-preflight-design.md`  
 **0034 Implementation Closure:** `docs/implementation/phase-09-08-0034-system-account-mapping-closure.md`  
 **Gap Analysis:** `docs/gap-analysis/phase-09-08-gl-journal-engine.md` (analysis baseline SHA `bf89b8fa3b76ae3231549e2f97d2590cc2d17f6f`).  
@@ -4394,7 +4394,7 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 # 32. Current Execution Pointer
 
 **Current Phase:** `PHASE 09 — Finance & Accounting Foundation / 09.08 GL / Journal Engine`  
-**Status:** `09.08 0034_MAPPING_INTEGRITY_IMPLEMENTED / FINAL_CLOSURE_CI_PENDING` — `0034` applied successfully in ephemeral PostgreSQL 17 CI tests, validated implementation SHA `b9a140c48e26be9d0417b90504749140761b5569`, Full CI #1297 / run `41095299470` all four jobs SUCCESS. Final closure documentation commit still requires Full CI. No Journal Writer or 09.09 Posting Rules; no populated target database migrated.  
+**Status:** `09.08 0034_MAPPING_INTEGRITY_CLOSED / JOURNAL_CONTEXT_NEXT` — tested on disposable PostgreSQL 17 only. Implementation SHA `b9a140c48e26be9d0417b90504749140761b5569` Full CI #1297 SUCCESS; documentation SHA `5302317adf9f054185e95b9b3879be96f74b3b51` Full CI #1298 SUCCESS; final closure-status SHA requires its own Full CI. No Journal Writer, 0035 or Posting Rules started.  
 **09.08 0034 Closure:** `docs/implementation/phase-09-08-0034-system-account-mapping-closure.md` — executable SQL, metadata, integrity/concurrency tests and historical precondition verified; PR #258 validation-only and no Merge. 
 **09.08 Preflight:** `docs/implementation/phase-09-08-migration-preflight-design.md` plus `scripts/database/phase-09-08-preflight.mjs` and `server/tests/postgresql-gl-migration-preflight.integration.test.mjs`; tested on ephemeral PostgreSQL 17 only. Real populated target requires separately authorized preflight/backup prior to applying 0034.  
 **Integration Branch:** `agent/postgres-v1.7-core`  

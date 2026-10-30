@@ -1,10 +1,10 @@
 # Phase 09.08 / Slice 0034 — GL System Account Mapping Integrity
 
-**Status:** IMPLEMENTATION COMPLETE / FULL CI SUCCESS / CLOSURE DOCUMENTATION VALIDATION PENDING  
+**Status:** 0034 CLOSED — full implementation + documentation CI validated; final status-commit CI required  
 **Date:** 2026-10-30  
 **Implementation baseline SHA:** `dec47e237e9e470f673b0d9a7c88fc360ffd7aee`  
 **Verified implementation HEAD:** `b9a140c48e26be9d0417b90504749140761b5569`  
-**Full CI:** [#1297](https://github.com/mostafadaghash/erp-erp-web-app-rtl-project1e1e2/actions/runs/41095299470), all four jobs SUCCESS.  
+**Full CI:** [#1297](https://github.com/mostafadaghash/erp-erp-web-app-rtl-project1e1e2/actions/runs/41095299470) implementation and [#1298](https://github.com/mostafadaghash/erp-erp-web-app-rtl-project1e1e2/actions/runs/41096103880) documentation, all four jobs SUCCESS.  
 **Validation PR:** #258, validation-only, do not merge, close only after final documentation SHA passes Full CI.
 
 ## Scope and artifacts
@@ -52,7 +52,8 @@ The PostgreSQL database used for validation is the **temporary CI test database 
 - [x] New `0034` SQL + metadata created with atomic/fail-closed preconditions and verification.
 - [x] Legacy and new PostgreSQL 17 tests aligned and passing.
 - [x] Full CI #1297 SUCCESS on `b9a140c48e26be9d0417b90504749140761b5569`.
-- [ ] Final closure documentation SHA passes Full CI.
+- [x] Documentation SHA `5302317adf9f054185e95b9b3879be96f74b3b51` passed Full CI #1298 / run `41096103880`.
+- [ ] Final closure-status SHA Full CI pending (required before PR #258 closure).
 - [ ] Validation PR #258 closed without Merge.
 - [ ] No populated target DB migration claimed (separately gated, not a blocker for development-code closure).
 
