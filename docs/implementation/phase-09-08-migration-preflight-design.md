@@ -1,6 +1,6 @@
 # Phase 09.08 — Forward-only Migration Design and Precondition Verification
 
-**Status:** `DESIGN_DOCUMENTED / CI_PREFLIGHT_PENDING`  
+**Status:** `DESIGN_PREFLIGHT_COMPLETE / CI_VALIDATED / LIVE_TARGET_PREFLIGHT_PENDING`  
 **Date:** 2026-10-30  
 **Scope:** first implementation-planning slice **only**, ahead of any new Journal DDL or Journal Backend code.  
 **Approved basis:** Architecture Baseline v1.7, Master Implementation Plan, ACCEPTED ADR-0027, completed `phase-09-08-gl-journal-engine.md`.  
@@ -139,7 +139,7 @@ The forward migration's metadata `preconditionSql` must fail on real historical 
 - [x] Historical/context invalid-data preconditions defined.
 - [x] Read-only reusable preflight executable authored.
 - [x] PostgreSQL 17 positive/negative integration tests authored and CI-wired.
-- [ ] Full CI passed on the final slice SHA and PR closed without Merge.
+- [x] Preflight implementation SHA `6ac5cbd5fcb85426d731dad0ee8a7e83bf9a2c8a` passed Full CI #1276 / run `41060978535`: `verify`, `backend-verify` (including PostgreSQL 17 read-only GL preflight positive/negative tests), `browser-contract`, and `release-gate` all SUCCESS. The final documentation closure SHA must independently pass Full CI before PR #257 is closed without merge.
 - [ ] Read-only result captured on each future populated target (must occur separately before actual migration).
 
 **Next Action after Full CI gate:** implement **only** the forward-only `0034_gl_system_account_mapping_integrity` migration, with its actual `.sql`, `.meta.json`, PostgreSQL integrity/concurrency integration coverage and aligned migration harness. No Journal writer or 09.09 business rules in that next slice.
