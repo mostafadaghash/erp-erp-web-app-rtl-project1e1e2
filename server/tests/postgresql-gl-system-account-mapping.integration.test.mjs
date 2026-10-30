@@ -1,8 +1,11 @@
 import assert from "node:assert/strict";
+import { mkdtemp, cp, rm, readdir } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import test from "node:test";
 import pg from "pg";
 
-import { runMigrations } from "../../scripts/database/migrations.mjs";
+import { DEFAULT_MIGRATIONS_DIR, runMigrations } from "../../scripts/database/migrations.mjs";
 import { cleanupDatabase, withClient } from "./postgresql-schema-test-support.mjs";
 
 const { Client } = pg;
@@ -74,13 +77,6 @@ async function insert(client,v,opts={}) {
 async function expectError(promise,sqlstate,constraint){
   await assert.rejects(promise,(e)=>e?.code===sqlstate && (!constraint || e.constraint===constraint),
     `expected ${sqlstate} / ${constraint || "any"}`);
-}
-
-async function withOwnClient(fn){
-  const client=new Client({connectionString:databaseUrl});
-  await client.connect();
-  try{return await fn(client);}
-  finally{await client.end();}
 }
 
 test("0034 relation, approved constraints and role/scoped mappings remain exact", async (t)=>{
@@ -199,10 +195,38 @@ test("0034 mapping writes and concurrent GL deactivation are serialized by row l
 test("0034 migration precondition refuses dirty historical GL data without schema side effects",async(t)=>{
  if(!databaseUrl)return t.skip("ERP_TEST_DATABASE_URL absent");
  await cleanupDatabase(databaseUrl);
- try{
-   await withClient(databaseUrl,async(client)=>{
-     // Deliberately dirty history can only be seeded before the 0034 protection.
-     // Use the 0033 snapshot test helper; the test is added in the next fixture.
+ const tmp=await mkdtemp(join(tmpdir(),"erp-0034-negative-"));
+ try {
+   const all=await readdir(DEFAULT_MIGRATIONS_DIR);
+   for(const file of all.filter(name => /^00(0[1-9]|[12][0-9]|3[0-3])_/.test(name))) {
+     await cp(join(DEFAULT_MIGRATIONS_DIR,file),join(tmp,file));
+   }
+   const baseline=await runMigrations({databaseUrl,migrationsDir:tmp});
+   assert.equal(baseline.applied.at(-1),"0033");
+   await withClient(databaseUrl,async(c)=>{
+     await c.query(`INSERT INTO companies
+       (id,name,base_currency_code,default_language,timezone,is_active,created_at,updated_at)
+       VALUES ($1,'Dirty GL A','EGP','ar-EG','Africa/Cairo',true,now(),now()),
+              ($2,'Dirty GL B','EGP','ar-EG','Africa/Cairo',true,now(),now())`,
+       [id(201),id(202)]);
+     await c.query(`INSERT INTO gl_accounts
+       (id,company_id,code,name,account_type,parent_id,is_system,is_active)
+       VALUES ($1,$3,'1001','Foreign Parent','ASSET',NULL,true,true),
+              ($2,$4,'1002','Cross Company Child','ASSET',$1,false,true)`,
+       [id(203),id(204),id(201),id(202)]);
    });
- }finally{await cleanupDatabase(databaseUrl);}
+   await assert.rejects(
+     runMigrations({databaseUrl}),
+     /0034_gl_system_account_mapping_integrity precondition failed/,
+   );
+   await withClient(databaseUrl,async(c)=>{
+     const mappingRelation=await c.query("SELECT to_regclass('public.system_account_mappings') AS object");
+     assert.equal(mappingRelation.rows[0].object,null);
+     const history=await c.query("SELECT version FROM schema_migrations ORDER BY version DESC LIMIT 1");
+     assert.equal(history.rows[0].version,"0033");
+   });
+ } finally {
+   await cleanupDatabase(databaseUrl);
+   await rm(tmp,{recursive:true,force:true});
+ }
 });
