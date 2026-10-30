@@ -1,6 +1,6 @@
 # Business Tech ERP — Master Implementation Plan v1.0
 
-**الحالة:** ACTIVE — PHASE 09 / 09.08 0034_MAPPING_INTEGRITY_CLOSED / JOURNAL_CONTEXT_NEXT  
+**الحالة:** ACTIVE — PHASE 09 / 09.08 0035_JOURNAL_GUARDS_DESIGN_COMPLETE / ADR-0028_PROPOSED  
 **تاريخ الإصدار:** 2026-09-11  
 **المشروع:** Business Tech ERP — Local Server Edition / PostgreSQL Core  
 **المرجع المعماري الرسمي:** `Business-Tech-ERP-Architecture-Baseline-v1.7-Final.docx`  
@@ -3270,9 +3270,11 @@ Create controlled verification/rebuild procedures capable of recalculating opera
 
 ## 09.08 GL / Journal Engine
 
-**Status:** `0034_MAPPING_INTEGRITY_CLOSED / 09.08_IN_PROGRESS` — forward-only `0034_gl_system_account_mapping_integrity` with metadata and PostgreSQL 17 integrity/concurrency/precondition tests passed Full CI #1297 / run `41095299470` at SHA `b9a140c48e26be9d0417b90504749140761b5569`, and documentation Full CI #1298 / run `41096103880` at SHA `5302317adf9f054185e95b9b3879be96f74b3b51`, all four Gates SUCCESS. Final closure-status SHA must independently pass Full CI; then validation PR #258 closes without merge. **No Journal Writer, 0035, 09.09 Posting Rules, or populated target DB migration.**  
+**Status:** `0034_MAPPING_INTEGRITY_CLOSED / 0035_GUARDS_DESIGN_REVIEWED / ADR-0028_PROPOSED / 09.08_IN_PROGRESS` — forward-only `0034_gl_system_account_mapping_integrity` with metadata and PostgreSQL 17 integrity/concurrency/precondition tests passed Full CI #1297 / run `41095299470` at SHA `b9a140c48e26be9d0417b90504749140761b5569`, and documentation Full CI #1298 / run `41096103880` at SHA `5302317adf9f054185e95b9b3879be96f74b3b51`, all four Gates SUCCESS. Final closure-status SHA must independently pass Full CI; then validation PR #258 closes without merge. **No Journal Writer, 0035, 09.09 Posting Rules, or populated target DB migration.**  
 **Migration Design / Preflight:** `docs/implementation/phase-09-08-migration-preflight-design.md`  
 **0034 Implementation Closure:** `docs/implementation/phase-09-08-0034-system-account-mapping-closure.md`  
+**0035 Journal Context / Immutability / Reversal Design:** `docs/implementation/phase-09-08-0035-journal-context-immutability-reversal-design.md` — DESIGN COMPLETE / NO DDL.  
+**Architecture Proposal ADR-0028:** `docs/decisions/ADR-0028-journal-commit-seal-and-reversal-integrity.md` — PROPOSED, explicit approval pending for the additive immutable seal relation.  
 **Gap Analysis:** `docs/gap-analysis/phase-09-08-gl-journal-engine.md` (analysis baseline SHA `bf89b8fa3b76ae3231549e2f97d2590cc2d17f6f`).  
 **Accepted Architecture Addendum:** `docs/decisions/ADR-0027-system-account-mapping-gl-context.md` — normalized `system_account_mappings` and 0034 structural mapping integrity are implemented. **JournalEntry/PostingBatch and JournalLine/Company context, reversal and posted history immutability are not yet implemented** and remain distinct 09.08 slices; no 09.09 business Posting Rules. Frozen existing-table Index Catalog remains unchanged.
 
@@ -4394,8 +4396,9 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 # 32. Current Execution Pointer
 
 **Current Phase:** `PHASE 09 — Finance & Accounting Foundation / 09.08 GL / Journal Engine`  
-**Status:** `09.08 0034_MAPPING_INTEGRITY_CLOSED / JOURNAL_CONTEXT_NEXT` — tested on disposable PostgreSQL 17 only. Implementation SHA `b9a140c48e26be9d0417b90504749140761b5569` Full CI #1297 SUCCESS; documentation SHA `5302317adf9f054185e95b9b3879be96f74b3b51` Full CI #1298 SUCCESS; final closure-status SHA requires its own Full CI. No Journal Writer, 0035 or Posting Rules started.  
-**09.08 0034 Closure:** `docs/implementation/phase-09-08-0034-system-account-mapping-closure.md` — executable SQL, metadata, integrity/concurrency tests and historical precondition verified; PR #258 validation-only and no Merge. 
+**Status:** `09.08 0034_MAPPING_INTEGRITY_CLOSED / 0035_DESIGN_COMPLETE / ADR-0028_PROPOSED` — no 0035 SQL/Backend implementation; Journal integrity design documents the missing posting batch context, late-line immutability and exact reversal protection. Tested 0034 on disposable PostgreSQL 17 only. Implementation SHA `b9a140c48e26be9d0417b90504749140761b5569` Full CI #1297 SUCCESS; documentation SHA `5302317adf9f054185e95b9b3879be96f74b3b51` Full CI #1298 SUCCESS; final closure-status SHA requires its own Full CI. No Journal Writer, 0035 or Posting Rules started.  
+**09.08 0034 Closure:** `docs/implementation/phase-09-08-0034-system-account-mapping-closure.md` — executable SQL, metadata, integrity/concurrency tests and historical precondition verified; PR #258 closed without Merge.  
+**09.08 0035 Design Review:** `docs/implementation/phase-09-08-0035-journal-context-immutability-reversal-design.md` — documentation only. A new physical `journal_entry_seals` integrity relation is proposed by ADR-0028, not yet approved or implemented. 
 **09.08 Preflight:** `docs/implementation/phase-09-08-migration-preflight-design.md` plus `scripts/database/phase-09-08-preflight.mjs` and `server/tests/postgresql-gl-migration-preflight.integration.test.mjs`; tested on ephemeral PostgreSQL 17 only. Real populated target requires separately authorized preflight/backup prior to applying 0034.  
 **Integration Branch:** `agent/postgres-v1.7-core`  
 **09.08 ADR-0027:** `docs/decisions/ADR-0027-system-account-mapping-gl-context.md` — ACCEPTED; 0034 Company/Treasury mapping structural integrity implemented. The broader Journal context guards, resolver and Backend Journal Writer remain pending separate implementation. No 09.09 Posting Rules.  
@@ -4584,7 +4587,7 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 **08.04 Implementation CI:** Run `#1031` / `35726979984` — SUCCESS; `verify`, `backend-verify` including PostgreSQL 17 reservation lifecycle, two-writer over-reservation race and 25-way stress, `browser-contract`, and `release-gate` all SUCCESS on the same implementation SHA.  
 **08.04 Migration/Index:** no new migration; migration tail remains `0024_inventory_ledger_integrity`; no Index addition and Frozen Reservation catalog remains unchanged.  
 **08.04 Validation PR:** `#237` — validation-only; close WITHOUT MERGE after final same-SHA documentation validation.  
-**Next Action:** execute **PHASE 08 / 08.05 Serials only** after final 08.04 documentation-SHA validation.  
+**Next Action:** review and explicitly accept or revise `docs/decisions/ADR-0028-journal-commit-seal-and-reversal-integrity.md` before any forward-only 0035 DDL. The 0035 Journal Context/Immutability/Reversal design is documented but the seal relation is a new physical-schema proposal; neither Journal Writer nor 09.09 Posting Rules may begin here.
 **Forbidden Next Actions:** لا 08.06 قبل إغلاق 08.05، لا Batch/Expiry lifecycle، لا Stock Transfer document orchestration، لا Sales/Delivery posting cutover، لا Frontend cutover، لا dual write، لا `main` merge، ولا Convex Production change.
 
 **Plan update — 2026-09-17 / ACCOUNTING CONSTRAINTS CLOSED:** تم إغلاق ثامن executable slice من 03.06 على SHA `ef03d141958c392032bd8caf16b5f880a193e86e`. Migration `0019`، ADR-0021، Accounting PK/FK/UNIQUE/CHECK layer، Finance Category → GL Account FK، والحفاظ على deferred Journal balance at COMMIT تم التحقق منهم فعليًا على PostgreSQL 17؛ Full CI run `35224498880` أخضر بالكامل وPR `#206` أُغلق بدون Merge. 03.06 ما زالت `IN_PROGRESS` و03.07 لم تبدأ.
