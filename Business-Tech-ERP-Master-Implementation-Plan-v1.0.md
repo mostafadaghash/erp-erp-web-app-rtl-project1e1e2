@@ -1,6 +1,6 @@
 # Business Tech ERP — Master Implementation Plan v1.0
 
-**الحالة:** ACTIVE — PHASE 09 / 09.08 READY_TO_START  
+**الحالة:** ACTIVE — PHASE 09 / 09.08 GAP_ANALYSIS_COMPLETE / BLOCKED_PENDING_ADR  
 **تاريخ الإصدار:** 2026-09-11  
 **المشروع:** Business Tech ERP — Local Server Edition / PostgreSQL Core  
 **المرجع المعماري الرسمي:** `Business-Tech-ERP-Architecture-Baseline-v1.7-Final.docx`  
@@ -3266,11 +3266,12 @@ Create controlled verification/rebuild procedures capable of recalculating opera
 - The transitive lock was updated to patched `shell-quote@1.12.0` without framework, runtime or Business changes. Security-repair SHA `a60f5dfaf3583aee3fb8fce0e221cecd4889cf44` passed Full CI #1270 / run `37798906260`: SUCCESS across `verify`, `backend-verify`, `browser-contract`, and `release-gate`.
 - This documentation record commit must itself pass Full CI before 09.08 implementation work begins.
 
-**Next Action:** Phase 09.08 GL / Journal Engine — Gap Analysis only before any 09.08 Business DDL/Backend change.
+**Next Action:** create bounded `ADR-0027` for 09.08 only: freeze System Account Mapping storage/key semantics and the Backend/DB Company/Branch/GL context-coherence boundary. No Journal DDL, Backend Journal implementation, 09.09 Posting Rules, frontend cutover, `main` merge, or Convex Production change before that ADR is accepted.
 
 ## 09.08 GL / Journal Engine
 
-**Status:** `READY_TO_START`
+**Status:** `BLOCKED` — Gap Analysis complete; ADR-0027 required before any 09.08 Journal DDL/Backend implementation.  
+**Gap Analysis:** `docs/gap-analysis/phase-09-08-gl-journal-engine.md` (analysis baseline SHA `bf89b8fa3b76ae3231549e2f97d2590cc2d17f6f`).
 
 - Chart of Accounts.
 - system account mappings.
@@ -4390,8 +4391,9 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 # 32. Current Execution Pointer
 
 **Current Phase:** `PHASE 09 — Finance & Accounting Foundation / 09.08 GL / Journal Engine`  
-**Status:** `READY_TO_START`  
+**Status:** `BLOCKED` — Gap Analysis complete; bounded ADR-0027 is required before implementation.  
 **Integration Branch:** `agent/postgres-v1.7-core`  
+**09.08 Gap Analysis:** `docs/gap-analysis/phase-09-08-gl-journal-engine.md` — complete on analysis baseline `bf89b8fa3b76ae3231549e2f97d2590cc2d17f6f`; System Account Mapping and Company/Branch/GL context-coherence contract remain intentionally unresolved pending ADR-0027. No Journal DDL/Backend implementation was introduced.  
 **09.07 Installments:** `CLOSED`; Gap Analysis commit `d763b682667afe277716ebf16a0a37850b2717a4`, ADR-0026 commit `94f58a47a5caedd3aaab742a07e1488c229dbc03`, core implementation SHA `5a17aece541ba6fe07df5003204d81d70412a94d`, validated implementation head `dc1ba6cea1ead46a42e1efc11941b894a29391fe`, documentation closure SHA `063aabdb0c1ae9fa3a417f21e5e39727af846cde`. Full CI #1266 / run `37204973698` and documentation Full CI #1267 / run `37205234750` both SUCCESS across `verify`, `backend-verify`, `browser-contract`, and `release-gate`. Validation PR `#253` is validation-only and will be closed without merge after this final record CI. Final security-repair SHA `a60f5dfaf3583aee3fb8fce0e221cecd4889cf44` passed Full CI #1270 / run `37798906260` after replacing vulnerable transitive `shell-quote@1.10.0` with patched `1.12.0`; no 09.07 Business/PostgreSQL behavior changed. This documentation record commit must itself pass Full CI before 09.08 implementation begins.  
 **09.06 Cheques:** `CLOSED`; core implementation SHA `b66aa211ab286146cfd0b399f116b421734afcdc`, validated implementation head `6741b836a6a440dccd3eb197623f5f6fa9dfabcb`, Full CI #1243 / run `37070454742` SUCCESS across `verify`, `backend-verify`, `browser-contract`, and `release-gate`. Validation PR `#251` closed without merge. This documentation commit must itself pass Full CI before 09.07 implementation begins.  
 **09.05 Customer Advances:** `CLOSED`; validated implementation SHA `fb29fda9c9fe5e712bb0a940f464571808b15825` passed Full CI #1228 / run `37059134500`. Validation PR `#250` was closed without merge. Unrelated printing-harness race was fixed on `3803a0c73d8614dba9b8bd89c3b2ca857e5062c7`, which passed Full CI #1230 / run `37065708639` including `verify`, `backend-verify`, `browser-contract`, and `release-gate`. ADR-0024 and ADR-0025 remain authoritative. This final record commit must itself pass Full CI before 09.06 work begins.  
