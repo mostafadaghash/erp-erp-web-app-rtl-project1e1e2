@@ -41,6 +41,21 @@ const HISTORICAL_AUDITS = [
       FROM public.gl_accounts WHERE parent_id = id`,
   },
   {
+    id: "gl_parent_cycle",
+    sql: `WITH RECURSIVE parent_path AS (
+      SELECT a.id AS root, a.parent_id, ARRAY[a.id] AS visited, false AS cycle_found
+      FROM public.gl_accounts a
+      UNION ALL
+      SELECT p.root, a.parent_id, p.visited || a.id,
+             a.id = ANY(p.visited) AS cycle_found
+      FROM parent_path p
+      JOIN public.gl_accounts a ON a.id = p.parent_id
+      WHERE NOT p.cycle_found
+    )
+    SELECT COUNT(DISTINCT root)::int AS violations
+    FROM parent_path WHERE cycle_found`,
+  },
+  {
     id: "journal_posting_batch_context",
     sql: `SELECT COUNT(*)::int AS violations
       FROM public.journal_entries je
