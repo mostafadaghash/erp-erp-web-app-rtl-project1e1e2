@@ -1,13 +1,33 @@
 import assert from "node:assert/strict";
+import { mkdtemp, cp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import test from "node:test";
 import pg from "pg";
 
-import { runMigrations } from "../../scripts/database/migrations.mjs";
+import { DEFAULT_MIGRATIONS_DIR, runMigrations } from "../../scripts/database/migrations.mjs";
 import { runGlMigrationPreflight } from "../../scripts/database/phase-09-08-preflight.mjs";
 import { cleanupDatabase } from "./postgresql-schema-test-support.mjs";
 
 const { Client } = pg;
 const databaseUrl = process.env.ERP_TEST_DATABASE_URL;
+
+// The pre-0034 readiness test must model an already-deployed 0033 database,
+// while repository files now include a pending forward-only 0034 migration.
+async function applyLegacy33Baseline() {
+  const dir = await mkdtemp(join(tmpdir(), "erp-pre-0034-"));
+  try {
+    for (let i = 1; i <= 33; i += 1) {
+      const version = String(i).padStart(4, "0");
+      const { readdir } = await import("node:fs/promises");
+      const names = (await readdir(DEFAULT_MIGRATIONS_DIR)).filter((f) => f.startsWith(version + "_"));
+      for (const name of names) await cp(join(DEFAULT_MIGRATIONS_DIR,name), join(dir,name));
+    }
+    return await runMigrations({ databaseUrl, migrationsDir: dir });
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+}
 
 async function withClient(fn) {
   const client = new Client({ connectionString: databaseUrl });
@@ -23,7 +43,7 @@ test("09.08 preflight proves the clean 0033 PostgreSQL 17 baseline without apply
   if (!databaseUrl) return t.skip("ERP_TEST_DATABASE_URL is not configured");
   await cleanupDatabase(databaseUrl);
   try {
-    const migrated = await runMigrations({ databaseUrl });
+    const migrated = await applyLegacy33Baseline();
     assert.equal(migrated.applied.at(-1), "0033");
     const result = await runGlMigrationPreflight({ databaseUrl });
     assert.equal(result.mode, "READ_ONLY_BASELINE_PREFLIGHT");
@@ -51,7 +71,7 @@ test("09.08 preflight rejects historical cross-company and cross-branch accounti
   if (!databaseUrl) return t.skip("ERP_TEST_DATABASE_URL is not configured");
   await cleanupDatabase(databaseUrl);
   try {
-    await runMigrations({ databaseUrl });
+    await applyLegacy33Baseline();
     await withClient(async (client) => {
       const ids = {
         companyA: "76000000-0000-4000-8000-000000000001",
