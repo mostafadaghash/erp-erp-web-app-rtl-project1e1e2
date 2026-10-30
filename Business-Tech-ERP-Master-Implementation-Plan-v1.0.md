@@ -1,6 +1,6 @@
 # Business Tech ERP — Master Implementation Plan v1.0
 
-**الحالة:** ACTIVE — PHASE 09 / 09.08 ADR-0027 ACCEPTED / READY_FOR_IMPLEMENTATION_AFTER_FINAL_CI  
+**الحالة:** ACTIVE — PHASE 09 / 09.08 MIGRATION_PREFLIGHT_DESIGN / CI_PENDING  
 **تاريخ الإصدار:** 2026-09-11  
 **المشروع:** Business Tech ERP — Local Server Edition / PostgreSQL Core  
 **المرجع المعماري الرسمي:** `Business-Tech-ERP-Architecture-Baseline-v1.7-Final.docx`  
@@ -3266,11 +3266,12 @@ Create controlled verification/rebuild procedures capable of recalculating opera
 - The transitive lock was updated to patched `shell-quote@1.12.0` without framework, runtime or Business changes. Security-repair SHA `a60f5dfaf3583aee3fb8fce0e221cecd4889cf44` passed Full CI #1270 / run `37798906260`: SUCCESS across `verify`, `backend-verify`, `browser-contract`, and `release-gate`.
 - This documentation record commit must itself pass Full CI before 09.08 implementation work begins.
 
-**Next Action:** after Full CI succeeds on the final ADR-0027 acceptance documentation SHA, start **09.08 GL / Journal Engine implementation only**, beginning with the forward-only `system_account_mappings` migration and approved integrity-guard design/preconditions before any SQL changes. Do not implement 09.09 Posting Rules, frontend cutover, `main` merge or Convex Production changes. This ADR acceptance step itself modifies documentation only.
+**Next Action:** complete Full CI and validation-PR closure for the 09.08 read-only migration preflight design slice. Once verified, implement **only** forward-only `0034_gl_system_account_mapping_integrity` and its PostgreSQL 17 integrity/concurrency tests as a later separate step; do not start Journal writer, 09.09 Posting Rules, frontend cutover, `main` merge or Convex Production changes.
 
 ## 09.08 GL / Journal Engine
 
-**Status:** `ADR_ACCEPTED / READY_FOR_IMPLEMENTATION_AFTER_FINAL_CI` — Gap Analysis completed; design decision explicitly delegated and accepted on 2026-10-30. This ADR-only step changes documents only, **not** Journal DDL, Backend implementation or 09.09 Posting Rules.  
+**Status:** `IN_PROGRESS — MIGRATION_PREFLIGHT_DESIGN / CI_PENDING` — ADR-0027 accepted; 09.08 first implementation-planning slice provides a reusable read-only PostgreSQL 17 preflight plus positive/negative integration tests, without any new Migration or Journal Backend implementation.  
+**Migration Design / Preflight:** `docs/implementation/phase-09-08-migration-preflight-design.md`  
 **Gap Analysis:** `docs/gap-analysis/phase-09-08-gl-journal-engine.md` (analysis baseline SHA `bf89b8fa3b76ae3231549e2f97d2590cc2d17f6f`).  
 **Accepted Architecture Addendum:** `docs/decisions/ADR-0027-system-account-mapping-gl-context.md` — normalized `system_account_mappings`, distinct GL account per Treasury, Company/Treasury role scopes, active-leaf account resolution, and PostgreSQL + Backend Company/Branch/GL/PostingBatch/reversal integrity. Implementation requires a **later forward-only migration** and complete test gates. Existing closed migration history and frozen existing-table Index Catalog remain unchanged.
 
@@ -4392,7 +4393,8 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 # 32. Current Execution Pointer
 
 **Current Phase:** `PHASE 09 — Finance & Accounting Foundation / 09.08 GL / Journal Engine`  
-**Status:** `ADR_ACCEPTED / READY_FOR_IMPLEMENTATION_AFTER_FINAL_CI` — accepted owner-delegated ADR-0027 on 2026-10-30; implementation has **not** started.  
+**Status:** `IN_PROGRESS — 09.08 MIGRATION_PREFLIGHT_DESIGN / CI_PENDING` — first 09.08 slice (preconditions and read-only tests only). No 0034 DDL or Journal writer exists yet.  
+**09.08 Preflight:** `docs/implementation/phase-09-08-migration-preflight-design.md` plus `scripts/database/phase-09-08-preflight.mjs` and `server/tests/postgresql-gl-migration-preflight.integration.test.mjs`; CI validation required before the next implementation slice. The read-only executable audits the committed PostgreSQL 17 baseline and historical cross-context data. CI verifies only ephemeral test DB; each real populated target remains unverified until a separately authorized read-only run.  
 **Integration Branch:** `agent/postgres-v1.7-core`  
 **09.08 ADR-0027:** `docs/decisions/ADR-0027-system-account-mapping-gl-context.md` — ACCEPTED design: dedicated normalized Company/Treasury account mappings with distinct GL target per Treasury, fail-closed active leaf resolver, and SQL + Backend GL context guards. Only documentation changes in this decision step; no SQL/Backend/09.09 changes.  
 **09.08 Gap Analysis:** `docs/gap-analysis/phase-09-08-gl-journal-engine.md` — complete on analysis baseline `bf89b8fa3b76ae3231549e2f97d2590cc2d17f6f`; System Account Mapping and Company/Branch/GL context-coherence contract remain intentionally unresolved pending ADR-0027. No Journal DDL/Backend implementation was introduced.  
