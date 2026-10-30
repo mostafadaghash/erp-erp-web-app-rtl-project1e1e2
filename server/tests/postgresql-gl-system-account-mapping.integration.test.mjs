@@ -133,6 +133,9 @@ test("0034 relation, approved constraints and role/scoped mappings remain exact"
         (id,company_id,code,name,account_type,parent_id,is_system,is_active)
         VALUES ($1,$2,'9000','Wrong Parent','ASSET',$3,false,true)`,
         [id(80),v.foreignCompany,v.parent]),"23514","ct_gl_accounts__hierarchy");
+      // This child is mapped, so unmap it before testing the independent cycle guard.
+      await client.query(`DELETE FROM system_account_mappings WHERE company_id=$1
+        AND scope_type='COMPANY' AND role_key='CUSTOMER_RECEIVABLE_CONTROL'`,[v.company]);
       await expectError(client.query("UPDATE gl_accounts SET parent_id=$1 WHERE id=$2",[v.child,v.parent]),"23514","ct_gl_accounts__hierarchy");
       await expectError(client.query(`INSERT INTO gl_accounts
         (id,company_id,code,name,account_type,parent_id,is_system,is_active)
