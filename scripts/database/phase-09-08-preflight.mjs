@@ -1,7 +1,7 @@
 import { pathToFileURL } from "node:url";
 import pg from "pg";
 
-import { runMigrations } from "./migrations.mjs";
+import { loadMigrationDefinitions, DEFAULT_MIGRATIONS_DIR } from "./migrations.mjs";
 
 const { Client } = pg;
 
@@ -114,8 +114,10 @@ export async function runGlMigrationPreflight({ databaseUrl } = {}) {
     throw new Error("ERP_DATABASE_URL must be explicitly provided for the 09.08 preflight");
   }
 
-  // verifyOnly validates every applied definition/checksum without applying pending DDL.
-  const verified = await runMigrations({ databaseUrl, verifyOnly: true });
+  // Validate only the 33 APPLIED definition checksums. Never invoke verify-only on
+  // the whole catalog: that would reject legitimate pending migration 0034.
+  const definitions = await loadMigrationDefinitions(DEFAULT_MIGRATIONS_DIR);
+  const baselineDefinitions = definitions.filter((item) => item.version <= "0033");
   const client = new Client({
     connectionString: databaseUrl,
     application_name: "business-tech-erp-gl-preflight",
@@ -139,15 +141,23 @@ export async function runGlMigrationPreflight({ databaseUrl } = {}) {
         "SELECT version,name FROM public.schema_migrations ORDER BY version",
       );
       const latest = history.rows.at(-1);
+      const completeHistory = await client.query(
+        "SELECT version,name,checksum FROM public.schema_migrations ORDER BY version",
+      );
+      const expectedByVersion = new Map(baselineDefinitions.map((d) => [d.version, d]));
+      const historyMatches = completeHistory.rowCount === 33 &&
+        baselineDefinitions.length === 33 &&
+        completeHistory.rows.every((row) => {
+          const definition = expectedByVersion.get(row.version);
+          return definition?.name === row.name && definition?.checksum === row.checksum;
+        });
       checks.push(check(
         "baseline_0033",
         latest?.version === "0033" &&
           latest?.name === "installment_settlement_integrity" &&
-          history.rowCount === 33 &&
-          verified.total === 33 &&
-          verified.applied.length === 0 &&
-          verified.skipped.length === 33,
-        { migration_count: history.rowCount, last_version: latest?.version ?? null },
+          historyMatches,
+        { migration_count: history.rowCount, last_version: latest?.version ?? null,
+          applied_checksums_match: historyMatches },
       ));
 
       const found = await client.query(
