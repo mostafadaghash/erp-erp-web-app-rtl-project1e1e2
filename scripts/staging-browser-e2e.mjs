@@ -163,13 +163,27 @@ async function inflateTar(source, destination) {
   child.stderr.on("data", (chunk) => {
     stderr += chunk;
   });
-  await pipeline(
-    createReadStream(source),
-    createBrotliDecompress(),
-    child.stdin,
-  );
-  const [code] = await once(child, "close");
+  const closePromise = once(child, "close");
+  let streamError;
+  try {
+    await pipeline(
+      createReadStream(source),
+      createBrotliDecompress(),
+      child.stdin,
+    );
+  } catch (error) {
+    streamError = error;
+  }
+  const [code] = await closePromise;
   if (code !== 0) throw new Error(`تعذر فك حزمة Chromium: ${stderr.trim()}`);
+  if (
+    streamError &&
+    (!(streamError instanceof Error) ||
+      !("code" in streamError) ||
+      streamError.code !== "ERR_STREAM_PREMATURE_CLOSE")
+  ) {
+    throw streamError;
+  }
 }
 
 async function prepareWindowsBrowser() {

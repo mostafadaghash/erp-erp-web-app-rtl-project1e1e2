@@ -1,0 +1,8 @@
+{
+  "version": "0025",
+  "name": "batch_expiry_permission",
+  "transactional": true,
+  "preconditionSql": "SELECT EXISTS (SELECT 1 FROM public.schema_migrations WHERE version = '0024') AND NOT EXISTS (SELECT 1 FROM public.permissions WHERE permission_key = 'inventory.sell_expired_batch') AS ok;",
+  "verificationSql": "SELECT (SELECT count(*)::int FROM public.permissions WHERE permission_key = 'inventory.sell_expired_batch' AND module = 'inventory' AND description_key = 'permissions.inventory.sellExpiredBatch') = 1 AS ok;",
+  "recovery": "Transactional failure rolls back the permission-catalog migration. After successful apply, preserve the stable permission key and use forward-only correction."
+}

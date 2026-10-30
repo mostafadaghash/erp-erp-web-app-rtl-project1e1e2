@@ -1,0 +1,8 @@
+{
+  "version": "0033",
+  "name": "installment_settlement_integrity",
+  "transactional": true,
+  "preconditionSql": "SELECT to_regclass('public.installment_plans') IS NOT NULL AND to_regclass('public.installments') IS NOT NULL AND to_regclass('public.financial_allocations') IS NOT NULL AND to_regprocedure('public.fn_cheque_lifecycle_guard()') IS NOT NULL AS ok;",
+  "verificationSql": "SELECT to_regprocedure('public.fn_installment_projected_status(numeric,numeric,date,date)') IS NOT NULL AND to_regprocedure('public.fn_installment_effective_paid(uuid)') IS NOT NULL AND EXISTS (SELECT 1 FROM pg_trigger WHERE tgname='bt_installment_plans__guard' AND NOT tgisinternal) AND EXISTS (SELECT 1 FROM pg_trigger WHERE tgname='bt_installments__guard' AND NOT tgisinternal) AND EXISTS (SELECT 1 FROM pg_trigger WHERE tgname='bt_financial_allocations__installment_guard' AND NOT tgisinternal) AND EXISTS (SELECT 1 FROM pg_trigger WHERE tgname='at_financial_allocations__installment_refresh' AND NOT tgisinternal) AS ok;",
+  "recovery": "Transactional failure restores the pre-09.07 state. After success use forward-only migrations; do not rewrite migration 0033."
+}

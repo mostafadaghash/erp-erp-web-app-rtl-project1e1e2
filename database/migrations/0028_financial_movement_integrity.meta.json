@@ -1,0 +1,8 @@
+{
+  "version": "0028",
+  "name": "financial_movement_integrity",
+  "transactional": true,
+  "preconditionSql": "SELECT to_regclass('public.financial_movements') IS NOT NULL AND to_regclass('public.treasury_balance_positions') IS NOT NULL AND to_regclass('public.posting_batches') IS NOT NULL AS ok;",
+  "verificationSql": "SELECT (SELECT count(*) FROM pg_trigger WHERE tgrelid='public.financial_movements'::regclass AND tgname IN ('bt_financial_movements__posting_context','bt_financial_movements__immutable') AND NOT tgisinternal)=2 AS ok;",
+  "recovery": "Transactional failure rolls back the Financial Movement integrity functions and triggers. After success use a forward-only migration for changes."
+}

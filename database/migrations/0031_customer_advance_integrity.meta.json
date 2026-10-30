@@ -1,0 +1,8 @@
+{
+  "version":"0031",
+  "name":"customer_advance_integrity",
+  "transactional":true,
+  "preconditionSql":"SELECT to_regclass('public.customer_advances') IS NOT NULL AND to_regclass('public.advance_applications') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='advance_applications' AND column_name='posting_batch_id') AS ok;",
+  "verificationSql":"SELECT to_regprocedure('public.fn_customer_advance_effective_applied(uuid)') IS NOT NULL AND EXISTS (SELECT 1 FROM pg_trigger WHERE tgname='bt_advance_applications__insert_guard' AND NOT tgisinternal) AND EXISTS (SELECT 1 FROM pg_trigger WHERE tgname='at_advance_applications__refresh_projection' AND NOT tgisinternal) AND EXISTS (SELECT 1 FROM pg_trigger WHERE tgname='bt_advance_applications__immutable' AND NOT tgisinternal) AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='advance_applications' AND column_name='posting_batch_id') AS ok;",
+  "recovery":"Transactional failure restores the pre-09.05 state. After success use forward-only migrations; do not rewrite migration 0031."
+}

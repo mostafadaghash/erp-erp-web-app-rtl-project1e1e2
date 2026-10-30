@@ -1,0 +1,8 @@
+{
+  "version": "0029",
+  "name": "receipt_disbursement_integrity",
+  "transactional": true,
+  "preconditionSql": "SELECT to_regclass('public.receipts') IS NOT NULL AND to_regclass('public.disbursements') IS NOT NULL AND to_regclass('public.financial_movements') IS NOT NULL AS ok;",
+  "verificationSql": "SELECT (SELECT count(*) FROM pg_trigger WHERE tgname IN ('bt_receipts__immutable','bt_disbursements__immutable','bt_financial_movements__cash_source_singleton') AND NOT tgisinternal)=3 AS ok;",
+  "recovery": "Transactional failure rolls back the 09.03 integrity functions and triggers. After success use a forward-only migration for changes."
+}
