@@ -25,7 +25,7 @@ const PURCHASING_TABLES = ["purchase_invoices","purchase_invoice_lines","purchas
 const FINANCE_TABLES = [
   "treasuries","finance_categories","receipts","disbursements","treasury_transfers",
   "financial_movements","treasury_balance_positions","financial_allocations","customer_advances",
-  "advance_applications","cheques","installment_plans","installments",
+  "advance_applications","cheques","installment_plans","installments","system_account_mappings",
 ];
 const ACCOUNTING_TABLES = ["gl_accounts","journal_entries","journal_lines"];
 const REPAIR_TABLES = ["repair_orders","repair_status_history","repair_assignments","repair_issue_reports","repair_customer_decisions","repair_tracking_tokens","customer_followups","followup_actions","followup_status_history","message_templates","notifications","notification_recipients"];
@@ -83,6 +83,7 @@ const MIGRATIONS = [
   { version: "0031", name: "customer_advance_integrity", transactional: true },
   { version: "0032", name: "cheque_lifecycle_integrity", transactional: true },
   { version: "0033", name: "installment_settlement_integrity", transactional: true },
+  { version: "0034", name: "gl_system_account_mapping_integrity", transactional: true },
 ];
 
 async function withClient(fn) {
