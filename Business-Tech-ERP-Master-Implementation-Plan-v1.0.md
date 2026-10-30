@@ -1,6 +1,6 @@
 # Business Tech ERP — Master Implementation Plan v1.0
 
-**الحالة:** ACTIVE — PHASE 09 / 09.08 MIGRATION_PREFLIGHT_DESIGN / CI_PENDING  
+**الحالة:** ACTIVE — PHASE 09 / 09.08 MIGRATION_PREFLIGHT_DESIGN_CLOSED / 0034_READY_TO_START  
 **تاريخ الإصدار:** 2026-09-11  
 **المشروع:** Business Tech ERP — Local Server Edition / PostgreSQL Core  
 **المرجع المعماري الرسمي:** `Business-Tech-ERP-Architecture-Baseline-v1.7-Final.docx`  
@@ -3266,11 +3266,11 @@ Create controlled verification/rebuild procedures capable of recalculating opera
 - The transitive lock was updated to patched `shell-quote@1.12.0` without framework, runtime or Business changes. Security-repair SHA `a60f5dfaf3583aee3fb8fce0e221cecd4889cf44` passed Full CI #1270 / run `37798906260`: SUCCESS across `verify`, `backend-verify`, `browser-contract`, and `release-gate`.
 - This documentation record commit must itself pass Full CI before 09.08 implementation work begins.
 
-**Next Action:** complete Full CI and validation-PR closure for the 09.08 read-only migration preflight design slice. Once verified, implement **only** forward-only `0034_gl_system_account_mapping_integrity` and its PostgreSQL 17 integrity/concurrency tests as a later separate step; do not start Journal writer, 09.09 Posting Rules, frontend cutover, `main` merge or Convex Production changes.
+**Next Action:** after green Full CI on the final preflight closure SHA and safe no-merge closure of PR #257, implement **only** forward-only `0034_gl_system_account_mapping_integrity` with `.meta.json`, integrity/concurrency tests and aligned migration test harness. Actual populated target databases require independent read-only preflight and backup verification before application. Do not start Journal writer, 09.09 Posting Rules, frontend cutover, `main` merge or Convex Production changes.
 
 ## 09.08 GL / Journal Engine
 
-**Status:** `IN_PROGRESS — MIGRATION_PREFLIGHT_DESIGN / CI_PENDING` — ADR-0027 accepted; 09.08 first implementation-planning slice provides a reusable read-only PostgreSQL 17 preflight plus positive/negative integration tests, without any new Migration or Journal Backend implementation.  
+**Status:** `MIGRATION_PREFLIGHT_DESIGN_CLOSED / 0034_READY_TO_START` — ADR-0027 accepted; 09.08 read-only migration preflight and positive/negative PostgreSQL 17 integration tests passed Full CI #1276 / run `41060978535` on SHA `6ac5cbd5fcb85426d731dad0ee8a7e83bf9a2c8a`. Final closure documentation SHA must pass Full CI. No new Migration or Journal Backend implementation performed.  
 **Migration Design / Preflight:** `docs/implementation/phase-09-08-migration-preflight-design.md`  
 **Gap Analysis:** `docs/gap-analysis/phase-09-08-gl-journal-engine.md` (analysis baseline SHA `bf89b8fa3b76ae3231549e2f97d2590cc2d17f6f`).  
 **Accepted Architecture Addendum:** `docs/decisions/ADR-0027-system-account-mapping-gl-context.md` — normalized `system_account_mappings`, distinct GL account per Treasury, Company/Treasury role scopes, active-leaf account resolution, and PostgreSQL + Backend Company/Branch/GL/PostingBatch/reversal integrity. Implementation requires a **later forward-only migration** and complete test gates. Existing closed migration history and frozen existing-table Index Catalog remain unchanged.
@@ -4393,7 +4393,7 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 # 32. Current Execution Pointer
 
 **Current Phase:** `PHASE 09 — Finance & Accounting Foundation / 09.08 GL / Journal Engine`  
-**Status:** `IN_PROGRESS — 09.08 MIGRATION_PREFLIGHT_DESIGN / CI_PENDING` — first 09.08 slice (preconditions and read-only tests only). No 0034 DDL or Journal writer exists yet.  
+**Status:** `09.08 MIGRATION_PREFLIGHT_DESIGN_CLOSED / 0034_READY_TO_START` — PostgreSQL 17 clean baseline + negative historical-integrity fixtures validated on Full CI #1276 / run `41060978535` (all four CI jobs SUCCESS), implementation SHA `6ac5cbd5fcb85426d731dad0ee8a7e83bf9a2c8a`; final documentation commit requires its own Full CI. No 0034 DDL or Journal writer yet.  
 **09.08 Preflight:** `docs/implementation/phase-09-08-migration-preflight-design.md` plus `scripts/database/phase-09-08-preflight.mjs` and `server/tests/postgresql-gl-migration-preflight.integration.test.mjs`; CI validation required before the next implementation slice. The read-only executable audits the committed PostgreSQL 17 baseline and historical cross-context data. CI verifies only ephemeral test DB; each real populated target remains unverified until a separately authorized read-only run.  
 **Integration Branch:** `agent/postgres-v1.7-core`  
 **09.08 ADR-0027:** `docs/decisions/ADR-0027-system-account-mapping-gl-context.md` — ACCEPTED design: dedicated normalized Company/Treasury account mappings with distinct GL target per Treasury, fail-closed active leaf resolver, and SQL + Backend GL context guards. Only documentation changes in this decision step; no SQL/Backend/09.09 changes.  
