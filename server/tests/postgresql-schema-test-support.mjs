@@ -145,6 +145,10 @@ export async function cleanupReportingTables(databaseUrl) {
 
 export async function cleanupDatabase(databaseUrl) {
   await withClient(databaseUrl, async (client) => {
+    await client.query("DROP FUNCTION IF EXISTS public.fn_gl_system_account_mapping_validate() CASCADE");
+    await client.query("DROP FUNCTION IF EXISTS public.fn_gl_account_hierarchy_guard() CASCADE");
+    await client.query("DROP FUNCTION IF EXISTS public.fn_mapped_treasury_guard() CASCADE");
+    await client.query("DROP FUNCTION IF EXISTS public.fn_branch_company_immutable() CASCADE");
     await client.query("DROP FUNCTION IF EXISTS public.fn_installment_allocation_refresh() CASCADE");
     await client.query("DROP FUNCTION IF EXISTS public.fn_installment_allocation_guard() CASCADE");
     await client.query("DROP FUNCTION IF EXISTS public.fn_installment_schedule_total_guard() CASCADE");
