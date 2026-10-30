@@ -107,6 +107,7 @@ async function cleanup() {
     await client.query("DROP VIEW IF EXISTS public.purchase_returnable_quantities_v");
     await client.query("DROP VIEW IF EXISTS public.sales_returnable_quantities_v");
     await client.query("DROP TABLE IF EXISTS public.migration_transaction_probe");
+    await client.query("DROP TABLE IF EXISTS public.system_account_mappings");
     for (const table of [...BUSINESS_TABLES].reverse()) await client.query(`DROP TABLE IF EXISTS public.${table}`);
     await client.query("DROP FUNCTION IF EXISTS public.fn_journal_entries_balanced_at_commit()");
     await client.query("DROP TABLE IF EXISTS public.schema_migrations");
