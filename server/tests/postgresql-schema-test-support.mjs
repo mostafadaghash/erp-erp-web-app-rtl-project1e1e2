@@ -136,7 +136,6 @@ export async function cleanupReportingTables(databaseUrl) {
     await cleanupPurchasingConstraintLayer(client);
     await cleanupAccountingConstraintLayer(client);
     await cleanupReportingConstraintLayer(client);
-    await client.query("DROP TABLE IF EXISTS public.system_account_mappings");
     for (const table of [...REPORTING_TABLES].reverse()) {
       await client.query(`DROP TABLE IF EXISTS public.${table}`);
     }
@@ -184,6 +183,7 @@ export async function cleanupDatabase(databaseUrl) {
     await cleanupReportingConstraintLayer(client);
     for (const table of [...REPORTING_TABLES].reverse()) await client.query(`DROP TABLE IF EXISTS public.${table}`);
     for (const table of [...REPAIR_TABLES].reverse()) await client.query(`DROP TABLE IF EXISTS public.${table}`);
+    await client.query("DROP TABLE IF EXISTS public.system_account_mappings");
     await client.query("DROP TABLE IF EXISTS public.journal_lines, public.journal_entries, public.gl_accounts");
     await client.query("DROP FUNCTION IF EXISTS public.fn_journal_entries_balanced_at_commit()");
     await client.query("DROP TABLE IF EXISTS public.installments, public.installment_plans, public.cheques, public.advance_applications, public.customer_advances, public.financial_allocations, public.treasury_balance_positions, public.financial_movements, public.treasury_transfers, public.finance_categories, public.disbursements, public.receipts, public.treasuries");
