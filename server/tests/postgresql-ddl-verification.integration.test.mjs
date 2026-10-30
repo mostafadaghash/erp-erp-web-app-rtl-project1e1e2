@@ -111,8 +111,8 @@ test("03.08 final DDL verification covers case-insensitive user identity on Post
       );
       assert.equal(history.rowCount, MIGRATIONS.length);
       assert.deepEqual(history.rows.at(-1), {
-        version: "0033",
-        name: "installment_settlement_integrity",
+        version: "0034",
+        name: "gl_system_account_mapping_integrity",
       });
       assert.deepEqual(
         history.rows.find((row) => row.version === "0022"),
