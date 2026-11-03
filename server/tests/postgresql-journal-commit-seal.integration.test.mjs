@@ -112,7 +112,7 @@ async function setup(t) {
   if (!databaseUrl) { t.skip("ERP_TEST_DATABASE_URL is absent"); return false; }
   await cleanupDatabase(databaseUrl);
   const migrations=await runMigrations({databaseUrl});
-  assert.equal(migrations.applied.at(-1),"0035");
+  assert.equal(migrations.applied.at(-1),"0036");
   return true;
 }
 
@@ -182,7 +182,7 @@ test("0035 sealed Journal is immutable, precise, nonempty and app-role protected
       assert.deepEqual(audit.rows[0],{seal_indexes:1,legacy_balance:1});
     });
     const recheck=await runMigrations({databaseUrl,verifyOnly:true});
-    assert.equal(recheck.skipped.at(-1),"0035");
+    assert.equal(recheck.skipped.at(-1),"0036");
   } finally {await cleanupDatabase(databaseUrl);}
 });
 
