@@ -84,7 +84,7 @@ test("0034 relation, approved constraints and role/scoped mappings remain exact"
   await cleanupDatabase(databaseUrl);
   try {
     const applied=await runMigrations({databaseUrl});
-    assert.equal(applied.applied.at(-1),"0034");
+    assert.equal(applied.applied.at(-1),"0035");
     await withClient(databaseUrl,async(client)=>{
       const defs=await client.query(`SELECT conname,contype
         FROM pg_constraint WHERE conrelid='public.system_account_mappings'::regclass
@@ -149,7 +149,7 @@ test("0034 relation, approved constraints and role/scoped mappings remain exact"
       await client.query("UPDATE gl_accounts SET is_active=false WHERE id=$1",[v.account]);
     });
     const rerun=await runMigrations({databaseUrl,verifyOnly:true});
-    assert.equal(rerun.skipped.at(-1),"0034");
+    assert.equal(rerun.skipped.at(-1),"0035");
   } finally {await cleanupDatabase(databaseUrl);}
 });
 

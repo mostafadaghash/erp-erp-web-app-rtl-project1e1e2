@@ -62,6 +62,7 @@ export const MIGRATIONS = [
   "0032",
   "0033",
   "0034",
+  "0035",
 ];
 
 export async function withClient(databaseUrl, fn) {
@@ -144,6 +145,12 @@ export async function cleanupReportingTables(databaseUrl) {
 
 export async function cleanupDatabase(databaseUrl) {
   await withClient(databaseUrl, async (client) => {
+    for (const name of [
+      "fn_journal_line_snapshot(uuid)", "fn_journal_seal_write_guard()",
+      "fn_journal_entry_insert_guard()", "fn_journal_history_immutable()",
+      "fn_journal_batch_immutable()", "fn_journal_line_insert_guard()",
+      "fn_journal_entry_seal_at_commit()", "fn_journal_line_seal_validate()",
+    ]) await client.query("DROP FUNCTION IF EXISTS public." + name + " CASCADE");
     await client.query("DROP FUNCTION IF EXISTS public.fn_gl_system_account_mapping_validate() CASCADE");
     await client.query("DROP FUNCTION IF EXISTS public.fn_gl_account_hierarchy_guard() CASCADE");
     await client.query("DROP FUNCTION IF EXISTS public.fn_mapped_treasury_guard() CASCADE");
@@ -183,6 +190,7 @@ export async function cleanupDatabase(databaseUrl) {
     await cleanupReportingConstraintLayer(client);
     for (const table of [...REPORTING_TABLES].reverse()) await client.query(`DROP TABLE IF EXISTS public.${table}`);
     for (const table of [...REPAIR_TABLES].reverse()) await client.query(`DROP TABLE IF EXISTS public.${table}`);
+    await client.query("DROP TABLE IF EXISTS public.journal_entry_seals");
     await client.query("DROP TABLE IF EXISTS public.system_account_mappings");
     await client.query("DROP TABLE IF EXISTS public.journal_lines, public.journal_entries, public.gl_accounts");
     await client.query("DROP FUNCTION IF EXISTS public.fn_journal_entries_balanced_at_commit()");

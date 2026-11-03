@@ -1,12 +1,26 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { mkdtemp, readdir, cp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import pg from "pg";
 
-import { runMigrations } from "../../scripts/database/migrations.mjs";
+import { runMigrations, DEFAULT_MIGRATIONS_DIR } from "../../scripts/database/migrations.mjs";
 import { cleanupDatabase, MIGRATIONS } from "./postgresql-schema-test-support.mjs";
 
 const { Client } = pg;
 const databaseUrl = process.env.ERP_TEST_DATABASE_URL;
+// This regression covers the historical 0009/0019 shape, prior to 0035.
+// New 0035 semantics are exercised separately on the latest schema.
+async function legacyAccountingMigrationsDir() {
+  const dir=await mkdtemp(join(tmpdir(),"erp-accounting-pre-0035-"));
+  const files=await readdir(DEFAULT_MIGRATIONS_DIR);
+  for (const file of files.filter(f=>/^00[0-2][0-9]_/.test(f)||/^003[0-4]_/.test(f))) {
+    await cp(join(DEFAULT_MIGRATIONS_DIR,file),join(dir,file));
+  }
+  return dir;
+}
+const LEGACY_MIGRATIONS=MIGRATIONS.slice(0,-1);
 const ACCOUNTING_TABLES = ["gl_accounts", "journal_entries", "journal_lines"];
 
 async function withClient(fn) {
@@ -87,9 +101,10 @@ async function seedFixture(client) {
 test("03.06 Accounting constraints enforce canonical integrity on PostgreSQL 17", async (t) => {
   if (!databaseUrl) return t.skip("ERP_TEST_DATABASE_URL is not configured");
   await cleanupDatabase(databaseUrl);
+  const legacyDir=await legacyAccountingMigrationsDir();
   try {
-    const first = await runMigrations({ databaseUrl });
-    assert.deepEqual(first.applied, MIGRATIONS);
+    const first = await runMigrations({ databaseUrl, migrationsDir: legacyDir });
+    assert.deepEqual(first.applied, LEGACY_MIGRATIONS);
     assert.deepEqual(first.skipped, []);
 
     await withClient(async (client) => {
@@ -235,7 +250,7 @@ test("03.06 Accounting constraints enforce canonical integrity on PostgreSQL 17"
         "23503", "fk_journal_entries__posting_batch");
 
       const history = await client.query("SELECT version,name,checksum FROM schema_migrations ORDER BY version");
-      assert.equal(history.rowCount, MIGRATIONS.length);
+      assert.equal(history.rowCount, LEGACY_MIGRATIONS.length);
       const accountingSlice = history.rows.find((row) => row.version === "0019");
       assert.equal(accountingSlice?.name, "accounting_constraints");
       assert.match(accountingSlice?.checksum ?? "", /^[0-9a-f]{64}$/);
@@ -248,13 +263,14 @@ test("03.06 Accounting constraints enforce canonical integrity on PostgreSQL 17"
       assert.match(latest?.checksum ?? "", /^[0-9a-f]{64}$/);
     });
 
-    const second = await runMigrations({ databaseUrl });
+    const second = await runMigrations({ databaseUrl, migrationsDir: legacyDir });
     assert.deepEqual(second.applied, []);
-    assert.deepEqual(second.skipped, MIGRATIONS);
-    const verification = await runMigrations({ databaseUrl, verifyOnly: true });
+    assert.deepEqual(second.skipped, LEGACY_MIGRATIONS);
+    const verification = await runMigrations({ databaseUrl, migrationsDir: legacyDir, verifyOnly: true });
     assert.deepEqual(verification.applied, []);
-    assert.deepEqual(verification.skipped, MIGRATIONS);
+    assert.deepEqual(verification.skipped, LEGACY_MIGRATIONS);
   } finally {
     await cleanupDatabase(databaseUrl);
+    await rm(legacyDir,{recursive:true,force:true});
   }
 });
