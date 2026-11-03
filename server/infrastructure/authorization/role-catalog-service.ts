@@ -148,7 +148,81 @@ export class RoleCatalogService {
       ] as const
       const grantValues = grants.map((_, index) => {
         const offset = index * 2
-        return `(${offset + 1}::text,${offset + 2}::text)`
+        return '(
+      }).join(', ')
+      await client.query(
+        `INSERT INTO role_permissions (role_id, permission_id, is_allowed)
+         SELECT r.id, p.id, true
+           FROM (VALUES ${grantValues}) AS approved(role_key, permission_key)
+           JOIN roles r ON r.role_key=approved.role_key
+           JOIN permissions p ON p.permission_key=approved.permission_key
+          ORDER BY r.role_key, p.permission_key
+         ON CONFLICT (role_id, permission_id)
+         DO UPDATE SET is_allowed=EXCLUDED.is_allowed`,
+        grants.flatMap(([roleKey, permissionKey]) => [roleKey, permissionKey]),
+      )
+
+      return canonicalizeDefaultRoleRows(result.rows)
+    })
+  }
+
+  async listDefaultRoles(): Promise<readonly RoleRecord[]> {
+    return this.database.transaction(async (client) => {
+      return this.listDefaultRolesWithClient(client)
+    })
+  }
+
+  private async listDefaultRolesWithClient(
+    client: PoolClient,
+  ): Promise<readonly RoleRecord[]> {
+    const result = await client.query<RoleRow>(
+      `SELECT id,role_key,display_name_key,is_system
+         FROM roles
+        WHERE role_key = ANY($1::text[])`,
+      [DEFAULT_SYSTEM_ROLES.map((role) => role.roleKey)],
+    )
+
+    return canonicalizeDefaultRoleRows(result.rows)
+  }
+}
+ + (offset + 1) + '::text,
+      }).join(', ')
+      await client.query(
+        `INSERT INTO role_permissions (role_id, permission_id, is_allowed)
+         SELECT r.id, p.id, true
+           FROM (VALUES ${grantValues}) AS approved(role_key, permission_key)
+           JOIN roles r ON r.role_key=approved.role_key
+           JOIN permissions p ON p.permission_key=approved.permission_key
+          ORDER BY r.role_key, p.permission_key
+         ON CONFLICT (role_id, permission_id)
+         DO UPDATE SET is_allowed=EXCLUDED.is_allowed`,
+        grants.flatMap(([roleKey, permissionKey]) => [roleKey, permissionKey]),
+      )
+
+      return canonicalizeDefaultRoleRows(result.rows)
+    })
+  }
+
+  async listDefaultRoles(): Promise<readonly RoleRecord[]> {
+    return this.database.transaction(async (client) => {
+      return this.listDefaultRolesWithClient(client)
+    })
+  }
+
+  private async listDefaultRolesWithClient(
+    client: PoolClient,
+  ): Promise<readonly RoleRecord[]> {
+    const result = await client.query<RoleRow>(
+      `SELECT id,role_key,display_name_key,is_system
+         FROM roles
+        WHERE role_key = ANY($1::text[])`,
+      [DEFAULT_SYSTEM_ROLES.map((role) => role.roleKey)],
+    )
+
+    return canonicalizeDefaultRoleRows(result.rows)
+  }
+}
+ + (offset + 2) + '::text)'
       }).join(', ')
       await client.query(
         `INSERT INTO role_permissions (role_id, permission_id, is_allowed)
