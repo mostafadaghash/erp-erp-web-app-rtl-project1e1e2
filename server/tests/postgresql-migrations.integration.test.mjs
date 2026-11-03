@@ -85,6 +85,7 @@ const MIGRATIONS = [
   { version: "0033", name: "installment_settlement_integrity", transactional: true },
   { version: "0034", name: "gl_system_account_mapping_integrity", transactional: true },
   { version: "0035", name: "journal_context_immutability_reversal_integrity", transactional: true },
+  { version: "0036", name: "chart_of_accounts_permissions", transactional: true },
 ];
 
 async function withClient(fn) {

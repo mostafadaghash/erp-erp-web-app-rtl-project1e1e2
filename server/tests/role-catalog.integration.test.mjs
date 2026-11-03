@@ -124,7 +124,24 @@ test(
       const rolePermissionCount = await pool.query(
         "SELECT COUNT(*)::integer AS count FROM role_permissions",
       );
-      assert.equal(rolePermissionCount.rows[0]?.count, 0);
+      assert.equal(rolePermissionCount.rows[0]?.count, 6);
+
+      const chartDefaultGrants = await pool.query(
+        `SELECT r.role_key,p.permission_key,rp.is_allowed
+           FROM role_permissions rp
+           JOIN roles r ON r.id=rp.role_id
+           JOIN permissions p ON p.id=rp.permission_id
+          WHERE p.permission_key LIKE 'accounting.%'
+          ORDER BY r.role_key,p.permission_key`,
+      );
+      assert.deepEqual(chartDefaultGrants.rows.map((row) => [row.role_key,row.permission_key,row.is_allowed]), [
+        ["ACCOUNTANT","accounting.chart.view",true],
+        ["ACCOUNTANT","accounting.mappings.view",true],
+        ["SYSTEM_ADMIN","accounting.chart.manage",true],
+        ["SYSTEM_ADMIN","accounting.chart.view",true],
+        ["SYSTEM_ADMIN","accounting.mappings.manage",true],
+        ["SYSTEM_ADMIN","accounting.mappings.view",true],
+      ]);
 
       const roleIndexes = await pool.query(
         `SELECT indexname

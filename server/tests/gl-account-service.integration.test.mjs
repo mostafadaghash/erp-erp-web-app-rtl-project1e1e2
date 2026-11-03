@@ -15,7 +15,8 @@ const v={
   co:id(1),foreignCo:id(2),branch:id(3),foreignBranch:id(4),
   admin:id(5),accountant:id(6),selected:id(7),denied:id(8),
   foreignAdmin:id(9),inactive:id(10),
-  pView:id(11),pManage:id(12),
+  pView:'09080000-0000-4000-8000-000000000101',
+  pManage:'09080000-0000-4000-8000-000000000102',
 }
 const runner=pool=>({transaction:(work,options)=>withTransaction(pool,work,options)})
 const newAccount=(key,code,extra={})=>({
@@ -30,7 +31,7 @@ async function setup(){
   try{
     const result=await runMigrations({databaseUrl:url})
     assert.deepEqual(result.applied,MIGRATIONS)
-    assert.equal(MIGRATIONS.at(-1),'0035')
+    assert.equal(MIGRATIONS.at(-1),'0036')
     const version=(await pool.query('SHOW server_version_num')).rows[0]?.server_version_num
     assert.ok(Number(version)>=170000&&Number(version)<180000,'PostgreSQL 17 required')
     const roles=await new RoleCatalogService(runner(pool)).ensureDefaultRoles()
@@ -49,19 +50,7 @@ async function setup(){
       "($2,$4,'GL B','GL-B',true,now(),now())",
       [v.branch,v.foreignBranch,v.co,v.foreignCo],
     )
-    // Only test data gets the two ADR-0029 permissions; production catalog
-    // provisioning is a separately gated future phase, never implicit.
-    await pool.query(
-      'INSERT INTO permissions (id,permission_key,module,description_key) '+
-      "VALUES ($1,$3,'accounting','permissions.accounting.chart.view'),"+
-      "($2,$4,'accounting','permissions.accounting.chart.manage')",
-      [v.pView,v.pManage,GL_CHART_PERMISSIONS.view,GL_CHART_PERMISSIONS.manage],
-    )
-    await pool.query(
-      'INSERT INTO role_permissions(role_id,permission_id,is_allowed) VALUES '+
-      '($1,$3,true),($1,$4,true),($2,$3,true),($2,$4,false)',
-      [adminRole.id,accountantRole.id,v.pView,v.pManage],
-    )
+    // 0036 provisions the canonical role defaults. No fixture-level permissions.
     await withTransaction(pool,async client=>{
       await client.query(
         'INSERT INTO users (id,name,username,email,password_hash,role_id,default_branch_id,'+

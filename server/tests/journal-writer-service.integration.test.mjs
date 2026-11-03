@@ -95,7 +95,7 @@ async function setup(t) {
   try {
     const migrated=await runMigrations({databaseUrl:url})
     assert.deepEqual(migrated.applied,MIGRATIONS)
-    assert.equal(MIGRATIONS.at(-1),'0035')
+    assert.equal(MIGRATIONS.at(-1),'0036')
     const version=await pool.query('SHOW server_version_num')
     const major=Number(version.rows[0].server_version_num)
     assert.ok(major>=170000 && major<180000,'PostgreSQL 17 required')

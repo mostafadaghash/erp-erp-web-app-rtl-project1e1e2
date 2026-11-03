@@ -134,6 +134,34 @@ export class RoleCatalogService {
         params,
       )
 
+      // ADR-0029 permissions may be migrated before default roles exist.
+      // Materialize the six approved default grants whenever these roles are
+      // bootstrapped. This never creates permission keys or user overrides.
+      // Absence of a pre-0036 permission key leaves it fail-closed.
+      const grants = [
+        ['SYSTEM_ADMIN', 'accounting.chart.view'],
+        ['SYSTEM_ADMIN', 'accounting.chart.manage'],
+        ['SYSTEM_ADMIN', 'accounting.mappings.view'],
+        ['SYSTEM_ADMIN', 'accounting.mappings.manage'],
+        ['ACCOUNTANT', 'accounting.chart.view'],
+        ['ACCOUNTANT', 'accounting.mappings.view'],
+      ] as const
+      const grantValues = grants.map((_, index) => {
+        const offset = index * 2
+        return `(${offset + 1}::text,${offset + 2}::text)`
+      }).join(', ')
+      await client.query(
+        `INSERT INTO role_permissions (role_id, permission_id, is_allowed)
+         SELECT r.id, p.id, true
+           FROM (VALUES ${grantValues}) AS approved(role_key, permission_key)
+           JOIN roles r ON r.role_key=approved.role_key
+           JOIN permissions p ON p.permission_key=approved.permission_key
+          ORDER BY r.role_key, p.permission_key
+         ON CONFLICT (role_id, permission_id)
+         DO UPDATE SET is_allowed=EXCLUDED.is_allowed`,
+        grants.flatMap(([roleKey, permissionKey]) => [roleKey, permissionKey]),
+      )
+
       return canonicalizeDefaultRoleRows(result.rows)
     })
   }
