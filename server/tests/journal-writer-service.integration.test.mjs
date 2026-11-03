@@ -128,6 +128,12 @@ test('09.08 writer posts exact decimal lines using the caller transaction, batch
       assert.equal(journal.lines[2].debit,'0.0000')
       return {batch,journal}
     })
+    const timeMatch=await pool.query(
+      'SELECT je.posted_at=pb.posted_at AS exact_match FROM journal_entries je '+
+      'JOIN posting_batches pb ON pb.id=je.posting_batch_id WHERE je.id=$1',
+      [result.journal.id],
+    )
+    assert.equal(timeMatch.rows[0].exact_match,true)
     const stored=await pool.query(
       'SELECT debit::text,credit::text,gl_account_id,counterparty_id '+
       'FROM journal_lines WHERE journal_entry_id=$1 ORDER BY id',[result.journal.id],

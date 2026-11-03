@@ -85,7 +85,7 @@ interface AccountRow extends QueryResultRow {
 }
 interface OriginalRow extends QueryResultRow {
   id: string; branch_id: string; source_type: string; source_id: string
-  posting_batch_id: string; reversal_of_entry_id: string | null; posted_at: Date
+  posting_batch_id: string; reversal_of_entry_id: string | null; later_than_original: boolean
 }
 interface OriginalLineRow extends QueryResultRow {
   gl_account_id: string; debit: string; credit: string; counterparty_id: string | null
@@ -177,8 +177,9 @@ async function persist(
   await client.query(
     'INSERT INTO public.journal_entries '+
     '(id,branch_id,source_type,source_id,posting_batch_id,reversal_of_entry_id,posted_at,created_by,description) '+
-    'VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)',
-    [id,batch.branch_id,batch.source_type,batch.source_id,batch.id,original,batch.posted_at,batch.created_by,description],
+    'SELECT $1,pb.branch_id,pb.source_type,pb.source_id,pb.id,$2,pb.posted_at,pb.created_by,$3 '+
+    'FROM public.posting_batches pb WHERE pb.id=$4',
+    [id,original,description,batch.id],
   )
   const stored: JournalLineResult[]=[]
   for (const line of lines) {
@@ -223,8 +224,10 @@ export class JournalWriterService {
     }
     // Original lock serializes two independent reversers in READ COMMITTED.
     const originalResult=await client.query<OriginalRow>(
-      'SELECT id,branch_id,source_type,source_id,posting_batch_id,reversal_of_entry_id,posted_at '+
-      'FROM public.journal_entries WHERE id=$1 FOR UPDATE',[input.originalEntryId],
+      'SELECT e.id,e.branch_id,e.source_type,e.source_id,e.posting_batch_id,'+
+      'e.reversal_of_entry_id,(pb.posted_at>e.posted_at) AS later_than_original '+
+      'FROM public.journal_entries e JOIN public.posting_batches pb ON pb.id=$2 '+
+      'WHERE e.id=$1 FOR UPDATE OF e',[input.originalEntryId,batch.id],
     )
     const original=originalResult.rows[0]
     if (!original) throw new JournalWriterError('ORIGINAL_NOT_FOUND')
@@ -233,7 +236,7 @@ export class JournalWriterService {
         original.source_type!==batch.source_type ||
         original.source_id!==batch.source_id ||
         original.posting_batch_id!==batch.reverses_posting_batch_id ||
-        batch.posted_at.getTime()<=original.posted_at.getTime()) {
+        !original.later_than_original) {
       throw new JournalWriterError('ORIGINAL_SCOPE_MISMATCH')
     }
     const checks=await client.query<{sealed:boolean;reversed:boolean}&QueryResultRow>(
