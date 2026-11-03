@@ -148,7 +148,8 @@ export class RoleCatalogService {
       ] as const
       const grantValues = grants.map((_, index) => {
         const offset = index * 2
-        return '(
+        const placeholder = String.fromCharCode(36)
+        return '(' + placeholder + (offset + 1) + '::text,' + placeholder + (offset + 2) + '::text)'
       }).join(', ')
       await client.query(
         `INSERT INTO role_permissions (role_id, permission_id, is_allowed)
