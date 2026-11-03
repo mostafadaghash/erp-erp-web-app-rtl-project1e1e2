@@ -42,12 +42,20 @@ async function seed(pool) {
     "INSERT INTO roles(id,role_key,display_name_key,is_system) VALUES ($1,'JOURNAL_WRITER_TEST','test.journal',false)",
     [v.role],
   )
-  await pool.query(
-    "INSERT INTO users (id,name,username,email,password_hash,role_id,default_branch_id,branch_scope_mode,preferred_language,is_active,created_at,updated_at) "+
-    "VALUES ($1,'GL Writer','gl-writer',NULL,'test-hash',$3,$4,'ALL','ar-EG',true,now(),now()),"+
-    "($2,'Denied GL Writer','gl-denied',NULL,'test-hash',$3,$4,'SELECTED','ar-EG',true,now(),now())",
-    [v.actor,v.deniedActor,v.role,v.branch],
-  )
+  await withTransaction(pool,async client=>{
+    await client.query(
+      "INSERT INTO users (id,name,username,email,password_hash,role_id,default_branch_id,branch_scope_mode,preferred_language,is_active,created_at,updated_at) "+
+      "VALUES ($1,'GL Writer','gl-writer',NULL,'test-hash',$3,$4,'ALL','ar-EG',true,now(),now()),"+
+      "($2,'Denied GL Writer','gl-denied',NULL,'test-hash',$3,$5,'SELECTED','ar-EG',true,now(),now())",
+      [v.actor,v.deniedActor,v.role,v.branch,v.otherBranch],
+    )
+    // A SELECTED user must have access to their own default Branch at COMMIT,
+    // but not to the Journal source Branch under test.
+    await client.query(
+      'INSERT INTO user_branch_access(user_id,branch_id) VALUES ($1,$2)',
+      [v.deniedActor,v.otherBranch],
+    )
+  })
   await pool.query(
     "INSERT INTO gl_accounts(id,company_id,code,name,account_type,parent_id,is_system,is_active) "+
     "VALUES ($1,$6,'1000','Cash','ASSET',NULL,true,true),"+
