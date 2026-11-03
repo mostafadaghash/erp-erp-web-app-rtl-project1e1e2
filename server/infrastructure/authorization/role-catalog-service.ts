@@ -134,107 +134,26 @@ export class RoleCatalogService {
         params,
       )
 
-      // ADR-0029 permissions may be migrated before default roles exist.
-      // Materialize the six approved default grants whenever these roles are
-      // bootstrapped. This never creates permission keys or user overrides.
-      // Absence of a pre-0036 permission key leaves it fail-closed.
-      const grants = [
-        ['SYSTEM_ADMIN', 'accounting.chart.view'],
-        ['SYSTEM_ADMIN', 'accounting.chart.manage'],
-        ['SYSTEM_ADMIN', 'accounting.mappings.view'],
-        ['SYSTEM_ADMIN', 'accounting.mappings.manage'],
-        ['ACCOUNTANT', 'accounting.chart.view'],
-        ['ACCOUNTANT', 'accounting.mappings.view'],
-      ] as const
-      const grantValues = grants.map((_, index) => {
-        const offset = index * 2
-        const placeholder = String.fromCharCode(36)
-        return '(' + placeholder + (offset + 1) + '::text,' + placeholder + (offset + 2) + '::text)'
-      }).join(', ')
+      // ADR-0029: the migration can run before roles are initialized.
+      // This fixed approved 6-pair registry provisions defaults when the
+      // canonical roles appear. No untrusted input is interpolated into SQL.
+      // In databases before 0036 the join matches no permissions and is inert.
       await client.query(
         `INSERT INTO role_permissions (role_id, permission_id, is_allowed)
          SELECT r.id, p.id, true
-           FROM (VALUES ${grantValues}) AS approved(role_key, permission_key)
+           FROM (VALUES
+             ('SYSTEM_ADMIN','accounting.chart.view'),
+             ('SYSTEM_ADMIN','accounting.chart.manage'),
+             ('SYSTEM_ADMIN','accounting.mappings.view'),
+             ('SYSTEM_ADMIN','accounting.mappings.manage'),
+             ('ACCOUNTANT','accounting.chart.view'),
+             ('ACCOUNTANT','accounting.mappings.view')
+           ) AS approved(role_key,permission_key)
            JOIN roles r ON r.role_key=approved.role_key
            JOIN permissions p ON p.permission_key=approved.permission_key
           ORDER BY r.role_key, p.permission_key
-         ON CONFLICT (role_id, permission_id)
+         ON CONFLICT (role_id,permission_id)
          DO UPDATE SET is_allowed=EXCLUDED.is_allowed`,
-        grants.flatMap(([roleKey, permissionKey]) => [roleKey, permissionKey]),
-      )
-
-      return canonicalizeDefaultRoleRows(result.rows)
-    })
-  }
-
-  async listDefaultRoles(): Promise<readonly RoleRecord[]> {
-    return this.database.transaction(async (client) => {
-      return this.listDefaultRolesWithClient(client)
-    })
-  }
-
-  private async listDefaultRolesWithClient(
-    client: PoolClient,
-  ): Promise<readonly RoleRecord[]> {
-    const result = await client.query<RoleRow>(
-      `SELECT id,role_key,display_name_key,is_system
-         FROM roles
-        WHERE role_key = ANY($1::text[])`,
-      [DEFAULT_SYSTEM_ROLES.map((role) => role.roleKey)],
-    )
-
-    return canonicalizeDefaultRoleRows(result.rows)
-  }
-}
- + (offset + 1) + '::text,
-      }).join(', ')
-      await client.query(
-        `INSERT INTO role_permissions (role_id, permission_id, is_allowed)
-         SELECT r.id, p.id, true
-           FROM (VALUES ${grantValues}) AS approved(role_key, permission_key)
-           JOIN roles r ON r.role_key=approved.role_key
-           JOIN permissions p ON p.permission_key=approved.permission_key
-          ORDER BY r.role_key, p.permission_key
-         ON CONFLICT (role_id, permission_id)
-         DO UPDATE SET is_allowed=EXCLUDED.is_allowed`,
-        grants.flatMap(([roleKey, permissionKey]) => [roleKey, permissionKey]),
-      )
-
-      return canonicalizeDefaultRoleRows(result.rows)
-    })
-  }
-
-  async listDefaultRoles(): Promise<readonly RoleRecord[]> {
-    return this.database.transaction(async (client) => {
-      return this.listDefaultRolesWithClient(client)
-    })
-  }
-
-  private async listDefaultRolesWithClient(
-    client: PoolClient,
-  ): Promise<readonly RoleRecord[]> {
-    const result = await client.query<RoleRow>(
-      `SELECT id,role_key,display_name_key,is_system
-         FROM roles
-        WHERE role_key = ANY($1::text[])`,
-      [DEFAULT_SYSTEM_ROLES.map((role) => role.roleKey)],
-    )
-
-    return canonicalizeDefaultRoleRows(result.rows)
-  }
-}
- + (offset + 2) + '::text)'
-      }).join(', ')
-      await client.query(
-        `INSERT INTO role_permissions (role_id, permission_id, is_allowed)
-         SELECT r.id, p.id, true
-           FROM (VALUES ${grantValues}) AS approved(role_key, permission_key)
-           JOIN roles r ON r.role_key=approved.role_key
-           JOIN permissions p ON p.permission_key=approved.permission_key
-          ORDER BY r.role_key, p.permission_key
-         ON CONFLICT (role_id, permission_id)
-         DO UPDATE SET is_allowed=EXCLUDED.is_allowed`,
-        grants.flatMap(([roleKey, permissionKey]) => [roleKey, permissionKey]),
       )
 
       return canonicalizeDefaultRoleRows(result.rows)
