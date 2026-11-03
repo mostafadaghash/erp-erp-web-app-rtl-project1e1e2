@@ -20,7 +20,7 @@ async function legacyAccountingMigrationsDir() {
   }
   return dir;
 }
-const LEGACY_MIGRATIONS=MIGRATIONS.slice(0,-1);
+const LEGACY_MIGRATIONS=MIGRATIONS.filter((version)=>version <= '0034');
 const ACCOUNTING = ["gl_accounts","journal_entries","journal_lines"];
 const EXPECTED = {
   gl_accounts:[["id","uuid",true],["company_id","uuid",true],["code","text",true],["name","text",true],["account_type","text",true],["parent_id","uuid",false],["is_system","boolean",true],["is_active","boolean",true]],
