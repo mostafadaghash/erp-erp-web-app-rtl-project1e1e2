@@ -71,12 +71,12 @@ async function batch(client,v,n,{operation="POST",reverses=null,
   return {id:b,postedAt:result.rows[0].posted_at};
 }
 async function header(client,v,n,b,{branch=v.branch,source=v.source,author=v.user,
-    reversal=null,postedAt=b.postedAt}={}){
+    reversal=null,postedAt=null}={}){
   const e=id(n);
   await client.query(`INSERT INTO journal_entries
     (id,branch_id,source_type,source_id,posting_batch_id,reversal_of_entry_id,
      posted_at,created_by,description)
-    VALUES ($1,$2,'JOURNAL_0035',$3,$4,$5,$6,$7,'0035 guard test')`,
+    VALUES ($1,$2,'JOURNAL_0035',$3,$4,$5,COALESCE($6::timestamptz,(SELECT posted_at FROM public.posting_batches WHERE id=$4)),$7,'0035 guard test')`,
     [e,branch,source,b.id,reversal,postedAt,author]);
   return e;
 }
