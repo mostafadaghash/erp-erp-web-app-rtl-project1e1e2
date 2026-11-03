@@ -1,13 +1,13 @@
 # ADR-0029 — Chart of Accounts Administration & Authorization Contract
 
-- **Status:** PROPOSED / NOT ACCEPTED
+- **Status:** ACCEPTED — architecture decision only, implementation NOT STARTED
 - **Date:** 2026-11-03
 - **Phase:** 09.08 GL / Journal Engine (architecture/decision only)
 - **Branch:** `agent/postgres-v1.7-core`
-- **Decision owner:** Business Tech ERP project owner; this proposal remains unaccepted until a separate explicit acceptance and same-SHA documentation gate.
+- **Decision owner / acceptance:** Business Tech ERP project owner explicitly approved the full ADR-0029 proposal in the 2026-11-03 conversation by responding «اعتمد» to the immediately preceding request to accept ADR-0029 as written. This is a specific owner acceptance, not an implied general delegation. The acceptance documentation commit still requires independent same-SHA Full CI.
 - **Grounding:** Architecture Baseline v1.7 §§2.1, 8, 19.1, 24.16, 25.14, 26.7, 27, 28.6; Master Implementation Plan v1.0 §09.08; ADR-0013/0021/0027/0028; `docs/gap-analysis/phase-09-08-chart-of-accounts-management.md`; canonical migrations 0009/0019/0034/0035; existing `BranchScopeService`, `EffectivePermissionService`, `AuditService`, `IdempotencyService`, `SystemAccountResolver` and `JournalWriterService`.
 
-> **Boundary:** Everything labelled 'Proposed' below is a new administrative policy, not a rule already settled by v1.7. This ADR does not authorize SQL, code, permissions seed, staging/production data changes, a new default chart, 09.09 Posting Rules, or merge to `main`.
+> **Decision scope:** The project owner accepted the administrative policies in Sections 2–6 as a bounded extension to Architecture Baseline v1.7. Acceptance authorizes a **later separately gated 09.08 implementation**, not SQL/code/permission seeds/staging or Production data changes in this documentation step. It does not authorize a default Chart, 09.09 Posting Rules, changes to Convex Production, or a merge to `main`.
 
 ## 1. Problem and non-negotiable existing contract
 
@@ -17,13 +17,13 @@ Architecture v1.7 explicitly disallows an advanced accounting tree/direct Journa
 
 **Gap:** there is no dedicated permissioned/audited `GLAccountService` or `SystemAccountMappingAdministrationService`, no approved CRUD/lifecycle policy, and no Chart-specific permission catalogue. A PostgreSQL FK/trigger is necessary but insufficient as a business administration service.
 
-## 2. Proposed decision A — boundary and permission model
+## 2. Accepted decision A — boundary and permission model
 
-**Proposed:** implement internal administration services in a later, independent 09.08 implementation slice, with a *restricted configuration API* only when its API cutover is authorized. No direct Journal-writing route, no general user GL tree UI. A future admin settings view may be a compact account list + mappings editor; ordinary sales/cashier UI continues to use business names rather than debit/credit/GL.
+**Decision:** implement internal administration services in a later, independent 09.08 implementation slice, with a *restricted configuration API* only when its API cutover is authorized. No direct Journal-writing route, no general user GL tree UI. A future admin settings view may be a compact account list + mappings editor; ordinary sales/cashier UI continues to use business names rather than debit/credit/GL.
 
-New **proposed** permission keys, to be added to the existing catalog through a tested, versioned permission-data change only **after** this ADR is accepted:
+New **accepted design** permission keys, to be added to the existing catalog through a tested, versioned permission-data change only **after** this ADR is accepted:
 
-| Key | Default grants (proposed) | Use |
+| Key | Approved default grants (implementation pending) | Use |
 |---|---|---|
 | `accounting.chart.view` | `SYSTEM_ADMIN`, `ACCOUNTANT` | Inspect Company Chart and inactive entries |
 | `accounting.chart.manage` | `SYSTEM_ADMIN` | Create/rename/change allowed fields/activate/deactivate GL Accounts |
@@ -32,15 +32,15 @@ New **proposed** permission keys, to be added to the existing catalog through a 
 
 All other roles default **DENY**. The existing Role Default -> User Allow/Deny Override -> Effective Permission precedence remains binding, including an explicit **DENY** of a default System Admin grant. No hard-coded `role === SYSTEM_ADMIN` bypass and no silent reuse of `finance.accounts.manage` (which currently governs Treasuries). The owner may explicitly grant an Accountant a manage key via the existing user override workflow, with its own audit.
 
-**Company scope policy (proposed):** because one Chart serves every Branch in a Company, these sensitive Company-wide administration and raw CoA/mapping reads require the requested Company to exist and be active, effective permission, an active user, and `branch_scope_mode='ALL'` validated in the **same transaction**. `SELECTED` branch-only access is not promoted to Company-wide Chart administration, even when the selected Branch belongs to that Company. Do not use a caller-supplied `companyId` as authority: validate it against the current trusted tenant and the targeted Branch/Treasury/Company relation. The V1 user/Branch `ALL` scope is not a substitute for authorization to a different tenant. Operational report reads remain separately Branch-scoped.
+**Company scope policy (accepted):** because one Chart serves every Branch in a Company, these sensitive Company-wide administration and raw CoA/mapping reads require the requested Company to exist and be active, effective permission, an active user, and `branch_scope_mode='ALL'` validated in the **same transaction**. `SELECTED` branch-only access is not promoted to Company-wide Chart administration, even when the selected Branch belongs to that Company. Do not use a caller-supplied `companyId` as authority: validate it against the current trusted tenant and the targeted Branch/Treasury/Company relation. The V1 user/Branch `ALL` scope is not a substitute for authorization to a different tenant. Operational report reads remain separately Branch-scoped.
 
-## 3. Proposed decision B — creation and modification policy
+## 3. Accepted decision B — creation and modification policy
 
-**Create (proposed):** only a trusted admin command. Require authenticated actor, target Company, idempotency key, and audit reason. Assign a server UUID; require a nonblank trimmed account code (canonical uppercase ASCII letters/digits and `._-`, max 64 characters, retain leading zeroes), a nonblank display name supporting Arabic/English (1..200 characters after trim; reject control characters), and a nonblank `account_type` text (max 64 characters). This is **application input hygiene**, not a new PostgreSQL enum or an assertion that the Baseline defines semantic account types. Never silently rewrite a code from an existing Chart. Uniqueness is ultimately enforced by existing `(company_id,code)` constraint; concurrency must test same-code insertion. Validate an optional active parent in the same Company, with no cycles; parent cannot already be mapped or historically posted as a leaf.
+**Create (accepted):** only a trusted admin command. Require authenticated actor, target Company, idempotency key, and audit reason. Assign a server UUID; require a nonblank trimmed account code (canonical uppercase ASCII letters/digits and `._-`, max 64 characters, retain leading zeroes), a nonblank display name supporting Arabic/English (1..200 characters after trim; reject control characters), and a nonblank `account_type` text (max 64 characters). This is **application input hygiene**, not a new PostgreSQL enum or an assertion that the Baseline defines semantic account types. Never silently rewrite a code from an existing Chart. Uniqueness is ultimately enforced by existing `(company_id,code)` constraint; concurrency must test same-code insertion. Validate an optional active parent in the same Company, with no cycles; parent cannot already be mapped or historically posted as a leaf.
 
-**System flag (proposed):** ordinary administration creates `is_system=false`. Existing `is_system=true` accounts remain discoverable and protected. Creation of an internal System Account requires a separate trusted setup operation; no automatic default chart, account or mapping is fabricated. `is_system` is immutable after creation, and `is_system` alone never substitutes for an explicit ADR-0027 role mapping.
+**System flag (accepted):** ordinary administration creates `is_system=false`. Existing `is_system=true` accounts remain discoverable and protected. Creation of an internal System Account requires a separate trusted setup operation; no automatic default chart, account or mapping is fabricated. `is_system` is immutable after creation, and `is_system` alone never substitutes for an explicit ADR-0027 role mapping.
 
-**Change matrix (proposed):**
+**Change matrix (accepted):**
 
 | Field/action | Never referenced, active leaf | Once mapped, used in Journal history, or used by Finance Category |
 |---|---|---|
@@ -53,7 +53,7 @@ All other roles default **DENY**. The existing Role Default -> User Allow/Deny O
 
 **Historical display consequence:** renaming a posted account changes the *current descriptive label* but not the immutable `gl_account_id`, code, JournalLine or posted amount. Audit must retain the previous name/reason and future historical reports must retain account ID/code for traceability; any requirement to reproduce the exact label printed at a historical point requires an independently designed report snapshot, not a Journal rewrite. No mass recoding of historically used accounts.
 
-## 4. Proposed decision C — lifecycle / dependencies
+## 4. Accepted decision C — lifecycle / dependencies
 
 - **No physical DELETE of `gl_accounts` in V1**, including unused accounts. Deactivation is the reversible administrative alternative. No blanking/truncating an account to simulate deletion.
 - Deactivation fails if the account is mapped, referenced by **any** JournalLine (including reversed/zero-valued historical postings), referenced by any **active** Finance Category, has an active child, or is a required configured posting account. This is deliberately stricter than the current `0034` mapped-account guard.
@@ -62,7 +62,7 @@ All other roles default **DENY**. The existing Role Default -> User Allow/Deny O
 - An inactive parent cannot receive a new active child; parent deactivation must not strand active children. The backend must recheck Finance Category references (the Category has its own direct `gl_account_id` FK, not a System Mapping). No invented Company FK on Finance Category: at posting, the source Branch/Company must independently validate the selected Category GL Account.
 - Changes that would violate these guarantees must fail atomically. If tests reveal the accepted SQL triggers still permit an unsafe **direct SQL** path for the actual runtime DB role, the implementation must produce a separately reviewed *forward-only* integrity/privilege migration with PostgreSQL evidence, never rewrite `0034`/`0035`.
 
-## 5. Proposed decision D — mapping administration and governance
+## 5. Accepted decision D — mapping administration and governance
 
 **Only the six foundation role keys accepted by ADR-0027** may be managed in 09.08: TREASURY-scoped `TREASURY_ASSET`, and COMPANY-scoped `CUSTOMER_RECEIVABLE_CONTROL`, `SUPPLIER_PAYABLE_CONTROL`, `CUSTOMER_ADVANCES_LIABILITY`, `CHEQUES_RECEIVABLE_CONTROL`, `CHEQUES_PAYABLE_CONTROL`. An uppercase formatted key is **not by itself authorized**. 09.09 must separately approve any sales, VAT, inventory, COGS, purchase-return-variance or other operation-specific role.
 
@@ -73,7 +73,7 @@ All other roles default **DENY**. The existing Role Default -> User Allow/Deny O
 - Do not copy `finance_categories.gl_account_id` into System Mappings. Finance Category mapping management is owned by its Finance service, with source-Company/active-leaf checks at use time; coordination is a later independent integration gate.
 - Audit `MAPPING_CREATED`, `MAPPING_REPLACED`, or `MAPPING_REMOVED` must include Company, actor, reason, role, scope and safe before/after target IDs. No direct per-document debit/credit editing by administrators.
 
-## 6. Proposed decision E — transactions, lock ordering and audit
+## 6. Accepted decision E — transactions, lock ordering and audit
 
 - Default isolation is the accepted **READ COMMITTED**. All write and stale-state checks happen on one `PoolClient`, one atomic transaction. Reuse the existing Idempotency + Audit infrastructure. Idempotency is claimed before effects; same key + same payload returns the prior outcome, different payload conflicts; no partial audit/DB commit.
 - **Account mutation:** validate effective permission and Company/ALL scope, lock the Company administration root as needed, then acquire sorted GL target/old parent/new parent row locks; recheck leaf, child and historical references under those locks. Concurrent Journal writers already lock the referenced GL `FOR SHARE`: the mutator's `FOR UPDATE` must wait, then re-evaluate posted history before any field change/deactivation.
@@ -83,7 +83,7 @@ All other roles default **DENY**. The existing Role Default -> User Allow/Deny O
 - Require a bounded, nonblank audit reason and structured Who/What/When/Company/optional Branch/Before/After on **every** Chart or mapping mutation, including failed-attempt telemetry where independently allowed. Audit and mutation commit or roll back together; do not write raw secrets, arbitrary user messages, financial information unrelated to the change, or trust a frontend audit flag.
 - Use the existing safe error mapper (forbidden, conflict/stale snapshot, dependency, invalid input). Do not surface raw PostgreSQL constraint names, internal GL SQL or other-Company account IDs to unauthorized callers.
 
-## 7. Alternatives considered and rejected (proposed)
+## 7. Alternatives considered and rejected
 
 1. **General-user manual Journal/tree editing:** rejected by v1.7 UX and generated-posting Source-of-Truth contract.
 2. **Reuse `finance.accounts.manage` for GL/mappings:** rejected because it governs operational Treasuries, not sensitive Company-wide GL configuration.
@@ -92,12 +92,12 @@ All other roles default **DENY**. The existing Role Default -> User Allow/Deny O
 5. **Unrestricted account removal or in-use mapping rotation:** rejected because it endangers reversibility, reconciliation and historical audit.
 6. **Import legacy Convex `systemKey`/two-decimal GL conventions:** rejected because Convex implementation is not v1.7 architectural authority.
 
-## 8. Implementation and acceptance gates (future work, NOT started)
+## 8. Implementation and verification gates (future work, NOT started)
 
-After explicit acceptance, run a new independent 09.08 implementation slice with Gap Analysis delta and single writer owner: (1) approved permission catalog defaults and admin service, (2) account query/create/update/activate/deactivate, (3) mapping admin create/rotate/remove and audit/idempotency, (4) narrowly scoped API boundary only when cutover stage allows it. No ordinary V1 Journal editor.
+Following this acceptance and completion of its documentation-only CI gate, run a new independent 09.08 implementation slice with Gap Analysis delta and single writer owner: (1) approved permission catalog defaults and admin service, (2) account query/create/update/activate/deactivate, (3) mapping admin create/rotate/remove and audit/idempotency, (4) narrowly scoped API boundary only when cutover stage allows it. No ordinary V1 Journal editor.
 
 Before closing that future slice, PostgreSQL 17 tests on the **same final SHA** must cover: unique Company code collisions; same-Company/cycle/leaf rules; account history freeze and reversible naming; posted account deactivation rejection preserving reversal; active Finance Category dependency; Company/ALL permission + deny override; cross-Company isolation; mapping PK/unique and six-key registry; no unapproved role; mapping change during posting; two concurrent admins/stale snapshots/ABA assessment; create/remove/replace with audit, idempotent retry and rollback; both allowed and blocked SQL runtime-role paths; TypeScript, security, full CI four jobs and migration/index catalog non-regression. Record PR and result without merging to `main`.
 
-**Unresolved until acceptance:** this proposal intentionally introduces new V1 admin-policy choices and proposed permission keys. No part should be called `ACCEPTED` by implication from a general delegation to select a good design. The owner may approve the *exact ADR* in a separate turn.
+**Acceptance record:** the owner specifically accepted the proposed ADR-0029 on 2026-11-03. Its Company-wide permission rules, field/lifecycle rules, mapping governance and transaction discipline are now accepted architectural policy, **not implemented code**. The existing Canonical schema, SQL/Index Catalog, immutable Journal history and ADR-0027/0028 remain unchanged. Required role seeds, services and runtime privilege checks remain future gated work.
 
-**Next action only:** present the proposal for owner review and explicit ADR-0029 acceptance or requested amendments. Keep 09.08 `IN_PROGRESS` and 09.09 `NOT_STARTED`.
+**Next action only:** after the acceptance documentation SHA passes all four Full CI jobs and validation PR closes without Merge, implement the first bounded 09.08 CoA administration-service slice against this accepted contract, with dedicated PostgreSQL 17/security/concurrency tests. Keep 09.08 `IN_PROGRESS` and 09.09 `NOT_STARTED`.
