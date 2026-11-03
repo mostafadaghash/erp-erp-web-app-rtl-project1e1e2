@@ -338,12 +338,14 @@ test("0035 refuses old unsealed Journals atomically; it never backfills history"
       const v=await fixture(client);
       const b=await batch(client,v,80);
       const e=id(81);
-      await client.query(`INSERT INTO journal_entries
-        (id,branch_id,source_type,source_id,posting_batch_id,reversal_of_entry_id,
-         posted_at,created_by,description)
-        VALUES ($1,$2,'JOURNAL_0035',$3,$4,NULL,$5,$6,'pre-0035')`,
-        [e,v.branch,v.source,b.id,b.postedAt,v.user]);
-      await lines(client,e,normal(v,600));
+      await withTransaction(client, async()=>{
+        await client.query(`INSERT INTO journal_entries
+          (id,branch_id,source_type,source_id,posting_batch_id,reversal_of_entry_id,
+           posted_at,created_by,description)
+          VALUES ($1,$2,'JOURNAL_0035',$3,$4,NULL,$5,$6,'pre-0035')`,
+          [e,v.branch,v.source,b.id,b.postedAt,v.user]);
+        await lines(client,e,normal(v,600));
+      });
     });
     await assert.rejects(runMigrations({databaseUrl}),
       /0035_journal_context_immutability_reversal_integrity precondition failed/);
