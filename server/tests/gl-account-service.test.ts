@@ -12,7 +12,7 @@ test('09.08-A Chart create rejects invalid code, name, reason, type and system f
   await assert.rejects(service.create({...base,name:'\u0000foo'}),/Account name/)
   await assert.rejects(service.create({...base,accountType:''}),/Account type/)
   await assert.rejects(service.create({...base,reason:' '}),/Audit reason/)
-  await assert.rejects(service.create({...base,idempotencyKey:' '.repeat(130)}),/Idempotency key/)
+  await assert.rejects(service.create({...base,idempotencyKey:'x'.repeat(130)}),/Idempotency key/)
   await assert.rejects(service.create({...base,isSystem:true} as never),/System accounts/)
 })
 test('09.08-A Chart list rejects non-boolean options before SQL',async()=>{
