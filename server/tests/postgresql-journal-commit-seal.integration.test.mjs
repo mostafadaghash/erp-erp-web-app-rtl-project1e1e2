@@ -142,6 +142,12 @@ test("0035 sealed Journal is immutable, precise, nonempty and app-role protected
         "23514","ct_posting_batches__journal_immutable");
       await expectError(client.query("DELETE FROM posting_batches WHERE id=$1",[posted.batch]),
         "23514","ct_posting_batches__journal_immutable");
+      // TRUNCATE bypasses row-level UPDATE/DELETE triggers; the 0035 DDL
+      // explicitly blocks it on every historical table.
+      for(const table of ["journal_lines","journal_entries","posting_batches","journal_entry_seals"]) {
+        await expectError(client.query("TRUNCATE public."+table),
+          "23514","ct_journal_history__immutable");
+      }
       await expectError(client.query("UPDATE journal_entry_seals SET line_count=4 WHERE entry_id=$1",[posted.entry]),
         "23514","ct_journal_entry_seals__write_protected");
       await expectError(client.query("DELETE FROM journal_entry_seals WHERE entry_id=$1",[posted.entry]),

@@ -152,6 +152,21 @@ BEGIN
     MESSAGE='Journal history is append-only; use a reversal or correction';
 END;
 $$;
+-- TRUNCATE skips row triggers: explicitly protect the historical tables and
+-- integrity seal, including attempts using TRUNCATE ... CASCADE.
+CREATE TRIGGER bt_journal_entries__truncate_guard
+BEFORE TRUNCATE ON public.journal_entries
+FOR EACH STATEMENT EXECUTE FUNCTION public.fn_journal_history_immutable();
+CREATE TRIGGER bt_journal_lines__truncate_guard
+BEFORE TRUNCATE ON public.journal_lines
+FOR EACH STATEMENT EXECUTE FUNCTION public.fn_journal_history_immutable();
+CREATE TRIGGER bt_journal_entry_seals__truncate_guard
+BEFORE TRUNCATE ON public.journal_entry_seals
+FOR EACH STATEMENT EXECUTE FUNCTION public.fn_journal_history_immutable();
+CREATE TRIGGER bt_posting_batches__truncate_guard
+BEFORE TRUNCATE ON public.posting_batches
+FOR EACH STATEMENT EXECUTE FUNCTION public.fn_journal_history_immutable();
+
 CREATE TRIGGER bt_journal_entries__immutable
 BEFORE UPDATE OR DELETE ON public.journal_entries
 FOR EACH ROW EXECUTE FUNCTION public.fn_journal_history_immutable();
