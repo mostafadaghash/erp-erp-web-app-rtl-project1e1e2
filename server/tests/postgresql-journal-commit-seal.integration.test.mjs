@@ -266,7 +266,7 @@ test("0035 exact reversal multiset rejects missing duplicates and prevents doubl
       await expectError(header(client,v,55,b,{reversal:original.entry}),
         "23514","ct_journal_entries__reversal_context");
 
-      b=await batch(client,v,56,{operation:"REVERSAL",reverses:id(999)});
+      b=await batch(client,v,56,{operation:"REVERSAL",reverses:id(54)});
       await expectError(header(client,v,57,b,{reversal:original.entry}),
         "23514","ct_journal_entries__reversal_context");
 
