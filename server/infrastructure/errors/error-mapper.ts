@@ -22,6 +22,7 @@ import { StockTransferError } from '../inventory/stock-transfer-service.js'
 import { StocktakeError } from '../inventory/stocktake-service.js'
 import { InventoryAdjustmentError } from '../inventory/inventory-adjustment-service.js'
 import { TreasuryError } from '../finance/treasury-service.js'
+import { JournalWriterError } from '../accounting/journal-writer-service.js'
 
 export type SafeErrorParam = string | number | boolean | null
 export type SafeErrorParams = Readonly<Record<string, SafeErrorParam>>
@@ -56,6 +57,7 @@ export const ERROR_CODES = {
   STOCKTAKE_OPERATION_REJECTED: 'STOCKTAKE_OPERATION_REJECTED',
   INVENTORY_ADJUSTMENT_OPERATION_REJECTED: 'INVENTORY_ADJUSTMENT_OPERATION_REJECTED',
   TREASURY_OPERATION_REJECTED: 'TREASURY_OPERATION_REJECTED',
+  JOURNAL_OPERATION_REJECTED: 'JOURNAL_OPERATION_REJECTED',
   INVALID_ARGUMENT: 'INVALID_ARGUMENT',
   DB_UNIQUE_CONFLICT: 'DB_UNIQUE_CONFLICT',
   DB_REFERENCE_CONFLICT: 'DB_REFERENCE_CONFLICT',
@@ -251,6 +253,10 @@ export function toErrorContract(error: unknown): ErrorContract {
     return contract(ERROR_CODES.INVENTORY_ADJUSTMENT_OPERATION_REJECTED, {
       reason: error.reason,
     })
+  }
+
+  if (error instanceof JournalWriterError) {
+    return contract(ERROR_CODES.JOURNAL_OPERATION_REJECTED, { reason: error.reason })
   }
 
   if (error instanceof TreasuryError) {
