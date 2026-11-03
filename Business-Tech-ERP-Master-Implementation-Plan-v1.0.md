@@ -1,6 +1,6 @@
 # Business Tech ERP — Master Implementation Plan v1.0
 
-**الحالة:** ACTIVE — PHASE 09 / 09.08 JOURNAL_WRITER_AND_RESOLVER_CODE_FULL_CI_PASSED / 09.08_IN_PROGRESS  
+**الحالة:** ACTIVE — PHASE 09 / 09.08 CHART_OF_ACCOUNTS_GAP_REVIEW_COMPLETE / ADMIN_CONTRACT_PENDING / 09.08_IN_PROGRESS  
 **تاريخ الإصدار:** 2026-09-11  
 **المشروع:** Business Tech ERP — Local Server Edition / PostgreSQL Core  
 **المرجع المعماري الرسمي:** `Business-Tech-ERP-Architecture-Baseline-v1.7-Final.docx`  
@@ -3271,6 +3271,7 @@ Create controlled verification/rebuild procedures capable of recalculating opera
 ## 09.08 GL / Journal Engine
 
 **Status:** `0034_MAPPING_CLOSED / 0035_INTEGRITY_CLOSED / JOURNAL_WRITER_RESOLVER_CODE_FULL_CI_PASSED / 09.08_IN_PROGRESS` — internal Journal Writer and six-role ADR-0027 resolver implemented and PostgreSQL 17 verified. Code SHA `ff13e79a411aba819e3cff15c1081c77901fdf6b` passed Full CI #1313 / `41683061801` including PostgreSQL Writer/rollback/reversal/concurrency tests and four jobs. Validation PR #261 is documentation-gated and must close WITHOUT Merge only after final same-SHA CI. 09.08 remains IN_PROGRESS: independent Chart of Accounts management/service scope remains to be reviewed before closing the phase; 09.09 Posting Rules not started. No Convex/Production/main changes.  
+**Chart of Accounts Gap Review:** `docs/gap-analysis/phase-09-08-chart-of-accounts-management.md` — physical Chart, mapping and Journal integrity confirmed existing; authorized account/mapping administration commands are missing and field/lifecycle/permission policies require a bounded explicit decision. No 09.09 implementation.  
 **Migration Design / Preflight:** `docs/implementation/phase-09-08-migration-preflight-design.md`  
 **0034 Implementation Closure:** `docs/implementation/phase-09-08-0034-system-account-mapping-closure.md`  
 **0035 Historical Design Review:** `docs/implementation/phase-09-08-0035-journal-context-immutability-reversal-design.md` — DESIGN COMPLETE as of 2026-10-30; later implementation is recorded separately.  
@@ -4398,10 +4399,11 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 # 32. Current Execution Pointer
 
 **Current Phase:** `PHASE 09 — Finance & Accounting Foundation / 09.08 GL / Journal Engine`  
-**Status:** `09.08 JOURNAL_WRITER_AND_ADR0027_RESOLVER_CODE_FULL_CI_PASSED / 09.08_IN_PROGRESS` — accepted ADR-0027/0028, migrations 0034/0035 and their PostgreSQL 17 protection gates remain intact. Internal transaction-bound Journal writer and scoped system-account resolver implemented on `ff13e79a411aba819e3cff15c1081c77901fdf6b`; Full CI #1313 / `41683061801` passed verify, backend-verify (including writer PostgreSQL integration), browser-contract and release-gate. Documentation closure SHA still requires same-SHA CI on validation PR #261 before closing WITHOUT Merge. No 09.09 Posting Rules, production migration, Convex Production or main merge.  
+**Status:** `09.08 CHART_OF_ACCOUNTS_GAP_REVIEW_COMPLETE / ADMIN_CONTRACT_PENDING / IN_PROGRESS` — Journal Writer and ADR-0027 Resolver code validated at `ff13e79a411aba819e3cff15c1081c77901fdf6b`; final documentation SHA `98446e08d227ca3e915597885feb3c7f8cbc4300` passed all four jobs in CI #1314 / `41683840978`, and PR #261 is CLOSED WITHOUT MERGE. The 09.08 CoA gap review now classifies the existing canonical relation/0034 hierarchy/mapping constraints/resolver as compliant and identifies missing administration services and unfrozen account lifecycle, permissions, mapping mutation and Company-scope policy. This review makes no code/DDL changes and **does not close 09.08** or start 09.09.  
 **09.08 0034 Closure:** `docs/implementation/phase-09-08-0034-system-account-mapping-closure.md` — executable SQL, metadata, integrity/concurrency tests and historical precondition verified; PR #258 closed without Merge.  
 **09.08 ADR-0028 decision evidence:** Architecture accepted 2026-10-30; code decision SHA `2bafc29568cb970eed6073423fb96e1f462bb9f9` passed Full CI #1301 / `41123800361`; PR #259 CLOSED without Merge on 2026-11-03.  
 **09.08 0035 Implementation:** `database/migrations/0035_journal_context_immutability_reversal_integrity.sql` + metadata, `server/tests/postgresql-journal-commit-seal.integration.test.mjs` and `docs/implementation/phase-09-08-0035-journal-context-immutability-reversal-closure.md` implemented and validated on PostgreSQL 17 / CI #1308, without modifying 0009, 0019, 0034 or 0022.  
+**09.08 Chart of Accounts Gap Review:** `docs/gap-analysis/phase-09-08-chart-of-accounts-management.md` — source-grounded classification, remaining admin contract decision required; no Business code/DDL.  
 **09.08 Backend Journal Writer:** `server/infrastructure/accounting/journal-writer-service.ts` with `JournalWriterService` and ADR-0027 `SystemAccountResolver`; unit and PostgreSQL 17 tests passed Full CI #1313 on code SHA `ff13e79a411aba819e3cff15c1081c77901fdf6b`. Gap: `docs/gap-analysis/phase-09-08-backend-journal-writer.md`; closure: `docs/implementation/phase-09-08-journal-writer-closure.md`.  
 **09.08 Preflight:** `docs/implementation/phase-09-08-migration-preflight-design.md` plus `scripts/database/phase-09-08-preflight.mjs` and `server/tests/postgresql-gl-migration-preflight.integration.test.mjs`; tested on ephemeral PostgreSQL 17 only. Real populated target requires separately authorized preflight/backup prior to applying 0034.  
 **Integration Branch:** `agent/postgres-v1.7-core`  
@@ -4591,7 +4593,7 @@ V1 يعتبر صالحًا للتشغيل فقط إذا:
 **08.04 Implementation CI:** Run `#1031` / `35726979984` — SUCCESS; `verify`, `backend-verify` including PostgreSQL 17 reservation lifecycle, two-writer over-reservation race and 25-way stress, `browser-contract`, and `release-gate` all SUCCESS on the same implementation SHA.  
 **08.04 Migration/Index:** no new migration; migration tail remains `0024_inventory_ledger_integrity`; no Index addition and Frozen Reservation catalog remains unchanged.  
 **08.04 Validation PR:** `#237` — validation-only; close WITHOUT MERGE after final same-SHA documentation validation.  
-**Next Action:** validate final same-SHA Full CI for this Writer/Resolver documentation closure and close PR #261 WITHOUT Merge only after success. Then conduct the independent remaining 09.08 Chart of Accounts management/service Gap Review before 09.09 Posting Rules; no production migration or `main` merge.
+**Next Action:** author one bounded **proposed and unaccepted** Chart of Accounts Administration / Authorization Contract ADR (candidate ADR-0029), covering permitted command surface, Company/Branch permissions, account mutation/lifecycle, mapping administration and concurrency; require explicit owner approval before any CoA service/SQL or 09.09 Posting Rules.
 **Forbidden Next Actions:** لا 08.06 قبل إغلاق 08.05، لا Batch/Expiry lifecycle، لا Stock Transfer document orchestration، لا Sales/Delivery posting cutover، لا Frontend cutover، لا dual write، لا `main` merge، ولا Convex Production change.
 
 **Plan update — 2026-09-17 / ACCOUNTING CONSTRAINTS CLOSED:** تم إغلاق ثامن executable slice من 03.06 على SHA `ef03d141958c392032bd8caf16b5f880a193e86e`. Migration `0019`، ADR-0021، Accounting PK/FK/UNIQUE/CHECK layer، Finance Category → GL Account FK، والحفاظ على deferred Journal balance at COMMIT تم التحقق منهم فعليًا على PostgreSQL 17؛ Full CI run `35224498880` أخضر بالكامل وPR `#206` أُغلق بدون Merge. 03.06 ما زالت `IN_PROGRESS` و03.07 لم تبدأ.
