@@ -80,7 +80,9 @@ const SQL = Object.freeze({
     'SELECT n.nspname, pg_catalog.pg_get_userbyid(n.nspowner) AS owner,',
     "pg_catalog.has_schema_privilege(current_user,n.oid,'USAGE') AS schema_usage,",
     "pg_catalog.has_schema_privilege(current_user,n.oid,'CREATE') AS schema_create,",
+    "pg_catalog.has_schema_privilege(session_user,n.oid,'CREATE') AS session_schema_create,",
     "pg_catalog.has_database_privilege(current_database(),'CREATE') AS database_create,",
+    "pg_catalog.has_database_privilege(session_user,current_database(),'CREATE') AS session_database_create,",
     "pg_catalog.has_database_privilege(current_database(),'TEMPORARY') AS database_temporary,",
     "pg_catalog.pg_has_role(current_user,n.nspowner,'SET') AS can_assume_owner,",
     "pg_catalog.pg_has_role(session_user,n.nspowner,'SET') AS session_can_assume_owner,",
@@ -165,12 +167,25 @@ export function summarizeRuntimeRoleRisk({ identity, role, sessionRole, reachabl
   const adminMemberships = membershipEdges
     .filter(m=>m.admin_option===true)
     .map(m=>m.member_role+' -> '+m.granted_role)
+  const highlySensitive = new Set(['gl_accounts','journal_entry_seals','journal_entries','journal_lines'])
+  const dangerousSessionDml = tables
+    .filter(t=>highlySensitive.has(t.name) && (
+      t.session_can_update===true || t.session_can_delete===true ||
+      t.session_can_truncate===true || t.session_can_trigger===true
+    ))
+    .map(t=>t.name)
   const reasons = []
   if(identity.session_user!==identity.current_user) reasons.push('CURRENT_ROLE_DIFFERS_FROM_SESSION_LOGIN')
   if(privileged(sessionRole)) reasons.push('SESSION_LOGIN_HAS_ELEVATED_ROLE_FLAGS')
+  if(sessionRole?.rolcanlogin===false) reasons.push('SESSION_USER_ROLE_CANNOT_LOGIN')
   if(privileged(role)) reasons.push('CURRENT_ROLE_HAS_ELEVATED_ROLE_FLAGS')
   if(assumablePrivilegedRoles.length) reasons.push('SESSION_CAN_SET_ELEVATED_ROLE')
   if(scope?.session_can_assume_owner===true) reasons.push('SESSION_CAN_ASSUME_PUBLIC_SCHEMA_OWNER')
+  if(scope?.session_inherits_owner===true) reasons.push('SESSION_INHERITS_PUBLIC_SCHEMA_OWNER')
+  if(scope?.session_schema_create===true || scope?.session_database_create===true) {
+    reasons.push('SESSION_CAN_CREATE_IN_SCHEMA_OR_DATABASE')
+  }
+  if(dangerousSessionDml.length) reasons.push('SESSION_HAS_SENSITIVE_TABLE_DML')
   if(assumableObjectOwnerTables.length) reasons.push('SESSION_CAN_ASSUME_AUDITED_TABLE_OWNER')
   if(adminMemberships.length) reasons.push('ROLE_ADMIN_OPTION_REQUIRES_REVIEW')
   return {
@@ -180,6 +195,7 @@ export function summarizeRuntimeRoleRisk({ identity, role, sessionRole, reachabl
     assumable_privileged_roles:assumablePrivilegedRoles,
     assumable_audited_table_owners_for:assumableObjectOwnerTables,
     admin_membership_edges:adminMemberships,
+    session_sensitive_table_dml:dangerousSessionDml,
   }
 }
 
