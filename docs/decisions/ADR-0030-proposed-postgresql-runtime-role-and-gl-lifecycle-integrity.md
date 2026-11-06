@@ -1,12 +1,14 @@
-# ADR-0030 (PROPOSED) — PostgreSQL Runtime Principal and GL Account Lifecycle Integrity Boundary
+# ADR-0030 — PostgreSQL Runtime Principal and GL Account Lifecycle Integrity Boundary
 
-**Status:** PROPOSED / OWNER APPROVAL REQUIRED — DOCUMENTATION AND ARCHITECTURAL REVIEW ONLY; NOT ACCEPTED; NO MIGRATION AUTHORIZED  
-**Date:** 2026-11-03  
+**Status:** ACCEPTED — ARCHITECTURE CONTRACT ONLY; IMPLEMENTATION NOT STARTED; MIGRATION/ROLE/GRANT CHANGES REQUIRE SEPARATE APPROVAL  
+**Date:** 2026-11-03 (proposal); **Owner acceptance:** 2026-11-06  
+**Approval evidence:** The owner explicitly replied «اعتمد» to the immediately preceding, specifically named request «اعتمد ADR-0030». This accepts the bounded architecture contract in this ADR only; it is **not** approval of a specific migration, database role/GRANT change, live deployment, service mutation, or merge to `main`.  
+**Path note:** The historical `-proposed-` filename is retained for stable references; the document status now governs.  
 **Reviewed baseline:** `agent/postgres-v1.7-core` @ `72680b22633b2b619262fb6f4ae6efbdf952ac06`  
 **Phase:** 09.08-C — GL Account Mutation/Lifecycle, **BLOCKED / NOT IMPLEMENTED**  
 **Authority:** `Business-Tech-ERP-Architecture-Baseline-v1.7-Final.docx` §§8, 24.16, 25.14, 27, 28.6; accepted ADR-0027/0028/0029; Master Implementation Plan 09.08.  
 **Empirical evidence:** `docs/implementation/phase-09-08-c-gl-lifecycle-runtime-role-integrity-preflight.md` and PostgreSQL 17 CI #1332 / #1334, on an isolated test database.  
-**Decision boundary:** This document recommends a design and defines approval/testing gates. It **does not approve or implement** a SQL migration, new DB principal, DDL, role/grant change, backend lifecycle command, Production operation, Convex cutover or `main` merge.
+**Decision boundary:** The project owner accepted the architectural requirements and testing gates for separating runtime/migration principals and enforcing GL history, active Finance Category and parent/child integrity. Acceptance does **not** approve or implement any specific SQL migration, new DB principal, DDL, role/grant change, Backend lifecycle command, Production operation, Convex cutover or `main` merge.
 
 ## 1. Answer / recommendation
 
@@ -19,7 +21,7 @@ Adopt **two complementary safety boundaries**, not just a software-level check:
 
 Do not conflate application SYSTEM_ADMIN / `accounting.chart.manage` with PostgreSQL SUPERUSER, schema ownership or `GRANT`. ERP effective permissions remain authenticated and enforced inside the Backend transaction.
 
-**Approval status: NOT ACCEPTED.** The proposed migration is necessary before the future feature is enabled, but **no migration number, owner role, runtime username, security function signature or SQL change is authorized by this review**. Numbering is deferred until migration catalog and privileges are confirmed.
+**Approval status: ACCEPTED AS ARCHITECTURE ONLY.** A future forward-only hardening migration is the accepted architectural direction before enabling GL lifecycle mutations, but **no migration number, owner role name, runtime username, security function signature, deployment role/grant, SQL file or code change is authorized by this acceptance**. Numbering and concrete design remain independently gated until migration catalog, effective privileges, data state and concurrency are verified.
 
 ## 2. What the reviewed sources prove, and what they do not
 
@@ -35,7 +37,7 @@ Do not conflate application SYSTEM_ADMIN / `accounting.chart.manage` with Postgr
 
 There is **no evidence here of a deployed Backend DB role with current dangerous grants**, and no migration has been executed on a populated customer database.
 
-## 3. Proposed runtime-role / ownership contract (NOT YET APPROVED)
+## 3. Accepted runtime-role / ownership principles (implementation and exact grants pending)
 
 ### 3.1 Principal separation
 
@@ -46,7 +48,7 @@ There is **no evidence here of a deployed Backend DB role with current dangerous
 - **Protected functions:** if `SECURITY DEFINER` is necessary, its owner must be trustworthy and non-login, use fixed trusted `search_path` with `pg_temp` last, schema-qualify names, revoke default function EXECUTE from `PUBLIC`, grant to only the required principal and prevent arbitrary SQL injection or caller-supplied `companyId` / `app.user_id` from substituting for app authorization. PostgreSQL 17 documents that function EXECUTE privileges must be explicitly controlled.
 - **Secrets:** no password, connection URI, deployment username or real grants committed to docs/CI. Provision via separately gated deployment configuration with secret isolation, backup and rollback.
 
-This is an architecture **candidate**, not a claim that those PostgreSQL roles currently exist.
+This is an **accepted architectural role-separation requirement**, not a claim that those PostgreSQL roles currently exist. The exact provisioned identities, grants, mutation function architecture and migration sequence are **not accepted implementation details**; the restricted-privileged-function path in §6 remains a preferred candidate requiring verification.
 
 ### 3.2 Measurable read-only evidence to collect before final SQL design
 
@@ -54,7 +56,7 @@ On a **nonproduction or cloned/ephemeral, production-equivalent** PostgreSQL 17 
 
 Reject any proposed cutover where Fastify shares a superuser or schema-owner login with DDL/migrations. Define install/upgrade/bootstrap contract without touching local Convex secrets.
 
-## 4. Mandatory GL integrity contract (accepted ADR-0029, proposed DB enforcement)
+## 4. Mandatory GL integrity contract (ADR-0029 plus accepted ADR-0030 database-enforcement boundary)
 
 | Write class | Database-level invariant to prove |
 | --- | --- |
@@ -71,7 +73,7 @@ Reject any proposed cutover where Fastify shares a superuser or schema-owner log
 
 The existing `0035` JournalLine insert guard locks the GL `FOR SHARE`. A future forward-only integrity correction should preserve this lock and ensure lifecycle UPDATE rechecks after waiting. For active Finance Category and GL-child path, design symmetric row locks to prevent phantom dependent inserts and avoid deadlocks with the 0034 hierarchy, finance and Journal paths. The actual lock matrix must be proven by PostgreSQL 17 concurrency tests rather than assumed.
 
-## 5. Candidate migration strategy / deployment gate
+## 5. Accepted forward-only remediation requirement / separately gated migration design
 
 **Recommended answer: YES, at least one new forward-only, separately approved integrity/privilege migration is indicated before enabling GL Mutation/Lifecycle.** Exact migration count/order and whether install-time role provisioning is migration SQL or operations bootstrap remain unresolved. It must not modify old `0009` / `0019` / `0034` / `0035` / `0036` files or their checksums. A new versioned migration may add complementary triggers or forward-only replace existing function definitions only with compatibility evidence, protect historical identity/dependencies and implement required privilege changes. **No new discretionary index**, storage partition, global SERIALIZABLE mode or non-ADR account type enumeration.
 
@@ -96,14 +98,14 @@ The existing `0035` JournalLine insert guard locks the GL `FOR SHARE`. A future 
 - [x] 09.08-C PG17 evidence classified as exposure discovery, not production-role/production-integrity proof.
 - [x] Recommend forward-only, DB-level lifecycle and least-privilege remediation, explicitly excluding actual SQL/DDL/role mutation.
 - [x] Specify mandatory historical, category, parent/child, mapping and reverse-posting integrity tests and lock order.
-- [ ] Owner specifically accepts the proposed architecture and deployment-role contract **or requests revisions**.
+- [x] Owner explicitly accepted the architecture and role-separation / DB-integrity contract on **2026-11-06**; concrete deployed runtime credentials, SQL privileges and migrations remain separately gated.
 - [ ] Exact deployed-equivalent runtime principal and grants confirmed in independently authorized safe environment.
 - [ ] Separate approval for any implementation migration, service code or populated database upgrade.
 - [ ] Full CI on this review's final documentation SHA and validation-only PR closure WITHOUT MERGE.
 
-**Current status:** ADR-0030 **PROPOSED, NOT ACCEPTED**. 09.08-C GL Account Mutation/Lifecycle implementation **BLOCKED**. Parent 09.08 `IN_PROGRESS`; mapping administration 09.08-D and 09.09 Posting Rules `NOT_STARTED`.
+**Current status:** ADR-0030 **ACCEPTED (ARCHITECTURE ONLY)** on 2026-11-06. 09.08-C GL Account Mutation/Lifecycle implementation **BLOCKED / NOT STARTED** pending safe runtime principal evidence and separately approved integrity/privilege migration. Parent 09.08 `IN_PROGRESS`; mapping administration 09.08-D and 09.09 Posting Rules `NOT_STARTED`.
 
-**One next action after the documentation CI/PR gate:** obtain the owner's explicit decision on **ADR-0030**, or revise this proposal if rejected. Do not create a DB role, implement a migration, or write lifecycle commands as a side effect of this review.
+**One next action after the acceptance documentation CI/PR gate:** perform a **read-only / non-destructive PG17 runtime-principal, effective-GRANT and GL-integrity migration readiness assessment** on isolated or production-equivalent test infrastructure. Capture the exact proposed DDL/role provisioning, reversible deployment safeguards and PostgreSQL concurrency/negative-test plan for separate owner approval **before** executing any sensitive migration or role/grant operation. Do not start GL lifecycle mutations, mapping administration or 09.09 as a side effect of recording acceptance.
 
 ### PostgreSQL 17 technical references
 
