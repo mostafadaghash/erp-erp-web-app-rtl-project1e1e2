@@ -25,7 +25,16 @@ test('09.08-C: PostgreSQL 17 read-only role metadata, superuser CI distinguished
     assert.ok(x.risk.reasons.includes('SESSION_LOGIN_HAS_ELEVATED_ROLE_FLAGS'))
     assert.ok(x.risk.reasons.includes('CURRENT_ROLE_HAS_ELEVATED_ROLE_FLAGS'))
     assert.equal(x.risk.runtime_principal_attested,false)
-    assert.ok(x.tables.some(t=>t.name==='gl_accounts'&&t.session_can_assume_owner===true))
+    const gl=x.tables.find(t=>t.name==='gl_accounts')
+    assert.ok(gl,'even without migrations the audit reports a missing table explicitly')
+    assert.equal(typeof gl.exists_in_public,'boolean')
+    assert.ok(Object.hasOwn(gl,'session_can_assume_owner'))
+    if(process.env.ERP_ROLE_AUDIT_EXPECT_MIGRATED_SCHEMA==='1'){
+      assert.equal(gl.exists_in_public,true,'expected prior migrations and real GL table')
+      assert.equal(gl.session_can_assume_owner,true,'CI superuser must be able to assume table owner')
+      assert.ok(x.triggers.some(t=>t.table_name==='gl_accounts'&&t.tgname==='bt_gl_accounts__hierarchy_guard'))
+      assert.ok(x.functions.some(fn=>fn.name==='fn_gl_account_hierarchy_guard'&&fn.exists_in_public))
+    }
     assert.ok(x.functions.every(f=>!('function_settings' in f)),'return only selected safe function settings')
     assert.equal(x.data_rows_read,false)
     assert.ok(x.evidence_limit.includes('does NOT attest the actual Fastify login'))
