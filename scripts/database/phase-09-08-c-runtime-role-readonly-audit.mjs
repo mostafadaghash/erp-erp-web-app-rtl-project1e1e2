@@ -67,7 +67,7 @@ const SQL = Object.freeze({
     'ORDER BY w.name',
   ].join(' '),
   columns: [
-    'WITH wanted AS (SELECT * FROM pg_catalog.unnest($1::text[],$2::text[]) AS x(table_name,column_name))',
+    'WITH wanted AS (SELECT c1.name AS table_name,c2.name AS column_name FROM pg_catalog.unnest($1::text[]) WITH ORDINALITY AS c1(name,ord) JOIN pg_catalog.unnest($2::text[]) WITH ORDINALITY AS c2(name,ord) USING (ord))',
     'SELECT w.table_name,w.column_name,a.attnum IS NOT NULL AS exists_in_public,',
     "CASE WHEN a.attnum IS NULL THEN NULL ELSE pg_catalog.has_column_privilege(current_user,a.attrelid,a.attname,'UPDATE') END AS can_update,",
     "CASE WHEN a.attnum IS NULL THEN NULL ELSE pg_catalog.has_column_privilege(current_user,a.attrelid,a.attname,'INSERT') END AS can_insert",
