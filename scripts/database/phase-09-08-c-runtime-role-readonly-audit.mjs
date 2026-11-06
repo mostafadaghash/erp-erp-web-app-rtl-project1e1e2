@@ -86,7 +86,7 @@ const SQL = Object.freeze({
     "pg_catalog.has_database_privilege(current_database(),'TEMPORARY') AS database_temporary,",
     "pg_catalog.pg_has_role(current_user,n.nspowner,'SET') AS can_assume_owner,",
     "pg_catalog.pg_has_role(session_user,n.nspowner,'SET') AS session_can_assume_owner,",
-    "pg_catalog.pg_has_role(session_user,n.nspowner,'USAGE') AS session_inherits_owner"
+    "pg_catalog.pg_has_role(session_user,n.nspowner,'USAGE') AS session_inherits_owner",
     "FROM pg_catalog.pg_namespace n WHERE n.nspname='public'",
   ].join(' '),
   tables: [
