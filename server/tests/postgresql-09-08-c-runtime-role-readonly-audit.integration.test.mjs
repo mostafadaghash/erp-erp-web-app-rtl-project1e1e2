@@ -4,11 +4,20 @@ import test from 'node:test'
 import { Client } from 'pg'
 import { randomUUID } from 'node:crypto'
 import { auditRuntimeRoleReadOnly, summarizeRuntimeRoleRisk } from '../../scripts/database/phase-09-08-c-runtime-role-readonly-audit.mjs'
+import { runMigrations } from '../../scripts/database/migrations.mjs'
+import { cleanupDatabase } from './postgresql-schema-test-support.mjs'
 
 const url=process.env.ERP_TEST_DATABASE_URL
 
 test('09.08-C: PostgreSQL 17 read-only role metadata, superuser CI distinguished from deployed principal', async t=>{
   if(!url) return t.skip('ERP_TEST_DATABASE_URL missing')
+  const verifySchema=process.env.ERP_ROLE_AUDIT_EXPECT_MIGRATED_SCHEMA==='1'
+  // Only the ephemeral PostgreSQL 17 CI database may be prepared with migrations.
+  // The audited connection itself remains BEGIN TRANSACTION READ ONLY.
+  if(verifySchema){
+    await cleanupDatabase(url)
+    await runMigrations({databaseUrl:url})
+  }
   const c=new Client({connectionString:url})
   await c.connect()
   try {
@@ -47,6 +56,7 @@ test('09.08-C: PostgreSQL 17 read-only role metadata, superuser CI distinguished
     assert.equal((await c.query("SELECT current_setting('transaction_read_only') AS value")).rows[0].value,'off')
   } finally {
     await c.end()
+    if(verifySchema) await cleanupDatabase(url)
   }
 })
 
