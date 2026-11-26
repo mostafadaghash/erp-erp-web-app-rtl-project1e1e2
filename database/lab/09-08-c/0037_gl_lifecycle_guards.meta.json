@@ -1,0 +1,8 @@
+{
+  "version": "0037",
+  "name": "gl_lifecycle_guards",
+  "transactional": true,
+  "preconditionSql": "SELECT current_setting('server_version_num')::int / 10000 = 17 AND (SELECT max(version) FROM public.schema_migrations) = '0036' AS ok",
+  "verificationSql": "SELECT count(*) = 2 AS ok FROM pg_catalog.pg_trigger WHERE tgenabled = 'O' AND NOT tgisinternal AND (tgrelid, tgname, tgfoid) IN (('public.gl_accounts'::regclass,'bt_gl_accounts__lifecycle_guard','public.guard_gl_lifecycle_0037()'::regprocedure),('public.finance_categories'::regclass,'bt_finance_categories__active_gl','public.guard_category_gl_0037()'::regprocedure))",
+  "recovery": "Atomic lab-only candidate. Failure rolls back guards and metadata. Discard the isolated test database or restore its pre-test backup; never amend recorded checksums."
+}

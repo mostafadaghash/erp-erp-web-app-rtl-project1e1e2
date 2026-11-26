@@ -1,6 +1,7 @@
 # Business Tech ERP — Master Implementation Plan v1.0
 
-**الحالة:** ACTIVE — PHASE 09 / 09.08-C_READONLY_SESSION_ROLE_GRAPH_AUDIT_EXTENDED / ACTUAL_FASTIFY_RUNTIME_ROLE_UNVERIFIED / INTEGRITY_REMEDIATION_APPROVAL_PENDING / 09.08_IN_PROGRESS  
+**الحالة:** ACTIVE — Phase 09.08-C / isolated 0037 lab candidate; deployment and lifecycle cutover pending.
+**Lab evidence:** Owner authorized isolated implementation. Two Fastify lab processes reached PostgreSQL as the restricted lab login. Candidate SQL is outside the install migration directory. The isolated PG17 gate checks upgrade/verify, protected historical accounts, active categories, parent/child consistency, restricted login and competing transactions. Deployment-role grants, populated-data preflight, backup/restore rehearsal and the controlled lifecycle service remain separate. No production or main cutover. Next: review final-SHA CI for the lab candidate.
 **تاريخ الإصدار:** 2026-09-11  
 **المشروع:** Business Tech ERP — Local Server Edition / PostgreSQL Core  
 **المرجع المعماري الرسمي:** `Business-Tech-ERP-Architecture-Baseline-v1.7-Final.docx`  
